@@ -1,0 +1,4 @@
+../Core/Src/markerSensor.c:17:9:getMarkerSensor	3
+../Core/Src/markerSensor.c:34:9:checkMarker	14
+../Core/Src/markerSensor.c:95:6:checkCrossLine	1
+../Core/Src/markerSensor.c:113:6:checkGoalMarker	1

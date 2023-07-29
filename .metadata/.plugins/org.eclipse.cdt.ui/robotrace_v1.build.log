@@ -1,0 +1,10 @@
+08:07:28 **** Incremental Build of configuration Debug for project robotrace_v1 ****
+make -j16 all 
+arm-none-eabi-size   robotrace_v1.elf 
+   text	   data	    bss	    dec	    hex	filename
+  96404	    640	  30360	 127404	  1f1ac	robotrace_v1.elf
+Finished building: default.size.stdout
+ 
+
+08:07:28 Build Finished. 0 errors, 0 warnings. (took 309ms)
+

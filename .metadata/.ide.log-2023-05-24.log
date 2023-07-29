@@ -1,0 +1,106 @@
+2023-05-24 20:35:15,429 [INFO] UtilMem:75 - End SaveConfig() Used Memory: 676108176 Bytes (998244352)
+2023-05-24 20:58:01,122 [WARN] IP:2113 - I2C_Coeff_DF not found: check if there is a RefParameter without a condition.
+2023-05-24 20:58:01,122 [WARN] IP:2113 - Analog_Filter not found: check if there is a RefParameter without a condition.
+2023-05-24 20:58:01,157 [WARN] IP:2113 - I2C_Coeff_DF not found: check if there is a RefParameter without a condition.
+2023-05-24 20:58:01,157 [WARN] IP:2113 - Analog_Filter not found: check if there is a RefParameter without a condition.
+2023-05-24 20:58:01,159 [WARN] IP:2113 - I2C_Coeff_DF not found: check if there is a RefParameter without a condition.
+2023-05-24 20:58:01,159 [WARN] IP:2113 - Analog_Filter not found: check if there is a RefParameter without a condition.
+2023-05-24 20:58:01,184 [WARN] IP:2113 - I2C_Coeff_DF not found: check if there is a RefParameter without a condition.
+2023-05-24 20:58:01,184 [WARN] IP:2113 - Analog_Filter not found: check if there is a RefParameter without a condition.
+2023-05-24 20:58:01,185 [WARN] IP:2113 - I2C_Coeff_DF not found: check if there is a RefParameter without a condition.
+2023-05-24 20:58:01,185 [WARN] IP:2113 - Analog_Filter not found: check if there is a RefParameter without a condition.
+2023-05-24 20:58:50,869 [INFO] UtilMem:75 - End SaveConfig() Used Memory: 770254992 Bytes (998244352)
+2023-05-24 21:00:40,668 [INFO] UtilMem:75 - End SaveConfig() Used Memory: 795867368 Bytes (998244352)
+2023-05-24 21:07:54,923 [INFO] UtilMem:75 - End SaveConfig() Used Memory: 649766184 Bytes (998244352)
+2023-05-24 21:07:56,174 [INFO] UtilMem:75 - End SaveConfig() Used Memory: 683320616 Bytes (998244352)
+2023-05-24 21:07:57,218 [INFO] UtilMem:75 - End SaveConfig() Used Memory: 722640168 Bytes (998244352)
+2023-05-24 21:07:57,396 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: SPI
+2023-05-24 21:07:57,396 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: TIM6_7
+2023-05-24 21:07:57,396 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: TIM1_8
+2023-05-24 21:07:57,397 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: TIM1_8
+2023-05-24 21:07:57,397 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: TIM1_8
+2023-05-24 21:07:57,397 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: SYS
+2023-05-24 21:07:57,397 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: ADC
+2023-05-24 21:07:57,397 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: RCC
+2023-05-24 21:07:57,397 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: NVIC
+2023-05-24 21:07:57,397 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: DMA
+2023-05-24 21:07:57,397 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: TIM1_8
+2023-05-24 21:07:57,397 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: GPIO
+2023-05-24 21:07:57,398 [INFO] CodeGenerator:793 - code generatio: config db path: C:\ST\STM32CubeIDE_1.11.0\STM32CubeIDE\plugins\com.st.stm32cube.common.mx_6.8.0.202302231600\\db\
+2023-05-24 21:07:57,412 [INFO] Argument:319 - Argument : hdmavalue: null
+2023-05-24 21:07:57,412 [INFO] Argument:321 - 	 sub Args: 
+2023-05-24 21:07:57,412 [INFO] Argument:319 - Argument : Instancevalue: DMA2_Stream0
+2023-05-24 21:07:57,413 [INFO] Argument:329 - Argument : Instancevalue: DMA2_Stream0
+2023-05-24 21:07:57,413 [INFO] Argument:319 - Argument : Initvalue: null
+2023-05-24 21:07:57,413 [INFO] Argument:321 - 	 sub Args: 
+2023-05-24 21:07:57,413 [INFO] Argument:319 - Argument : Channelvalue: DMA_CHANNEL_0
+2023-05-24 21:07:57,413 [INFO] Argument:329 - Argument : Channelvalue: DMA_CHANNEL_0
+2023-05-24 21:07:57,413 [INFO] Argument:319 - Argument : Directionvalue: DMA_PERIPH_TO_MEMORY
+2023-05-24 21:07:57,413 [INFO] Argument:329 - Argument : Directionvalue: DMA_PERIPH_TO_MEMORY
+2023-05-24 21:07:57,413 [INFO] Argument:319 - Argument : PeriphIncvalue: DMA_PINC_DISABLE
+2023-05-24 21:07:57,413 [INFO] Argument:329 - Argument : PeriphIncvalue: DMA_PINC_DISABLE
+2023-05-24 21:07:57,413 [INFO] Argument:319 - Argument : MemIncvalue: DMA_MINC_ENABLE
+2023-05-24 21:07:57,413 [INFO] Argument:329 - Argument : MemIncvalue: DMA_MINC_ENABLE
+2023-05-24 21:07:57,413 [INFO] Argument:319 - Argument : PeriphDataAlignmentvalue: DMA_PDATAALIGN_HALFWORD
+2023-05-24 21:07:57,413 [INFO] Argument:329 - Argument : PeriphDataAlignmentvalue: DMA_PDATAALIGN_HALFWORD
+2023-05-24 21:07:57,413 [INFO] Argument:319 - Argument : MemDataAlignmentvalue: DMA_MDATAALIGN_HALFWORD
+2023-05-24 21:07:57,413 [INFO] Argument:329 - Argument : MemDataAlignmentvalue: DMA_MDATAALIGN_HALFWORD
+2023-05-24 21:07:57,414 [INFO] Argument:319 - Argument : Modevalue: DMA_NORMAL
+2023-05-24 21:07:57,414 [INFO] Argument:329 - Argument : Modevalue: DMA_NORMAL
+2023-05-24 21:07:57,414 [INFO] Argument:319 - Argument : Priorityvalue: DMA_PRIORITY_LOW
+2023-05-24 21:07:57,414 [INFO] Argument:329 - Argument : Priorityvalue: DMA_PRIORITY_LOW
+2023-05-24 21:07:57,414 [INFO] Argument:319 - Argument : FIFOModevalue: DMA_FIFOMODE_DISABLE
+2023-05-24 21:07:57,414 [INFO] Argument:329 - Argument : FIFOModevalue: DMA_FIFOMODE_DISABLE
+2023-05-24 21:07:57,414 [INFO] Argument:319 - Argument : FIFOThresholdvalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:329 - Argument : FIFOThresholdvalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:319 - Argument : MemBurstvalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:329 - Argument : MemBurstvalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:319 - Argument : PeriphBurstvalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:329 - Argument : PeriphBurstvalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:319 - Argument : Lockvalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:329 - Argument : Lockvalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:319 - Argument : Statevalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:329 - Argument : Statevalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:319 - Argument : Parentvalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:329 - Argument : Parentvalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:319 - Argument : XferCpltCallbackvalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:329 - Argument : XferCpltCallbackvalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:319 - Argument : XferHalfCpltCallbackvalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:329 - Argument : XferHalfCpltCallbackvalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:319 - Argument : XferM1CpltCallbackvalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:329 - Argument : XferM1CpltCallbackvalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:319 - Argument : XferErrorCallbackvalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:329 - Argument : XferErrorCallbackvalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:319 - Argument : ErrorCodevalue: null
+2023-05-24 21:07:57,414 [INFO] Argument:329 - Argument : ErrorCodevalue: null
+2023-05-24 21:07:57,586 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\MXTmpFiles\license.tmp_save
+2023-05-24 21:07:57,658 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\MXTmpFiles\license.tmp
+2023-05-24 21:07:57,691 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\MXTmpFiles\gpio.tmp_save
+2023-05-24 21:07:57,759 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\MXTmpFiles\gpio.tmp
+2023-05-24 21:07:58,052 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\MXTmpFiles\dma.tmp_save
+2023-05-24 21:07:58,120 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\MXTmpFiles\dma.tmp
+2023-05-24 21:07:58,125 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\MXTmpFiles\dma_GV.tmp_save
+2023-05-24 21:07:58,165 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\MXTmpFiles\dma_GV.tmp
+2023-05-24 21:07:58,181 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\Core\Src\stm32f4xx_it.c_save
+2023-05-24 21:07:58,383 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\Core\Src\stm32f4xx_it.c
+2023-05-24 21:07:58,391 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\Core\Inc\stm32f4xx_it.h_save
+2023-05-24 21:07:58,447 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\Core\Inc\stm32f4xx_it.h
+2023-05-24 21:07:58,464 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\Core\Src\stm32f4xx_hal_msp.c_save
+2023-05-24 21:07:58,626 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\Core\Src\stm32f4xx_hal_msp.c
+2023-05-24 21:07:58,637 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\MXTmpFiles\system.tmp_save
+2023-05-24 21:07:58,678 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\MXTmpFiles\system.tmp
+2023-05-24 21:07:58,692 [INFO] CodeEngine:311 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\Core\Inc\stm32f4xx_hal_conf.h_save
+2023-05-24 21:07:58,749 [INFO] CodeEngine:335 - Generated code: D:\robotrace_v2\robotrace_v2\Core\Inc\stm32f4xx_hal_conf.h
+2023-05-24 21:07:58,765 [WARN] IPConfigManager:2937 - Warning: the RefConfig PLL2P_FOR_MCO is not available in your config.xml file
+2023-05-24 21:07:58,767 [WARN] IPConfigManager:3431 - IP not found : TIM
+2023-05-24 21:07:58,768 [WARN] CodeGenerator:3754 - IP not found : null
+2023-05-24 21:07:58,779 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\Core\Inc\main.h_save
+2023-05-24 21:07:58,847 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\Core\Inc\main.h
+2023-05-24 21:07:58,859 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\Core\Src\main.c_save
+2023-05-24 21:07:58,964 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\Core\Src\main.c
+2023-05-24 21:07:59,422 [INFO] ProjectBuilder:2996 - Time for Copy HAL[1] : 140mS.
+2023-05-24 21:07:59,426 [INFO] ProjectBuilder:4304 - Project Generator version: 3.19.2
+2023-05-24 21:07:59,665 [INFO] ConfigFileManager:1483 - The Die is : DIE421
+2023-05-24 21:08:00,715 [INFO] ProjectBuilder:4505 - Time for Generating toolchain IDE Files: 1290mS.
+2023-05-24 21:08:00,716 [INFO] ProjectBuilder:2867 - Time for Copy CMSIS : 0mS.
+2023-05-24 21:08:00,717 [INFO] ProjectBuilder:2867 - Time for Copy CMSIS : 0mS.

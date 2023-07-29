@@ -1,0 +1,758 @@
+08:20:10 **** Incremental Build of configuration Debug for project robotrace_v2 ****
+make -j16 all 
+arm-none-eabi-gcc "../Core/Src/setup.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -I../FATFS/Target -I../FATFS/App -I../Middlewares/Third_Party/FatFs/src -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/setup.d" -MT"Core/Src/setup.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=softfp -mthumb -o "Core/Src/setup.o"
+../Core/Src/setup.c: In function 'setup':
+../Core/Src/setup.c:61:33: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+   61 |         ssd1306_printf(Font_6x8,"No.%x",swValRotary);
+      |                                 ^~~~~~~
+      |                                 |
+      |                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:85:57: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+   85 |                                 ssd1306_printf(Font_6x8,"SENSORS  ");
+      |                                                         ^~~~~~~~~~~
+      |                                                         |
+      |                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:96:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+   96 |                                                 ssd1306_printf(Font_6x8,"Motor");
+      |                                                                         ^~~~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:100:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  100 |                                         ssd1306_printf(Font_6x8,"PWM:%4d",motorTestPwm);
+      |                                                                 ^~~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:104:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  104 |                                         ssd1306_printf(Font_6x8,"enc:%5.0f",encTotalL/PALSE_MILLIMETER);        // Encoder
+      |                                                                 ^~~~~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:106:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  106 |                                         ssd1306_printf(Font_6x8,"Cur:%5d",motorCurrentL); // Current
+      |                                                                 ^~~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:110:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  110 |                                         ssd1306_printf(Font_6x8,"enc:%5.0f",encTotalR/PALSE_MILLIMETER);        // Encoder
+      |                                                                 ^~~~~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:112:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  112 |                                         ssd1306_printf(Font_6x8,"Cur:%5d",motorCurrentR); // Current
+      |                                                                 ^~~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:128:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  128 |                                                 ssd1306_printf(Font_6x8,"IMU BMI088");
+      |                                                                         ^~~~~~~~~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:133:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  133 |                                         ssd1306_printf(Font_6x8,"xg:%3.1f",BMI088val.gyro.x);
+      |                                                                 ^~~~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:135:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  135 |                                         ssd1306_printf(Font_6x8,"yg:%3.1f",BMI088val.gyro.y);
+      |                                                                 ^~~~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:137:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  137 |                                         ssd1306_printf(Font_6x8,"zg:%3.1f",BMI088val.gyro.z);
+      |                                                                 ^~~~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:140:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  140 |                                         ssd1306_printf(Font_6x8,"xangle:%3.1f",BMI088val.angle.x);
+      |                                                                 ^~~~~~~~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:142:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  142 |                                         ssd1306_printf(Font_6x8,"yangle:%3.1f",BMI088val.angle.y);
+      |                                                                 ^~~~~~~~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:144:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  144 |                                         ssd1306_printf(Font_6x8,"zangle:%3.1f",BMI088val.angle.z);
+      |                                                                 ^~~~~~~~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:157:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  157 |                                                 ssd1306_printf(Font_6x8,"Side sensors");
+      |                                                                         ^~~~~~~~~~~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:162:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  162 |                                         ssd1306_printf(Font_6x8,"Marker sensors:%d",getMarkerSensor());
+      |                                                                 ^~~~~~~~~~~~~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:165:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  165 |                                         ssd1306_printf(Font_6x8,"Board SW:%d",swValMainTact);
+      |                                                                 ^~~~~~~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:168:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  168 |                                         ssd1306_printf(Font_6x8,"Battery :%d",batteryVal);
+      |                                                                 ^~~~~~~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:184:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  184 |                                                 ssd1306_printf(Font_6x8,"%4d",lSensorCari[4]);
+      |                                                                         ^~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:186:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  186 |                                                 ssd1306_printf(Font_6x8,"%4d",lSensorCari[3]);
+      |                                                                         ^~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:188:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  188 |                                                 ssd1306_printf(Font_6x8,"%4d",lSensorCari[2]);
+      |                                                                         ^~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:190:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  190 |                                                 ssd1306_printf(Font_6x8,"%4d",lSensorCari[1]);
+      |                                                                         ^~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:192:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  192 |                                                 ssd1306_printf(Font_6x8,"%4d",lSensorCari[0]);
+      |                                                                         ^~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:195:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  195 |                                                 ssd1306_printf(Font_6x8,"%4d",lSensorCari[5]);
+      |                                                                         ^~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:197:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  197 |                                                 ssd1306_printf(Font_6x8,"%4d",lSensorCari[6]);
+      |                                                                         ^~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:199:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  199 |                                                 ssd1306_printf(Font_6x8,"%4d",lSensorCari[7]);
+      |                                                                         ^~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:201:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  201 |                                                 ssd1306_printf(Font_6x8,"%4d",lSensorCari[8]);
+      |                                                                         ^~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:203:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  203 |                                                 ssd1306_printf(Font_6x8,"%4d",lSensorCari[9]);
+      |                                                                         ^~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:206:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  206 |                                                 ssd1306_printf(Font_6x8,"%4d",lSensor[4]);
+      |                                                                         ^~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:208:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  208 |                                                 ssd1306_printf(Font_6x8,"%4d",lSensor[3]);
+      |                                                                         ^~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:210:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  210 |                                                 ssd1306_printf(Font_6x8,"%4d",lSensor[2]);
+      |                                                                         ^~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:212:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  212 |                                                 ssd1306_printf(Font_6x8,"%4d",lSensor[1]);
+      |                                                                         ^~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:214:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  214 |                                                 ssd1306_printf(Font_6x8,"%4d",lSensor[0]);
+      |                                                                         ^~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:217:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  217 |                                                 ssd1306_printf(Font_6x8,"%4d",lSensor[5]);
+      |                                                                         ^~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:219:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  219 |                                                 ssd1306_printf(Font_6x8,"%4d",lSensor[6]);
+      |                                                                         ^~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:221:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  221 |                                                 ssd1306_printf(Font_6x8,"%4d",lSensor[7]);
+      |                                                                         ^~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:223:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  223 |                                                 ssd1306_printf(Font_6x8,"%4d",lSensor[8]);
+      |                                                                         ^~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:225:73: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  225 |                                                 ssd1306_printf(Font_6x8,"%4d",lSensor[9]);
+      |                                                                         ^~~~~
+      |                                                                         |
+      |                                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:248:57: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  248 |                                 ssd1306_printf(Font_6x8,"microSD  ");
+      |                                                         ^~~~~~~~~~~
+      |                                                         |
+      |                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:253:49: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  253 |                         ssd1306_printf(Font_6x8,"init:%d",initMSD);
+      |                                                 ^~~~~~~~~
+      |                                                 |
+      |                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:268:57: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  268 |                                 ssd1306_printf(Font_6x8,"Calibrate");
+      |                                                         ^~~~~~~~~~~
+      |                                                         |
+      |                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:389:57: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  389 |                                 ssd1306_printf(Font_6x8,"Trace PID");
+      |                                                         ^~~~~~~~~~~
+      |                                                         |
+      |                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:411:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  411 |                                         ssd1306_printf(Font_6x8,"kp:%3d",lineTraceCtrl.kp);
+      |                                                                 ^~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:413:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  413 |                                         ssd1306_printf(Font_6x8,"ki:%3d",lineTraceCtrl.ki);
+      |                                                                 ^~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:415:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  415 |                                         ssd1306_printf(Font_6x8,"kd:%3d",lineTraceCtrl.kd);
+      |                                                                 ^~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:418:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  418 |                                         ssd1306_printf(Font_6x8,"pwm:%5d",lineTraceCtrl.pwm);
+      |                                                                 ^~~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:428:81: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  428 |                                                         ssd1306_printf(Font_6x8,"kp:   ");
+      |                                                                                 ^~~~~~~~
+      |                                                                                 |
+      |                                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:437:81: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  437 |                                                         ssd1306_printf(Font_6x8,"ki:   ");
+      |                                                                                 ^~~~~~~~
+      |                                                                                 |
+      |                                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:446:81: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  446 |                                                         ssd1306_printf(Font_6x8,"kd:   ");
+      |                                                                                 ^~~~~~~~
+      |                                                                                 |
+      |                                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:462:57: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  462 |                                 ssd1306_printf(Font_6x8,"Speed PID");
+      |                                                         ^~~~~~~~~~~
+      |                                                         |
+      |                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:484:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  484 |                                         ssd1306_printf(Font_6x8,"kp:%3d",veloCtrl.kp);
+      |                                                                 ^~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:486:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  486 |                                         ssd1306_printf(Font_6x8,"ki:%3d",veloCtrl.ki);
+      |                                                                 ^~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:488:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  488 |                                         ssd1306_printf(Font_6x8,"kd:%3d",veloCtrl.kd);
+      |                                                                 ^~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:491:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  491 |                                         ssd1306_printf(Font_6x8,"pwm:%5d",veloCtrl.pwm);
+      |                                                                 ^~~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:501:81: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  501 |                                                         ssd1306_printf(Font_6x8,"kp:   ");
+      |                                                                                 ^~~~~~~~
+      |                                                                                 |
+      |                                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:510:81: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  510 |                                                         ssd1306_printf(Font_6x8,"ki:   ");
+      |                                                                                 ^~~~~~~~
+      |                                                                                 |
+      |                                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:519:81: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  519 |                                                         ssd1306_printf(Font_6x8,"kd:   ");
+      |                                                                                 ^~~~~~~~
+      |                                                                                 |
+      |                                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:534:57: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  534 |                                 ssd1306_printf(Font_6x8,"Angular PID");
+      |                                                         ^~~~~~~~~~~~~
+      |                                                         |
+      |                                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:558:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  558 |                                         ssd1306_printf(Font_6x8,"kp:%3d",yawRateCtrl.kp);
+      |                                                                 ^~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:560:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  560 |                                         ssd1306_printf(Font_6x8,"ki:%3d",yawRateCtrl.ki);
+      |                                                                 ^~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:562:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  562 |                                         ssd1306_printf(Font_6x8,"kd:%3d",yawRateCtrl.kd);
+      |                                                                 ^~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:565:65: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  565 |                                         ssd1306_printf(Font_6x8,"pwm:%5d",yawRateCtrl.pwm);
+      |                                                                 ^~~~~~~~~
+      |                                                                 |
+      |                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:575:81: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  575 |                                                         ssd1306_printf(Font_6x8,"kp:   ");
+      |                                                                                 ^~~~~~~~
+      |                                                                                 |
+      |                                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:584:81: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  584 |                                                         ssd1306_printf(Font_6x8,"ki:   ");
+      |                                                                                 ^~~~~~~~
+      |                                                                                 |
+      |                                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:593:81: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  593 |                                                         ssd1306_printf(Font_6x8,"kd:   ");
+      |                                                                                 ^~~~~~~~
+      |                                                                                 |
+      |                                                                                 char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:608:41: warning: pointer targets in passing argument 2 of 'ssd1306_printf' differ in signedness [-Wpointer-sign]
+  608 |                 ssd1306_printf(Font_6x8,"None      ");
+      |                                         ^~~~~~~~~~~~
+      |                                         |
+      |                                         char *
+In file included from ../Core/Inc/main.h:46,
+                 from ../Core/Inc/setup.h:6,
+                 from ../Core/Src/setup.c:4:
+../Core/Inc/ssd1306.h:161:44: note: expected 'uint8_t *' {aka 'unsigned char *'} but argument is of type 'char *'
+  161 | void ssd1306_printf(FontDef Font, uint8_t *format, ...);
+      |                                   ~~~~~~~~~^~~~~~
+../Core/Src/setup.c:57:17: warning: unused variable 'cntLed' [-Wunused-variable]
+   57 |         uint8_t cntLed;
+      |                 ^~~~~~
+arm-none-eabi-gcc -o "robotrace_v2.elf" @"objects.list"  -lm -mcpu=cortex-m4 -T"D:\robotrace_v2\robotrace_v2\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="robotrace_v2.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=softfp -mthumb -u _printf_float -u _scanf_float -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: robotrace_v2.elf
+ 
+arm-none-eabi-size   robotrace_v2.elf 
+arm-none-eabi-objdump -h -S  robotrace_v2.elf  > "robotrace_v2.list"
+   text	   data	    bss	    dec	    hex	filename
+  85148	    584	  17136	 102868	  191d4	robotrace_v2.elf
+Finished building: default.size.stdout
+ 
+Finished building: robotrace_v2.list
+ 
+
+08:20:11 Build Finished. 0 errors, 68 warnings. (took 1s.166ms)
+

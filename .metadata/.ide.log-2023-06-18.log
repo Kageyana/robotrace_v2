@@ -1,0 +1,93 @@
+2023-06-18 12:39:59,008 [INFO] UtilMem:75 - End SaveConfig() Used Memory: 553906624 Bytes (920649728)
+2023-06-18 12:40:00,088 [INFO] UtilMem:75 - End SaveConfig() Used Memory: 484529648 Bytes (920649728)
+2023-06-18 12:40:01,568 [INFO] UtilMem:75 - End SaveConfig() Used Memory: 521237896 Bytes (920649728)
+2023-06-18 12:40:01,793 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: SPI
+2023-06-18 12:40:01,793 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: TIM6_7
+2023-06-18 12:40:01,793 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: TIM1_8
+2023-06-18 12:40:01,793 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: TIM1_8
+2023-06-18 12:40:01,793 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: SYS
+2023-06-18 12:40:01,793 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: ADC
+2023-06-18 12:40:01,793 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: RCC
+2023-06-18 12:40:01,793 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: NVIC
+2023-06-18 12:40:01,793 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: TIM1_8
+2023-06-18 12:40:01,793 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: DMA
+2023-06-18 12:40:01,793 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: TIM1_8
+2023-06-18 12:40:01,794 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: GPIO
+2023-06-18 12:40:01,794 [INFO] CodeGenerator:793 - code generatio: config db path: C:\ST\STM32CubeIDE_1.11.0\STM32CubeIDE\plugins\com.st.stm32cube.common.mx_6.8.0.202302231600\\db\
+2023-06-18 12:40:01,806 [INFO] Argument:319 - Argument : hdmavalue: null
+2023-06-18 12:40:01,806 [INFO] Argument:321 - 	 sub Args: 
+2023-06-18 12:40:01,806 [INFO] Argument:319 - Argument : Instancevalue: DMA2_Stream0
+2023-06-18 12:40:01,806 [INFO] Argument:329 - Argument : Instancevalue: DMA2_Stream0
+2023-06-18 12:40:01,806 [INFO] Argument:319 - Argument : Initvalue: null
+2023-06-18 12:40:01,806 [INFO] Argument:321 - 	 sub Args: 
+2023-06-18 12:40:01,806 [INFO] Argument:319 - Argument : Channelvalue: DMA_CHANNEL_0
+2023-06-18 12:40:01,806 [INFO] Argument:329 - Argument : Channelvalue: DMA_CHANNEL_0
+2023-06-18 12:40:01,806 [INFO] Argument:319 - Argument : Directionvalue: DMA_PERIPH_TO_MEMORY
+2023-06-18 12:40:01,806 [INFO] Argument:329 - Argument : Directionvalue: DMA_PERIPH_TO_MEMORY
+2023-06-18 12:40:01,806 [INFO] Argument:319 - Argument : PeriphIncvalue: DMA_PINC_DISABLE
+2023-06-18 12:40:01,806 [INFO] Argument:329 - Argument : PeriphIncvalue: DMA_PINC_DISABLE
+2023-06-18 12:40:01,806 [INFO] Argument:319 - Argument : MemIncvalue: DMA_MINC_ENABLE
+2023-06-18 12:40:01,806 [INFO] Argument:329 - Argument : MemIncvalue: DMA_MINC_ENABLE
+2023-06-18 12:40:01,806 [INFO] Argument:319 - Argument : PeriphDataAlignmentvalue: DMA_PDATAALIGN_HALFWORD
+2023-06-18 12:40:01,806 [INFO] Argument:329 - Argument : PeriphDataAlignmentvalue: DMA_PDATAALIGN_HALFWORD
+2023-06-18 12:40:01,806 [INFO] Argument:319 - Argument : MemDataAlignmentvalue: DMA_MDATAALIGN_HALFWORD
+2023-06-18 12:40:01,806 [INFO] Argument:329 - Argument : MemDataAlignmentvalue: DMA_MDATAALIGN_HALFWORD
+2023-06-18 12:40:01,806 [INFO] Argument:319 - Argument : Modevalue: DMA_NORMAL
+2023-06-18 12:40:01,806 [INFO] Argument:329 - Argument : Modevalue: DMA_NORMAL
+2023-06-18 12:40:01,806 [INFO] Argument:319 - Argument : Priorityvalue: DMA_PRIORITY_LOW
+2023-06-18 12:40:01,806 [INFO] Argument:329 - Argument : Priorityvalue: DMA_PRIORITY_LOW
+2023-06-18 12:40:01,806 [INFO] Argument:319 - Argument : FIFOModevalue: DMA_FIFOMODE_DISABLE
+2023-06-18 12:40:01,806 [INFO] Argument:329 - Argument : FIFOModevalue: DMA_FIFOMODE_DISABLE
+2023-06-18 12:40:01,806 [INFO] Argument:319 - Argument : FIFOThresholdvalue: null
+2023-06-18 12:40:01,806 [INFO] Argument:329 - Argument : FIFOThresholdvalue: null
+2023-06-18 12:40:01,806 [INFO] Argument:319 - Argument : MemBurstvalue: null
+2023-06-18 12:40:01,806 [INFO] Argument:329 - Argument : MemBurstvalue: null
+2023-06-18 12:40:01,806 [INFO] Argument:319 - Argument : PeriphBurstvalue: null
+2023-06-18 12:40:01,806 [INFO] Argument:329 - Argument : PeriphBurstvalue: null
+2023-06-18 12:40:01,807 [INFO] Argument:319 - Argument : Lockvalue: null
+2023-06-18 12:40:01,807 [INFO] Argument:329 - Argument : Lockvalue: null
+2023-06-18 12:40:01,807 [INFO] Argument:319 - Argument : Statevalue: null
+2023-06-18 12:40:01,807 [INFO] Argument:329 - Argument : Statevalue: null
+2023-06-18 12:40:01,807 [INFO] Argument:319 - Argument : Parentvalue: null
+2023-06-18 12:40:01,807 [INFO] Argument:329 - Argument : Parentvalue: null
+2023-06-18 12:40:01,807 [INFO] Argument:319 - Argument : XferCpltCallbackvalue: null
+2023-06-18 12:40:01,807 [INFO] Argument:329 - Argument : XferCpltCallbackvalue: null
+2023-06-18 12:40:01,807 [INFO] Argument:319 - Argument : XferHalfCpltCallbackvalue: null
+2023-06-18 12:40:01,807 [INFO] Argument:329 - Argument : XferHalfCpltCallbackvalue: null
+2023-06-18 12:40:01,807 [INFO] Argument:319 - Argument : XferM1CpltCallbackvalue: null
+2023-06-18 12:40:01,807 [INFO] Argument:329 - Argument : XferM1CpltCallbackvalue: null
+2023-06-18 12:40:01,807 [INFO] Argument:319 - Argument : XferErrorCallbackvalue: null
+2023-06-18 12:40:01,807 [INFO] Argument:329 - Argument : XferErrorCallbackvalue: null
+2023-06-18 12:40:01,807 [INFO] Argument:319 - Argument : ErrorCodevalue: null
+2023-06-18 12:40:01,807 [INFO] Argument:329 - Argument : ErrorCodevalue: null
+2023-06-18 12:40:01,989 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\MXTmpFiles\license.tmp_save
+2023-06-18 12:40:02,068 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\MXTmpFiles\license.tmp
+2023-06-18 12:40:02,098 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\MXTmpFiles\gpio.tmp_save
+2023-06-18 12:40:02,179 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\MXTmpFiles\gpio.tmp
+2023-06-18 12:40:02,469 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\MXTmpFiles\dma.tmp_save
+2023-06-18 12:40:02,533 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\MXTmpFiles\dma.tmp
+2023-06-18 12:40:02,539 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\MXTmpFiles\dma_GV.tmp_save
+2023-06-18 12:40:02,577 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\MXTmpFiles\dma_GV.tmp
+2023-06-18 12:40:02,595 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\Core\Src\stm32f4xx_it.c_save
+2023-06-18 12:40:02,771 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\Core\Src\stm32f4xx_it.c
+2023-06-18 12:40:02,781 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\Core\Inc\stm32f4xx_it.h_save
+2023-06-18 12:40:02,842 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\Core\Inc\stm32f4xx_it.h
+2023-06-18 12:40:02,863 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\Core\Src\stm32f4xx_hal_msp.c_save
+2023-06-18 12:40:03,020 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\Core\Src\stm32f4xx_hal_msp.c
+2023-06-18 12:40:03,032 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\MXTmpFiles\system.tmp_save
+2023-06-18 12:40:03,073 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\MXTmpFiles\system.tmp
+2023-06-18 12:40:03,088 [INFO] CodeEngine:311 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\Core\Inc\stm32f4xx_hal_conf.h_save
+2023-06-18 12:40:03,156 [INFO] CodeEngine:335 - Generated code: D:\robotrace_v2\robotrace_v2\Core\Inc\stm32f4xx_hal_conf.h
+2023-06-18 12:40:03,179 [WARN] IPConfigManager:2937 - Warning: the RefConfig PLL2P_FOR_MCO is not available in your config.xml file
+2023-06-18 12:40:03,183 [WARN] IPConfigManager:3431 - IP not found : TIM
+2023-06-18 12:40:03,184 [WARN] CodeGenerator:3754 - IP not found : null
+2023-06-18 12:40:03,198 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\Core\Inc\main.h_save
+2023-06-18 12:40:03,299 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\Core\Inc\main.h
+2023-06-18 12:40:03,313 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\Core\Src\main.c_save
+2023-06-18 12:40:03,425 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\Core\Src\main.c
+2023-06-18 12:40:03,872 [INFO] ProjectBuilder:2996 - Time for Copy HAL[1] : 120mS.
+2023-06-18 12:40:03,874 [INFO] ProjectBuilder:4304 - Project Generator version: 3.19.2
+2023-06-18 12:40:04,075 [INFO] ConfigFileManager:1483 - The Die is : DIE421
+2023-06-18 12:40:05,001 [INFO] ProjectBuilder:4505 - Time for Generating toolchain IDE Files: 1127mS.
+2023-06-18 12:40:05,002 [INFO] ProjectBuilder:2867 - Time for Copy CMSIS : 1mS.
+2023-06-18 12:40:05,003 [INFO] ProjectBuilder:2867 - Time for Copy CMSIS : 0mS.

@@ -1,0 +1,2 @@
+../Core/Src/battery.c:15:6:getADC2	8	static
+../Core/Src/battery.c:39:6:showBattery	16	static

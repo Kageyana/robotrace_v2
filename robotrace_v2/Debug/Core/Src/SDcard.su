@@ -1,0 +1,8 @@
+../Core/Src/SDcard.c:32:6:initMicroSD	4176	static
+../Core/Src/SDcard.c:73:6:initLog	368	static
+../Core/Src/SDcard.c:161:6:writeLogBuffer	16	static
+../Core/Src/SDcard.c:182:6:writeLogPut	40	static
+../Core/Src/SDcard.c:201:6:endLog	8	static
+../Core/Src/SDcard.c:214:6:getFileNumbers	360	static
+../Core/Src/SDcard.c:244:6:setLogStr	168	static
+../Core/Src/SDcard.c:262:6:SDtest	4160	static

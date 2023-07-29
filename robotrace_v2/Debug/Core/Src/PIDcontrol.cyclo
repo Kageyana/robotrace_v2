@@ -1,0 +1,7 @@
+../Core/Src/PIDcontrol.c:23:6:setTargetSpeed	1
+../Core/Src/PIDcontrol.c:32:6:setTargetAngularVelocity	1
+../Core/Src/PIDcontrol.c:41:6:setTargetAngle	1
+../Core/Src/PIDcontrol.c:50:6:motorControlTrace	6
+../Core/Src/PIDcontrol.c:91:6:motorControlSpeed	4
+../Core/Src/PIDcontrol.c:123:6:motorControlYawRate	4
+../Core/Src/PIDcontrol.c:156:6:motorControlYaw	4

@@ -1,0 +1,4 @@
+../Core/Src/switch.c:21:6:getSwitches	1
+../Core/Src/switch.c:36:9:getSWrotary	5
+../Core/Src/switch.c:53:9:getSWtact	6
+../Core/Src/switch.c:71:9:getSWMainTact	3

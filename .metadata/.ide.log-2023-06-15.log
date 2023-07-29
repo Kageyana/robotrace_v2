@@ -1,0 +1,80 @@
+2023-06-17 16:41:47,924 [WARN] IP:2113 - I2C_Coeff_DF not found: check if there is a RefParameter without a condition.
+2023-06-17 16:41:47,939 [WARN] IP:2113 - Analog_Filter not found: check if there is a RefParameter without a condition.
+2023-06-17 16:41:47,939 [WARN] IP:2113 - I2C_Coeff_DF not found: check if there is a RefParameter without a condition.
+2023-06-17 16:41:47,939 [WARN] IP:2113 - Analog_Filter not found: check if there is a RefParameter without a condition.
+2023-06-17 16:41:47,996 [WARN] IP:2113 - I2C_Coeff_DF not found: check if there is a RefParameter without a condition.
+2023-06-17 16:41:47,996 [WARN] IP:2113 - Analog_Filter not found: check if there is a RefParameter without a condition.
+2023-06-17 16:42:54,634 [WARN] IP:2113 - I2C_Coeff_DF not found: check if there is a RefParameter without a condition.
+2023-06-17 16:42:54,634 [WARN] IP:2113 - Analog_Filter not found: check if there is a RefParameter without a condition.
+2023-06-17 16:42:54,769 [WARN] IP:2113 - I2C_Coeff_DF not found: check if there is a RefParameter without a condition.
+2023-06-17 16:42:54,769 [WARN] IP:2113 - Analog_Filter not found: check if there is a RefParameter without a condition.
+2023-06-17 16:42:54,769 [WARN] IP:2113 - I2C_Coeff_DF not found: check if there is a RefParameter without a condition.
+2023-06-17 16:42:54,769 [WARN] IP:2113 - Analog_Filter not found: check if there is a RefParameter without a condition.
+2023-06-17 16:42:54,859 [WARN] IP:2113 - I2C_Coeff_DF not found: check if there is a RefParameter without a condition.
+2023-06-17 16:42:54,859 [WARN] IP:2113 - Analog_Filter not found: check if there is a RefParameter without a condition.
+2023-06-17 16:42:54,946 [WARN] IP:2113 - I2C_Coeff_DF not found: check if there is a RefParameter without a condition.
+2023-06-17 16:42:54,946 [WARN] IP:2113 - Analog_Filter not found: check if there is a RefParameter without a condition.
+2023-06-17 16:43:00,081 [WARN] IP:2113 - I2C_Coeff_DF not found: check if there is a RefParameter without a condition.
+2023-06-17 16:43:00,081 [WARN] IP:2113 - Analog_Filter not found: check if there is a RefParameter without a condition.
+2023-06-17 16:43:00,206 [WARN] IP:2113 - I2C_Coeff_DF not found: check if there is a RefParameter without a condition.
+2023-06-17 16:43:00,206 [WARN] IP:2113 - Analog_Filter not found: check if there is a RefParameter without a condition.
+2023-06-17 16:43:00,206 [WARN] IP:2113 - I2C_Coeff_DF not found: check if there is a RefParameter without a condition.
+2023-06-17 16:43:00,206 [WARN] IP:2113 - Analog_Filter not found: check if there is a RefParameter without a condition.
+2023-06-17 16:43:00,295 [WARN] IP:2113 - I2C_Coeff_DF not found: check if there is a RefParameter without a condition.
+2023-06-17 16:43:00,295 [WARN] IP:2113 - Analog_Filter not found: check if there is a RefParameter without a condition.
+2023-06-17 16:43:00,380 [WARN] IP:2113 - I2C_Coeff_DF not found: check if there is a RefParameter without a condition.
+2023-06-17 16:43:00,381 [WARN] IP:2113 - Analog_Filter not found: check if there is a RefParameter without a condition.
+2023-06-17 16:43:12,033 [INFO] UtilMem:75 - End SaveConfig() Used Memory: 531736784 Bytes (854589440)
+2023-06-17 16:43:13,438 [INFO] UtilMem:75 - End SaveConfig() Used Memory: 562145488 Bytes (854589440)
+2023-06-17 16:43:18,913 [INFO] UtilMem:75 - End SaveConfig() Used Memory: 602519776 Bytes (854589440)
+2023-06-17 16:43:19,347 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: SPI
+2023-06-17 16:43:19,348 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: SPI
+2023-06-17 16:43:19,348 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: TIM6_7
+2023-06-17 16:43:19,348 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: TIM1_8
+2023-06-17 16:43:19,348 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: TIM1_8
+2023-06-17 16:43:19,348 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: SYS
+2023-06-17 16:43:19,348 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: ADC
+2023-06-17 16:43:19,348 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: RCC
+2023-06-17 16:43:19,349 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: I2C
+2023-06-17 16:43:19,349 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: NVIC
+2023-06-17 16:43:19,349 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: TIM1_8
+2023-06-17 16:43:19,349 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: DMA
+2023-06-17 16:43:19,349 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: TIM1_8
+2023-06-17 16:43:19,350 [INFO] BlockDiagram:2759 - set Specific Code input for plugin: GPIO
+2023-06-17 16:43:19,351 [INFO] CodeGenerator:793 - code generatio: config db path: C:\ST\STM32CubeIDE_1.11.0\STM32CubeIDE\plugins\com.st.stm32cube.common.mx_6.8.0.202302231600\\db\
+2023-06-17 16:43:19,376 [WARN] IP:2113 - I2C_Coeff_DF not found: check if there is a RefParameter without a condition.
+2023-06-17 16:43:19,376 [WARN] IP:2113 - Analog_Filter not found: check if there is a RefParameter without a condition.
+2023-06-17 16:43:19,720 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\MXTmpFiles\license.tmp_save
+2023-06-17 16:43:20,073 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\MXTmpFiles\license.tmp
+2023-06-17 16:43:20,162 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\MXTmpFiles\gpio.tmp_save
+2023-06-17 16:43:20,305 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\MXTmpFiles\gpio.tmp
+2023-06-17 16:43:20,815 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\MXTmpFiles\dma.tmp_save
+2023-06-17 16:43:20,911 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\MXTmpFiles\dma.tmp
+2023-06-17 16:43:20,917 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\MXTmpFiles\dma_GV.tmp_save
+2023-06-17 16:43:20,964 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\MXTmpFiles\dma_GV.tmp
+2023-06-17 16:43:20,995 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\Core\Src\stm32f4xx_it.c_save
+2023-06-17 16:43:21,114 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\Core\Src\stm32f4xx_it.c
+2023-06-17 16:43:21,121 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\Core\Inc\stm32f4xx_it.h_save
+2023-06-17 16:43:21,196 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\Core\Inc\stm32f4xx_it.h
+2023-06-17 16:43:21,218 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\Core\Src\stm32f4xx_hal_msp.c_save
+2023-06-17 16:43:21,377 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\Core\Src\stm32f4xx_hal_msp.c
+2023-06-17 16:43:21,389 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\MXTmpFiles\system.tmp_save
+2023-06-17 16:43:21,464 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\MXTmpFiles\system.tmp
+2023-06-17 16:43:21,480 [INFO] CodeEngine:311 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\Core\Inc\stm32f4xx_hal_conf.h_save
+2023-06-17 16:43:21,558 [INFO] CodeEngine:335 - Generated code: D:\robotrace_v2\robotrace_v2\Core\Inc\stm32f4xx_hal_conf.h
+2023-06-17 16:43:21,595 [WARN] IPConfigManager:2937 - Warning: the RefConfig PLL2P_FOR_MCO is not available in your config.xml file
+2023-06-17 16:43:21,601 [WARN] IPConfigManager:3431 - IP not found : TIM
+2023-06-17 16:43:21,602 [WARN] CodeGenerator:3754 - IP not found : null
+2023-06-17 16:43:21,618 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\Core\Inc\main.h_save
+2023-06-17 16:43:21,697 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\Core\Inc\main.h
+2023-06-17 16:43:21,712 [INFO] CodeEngine:255 - oldGeneratedFile, D:\robotrace_v2\robotrace_v2\Core\Src\main.c_save
+2023-06-17 16:43:21,884 [INFO] CodeEngine:279 - Generated code: D:\robotrace_v2\robotrace_v2\Core\Src\main.c
+2023-06-17 16:43:22,374 [INFO] ProjectBuilder:2996 - Time for Copy HAL[1] : 148mS.
+2023-06-17 16:43:22,387 [INFO] ProjectBuilder:4304 - Project Generator version: 3.19.2
+2023-06-17 16:43:22,674 [INFO] ConfigFileManager:1483 - The Die is : DIE421
+2023-06-17 16:43:22,685 [INFO] ApiDbMcu:507 - Load IP Config File for FATFS
+2023-06-17 16:43:22,695 [INFO] ApiDbMcu:507 - Load IP Config File for FREERTOS
+2023-06-17 16:43:22,701 [INFO] ApiDbMcu:507 - Load IP Config File for LIBJPEG
+2023-06-17 16:43:22,711 [INFO] ApiDbMcu:507 - Load IP Config File for MBEDTLS
+2023-06-17 16:43:22,723 [INFO] ApiDbMcu:507 - Load IP Config File for USB_DEVICE
+2023-06-17 16:43:22,732 [INFO] ApiDbMcu:507 - Load IP Config File for USB_HOST

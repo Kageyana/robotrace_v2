@@ -1,0 +1,5 @@
+../Core/Src/control.c:31:6:initSystem	5
+../Core/Src/control.c:81:6:loopSystem	2
+../Core/Src/control.c:219:6:emargencyStop	1
+../Core/Src/control.c:228:6:countDown	2
+../Core/Src/control.c:237:6:checkCurve	1

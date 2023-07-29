@@ -1,0 +1,2 @@
+../Core/Src/motor.c:16:6:motorPwmOut	16	static
+../Core/Src/motor.c:49:6:motorPwmOutSynth	24	static

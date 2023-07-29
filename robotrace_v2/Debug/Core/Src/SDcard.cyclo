@@ -1,0 +1,8 @@
+../Core/Src/SDcard.c:32:6:initMicroSD	3
+../Core/Src/SDcard.c:73:6:initLog	5
+../Core/Src/SDcard.c:161:6:writeLogBuffer	2
+../Core/Src/SDcard.c:182:6:writeLogPut	3
+../Core/Src/SDcard.c:201:6:endLog	2
+../Core/Src/SDcard.c:214:6:getFileNumbers	4
+../Core/Src/SDcard.c:244:6:setLogStr	1
+../Core/Src/SDcard.c:262:6:SDtest	2
