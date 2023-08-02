@@ -1,0 +1,10 @@
+Designator,Val,Package,Mid X,Mid Y,Rotation,Layer
+C1,1μ,C_0402_1005Metric_Pad0.74x0.62mm_HandSolder,166.4,-98.3325,-90.0,top
+C2,0.1μ,C_0402_1005Metric_Pad0.74x0.62mm_HandSolder,168.0,-98.3325,-90.0,top
+J2,Conn_01x03,PinHeader_1x03_P2.00mm_Vertical,144.7,-98.2,0.0,top
+R1,200,R_0603_1608Metric_Pad0.98x0.95mm_HandSolder,154.1,-98.3875,-90.0,top
+R2,10k,R_0603_1608Metric_Pad0.98x0.95mm_HandSolder,157.0,-98.3875,90.0,top
+R3,200,R_0603_1608Metric_Pad0.98x0.95mm_HandSolder,178.6,-98.3875,-90.0,top
+R4,10k,R_0603_1608Metric_Pad0.98x0.95mm_HandSolder,175.7,-98.3875,90.0,top
+U1,LBR-123F,LBR-123F,149.7,-98.25,90.0,top
+U2,LBR-123F,LBR-123F,182.7,-98.25,90.0,top

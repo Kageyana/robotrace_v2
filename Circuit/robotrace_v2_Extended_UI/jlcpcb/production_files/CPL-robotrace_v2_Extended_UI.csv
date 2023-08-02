@@ -1,0 +1,21 @@
+Designator,Val,Package,Mid X,Mid Y,Rotation,Layer
+C1,0.1μ,C_0402_1005Metric_Pad0.74x0.62mm_HandSolder,150.6,-117.110889,270.0,bottom
+C2,0.1μ,C_0402_1005Metric_Pad0.74x0.62mm_HandSolder,153.9,-117.074278,270.0,bottom
+C3,0.1μ,C_0402_1005Metric_Pad0.74x0.62mm_HandSolder,157.1,-117.010889,270.0,bottom
+C4,0.1μ,C_0402_1005Metric_Pad0.74x0.62mm_HandSolder,160.3,-117.010889,270.0,bottom
+C5,0.1μ,C_0402_1005Metric_Pad0.74x0.62mm_HandSolder,163.5,-117.010889,270.0,bottom
+J1,GPIO,Molex_FFC_1x16_P0.50mm_Horizontal,157.7,-116.8925,0.0,top
+J2,OLED,PinHeader_1x04_P2.54mm_Vertical,144.3,-104.4175,90.0,top
+J3,USB_C_Receptacle_USB2.0,USB_C_Receptacle_XKB_U262-16XN-4BVC11,137.8,-117.1,0.0,bottom
+J4,Conn_01x06_Socket,PinHeader_1x06_P1.27mm_Vertical,141.6,-107.225,180.0,top
+R1,10k,R_0603_1608Metric_Pad0.98x0.95mm_HandSolder,152.3,-117.110889,90.0,bottom
+R2,10k,R_0603_1608Metric_Pad0.98x0.95mm_HandSolder,155.5,-117.010889,90.0,bottom
+R3,10k,R_0603_1608Metric_Pad0.98x0.95mm_HandSolder,158.7,-116.98,90.0,bottom
+R4,10k,R_0603_1608Metric_Pad0.98x0.95mm_HandSolder,161.9,-116.98,90.0,bottom
+R5,10k,R_0603_1608Metric_Pad0.98x0.95mm_HandSolder,165.1,-116.98,90.0,bottom
+R6,10k,R_0603_1608Metric_Pad0.98x0.95mm_HandSolder,166.2,-97.48,270.0,bottom
+R7,10k,R_0603_1608Metric_Pad0.98x0.95mm_HandSolder,163.7,-97.48,270.0,bottom
+R8,10k,R_0603_1608Metric_Pad0.98x0.95mm_HandSolder,161.2,-97.48,270.0,bottom
+R9,10k,R_0603_1608Metric_Pad0.98x0.95mm_HandSolder,158.7,-97.48,270.0,bottom
+SW1,SKRHABE010,SKRHAAE010,166.0,-109.6,0.0,top
+SW2,FR01FR16P-S,FR01FR16P-S,162.4,-96.3925,180.0,top
