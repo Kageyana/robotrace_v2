@@ -57,13 +57,23 @@ uint8_t checkMarker( void ) {
 			
 			// マーカー判定
 			if (checkStart == 1) {
-				if (encTotalN - encMarker <= encMM(40)) {
+				if (encTotalN - encMarker <= encMM(50)) {
 					if (encTotalN - encMarker <= encMM(10)) {
-						// 誤検出防止判定
+						// 10mm以内で反応が消えたら誤検出防止判定
 						if(nowMarker == 0) {
 							ret = 100;
 						}
 					}
+					// if (encTotalN - encMarker <= encMM(25) && encTotalN - encMarker >= encMM(15)) {
+					// 	// 15~25mm以内で反応が消えたらマーカー判定
+					// 	ret = existMarker;
+					// }
+					// if (encTotalN - encMarker <= encMM(42)) {
+					// 	// 42mm以上で反応が消えたら誤検出判定
+					// 	if(nowMarker == 0) {
+					// 		ret = 100;
+					// 	}
+					// }
 					// 反対側のマーカーが反応したらクロスライン
 					if(nowMarker != existMarker && nowMarker > 0) {
 						crossLine = 1;
@@ -93,16 +103,16 @@ uint8_t checkMarker( void ) {
 // 戻り値    	なし
 /////////////////////////////////////////////////////////////
 bool checkCrossLine(void) {
-	// int32_t valLine;
-	// bool ret = false;
+	int32_t valLine;
+	bool ret = false;
 
-	// valLine = lSensorCari[0]+lSensorCari[1]+lSensorCari[10]+lSensorCari[11];
+	valLine = lSensorCari[0]+lSensorCari[1]+lSensorCari[8]+lSensorCari[9];
 
-	// if (valLine < 8000) {
-	// 	ret = true;
-	// }
+	if (valLine < 8000) {
+		ret = true;
+	}
 
-	// return ret;
+	return ret;
 }
 /////////////////////////////////////////////////////////////
 // モジュール名 checkGoalMarker
@@ -111,10 +121,10 @@ bool checkCrossLine(void) {
 // 戻り値       0:マーカなし 0x1:右 0x2:左 0x3:クロスライン
 /////////////////////////////////////////////////////////////
 void checkGoalMarker (void) {
-	// if ( courseMarker == RIGHTMARKER ) {
-	// 	if (encRightMarker > encMM(600) ) {	// 2回目以降
-	// 		SGmarker++;
-	// 		encRightMarker = 0;
-	// 	}
-	// }
+	if ( courseMarker == RIGHTMARKER ) {
+		if (encRightMarker > encMM(600) ) {	// 2回目以降
+			SGmarker++;
+			encRightMarker = 0;
+		}
+	}
 }

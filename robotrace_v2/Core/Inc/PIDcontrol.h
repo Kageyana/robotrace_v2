@@ -10,9 +10,9 @@
 //====================================//
 // シンボル定義
 //====================================//
-#define KP1		14
+#define KP1		24
 #define KI1		0
-#define KD1		32
+#define KD1		90
 
 #define KP2		90
 #define KI2		50
@@ -25,6 +25,7 @@
 #define KP4		58
 #define KI4		28
 #define KD4		0
+
 
 typedef struct {
     int16_t kp;

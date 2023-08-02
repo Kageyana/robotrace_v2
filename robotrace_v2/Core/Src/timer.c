@@ -24,6 +24,24 @@ void Interrupt1ms(void) {
     motorControlTrace();
     motorControlSpeed();
 
+    // 走行中に処理
+    if (patternTrace > 10 && patternTrace < 100) {
+        // 緊急停止処理
+        // if (cntEmcStopAngleX()) emcStop = STOP_ANGLE_X;
+        // if (cntEmcStopAngleY()) emcStop = STOP_ANGLE_Y;
+        if (cntEmcStopEncStop()) emcStop = STOP_ENCODER_STOP;
+        if (cntEmcStopLineSensor()) emcStop = STOP_LINESENSOR;
+        
+        courseMarker = checkMarker();   // マーカー検知
+        checkGoalMarker();              // ゴールマーカー処理
+
+        // マーカーを通過した時
+        if (courseMarker == 2 && beforeCourseMarker == 0) {
+            cntMarker++;    // マーカーカウント
+        }
+        beforeCourseMarker = courseMarker;
+    }
+
     // 走行前に処理
     if (patternTrace < 10 || patternTrace > 100) {
         getSwitches();  // スイッチの入力を取得
@@ -41,8 +59,8 @@ void Interrupt1ms(void) {
         getADC2();
         
         if(initIMU) {
-            BMI088getGyro();
-            calcDegrees();
+            // BMI088getGyro();
+            // calcDegrees();
         }
         cnt10 = 0;
     }

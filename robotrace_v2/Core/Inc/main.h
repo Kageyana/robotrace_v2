@@ -54,6 +54,7 @@ extern "C" {
 #include "markerSensor.h"
 #include "lineSensor.h"
 #include "PIDcontrol.h"
+#include "emergencyStop.h"
 #include "control.h"
 
 /* USER CODE END Includes */

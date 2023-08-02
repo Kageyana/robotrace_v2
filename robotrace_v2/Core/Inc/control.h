@@ -10,7 +10,7 @@
 // 機体諸元
 
 // 速度パラメータ関連
-#define PARAM_STRAIGHT              1.5F
+#define PARAM_STRAIGHT              1.2F
 #define PARAM_CURVE                 1.2F
 #define PARAM_STOP                  0.8F
 #define PARAM_BOOST_STRAIGHT        2.2F
@@ -57,6 +57,14 @@ extern bool     initCurrent;    // 電流センサ初期化状況
 extern uint8_t  modeCurve;	    // カーブ判断 0:直線 1:カーブ進入
 
 extern uint16_t analogVal[10];         // ADC結果格納配列
+
+// パラメータ関連
+extern speedParam targetParam;
+
+// マーカー関連
+extern uint8_t  courseMarker;
+extern uint8_t  beforeCourseMarker;
+extern uint32_t cntMarker;
 
 // タイマ関連
 extern uint32_t cntRun;
