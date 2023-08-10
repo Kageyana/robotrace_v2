@@ -60,6 +60,14 @@ void setup( void )
 	
 	ssd1306_SetCursor(0,5);
 	ssd1306_printf(Font_6x8,"No.%x",swValRotary);
+
+	if (swValRotary != beforeHEX) 	{
+		// 切替時に実行
+		showBattery();	// バッテリ残量
+		ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+		ssd1306_FillRectangle(24,0,94,13, Black); // ヘッダ表示空白埋め
+		ssd1306_SetCursor(30,5); // タイトル位置
+	}
 	// ディップスイッチで項目選択
 	switch ( swValRotary ) {
 		// //------------------------------------------------------------------
@@ -68,11 +76,7 @@ void setup( void )
 		case HEX_START:
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
-				showBattery();	// バッテリ残量
-				// ロータリスイッチ値を表示
-				ssd1306_SetCursor(30,5);
 				ssd1306_printf(Font_6x8,"Start  ");
-				ssd1306_FillRectangle(0,16,127,63, Black);
 			}
 
 			data_select( &start, SW_PUSH );
@@ -84,11 +88,7 @@ void setup( void )
 		case HEX_SPEED_PARAM:
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
-				showBattery();	// バッテリ残量
-				// ロータリスイッチ値を表示
-				ssd1306_SetCursor(30,5);
 				ssd1306_printf(Font_6x8,"Parameter");
-				ssd1306_FillRectangle(0,16,127,63, Black);
 			}
 
 			dataTuningLR( &patternParameter1, 1, 1, 10);
@@ -167,11 +167,7 @@ void setup( void )
 		case HEX_SENSORS:
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
-				showBattery();	// バッテリ残量
-				// ロータリスイッチ値を表示
-				ssd1306_SetCursor(30,5);
 				ssd1306_printf(Font_6x8,"SENSORS  ");
-				ssd1306_FillRectangle(0,16,127,63, Black);
 			}
 
 			dataTuningLR( &patternSensors, 1, 1, 4 );
@@ -189,13 +185,13 @@ void setup( void )
 
 					// Left
 					ssd1306_SetCursor(0,38);
-					ssd1306_printf(Font_6x8,"enc:%5.0f",encTotalL/PALSE_MILLIMETER);	// Encoder
+					ssd1306_printf(Font_6x8,"enc:%d",encTotalL/PALSE_MILLIMETER);	// Encoder
 					ssd1306_SetCursor(0,48);
 					ssd1306_printf(Font_6x8,"Cur:%5d",motorCurrentL); // Current
 
 					// Right
 					ssd1306_SetCursor(70,38);
-					ssd1306_printf(Font_6x8,"enc:%5.0f",encTotalR/PALSE_MILLIMETER); 	// Encoder
+					ssd1306_printf(Font_6x8,"enc:%d",encTotalR/PALSE_MILLIMETER); 	// Encoder
 					ssd1306_SetCursor(70,48);
 					ssd1306_printf(Font_6x8,"Cur:%5d",motorCurrentR); // Current
 
@@ -330,11 +326,7 @@ void setup( void )
 		case HEX_LOG:
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
-				showBattery();	// バッテリ残量
-				// ロータリスイッチ値を表示
-				ssd1306_SetCursor(30,5);
 				ssd1306_printf(Font_6x8,"microSD  ");
-				ssd1306_FillRectangle(0,16,127,63, Black);
 			}
 
 			ssd1306_SetCursor(35,24);
@@ -350,12 +342,7 @@ void setup( void )
 		case HEX_CALIBRATION:
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
-				showBattery();	// バッテリ残量
-				// ロータリスイッチ値を表示
-				ssd1306_SetCursor(30,5);
 				ssd1306_printf(Font_6x8,"Calibrate");
-				ssd1306_FillRectangle(0,16,127,63, Black);
-
 				patternCalibration = 1;
 			}
 			data_select( &trace_test, SW_PUSH );
@@ -471,11 +458,7 @@ void setup( void )
 		case HEX_PID_TRACE:
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
-				showBattery();	// バッテリ残量
-				// ロータリスイッチ値を表示
-				ssd1306_SetCursor(30,5);
 				ssd1306_printf(Font_6x8,"Trace PID");
-				ssd1306_FillRectangle(0,16,127,63, Black);
 			}
 
 			
@@ -544,11 +527,7 @@ void setup( void )
 		case HEX_PID_SPEED:
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
-				showBattery();	// バッテリ残量
-				// ロータリスイッチ値を表示
-				ssd1306_SetCursor(30,5);
 				ssd1306_printf(Font_6x8,"Speed PID");
-				ssd1306_FillRectangle(0,16,127,63, Black);
 			}
 
 			data_select( &trace_test, SW_PUSH );
@@ -616,11 +595,7 @@ void setup( void )
 		case HEX_PID_ANGULAR:
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
-				showBattery();	// バッテリ残量
-				// ロータリスイッチ値を表示
-				ssd1306_SetCursor(30,5);
 				ssd1306_printf(Font_6x8,"Angular PID");
-				ssd1306_FillRectangle(0,16,127,63, Black);
 			}
 			
 			setTargetAngularVelocity(0);

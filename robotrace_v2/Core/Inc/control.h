@@ -56,7 +56,8 @@ extern bool     useIMU;         // IMU使用状況
 extern bool     initCurrent;    // 電流センサ初期化状況
 extern uint8_t  modeCurve;	    // カーブ判断 0:直線 1:カーブ進入
 
-extern uint16_t analogVal[10];         // ADC結果格納配列
+extern uint16_t analogVal1[10];         // ADC結果格納配列
+extern uint16_t analogVal2[3];         // ADC結果格納配列
 
 // パラメータ関連
 extern speedParam targetParam;
@@ -77,5 +78,6 @@ void loopSystem (void);
 void emargencyStop (void);
 void countDown (void);
 void checkCurve(void);
+void getADC2(void);
 
 #endif // CONTROL_H_

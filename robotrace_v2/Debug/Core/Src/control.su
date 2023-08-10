@@ -1,5 +1,0 @@
-../Core/Src/control.c:31:6:initSystem	24	static
-../Core/Src/control.c:81:6:loopSystem	8	static
-../Core/Src/control.c:219:6:emargencyStop	4	static
-../Core/Src/control.c:228:6:countDown	4	static
-../Core/Src/control.c:237:6:checkCurve	4	static

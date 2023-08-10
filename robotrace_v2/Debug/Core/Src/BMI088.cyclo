@@ -1,6 +1,0 @@
-../Core/Src/BMI088.c:20:9:BMI088ReadByteByte	1
-../Core/Src/BMI088.c:38:6:BMI088WriteByte	1
-../Core/Src/BMI088.c:52:6:BMI088ReadAxisData	1
-../Core/Src/BMI088.c:69:6:initBMI088	2
-../Core/Src/BMI088.c:92:6:BMI088getGyro	2
-../Core/Src/BMI088.c:113:6:calcDegrees	1

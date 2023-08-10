@@ -1,4 +1,0 @@
-../Core/Src/switch.c:21:6:getSwitches	8	static
-../Core/Src/switch.c:36:9:getSWrotary	16	static
-../Core/Src/switch.c:53:9:getSWtact	16	static
-../Core/Src/switch.c:71:9:getSWMainTact	16	static

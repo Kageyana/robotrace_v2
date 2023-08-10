@@ -1,0 +1,8 @@
+robotrace_v2/build/
+robotrace_v2/cmake/
+robotrace_v2/Debug/
+robotrace_v2/.settings/
+robotrace_v2/.vs/
+robotrace_v2/.vscode/
+robotrace_v2/CMakeLists.txt
+robotrace_v2/CMakePresets.json

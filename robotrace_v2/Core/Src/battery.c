@@ -7,30 +7,6 @@
 //====================================//
 uint16_t motorCurrentL, motorCurrentR, batteryVal;
 /////////////////////////////////////////////////////////////////////
-// モジュール名 getADC2
-// 処理概要     AD値の取得
-// 引数         なし
-// 戻り値       なし
-/////////////////////////////////////////////////////////////////////
-void getADC2(void) {
-    HAL_ADC_Start(&hadc2);
-    if( HAL_ADC_PollForConversion(&hadc2, 1) == HAL_OK ) {
-        motorCurrentL = HAL_ADC_GetValue(&hadc2);
-    }
-
-    HAL_ADC_Start(&hadc2);
-    if( HAL_ADC_PollForConversion(&hadc2, 1) == HAL_OK ) {
-        motorCurrentR = HAL_ADC_GetValue(&hadc2);
-    }
-
-    HAL_ADC_Start(&hadc2);
-    if( HAL_ADC_PollForConversion(&hadc2, 1) == HAL_OK ) {
-        batteryVal = HAL_ADC_GetValue(&hadc2);
-    }
-    HAL_ADC_Stop(&hadc2);
-}
-
-/////////////////////////////////////////////////////////////////////
 // モジュール名 showBattery
 // 処理概要     グラフィック液晶にバッテリ残量を表示する
 // 引数         なし
@@ -69,4 +45,15 @@ void showBattery (void) {
         ssd1306_SetCursor(103,5);
         ssd1306_printf(Font_6x8,"USB");
     }
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 showBatMark
+// 処理概要     グラフィック液晶にバッテリマークを表示する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void showBatMark (void) {
+    // 電池マーク
+	ssd1306_DrawRectangle(96,3,125,14,White);
+	ssd1306_DrawRectangle(126,5,127,12,White);
 }

@@ -46,7 +46,7 @@ void getLineSensor(void) {
 	
 	cntls++;
 	for ( i=0;i<NUM_SENSORS;i++) {
-		lSensorInt[i] += analogVal[i];
+		lSensorInt[i] += analogVal1[i];
 		if (cntls > 16) {
 			lSensor[i] = lSensorInt[i] >> 4;	// 平均値算出
 			lSensorInt[i] = 0;					// 積算値リセット

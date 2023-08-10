@@ -16,7 +16,8 @@ bool    useIMU = false; 	// IMU使用状況			false:使用停止		true:使用中
 bool    initCurrent = false;    // 電流センサ初期化状況		false:初期化失敗	true:初期化成功
 uint8_t modeCurve = 0;		// カーブ判断			0:直線			1:カーブ進入
 
-uint16_t 	analogVal[NUM_SENSORS];		// ADC結果格納配列
+uint16_t 	analogVal1[NUM_SENSORS];		// ADC結果格納配列
+uint16_t 	analogVal2[3];		// ADC結果格納配列
 
 // 速度パラメータ関連
 speedParam targetParam = {	
@@ -53,7 +54,8 @@ void initSystem (void) {
 	uint8_t rawData[6];
 
 	// ADC
-	if (HAL_ADC_Start_DMA(&hadc1, analogVal, 10) != HAL_OK)	Error_Handler();
+	if (HAL_ADC_Start_DMA(&hadc1, analogVal1, 10) != HAL_OK)	Error_Handler();
+	if (HAL_ADC_Start_DMA(&hadc2, analogVal2, 3) != HAL_OK)		Error_Handler();
 
 	// Encoder count
 	HAL_TIM_Encoder_Start(&htim3,TIM_CHANNEL_ALL);
@@ -85,8 +87,8 @@ void initSystem (void) {
 
 	// トップバー表示
 	// 電池マーク
-	ssd1306_DrawRectangle(96,3,125,14,White);
-	ssd1306_DrawRectangle(126,5,127,12,White);
+	showBatMark();
+	
 	ssd1306_UpdateScreen();
 	HAL_Delay(100);
 	showBattery();	// バッテリ残量
@@ -301,4 +303,29 @@ void checkCurve(void) {
 	// 		modeCurve = 1;
 	// 	}
 	// }
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 getADC2
+// 処理概要     AD値の取得
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void getADC2(void) {
+    // HAL_ADC_Start(&hadc2);
+    // if( HAL_ADC_PollForConversion(&hadc2, 1) == HAL_OK ) {
+    //     motorCurrentL = HAL_ADC_GetValue(&hadc2);
+    // }
+	motorCurrentL = analogVal2[0];
+	motorCurrentR = analogVal2[1];
+	batteryVal = analogVal2[2];
+    // HAL_ADC_Start(&hadc2);
+    // if( HAL_ADC_PollForConversion(&hadc2, 1) == HAL_OK ) {
+    //     motorCurrentR = HAL_ADC_GetValue(&hadc2);
+    // }
+
+    // HAL_ADC_Start(&hadc2);
+    // if( HAL_ADC_PollForConversion(&hadc2, 1) == HAL_OK ) {
+    //     batteryVal = HAL_ADC_GetValue(&hadc2);
+    // }
+    // HAL_ADC_Stop(&hadc2);
 }

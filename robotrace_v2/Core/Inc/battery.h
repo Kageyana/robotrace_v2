@@ -15,7 +15,6 @@ extern uint16_t motorCurrentL, motorCurrentR, batteryVal;
 //====================================//
 // プロトタイプ宣言
 //====================================//
-void getADC2(void);
 void showBattery (void);
-
+void showBatMark (void);
 #endif // BATTERY_H_

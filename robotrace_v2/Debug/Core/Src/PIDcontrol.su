@@ -1,7 +1,0 @@
-../Core/Src/PIDcontrol.c:23:6:setTargetSpeed	16	static
-../Core/Src/PIDcontrol.c:32:6:setTargetAngularVelocity	16	static
-../Core/Src/PIDcontrol.c:41:6:setTargetAngle	16	static
-../Core/Src/PIDcontrol.c:50:6:motorControlTrace	48	static
-../Core/Src/PIDcontrol.c:91:6:motorControlSpeed	40	static
-../Core/Src/PIDcontrol.c:123:6:motorControlYawRate	40	static
-../Core/Src/PIDcontrol.c:156:6:motorControlYaw	40	static

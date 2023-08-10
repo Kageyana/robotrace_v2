@@ -1,4 +1,0 @@
-../Core/Src/lineSensor.c:26:6:powerLinesensors	3
-../Core/Src/lineSensor.c:41:6:getLineSensor	9
-../Core/Src/lineSensor.c:74:6:getAngleSensor	6
-../Core/Src/lineSensor.c:116:6:calibrationLinesensor	3
