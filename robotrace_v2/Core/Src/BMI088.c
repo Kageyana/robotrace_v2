@@ -93,16 +93,17 @@ void BMI088getGyro(void) {
     uint8_t rawData[6];
 	int16_t gyroVal[3], i;
 
-	// 角速度の生データを取得
-	BMI088ReadAxisData(0x02,rawData);
-	for(i=0;i<3;i++) {
-		gyroVal[i] = (rawData[(i*2)+1] << 8) | rawData[i*2];	// LSBとMSBを結合
+	if (HAL_GPIO_ReadPin(SD_CS_GPIO_Port, SD_CS_Pin) == GPIO_PIN_SET) {
+		// 角速度の生データを取得
+		BMI088ReadAxisData(0x02,rawData);
+		for(i=0;i<3;i++) {
+			gyroVal[i] = (rawData[(i*2)+1] << 8) | rawData[i*2];	// LSBとMSBを結合
+		}
+
+		BMI088val.gyro.x = (float)gyroVal[0] / GYROLSB;
+		BMI088val.gyro.y = (float)gyroVal[1] / GYROLSB;
+		BMI088val.gyro.z = (float)gyroVal[2] / GYROLSB;
 	}
-
-    BMI088val.gyro.x = (float)gyroVal[0] / GYROLSB;
-    BMI088val.gyro.y = (float)gyroVal[1] / GYROLSB;
-    BMI088val.gyro.z = (float)gyroVal[2] / GYROLSB;
-
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 calcDegrees

@@ -185,13 +185,13 @@ void setup( void )
 
 					// Left
 					ssd1306_SetCursor(0,38);
-					ssd1306_printf(Font_6x8,"enc:%d",encTotalL/PALSE_MILLIMETER);	// Encoder
+					ssd1306_printf(Font_6x8,"enc:%5.1f",encTotalL/PALSE_MILLIMETER);	// Encoder
 					ssd1306_SetCursor(0,48);
 					ssd1306_printf(Font_6x8,"Cur:%5d",motorCurrentL); // Current
 
 					// Right
 					ssd1306_SetCursor(70,38);
-					ssd1306_printf(Font_6x8,"enc:%d",encTotalR/PALSE_MILLIMETER); 	// Encoder
+					ssd1306_printf(Font_6x8,"enc:%5.1f",encTotalR/PALSE_MILLIMETER); 	// Encoder
 					ssd1306_SetCursor(70,48);
 					ssd1306_printf(Font_6x8,"Cur:%5d",motorCurrentR); // Current
 
@@ -220,11 +220,11 @@ void setup( void )
 					ssd1306_SetCursor(0,44);
 					ssd1306_printf(Font_6x8,"zg:%3.1f",BMI088val.gyro.z);
 
-					ssd1306_SetCursor(70,24);
+					ssd1306_SetCursor(60,24);
 					ssd1306_printf(Font_6x8,"xangle:%3.1f",BMI088val.angle.x);
-					ssd1306_SetCursor(70,34);
+					ssd1306_SetCursor(60,34);
 					ssd1306_printf(Font_6x8,"yangle:%3.1f",BMI088val.angle.y);
-					ssd1306_SetCursor(70,44);
+					ssd1306_SetCursor(60,44);
 					ssd1306_printf(Font_6x8,"zangle:%3.1f",BMI088val.angle.z);
 
 					if (swValTact == SW_PUSH) {
@@ -330,10 +330,15 @@ void setup( void )
 			}
 
 			ssd1306_SetCursor(35,24);
-			ssd1306_printf(Font_6x8,"init:%d",initMSD);
+			ssd1306_printf(Font_6x8,"init:%d %d",initMSD, modeLOG);
 
-			if (swValTact == SW_PUSH) {
-				SDtest();
+			if (swValTact == SW_UP && !modeLOG ) {
+				initLog();
+				modeLOG = true;    // log start
+
+			}
+			if (swValTact == SW_DOWN && modeLOG) {
+				endLog();
 			}
 			break;
 		// //------------------------------------------------------------------

@@ -83,8 +83,7 @@ void initSystem (void) {
 	
 	// Timer interrupt
 	HAL_TIM_Base_Start_IT(&htim6);
-	// HAL_TIM_Base_Start_IT(&htim7);
-
+	
 	// トップバー表示
 	// 電池マーク
 	showBatMark();
@@ -102,6 +101,13 @@ void initSystem (void) {
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
 void loopSystem (void) {
+
+	// 緊急停止処理
+	if (patternTrace > 10 && patternTrace < 100 && emcStop > 0) {
+		goalTime = cntRun;
+		emargencyStop();
+	}
+	
 	switch (patternTrace) {
       	case 0:
 			setup();
@@ -128,9 +134,8 @@ void loopSystem (void) {
 			if ( countdown <= 1000 ) {
 				motorPwmOut(0,0);	// モータドライバICのスリープモードを解除
 				modeLCD = false;	// LCD OFF
-				useIMU = true;		// IMU 使用開始
 				// Logファイル作成
-				// if (initMSD) initLog();
+				if (initMSD) initLog();
 				
 				// 変数初期化
 				encTotalN = 0;
@@ -144,7 +149,7 @@ void loopSystem (void) {
 				yawRateCtrl.Int = 0.0;
 				yawCtrl.Int = 0.0;
 
-				// modeLOG = true;    // log start
+				modeLOG = true;    // log start
 				patternTrace = 11;
 			}
 			break;
@@ -242,9 +247,7 @@ void loopSystem (void) {
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
 void emargencyStop (void) { 
-	// if (modeLOG) endLog();
-	useIMU = false;		// IMU 使用開始
-	modeLCD = true;
+	if (modeLOG) endLog();
 	patternTrace = 102;
 }
 ///////////////////////////////////////////////////////////////////////////
@@ -311,21 +314,7 @@ void checkCurve(void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void getADC2(void) {
-    // HAL_ADC_Start(&hadc2);
-    // if( HAL_ADC_PollForConversion(&hadc2, 1) == HAL_OK ) {
-    //     motorCurrentL = HAL_ADC_GetValue(&hadc2);
-    // }
 	motorCurrentL = analogVal2[0];
 	motorCurrentR = analogVal2[1];
 	batteryVal = analogVal2[2];
-    // HAL_ADC_Start(&hadc2);
-    // if( HAL_ADC_PollForConversion(&hadc2, 1) == HAL_OK ) {
-    //     motorCurrentR = HAL_ADC_GetValue(&hadc2);
-    // }
-
-    // HAL_ADC_Start(&hadc2);
-    // if( HAL_ADC_PollForConversion(&hadc2, 1) == HAL_OK ) {
-    //     batteryVal = HAL_ADC_GetValue(&hadc2);
-    // }
-    // HAL_ADC_Stop(&hadc2);
 }

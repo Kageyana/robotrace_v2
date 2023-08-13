@@ -107,7 +107,7 @@ void initLog(void) {
   setLogStr("cntlog",       "%d");
   setLogStr("markerSensor",  "%d");
   setLogStr("encCurrentN",  "%d");
-  setLogStr("gyroVal_Z",   "%d");
+  // setLogStr("gyroVal_Z",   "%d");
   setLogStr("encTotalN",    "%d");
   setLogStr("targetSpeed",    "%d");
 
@@ -118,8 +118,8 @@ void initLog(void) {
   // setLogStr("encTotalL",    "%d");
   // setLogStr("angleSensor",  "%d");
   // setLogStr("modeCurve",    "%d");
-  setLogStr("motorpwmR",  "%d");
-  setLogStr("motorpwmL",  "%d");
+  // setLogStr("motorpwmR",  "%d");
+  // setLogStr("motorpwmL",  "%d");
   // setLogStr("lineTraceCtrl.pwm",    "%d");
   // setLogStr("veloCtrl.pwm",    "%d");
   // strcat(columnTitle,"lSensorf_0,");
@@ -138,17 +138,22 @@ void initLog(void) {
   // setLogStr("gyroVal_Y",   "%d");  
   // setLogStr("angle_X",   "%d");
   // setLogStr("angle_Y",   "%d");
-  setLogStr("angle_Z",   "%d");
+  // setLogStr("angle_Z",   "%d");
   // setLogStr("rawCurrentR",  "%d");
   // setLogStr("rawCurrentL",  "%d");
   // setLogStr("CurvatureRadius",  "%d");
-  setLogStr("cntMarker",  "%d");
-  setLogStr("optimalIndex",  "%d");
-  setLogStr("ROC",  "%d");
+  // setLogStr("cntMarker",  "%d");
+  // setLogStr("optimalIndex",  "%d");
+  // setLogStr("ROC",  "%d");
+  setLogStr("distL",  "%d");
+  setLogStr("distR",  "%d");
 
   strcat(columnTitle,"\n");
   strcat(formatLog,"\n");
   f_printf(&fil_W, columnTitle);
+
+  // タイマ割り込み開始
+  HAL_TIM_Base_Start_IT(&htim7);
 
   cntLog = 0;
 }
@@ -182,14 +187,16 @@ void writeLogBuffer (uint8_t valNum, ...) {
 void writeLogPut(void) {
   uint8_t str[32];
 
-  if (sendLogNum < logIndex) {
-    if (logBuffer[sendLogNum & BUFFER_SIZW_LOG - 1] == "\n") {
-      f_puts(logBuffer[sendLogNum & BUFFER_SIZW_LOG - 1], &fil_W);
-    } else {
-      sprintf(str,"%d,",logBuffer[sendLogNum & BUFFER_SIZW_LOG - 1]);
-      f_puts(str, &fil_W);
+  if (HAL_GPIO_ReadPin(IMU_CSB2_GPIO_Port, IMU_CSB2_Pin) == GPIO_PIN_SET) {
+    if (sendLogNum < logIndex) {
+      if (logBuffer[sendLogNum & BUFFER_SIZW_LOG - 1] == "\n") {
+        f_puts(logBuffer[sendLogNum & BUFFER_SIZW_LOG - 1], &fil_W);
+      } else {
+        sprintf(str,"%d,",logBuffer[sendLogNum & BUFFER_SIZW_LOG - 1]);
+        f_puts(str, &fil_W);
+      }
+      sendLogNum++;
     }
-    sendLogNum++;
   }
 }
 /////////////////////////////////////////////////////////////////////
@@ -202,6 +209,9 @@ void endLog(void) {
   modeLOG = false;
   while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );
   f_close(&fil_W);
+
+  // タイマ割り込み終了
+  HAL_TIM_Base_Stop_IT(&htim7);
 
   // if (!optimalTrace) saveLogNumber(fileNumbers[endFileIndex]+1); // 探索走行のとき最新ログ番号を保存する
 }

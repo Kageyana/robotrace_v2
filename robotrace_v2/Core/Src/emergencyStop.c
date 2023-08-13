@@ -65,7 +65,7 @@ bool cntEmcStopLineSensor(void) {
     static uint16_t cntLineSensor;
 
     // 緊急停止条件
-    if (lSensor[4]+lSensor[5] > 3300) cntLineSensor++;
+    if (lSensor[4]+lSensor[5] > 6000) cntLineSensor++;
     else    cntLineSensor = 0;
 
     if (cntLineSensor > STOP_COUNT_LINESENSOR) return true;
