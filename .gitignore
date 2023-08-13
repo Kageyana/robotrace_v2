@@ -6,3 +6,4 @@ robotrace_v2/.vs/
 robotrace_v2/.vscode/
 robotrace_v2/CMakeLists.txt
 robotrace_v2/CMakePresets.json
+.metadata/
