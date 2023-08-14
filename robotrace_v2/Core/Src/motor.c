@@ -7,6 +7,8 @@
 //====================================//
 int16_t motorpwmL = 0;
 int16_t motorpwmR = 0;
+uint16_t motorCurrentValL, motorCurrentValR;
+float motorCurrentL, motorCurrentR;
 /////////////////////////////////////////////////////////////////////
 // モジュール名 motorPwmOut
 // 処理概要     左右のモータにPWMを出力する
@@ -16,8 +18,8 @@ int16_t motorpwmR = 0;
 void motorPwmOut(int16_t pwmL, int16_t pwmR) {
 
     // 0除算回避
-    if (pwmL == 0) pwmL = 1;
-    if (pwmR == 0) pwmR = 1;
+    if (pwmL == 0) __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 0);
+    if (pwmR == 0) __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
 
     if (pwmL != 0) {
         if (pwmL > 0) {
@@ -78,4 +80,20 @@ void motorPwmOutSynth(int16_t tPwm, int16_t sPwm, int16_t yrPwm, int16_t yPwm) {
     }
     
 	motorPwmOut(motorpwmL, motorpwmR);
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 getMotorCurrent
+// 処理概要     MP6551のCMピン出力[V]を電流値[A]に変換する
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void getMotorCurrent(void) {
+    float vL,vR;
+
+    // AD値を電圧[V]に変換
+    vL = (float)(motorCurrentValL-HALFSCAL)/4095*3.3;
+    vR = (float)(motorCurrentValR-HALFSCAL)/4095*3.3;
+
+    motorCurrentL = vL / RREF * 10000.0;
+    motorCurrentR = vR / RREF * 10000.0;
 }

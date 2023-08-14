@@ -20,7 +20,6 @@ int8_t pushLR = 0;
 int8_t pushUD = 0;
 
 // パターン関連
-int16_t beforeHEX = 256;	// 前回のロータリスイッチ値を保存 初期値は0~f以外の値
 uint8_t push1 = 0;
 int16_t patternSensors = 1;
 int16_t beforeSensors = 0;
@@ -55,19 +54,27 @@ int16_t motorTestPwm = 200;
 void setup( void )
 {
 	uint8_t cntLed;
-	static uint8_t beforePparam;
+	static uint8_t beforePparam, beforeBATLV, beforeHEX = 255;
 
-	
-	ssd1306_SetCursor(0,5);
-	ssd1306_printf(Font_6x8,"No.%x",swValRotary);
+	SchmittBatery();    // バッテリレベルを取得
+	if (batteryLevel != beforeBATLV) {
+		// バッテリレベルが変化したときに実行
+		showBattery();	// バッテリ残量表示
+	}
 
 	if (swValRotary != beforeHEX) 	{
-		// 切替時に実行
-		showBattery();	// バッテリ残量
+		// ロータリスイッチ切替時に実行
+
+		// ロータリスイッチ値を表示
+		ssd1306_SetCursor(0,3);
+		ssd1306_printf(Font_6x8,"No.%x",swValRotary);
+
+		
 		ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
 		ssd1306_FillRectangle(24,0,94,13, Black); // ヘッダ表示空白埋め
-		ssd1306_SetCursor(30,5); // タイトル位置
+		ssd1306_SetCursor(30,3); // ヘッダタイトル位置
 	}
+
 	// ディップスイッチで項目選択
 	switch ( swValRotary ) {
 		// //------------------------------------------------------------------
@@ -77,6 +84,8 @@ void setup( void )
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
 				ssd1306_printf(Font_6x8,"Start  ");
+				ssd1306_SetCursor(30,25);
+				ssd1306_printf(Font_11x18,"Ready?");
 			}
 
 			data_select( &start, SW_PUSH );
@@ -168,9 +177,10 @@ void setup( void )
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
 				ssd1306_printf(Font_6x8,"SENSORS  ");
+				beforeSensors = 100;
 			}
 
-			dataTuningLR( &patternSensors, 1, 1, 4 );
+			dataTuningLR( &patternSensors, 1, 1, 6 );
 			switch( patternSensors ) {
 				case 1:
 					if (patternSensors != beforeSensors) 	{
@@ -180,20 +190,20 @@ void setup( void )
 						ssd1306_printf(Font_6x8,"Motor");
 					}
 					// Duty
-					ssd1306_SetCursor(35,24);
-					ssd1306_printf(Font_6x8,"PWM:%4d",motorTestPwm);
+					ssd1306_SetCursor(35,30);
+					ssd1306_printf(Font_6x8,"Duty:%4d",motorTestPwm);
 
 					// Left
-					ssd1306_SetCursor(0,38);
-					ssd1306_printf(Font_6x8,"enc:%5.1f",encTotalL/PALSE_MILLIMETER);	// Encoder
-					ssd1306_SetCursor(0,48);
-					ssd1306_printf(Font_6x8,"Cur:%5d",motorCurrentL); // Current
+					ssd1306_SetCursor(0,42);
+					ssd1306_printf(Font_6x8,"enc:%5.0f",encTotalL/PALSE_MILLIMETER);	// Encoder
+					ssd1306_SetCursor(0,52);
+					ssd1306_printf(Font_6x8,"Cur:%5.2f",motorCurrentL); // Current
 
 					// Right
-					ssd1306_SetCursor(70,38);
-					ssd1306_printf(Font_6x8,"enc:%5.1f",encTotalR/PALSE_MILLIMETER); 	// Encoder
-					ssd1306_SetCursor(70,48);
-					ssd1306_printf(Font_6x8,"Cur:%5d",motorCurrentR); // Current
+					ssd1306_SetCursor(70,42);
+					ssd1306_printf(Font_6x8,"enc:%5.0f",encTotalR/PALSE_MILLIMETER); 	// Encoder
+					ssd1306_SetCursor(70,52);
+					ssd1306_printf(Font_6x8,"Cur:%5.2f",motorCurrentR); // Current
 
 					dataTuningUD ( &motorTestPwm, 100, -500, 500 );
 					data_select( &motor_test, SW_PUSH );
@@ -208,24 +218,23 @@ void setup( void )
 					if (patternSensors != beforeSensors) 	{
 						// 切替時に実行
 						ssd1306_FillRectangle(0,16,127,63, Black); // 黒塗り
-						ssd1306_SetCursor(32,16);
-						ssd1306_printf(Font_6x8,"IMU BMI088");
+						ssd1306_SetCursor(36,16);
+						ssd1306_printf(Font_7x10,"IMU[deg]");
 					}
 					
+					ssd1306_SetCursor(0,30);
+					ssd1306_printf(Font_7x10,"xg:%6.1f",BMI088val.gyro.x);
+					ssd1306_SetCursor(0,42);
+					ssd1306_printf(Font_7x10,"yg:%6.1f",BMI088val.gyro.y);
+					ssd1306_SetCursor(0,54);
+					ssd1306_printf(Font_7x10,"zg:%6.1f",BMI088val.gyro.z);
 
-					ssd1306_SetCursor(0,24);
-					ssd1306_printf(Font_6x8,"xg:%3.1f",BMI088val.gyro.x);
-					ssd1306_SetCursor(0,34);
-					ssd1306_printf(Font_6x8,"yg:%3.1f",BMI088val.gyro.y);
-					ssd1306_SetCursor(0,44);
-					ssd1306_printf(Font_6x8,"zg:%3.1f",BMI088val.gyro.z);
-
-					ssd1306_SetCursor(60,24);
-					ssd1306_printf(Font_6x8,"xangle:%3.1f",BMI088val.angle.x);
-					ssd1306_SetCursor(60,34);
-					ssd1306_printf(Font_6x8,"yangle:%3.1f",BMI088val.angle.y);
-					ssd1306_SetCursor(60,44);
-					ssd1306_printf(Font_6x8,"zangle:%3.1f",BMI088val.angle.z);
+					ssd1306_SetCursor(64,30);
+					ssd1306_printf(Font_7x10,"xd:%6.1f",BMI088val.angle.x);
+					ssd1306_SetCursor(64,42);
+					ssd1306_printf(Font_7x10,"yd:%6.1f",BMI088val.angle.y);
+					ssd1306_SetCursor(64,54);
+					ssd1306_printf(Font_7x10,"zd:%6.1f",BMI088val.angle.z);
 
 					if (swValTact == SW_PUSH) {
 						BMI088val.angle.x = 0;
@@ -238,21 +247,41 @@ void setup( void )
 						// 切替時に実行
 						ssd1306_FillRectangle(0,16,127,63, Black); // 黒塗り
 						ssd1306_SetCursor(32,16);
-						ssd1306_printf(Font_6x8,"Side sensors");
+						ssd1306_printf(Font_7x10,"Side sensors");
 					}
-					
-
-					ssd1306_SetCursor(0,24);
-					ssd1306_printf(Font_6x8,"Marker sensors:%d",getMarkerSensor());
-
-					ssd1306_SetCursor(0,34);
-					ssd1306_printf(Font_6x8,"Board SW:%d",swValMainTact);
-
-					ssd1306_SetCursor(0,44);
-					ssd1306_printf(Font_6x8,"Battery :%d",batteryVal);
+					ssd1306_SetCursor(0,30);
+					ssd1306_printf(Font_7x10,"Marker sensors:%d",getMarkerSensor());
 
 					break;
 				case 4:
+					if (patternSensors != beforeSensors) 	{
+						// 切替時に実行
+						ssd1306_FillRectangle(0,16,127,63, Black); // 黒塗り
+						ssd1306_SetCursor(32,16);
+						ssd1306_printf(Font_7x10,"Switches");
+					}
+					ssd1306_SetCursor(0,30);
+					ssd1306_printf(Font_7x10,"Board SW:%d",swValMainTact);
+
+					ssd1306_SetCursor(0,42);
+					ssd1306_printf(Font_7x10,"5axis SW:%d",swValTact);
+
+					break;
+				case 5:
+					if (patternSensors != beforeSensors) 	{
+						// 切替時に実行
+						ssd1306_FillRectangle(0,16,127,63, Black); // 黒塗り
+						ssd1306_SetCursor(32,16);
+						ssd1306_printf(Font_7x10,"Battery");
+					}
+					ssd1306_SetCursor(0,30);
+					ssd1306_printf(Font_7x10,"BatteryValAD:%d",batteryVal);
+
+					ssd1306_SetCursor(0,42);
+					ssd1306_printf(Font_7x10,"BatteryLv:%d",batteryLevel);
+
+					break;
+				case 6:
 					if (patternSensors != beforeSensors) 	{
 						// 切替時に実行
 						ssd1306_FillRectangle(0,16,127,63, Black); // 黒塗り
@@ -350,112 +379,112 @@ void setup( void )
 				ssd1306_printf(Font_6x8,"Calibrate");
 				patternCalibration = 1;
 			}
-			data_select( &trace_test, SW_PUSH );
-			// PUSHでトレースON/OFF
-			if ( trace_test == 1 ) {
-				modeCalLinesensors = 1; 	// キャリブレーション開始
-				powerLinesensors(1);
-			} else {
-				modeCalLinesensors = 0; 	// キャリブレーション終了
-				powerLinesensors(0);
-			}
+			// data_select( &trace_test, SW_PUSH );
+			// // PUSHでトレースON/OFF
+			// if ( trace_test == 1 ) {
+			// 	modeCalLinesensors = 1; 	// キャリブレーション開始
+			// 	powerLinesensors(1);
+			// } else {
+			// 	modeCalLinesensors = 0; 	// キャリブレーション終了
+			// 	powerLinesensors(0);
+			// }
 
-			ssd1306_SetCursor(0,24);
-			ssd1306_printf(Font_6x8,"flag:%d",modeCalLinesensors);
-			break;
+			// ssd1306_SetCursor(0,24);
+			// ssd1306_printf(Font_7x10,"flag:%d",modeCalLinesensors);
+			// break;
 
-			// switch (patternCalibration) {
-			// 	case 1:
-			// 		// スイッチ入力待ち
-			// 		dataTuningUD( &calTimes, 1, 1, 9);
+			switch (patternCalibration) {
+				case 1:
+					// スイッチ入力待ち
+					dataTuningUD( &calTimes, 1, 1, 9);
 
-			// 		setTargetSpeed(0);
-			// 		motorPwmOutSynth( 0, veloCtrl.pwm, 0, 0);
-			// 		if (swValTact == SW_PUSH) {
-			// 			cntSetup1 = 0;
-			// 			enc1 = 0;
-			// 			powerLinesensors(1);	// 先に点灯させて安定させる
-			// 			patternCalibration = 2;
-			// 		}
-			// 		break;
+					setTargetSpeed(0);
+					motorPwmOutSynth( 0, veloCtrl.pwm, 0, 0);
+					if (swValTact == SW_PUSH) {
+						cntSetup1 = 0;
+						enc1 = 0;
+						powerLinesensors(1);	// 先に点灯させて安定させる
+						patternCalibration = 2;
+					}
+					break;
 
-			// 	case 2:
-			// 		// 開始準備
-			// 		if (cntSetup1 > 1000) {
-			// 			BMI088val.angle.z = 0.0;	// 角度リセット
-			// 			yawRateCtrl.Int = 0.0;		// I成分リセット
-			// 			useIMU = true;
-			// 			setTargetSpeed(0);			// 目標速度0[m/s]
-			// 			enc1 = 0;
-			// 			modeCalLinesensors = 1; 	// キャリブレーション開始
-			// 			patternCalibration = 3;
-			// 		}
-			// 		break;
+				case 2:
+					// 開始準備
+					if (cntSetup1 > 1000) {
+						BMI088val.angle.z = 0.0;	// 角度リセット
+						yawRateCtrl.Int = 0.0;		// I成分リセット
+						useIMU = true;
+						setTargetSpeed(0);			// 目標速度0[m/s]
+						enc1 = 0;
+						modeCalLinesensors = 1; 	// キャリブレーション開始
+						patternCalibration = 3;
+					}
+					break;
 
-			// 	case 3:
-			// 		// 左旋回
-			// 		setTargetAngularVelocity(CALIBRATIONSPEED);
-			// 		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-			// 		if (BMI088val.angle.z > 45.0) {
-			// 			patternCalibration = 4;
-			// 		}
-			// 		break;
+				case 3:
+					// 左旋回
+					setTargetAngularVelocity(CALIBRATIONSPEED);
+					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+					if (BMI088val.angle.z > 45.0) {
+						patternCalibration = 4;
+					}
+					break;
 
-			// 	case 4:
-			// 		// 停止
-			// 		setTargetSpeed(0);
-			// 		motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
-			// 		if (abs(encCurrentN) == 0) {
-			// 			patternCalibration = 5;
-			// 		}
-			// 		break;
+				case 4:
+					// 停止
+					setTargetSpeed(0);
+					motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
+					if (abs(encCurrentN) == 0) {
+						patternCalibration = 5;
+					}
+					break;
 
-			// 	case 5:
-			// 		// 右旋回
-			// 		setTargetAngularVelocity(-CALIBRATIONSPEED);
-			// 		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-			// 		if (BMI088val.angle.z < -45) {
-			// 			patternCalibration = 6;
-			// 		}
-			// 		break;
+				case 5:
+					// 右旋回
+					setTargetAngularVelocity(-CALIBRATIONSPEED);
+					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+					if (BMI088val.angle.z < -45) {
+						patternCalibration = 6;
+					}
+					break;
 
-			// 	case 6:
-			// 		// 停止
-			// 		setTargetSpeed(0);
-			// 		motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
-			// 		if (abs(encCurrentN) == 0) {
-			// 			patternCalibration = 7;
-			// 		}
-			// 		break;
+				case 6:
+					// 停止
+					setTargetSpeed(0);
+					motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
+					if (abs(encCurrentN) == 0) {
+						patternCalibration = 7;
+					}
+					break;
 
-			// 	case 7:
-			// 		// 初期位置に戻る
-			// 		setTargetAngularVelocity(CALIBRATIONSPEED);
-			// 		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-			// 		if (BMI088val.angle.z > 0) {
-			// 			modeCalLinesensors = 0;
-			// 			patternCalibration = 8;
-			// 		}
-			// 		break;
+				case 7:
+					// 初期位置に戻る
+					setTargetAngularVelocity(CALIBRATIONSPEED);
+					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+					if (BMI088val.angle.z > 0) {
+						modeCalLinesensors = 0;
+						patternCalibration = 8;
+					}
+					break;
 
-			// 	case 8:
-			// 		// 停止
-			// 		motorPwmOutSynth( 0, veloCtrl.pwm, 0, 0);
-			// 		if (abs(encCurrentN) == 0) {
-			// 			calTimesNow++;
-			// 			if (calTimesNow >= calTimes) {
-			// 				calTimesNow = 0;
-			// 				useIMU = false;
-			// 				patternCalibration = 1;
-			// 			} else {
-			// 				patternCalibration = 3;
-			// 			}
-			// 		}
-			// 		break;
+				case 8:
+					// 停止
+					motorPwmOutSynth( 0, veloCtrl.pwm, 0, 0);
+					if (abs(encCurrentN) == 0) {
+						calTimesNow++;
+						if (calTimesNow >= calTimes) {
+							calTimesNow = 0;
+							useIMU = false;
+							patternCalibration = 1;
+						} else {
+							patternCalibration = 3;
+						}
+					}
+					break;
 			
-			// 	default:
-			// 		break;
-			// 	}
+				default:
+					break;
+				}
 			break;
 		// //------------------------------------------------------------------
 		// // ゲイン調整(直線トレース)
@@ -600,7 +629,7 @@ void setup( void )
 		case HEX_PID_ANGULAR:
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
-				ssd1306_printf(Font_6x8,"Angular PID");
+				ssd1306_printf(Font_6x8,"Angle PID");
 			}
 			
 			setTargetAngularVelocity(0);
@@ -678,7 +707,10 @@ void setup( void )
 
 		break;
 	} // switch
+
+	// 前回値更新
 	beforeHEX = swValRotary;
+	beforeBATLV= batteryLevel;
 
 	if (showDisplay) {
 		ssd1306_UpdateScreen();  // グラフィック液晶更新

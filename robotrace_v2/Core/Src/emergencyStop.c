@@ -62,7 +62,7 @@ bool cntEmcStopEncStop(void) {
 // 戻り値       true:緊急停止 false:異常なし
 /////////////////////////////////////////////////////////////////////
 bool cntEmcStopLineSensor(void) {
-    static uint16_t cntLineSensor;
+    static uint16_t cntLineSensor = 0;
 
     // 緊急停止条件
     if (lSensor[4]+lSensor[5] > 6000) cntLineSensor++;

@@ -90,7 +90,7 @@ void initSystem (void) {
 	
 	ssd1306_UpdateScreen();
 	HAL_Delay(100);
-	showBattery();	// バッテリ残量
+	// showBattery();	// バッテリ残量
 
 	// printf("boot Klic_RT_v2\n");
 }
@@ -113,23 +113,37 @@ void loopSystem (void) {
 			setup();
 
 			if (start) {
-				ssd1306_SetCursor(30,25);
-				ssd1306_printf(Font_11x18,"Ready");
-				ssd1306_UpdateScreen();  // グラフィック液晶更新
-				cntRun = 0;
+				// cntRun = 0;
 				countdown = 6000;		// カウントダウンスタート
 				powerLinesensors(1);	// ラインセンサ ON
 				patternTrace = 1;
 			}
 			break;
 		case 1:
-			// カウントダウンスタート
+			// トレース開始
 			motorPwmOutSynth( lineTraceCtrl.pwm, 0, 0, 0);
-//			if ( countdown >= 5000 ) ledOut(0x5);
-//			if ( countdown < 5000 && countdown >= 4000 ) ledOut(0x4);
-//			if ( countdown < 4000 && countdown >= 3000 ) ledOut(0x3);
-//			if ( countdown < 3000 && countdown >= 2000 ) ledOut(0x2);
-//			if ( countdown < 2000 && countdown >= 1000 ) ledOut(0x1);
+			// カウントダウンスタート
+			ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+			if ( countdown >= 5000 ) {
+				ssd1306_SetCursor(56,28);
+				ssd1306_printf(Font_16x26,"5");
+			}
+			if ( countdown < 5000 && countdown >= 4000 ) {
+				ssd1306_SetCursor(56,28);
+				ssd1306_printf(Font_16x26,"4");
+			}
+			if ( countdown < 4000 && countdown >= 3000 ) {
+				ssd1306_SetCursor(56,28);
+				ssd1306_printf(Font_16x26,"3");
+			}
+			if ( countdown < 3000 && countdown >= 2000 ) {
+				ssd1306_SetCursor(56,28);
+				ssd1306_printf(Font_16x26,"2");
+			}
+			if ( countdown < 2000 && countdown >= 1000 ) {
+				ssd1306_SetCursor(56,28);
+				ssd1306_printf(Font_16x26,"1");
+			}
 
 			if ( countdown <= 1000 ) {
 				motorPwmOut(0,0);	// モータドライバICのスリープモードを解除
@@ -141,7 +155,7 @@ void loopSystem (void) {
 				encTotalN = 0;
 				// distanceStart = 0;
 				encRightMarker = encMM(600);
-				cntRun = 0;
+				// cntRun = 0;
 				BMI088val.angle.x = 0.0f;
 				BMI088val.angle.y = 0.0f;
 				BMI088val.angle.z = 0.0f;
@@ -151,6 +165,8 @@ void loopSystem (void) {
 
 				modeLOG = true;    // log start
 				patternTrace = 11;
+			} else {
+				ssd1306_UpdateScreen();  // グラフィック液晶更新
 			}
 			break;
 
@@ -228,12 +244,6 @@ void loopSystem (void) {
       	case 102:
 			motorPwmOutSynth( 0, 0, 0, 0);
 			powerLinesensors(0);
-
-			ssd1306_SetCursor(24,25);
-			ssd1306_printf(Font_11x18,"Finish");
-			ssd1306_SetCursor(0,45);
-			ssd1306_printf(Font_11x18,"Time:%2.1f",goalTime/1000);
-			ssd1306_UpdateScreen();  // グラフィック液晶更新
 			break;
     
       	default:
@@ -246,8 +256,17 @@ void loopSystem (void) {
 // 引数         なし
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
-void emargencyStop (void) { 
+void emargencyStop (void) {
+
 	if (modeLOG) endLog();
+
+	ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+	ssd1306_SetCursor(0,25);
+	ssd1306_printf(Font_11x18,"Time");
+	ssd1306_SetCursor(0,45);
+	ssd1306_printf(Font_11x18,"%2.3f[s]",goalTime/1000);
+	ssd1306_UpdateScreen();  // グラフィック液晶更新
+
 	patternTrace = 102;
 }
 ///////////////////////////////////////////////////////////////////////////
@@ -314,7 +333,7 @@ void checkCurve(void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void getADC2(void) {
-	motorCurrentL = analogVal2[0];
-	motorCurrentR = analogVal2[1];
+	motorCurrentValL = analogVal2[0];
+	motorCurrentValR = analogVal2[1];
 	batteryVal = analogVal2[2];
 }

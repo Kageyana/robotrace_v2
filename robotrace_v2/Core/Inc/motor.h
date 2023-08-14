@@ -18,15 +18,21 @@
 
 #define FOWARD_R      HAL_GPIO_WritePin(MOTOR_DIR_R_GPIO_Port, MOTOR_DIR_R_Pin, GPIO_PIN_RESET)
 #define REVERSE_R     HAL_GPIO_WritePin(MOTOR_DIR_R_GPIO_Port, MOTOR_DIR_R_Pin, GPIO_PIN_SET)
+
+#define HALFSCAL        2070
+#define RREF            2700.0F
 //====================================//
 // グローバル変数の宣言
 //====================================//
 extern int16_t motorpwmL;
 extern int16_t motorpwmR;
+extern uint16_t motorCurrentValL, motorCurrentValR;
+extern float motorCurrentL, motorCurrentR;
 //====================================//
 // プロトタイプ宣言
 //====================================//
 void motorPwmOut(int16_t pwmL, int16_t pwmR);
 void motorPwmOutSynth(int16_t tPwm, int16_t sPwm, int16_t yrPwm, int16_t yPwm);
+void getMotorCurrent(void);
 
 #endif // MOTOR_H_
