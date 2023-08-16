@@ -14,13 +14,13 @@
 #define KI1		0
 #define KD1		150
 
-#define KP2		10
+#define KP2		5
 #define KI2		60
 #define KD2		0
 
-#define KP3		12
-#define KI3		75
-#define KD3		18
+#define KP3		5
+#define KI3		60
+#define KD3		20
 
 #define KP4		58
 #define KI4		28

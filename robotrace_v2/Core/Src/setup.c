@@ -30,7 +30,7 @@ int16_t patternParameter1 = 1;
 int16_t patternParameter2 = 1;
 int16_t patternParameter3 = 1;
 int16_t patternParameter4 = 1;
-int16_t patternGain = 1;
+int16_t patternGain = 3;
 int16_t patternSpeedseting = 1;
 int16_t patternLog = 1;
 int16_t patternCalibration = 1;
@@ -86,10 +86,106 @@ void setup( void )
 				ssd1306_printf(Font_6x8,"Start  ");
 				ssd1306_SetCursor(30,25);
 				ssd1306_printf(Font_11x18,"Ready?");
+				patternCalibration = 1;
 			}
-
-			data_select( &start, SW_PUSH );
 			
+			switch (patternCalibration) {
+				case 1:
+					calTimes = 1;
+					setTargetSpeed(0);
+
+					// スイッチ入力待ち
+					if (swValTact == SW_PUSH) {
+						if(lSensorOffset[0] > 0) {
+							// キャリブレーション実施済み
+							start = 1;
+						} else {
+							// キャリブレーション未実施
+
+							ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+							ssd1306_SetCursor(22,28);
+							ssd1306_printf(Font_7x10,"Calibration");
+							ssd1306_SetCursor(53,42);
+							ssd1306_printf(Font_7x10,"Now");
+
+							cntSetup1 = 0;
+							enc1 = 0;
+							powerLinesensors(1);	// 先に点灯させて安定させる
+							patternCalibration = 2;
+						}
+					}
+					break;
+
+				case 2:
+					// 開始準備
+					if (cntSetup1 > 1000) {
+						BMI088val.angle.z = 0.0;	// 角度リセット
+						yawRateCtrl.Int = 0.0;		// I成分リセット
+						useIMU = true;
+						setTargetSpeed(0);			// 目標速度0[m/s]
+						enc1 = 0;
+						modeCalLinesensors = 1; 	// キャリブレーション開始
+						patternCalibration = 3;
+					}
+					break;
+
+				case 3:
+					// 左旋回
+					setTargetAngularVelocity(CALIBRATIONSPEED);
+					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+					if (BMI088val.angle.z > 35.0) {
+						patternCalibration = 4;
+					}
+					break;
+
+				case 4:
+					// 停止
+					setTargetSpeed(0);
+					motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
+					if (abs(encCurrentN) == 0) {
+						patternCalibration = 5;
+					}
+					break;
+
+				case 5:
+					// 右旋回
+					setTargetAngularVelocity(-CALIBRATIONSPEED);
+					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+					if (BMI088val.angle.z < -35.0) {
+						patternCalibration = 6;
+					}
+					break;
+
+				case 6:
+					// 停止
+					setTargetSpeed(0);
+					motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
+					if (abs(encCurrentN) == 0) {
+						patternCalibration = 7;
+					}
+					break;
+
+				case 7:
+					// 初期位置に戻る
+					setTargetAngularVelocity(CALIBRATIONSPEED);
+					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+					if (BMI088val.angle.z > 0) {
+						modeCalLinesensors = 0;
+						patternCalibration = 8;
+					}
+					break;
+
+				case 8:
+					// 停止
+					motorPwmOutSynth( 0, veloCtrl.pwm, 0, 0);
+					if (abs(encCurrentN) == 0) {
+						start = 1;
+					}
+					break;
+			
+				default:
+					break;
+			}
 			break;
 		// //------------------------------------------------------------------
 		// // パラメータ調整(通常トレース)
@@ -425,7 +521,7 @@ void setup( void )
 					// 左旋回
 					setTargetAngularVelocity(CALIBRATIONSPEED);
 					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-					if (BMI088val.angle.z > 45.0) {
+					if (BMI088val.angle.z > 35.0) {
 						patternCalibration = 4;
 					}
 					break;
@@ -443,7 +539,7 @@ void setup( void )
 					// 右旋回
 					setTargetAngularVelocity(-CALIBRATIONSPEED);
 					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-					if (BMI088val.angle.z < -45) {
+					if (BMI088val.angle.z < -35) {
 						patternCalibration = 6;
 					}
 					break;
@@ -493,6 +589,15 @@ void setup( void )
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
 				ssd1306_printf(Font_6x8,"Trace PID");
+
+				ssd1306_SetCursor(0,18);
+				ssd1306_printf(Font_7x10,"kp:");
+				ssd1306_SetCursor(0,32);
+				ssd1306_printf(Font_7x10,"ki:");
+				ssd1306_SetCursor(0,44);
+				ssd1306_printf(Font_7x10,"kd:");
+				ssd1306_SetCursor(60,30);
+				ssd1306_printf(Font_7x10,"pwm:");
 			}
 
 			
@@ -508,48 +613,38 @@ void setup( void )
 				powerLinesensors(0);
 			}
 			
-			dataTuningLR( &patternGain, 1, 1, 3);
+			dataTuningUD( &patternGain, 1, 1, 3);
 
 			if (trace_test == 0) {
-				if ( (cntSetup1 / 250) % 2 != 0) {
-					ssd1306_SetCursor(0,24);
-					ssd1306_printf(Font_6x8,"kp:%3d",lineTraceCtrl.kp);
-					ssd1306_SetCursor(0,34);
-					ssd1306_printf(Font_6x8,"ki:%3d",lineTraceCtrl.ki);
-					ssd1306_SetCursor(0,44);
-					ssd1306_printf(Font_6x8,"kd:%3d",lineTraceCtrl.kd);
+				// ゲイン表示
+				ssd1306_SetCursor(21,44);
+				if (patternGain == 1) 	ssd1306_printfB(Font_7x10,"%3d",lineTraceCtrl.kd);
+				else 					ssd1306_printf(Font_7x10,"%3d",lineTraceCtrl.kd);
 
-					ssd1306_SetCursor(70,34);
-					ssd1306_printf(Font_6x8,"pwm:%5d",lineTraceCtrl.pwm);
-				}
+				ssd1306_SetCursor(21,32);
+				if (patternGain == 2)	ssd1306_printfB(Font_7x10,"%3d",lineTraceCtrl.ki);
+				else 					ssd1306_printf(Font_7x10,"%3d",lineTraceCtrl.ki);
+
+				ssd1306_SetCursor(21,18);
+				if (patternGain == 3) 	ssd1306_printfB(Font_7x10,"%3d",lineTraceCtrl.kp);
+				else 					ssd1306_printf(Font_7x10,"%3d",lineTraceCtrl.kp);
+				
+				// 制御量表示
+				ssd1306_SetCursor(88,30);
+				ssd1306_printf(Font_7x10,"%4d",lineTraceCtrl.pwm);
 			
 				switch( patternGain ) {
 					case 1:
-						// kp
-						dataTuningUD ( &lineTraceCtrl.kp, 1, 0, 255 );
-						//値を点滅
-						if ( (cntSetup1 / 250) % 2 == 0 ) {
-							ssd1306_SetCursor(0,24);
-							ssd1306_printf(Font_6x8,"kp:   ");
-						}
+						// kd
+						dataTuningLR ( &lineTraceCtrl.kd, 1, 0, 255 );
 						break;
 					case 2:
 						// ki
-						dataTuningUD ( &lineTraceCtrl.ki, 1, 0, 255 );
-						//値を点滅
-						if ( (cntSetup1 / 250) % 2 == 0 ) {
-							ssd1306_SetCursor(0,34);
-							ssd1306_printf(Font_6x8,"ki:   ");
-						}
+						dataTuningLR ( &lineTraceCtrl.ki, 1, 0, 255 );
 						break;
 					case 3:
-						// kd
-						dataTuningUD ( &lineTraceCtrl.kd, 1, 0, 255 );
-						//値を点滅
-						if ( (cntSetup1 / 250) % 2 == 0 ) {
-							ssd1306_SetCursor(0,44);
-							ssd1306_printf(Font_6x8,"kd:   ");
-						}
+						// kp
+						dataTuningLR ( &lineTraceCtrl.kp, 1, 0, 255 );
 						break;
 				}
 			}
@@ -562,6 +657,15 @@ void setup( void )
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
 				ssd1306_printf(Font_6x8,"Speed PID");
+
+				ssd1306_SetCursor(0,18);
+				ssd1306_printf(Font_7x10,"kp:");
+				ssd1306_SetCursor(0,32);
+				ssd1306_printf(Font_7x10,"ki:");
+				ssd1306_SetCursor(0,44);
+				ssd1306_printf(Font_7x10,"kd:");
+				ssd1306_SetCursor(60,30);
+				ssd1306_printf(Font_7x10,"pwm:");
 			}
 
 			data_select( &trace_test, SW_PUSH );
@@ -577,48 +681,38 @@ void setup( void )
 				powerLinesensors(0);
 			}
 
-			dataTuningLR( &patternGain, 1, 1, 3);
+			dataTuningUD( &patternGain, 1, 1, 3);
 			
 			if (trace_test == 0) {
-				if ( (cntSetup1 / 250) % 2 != 0) {
-					ssd1306_SetCursor(0,24);
-					ssd1306_printf(Font_6x8,"kp:%3d",veloCtrl.kp);
-					ssd1306_SetCursor(0,34);
-					ssd1306_printf(Font_6x8,"ki:%3d",veloCtrl.ki);
-					ssd1306_SetCursor(0,44);
-					ssd1306_printf(Font_6x8,"kd:%3d",veloCtrl.kd);
+				// ゲイン表示
+				ssd1306_SetCursor(21,44);
+				if (patternGain == 1) 	ssd1306_printfB(Font_7x10,"%3d",veloCtrl.kd);
+				else 					ssd1306_printf(Font_7x10,"%3d",veloCtrl.kd);
 
-					ssd1306_SetCursor(70,34);
-					ssd1306_printf(Font_6x8,"pwm:%5d",veloCtrl.pwm);
-				}
+				ssd1306_SetCursor(21,32);
+				if (patternGain == 2)	ssd1306_printfB(Font_7x10,"%3d",veloCtrl.ki);
+				else 					ssd1306_printf(Font_7x10,"%3d",veloCtrl.ki);
+
+				ssd1306_SetCursor(21,18);
+				if (patternGain == 3) 	ssd1306_printfB(Font_7x10,"%3d",veloCtrl.kp);
+				else 					ssd1306_printf(Font_7x10,"%3d",veloCtrl.kp);
+				
+				// 制御量表示
+				ssd1306_SetCursor(88,30);
+				ssd1306_printf(Font_7x10,"%4d",veloCtrl.pwm);
 			
 				switch( patternGain ) {
 					case 1:
-						// kp
-						dataTuningUD ( &veloCtrl.kp, 1, 0, 255 );
-						//値を点滅
-						if ( (cntSetup1 / 250) % 2 == 0 ) {
-							ssd1306_SetCursor(0,24);
-							ssd1306_printf(Font_6x8,"kp:   ");
-						}
+						// kd
+						dataTuningLR ( &veloCtrl.kd, 1, 0, 255 );
 						break;
 					case 2:
 						// ki
-						dataTuningUD ( &veloCtrl.ki, 1, 0, 255 );
-						//値を点滅
-						if ( (cntSetup1 / 250) % 2 == 0 ) {
-							ssd1306_SetCursor(0,34);
-							ssd1306_printf(Font_6x8,"ki:   ");
-						}
+						dataTuningLR ( &veloCtrl.ki, 1, 0, 255 );
 						break;
 					case 3:
-						// kd
-						dataTuningUD ( &veloCtrl.kd, 1, 0, 255 );
-						//値を点滅
-						if ( (cntSetup1 / 250) % 2 == 0 ) {
-							ssd1306_SetCursor(0,44);
-							ssd1306_printf(Font_6x8,"kd:   ");
-						}
+						// kp
+						dataTuningLR ( &veloCtrl.kp, 1, 0, 255 );
 						break;
 				}
 			}
@@ -630,6 +724,15 @@ void setup( void )
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
 				ssd1306_printf(Font_6x8,"Angle PID");
+
+				ssd1306_SetCursor(0,18);
+				ssd1306_printf(Font_7x10,"kp:");
+				ssd1306_SetCursor(0,32);
+				ssd1306_printf(Font_7x10,"ki:");
+				ssd1306_SetCursor(0,44);
+				ssd1306_printf(Font_7x10,"kd:");
+				ssd1306_SetCursor(60,30);
+				ssd1306_printf(Font_7x10,"pwm:");
 			}
 			
 			setTargetAngularVelocity(0);
@@ -647,48 +750,38 @@ void setup( void )
 				motorPwmOutSynth( 0, 0, 0, 0 );
 			}
 
-			dataTuningLR( &patternGain, 1, 1, 3);
+			dataTuningUD( &patternGain, 1, 1, 3);
 			
 			if (trace_test == 0) {
-				if ( (cntSetup1 / 250) % 2 != 0) {
-					ssd1306_SetCursor(0,24);
-					ssd1306_printf(Font_6x8,"kp:%3d",yawRateCtrl.kp);
-					ssd1306_SetCursor(0,34);
-					ssd1306_printf(Font_6x8,"ki:%3d",yawRateCtrl.ki);
-					ssd1306_SetCursor(0,44);
-					ssd1306_printf(Font_6x8,"kd:%3d",yawRateCtrl.kd);
+				// ゲイン表示
+				ssd1306_SetCursor(21,44);
+				if (patternGain == 1) 	ssd1306_printfB(Font_7x10,"%3d",yawRateCtrl.kd);
+				else 					ssd1306_printf(Font_7x10,"%3d",yawRateCtrl.kd);
 
-					ssd1306_SetCursor(70,34);
-					ssd1306_printf(Font_6x8,"pwm:%5d",yawRateCtrl.pwm);
-				}
+				ssd1306_SetCursor(21,32);
+				if (patternGain == 2)	ssd1306_printfB(Font_7x10,"%3d",yawRateCtrl.ki);
+				else 					ssd1306_printf(Font_7x10,"%3d",yawRateCtrl.ki);
+
+				ssd1306_SetCursor(21,18);
+				if (patternGain == 3) 	ssd1306_printfB(Font_7x10,"%3d",yawRateCtrl.kp);
+				else 					ssd1306_printf(Font_7x10,"%3d",yawRateCtrl.kp);
+				
+				// 制御量表示
+				ssd1306_SetCursor(88,30);
+				ssd1306_printf(Font_7x10,"%4d",yawRateCtrl.pwm);
 			
 				switch( patternGain ) {
 					case 1:
-						// kp
-						dataTuningUD ( &yawRateCtrl.kp, 1, 0, 255 );
-						//値を点滅
-						if ( (cntSetup1 / 250) % 2 == 0 ) {
-							ssd1306_SetCursor(0,24);
-							ssd1306_printf(Font_6x8,"kp:   ");
-						}
+						// kd
+						dataTuningLR ( &yawRateCtrl.kd, 1, 0, 255 );
 						break;
 					case 2:
 						// ki
-						dataTuningUD ( &yawRateCtrl.ki, 1, 0, 255 );
-						//値を点滅
-						if ( (cntSetup1 / 250) % 2 == 0 ) {
-							ssd1306_SetCursor(0,34);
-							ssd1306_printf(Font_6x8,"ki:   ");
-						}
+						dataTuningLR ( &yawRateCtrl.ki, 1, 0, 255 );
 						break;
 					case 3:
-						// kd
-						dataTuningUD ( &yawRateCtrl.kd, 1, 0, 255 );
-						//値を点滅
-						if ( (cntSetup1 / 250) % 2 == 0 ) {
-							ssd1306_SetCursor(0,44);
-							ssd1306_printf(Font_6x8,"kd:   ");
-						}
+						// kp
+						dataTuningLR ( &yawRateCtrl.kp, 1, 0, 255 );
 						break;
 				}
 			}

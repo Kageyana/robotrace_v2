@@ -114,7 +114,10 @@ void loopSystem (void) {
 
 			if (start) {
 				// cntRun = 0;
-				countdown = 6000;		// カウントダウンスタート
+				ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+				ssd1306_SetCursor(56,28);
+				ssd1306_printf(Font_16x26,"5");
+				countdown = 5000;		// カウントダウンスタート
 				powerLinesensors(1);	// ラインセンサ ON
 				patternTrace = 1;
 			}
@@ -123,29 +126,32 @@ void loopSystem (void) {
 			// トレース開始
 			motorPwmOutSynth( lineTraceCtrl.pwm, 0, 0, 0);
 			// カウントダウンスタート
-			ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
-			if ( countdown >= 5000 ) {
-				ssd1306_SetCursor(56,28);
-				ssd1306_printf(Font_16x26,"5");
-			}
-			if ( countdown < 5000 && countdown >= 4000 ) {
+			if ( countdown == 4000 ) {
+				ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56,28);
 				ssd1306_printf(Font_16x26,"4");
+				ssd1306_UpdateScreen();  // グラフィック液晶更新
 			}
-			if ( countdown < 4000 && countdown >= 3000 ) {
+			if ( countdown == 3000 ) {
+				ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56,28);
 				ssd1306_printf(Font_16x26,"3");
+				ssd1306_UpdateScreen();  // グラフィック液晶更新
 			}
-			if ( countdown < 3000 && countdown >= 2000 ) {
+			if ( countdown == 2000 ) {
+				ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56,28);
 				ssd1306_printf(Font_16x26,"2");
+				ssd1306_UpdateScreen();  // グラフィック液晶更新
 			}
-			if ( countdown < 2000 && countdown >= 1000 ) {
+			if ( countdown == 1000 ) {
+				ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56,28);
 				ssd1306_printf(Font_16x26,"1");
+				ssd1306_UpdateScreen();  // グラフィック液晶更新
 			}
 
-			if ( countdown <= 1000 ) {
+			if ( countdown <= 0 ) {
 				motorPwmOut(0,0);	// モータドライバICのスリープモードを解除
 				modeLCD = false;	// LCD OFF
 				// Logファイル作成
@@ -165,8 +171,6 @@ void loopSystem (void) {
 
 				modeLOG = true;    // log start
 				patternTrace = 11;
-			} else {
-				ssd1306_UpdateScreen();  // グラフィック液晶更新
 			}
 			break;
 
@@ -244,6 +248,12 @@ void loopSystem (void) {
       	case 102:
 			motorPwmOutSynth( 0, 0, 0, 0);
 			powerLinesensors(0);
+
+			// if (swValTact == SW_PUSH) {
+			// 	initSystem();
+			// 	start = 0;
+			// 	patternTrace = 0;
+			// }
 			break;
     
       	default:

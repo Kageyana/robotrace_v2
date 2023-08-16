@@ -574,3 +574,14 @@ void ssd1306_printf(FontDef Font, uint8_t *format, ...) {
 
     ssd1306_WriteString(str,Font,White);
 }
+
+void ssd1306_printfB(FontDef Font, uint8_t *format, ...) {
+    va_list  argptr;
+    uint8_t  str[SSD1306_WIDTH/6+10];
+
+    va_start(argptr, format);
+    vsprintf( str, format, argptr );
+    va_end(argptr);
+
+    ssd1306_WriteString(str,Font,Black);
+}
