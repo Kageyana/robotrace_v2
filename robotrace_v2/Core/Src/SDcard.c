@@ -63,10 +63,6 @@ bool initMicroSD(void) {
 
     // getFileNumbers();
 
-    fresult = f_open(&fil_T, "test.csv", FA_OPEN_ALWAYS | FA_WRITE);  // create file
-    while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );
-    f_close(&fil_T);
-
     return true;
   } else {
     // マウント失敗
@@ -77,11 +73,21 @@ bool initMicroSD(void) {
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 initLog
-// 処理概要     ロギング初期設定
+// 処理概要     ログ初期設定
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void initLog(void) {
+void initLog(void){
+  cntLog = 0;
+  modeLOG = true;    // log start
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 createLog
+// 処理概要     ログファイル初期設定
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void createLog(void) {
   FRESULT   fresult;
   DIR dir;                    // Directory
   FILINFO fno;                // File Info
@@ -131,9 +137,6 @@ void initLog(void) {
   strcat(columnTitle,"\n");
   strcat(formatLog,"\n");
   f_printf(&fil_W, columnTitle);
-
-  cntLog = 0;
-  modeLOG = true;    // log start
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogBuffer
@@ -161,11 +164,11 @@ void writeLogBuffer (void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void writeLogPut(void) {
-  uint32_t i;
+  uint32_t i,length = 0;
 
   for(i = 0;i<logIndex;i++) {
     f_printf(&fil_W, formatLog
-      ,logVal[i].time
+      ,logVal[i].time 
       ,logVal[i].marker
       ,logVal[i].speed
       ,(int32_t)(logVal[i].zg*10000)
@@ -183,14 +186,16 @@ void writeLogPut(void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void endLog(void) {
-
+  initIMU = false;
+  createLog(); // ログファイル作成
+  
+  modeLOG = false;
   // ログ書き込み
   writeLogPut();
   
-  modeLOG = false;
-  while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );
+  // while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );
   f_close(&fil_W);
-
+  initIMU = true;
   // if (!optimalTrace) saveLogNumber(fileNumbers[endFileIndex]+1); // 探索走行のとき最新ログ番号を保存する
 }
 /////////////////////////////////////////////////////////////////////

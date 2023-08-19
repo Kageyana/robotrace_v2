@@ -10,7 +10,7 @@
 #define UD	0       // 5方向タクトスイッチの上下方向
 #define LR	1       // 5方向タクトスイッチの左右方向
 
-#define CALIBRATIONSPEED 60.0F   // ラインセンサのキャリブレーション時の角速度[rad/s]
+#define CALIBRATIONSPEED 170.0F   // ラインセンサのキャリブレーション時の角速度[rad/s]
 
 #define HEX_START       0x0
 #define HEX_SPEED_PARAM 0x1
@@ -50,5 +50,6 @@ void data_select ( uint8_t *data , uint8_t button );
 void dataTuningUD ( int16_t *data, int16_t add, int16_t min, int16_t max);
 void dataTuningLR ( int16_t *data, int16_t add, int16_t min, int16_t max);
 void dataTuningUDF ( float *data, float add, float min, float max);
+void caribrateSensors(void);
 
 #endif /* SETUP_H_ */

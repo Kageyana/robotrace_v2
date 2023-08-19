@@ -54,7 +54,7 @@ void Interrupt1ms(void) {
         cntSwitchUD++;
         cntSwitchLR++;
     }
-
+    
     switch(cnt5) {
         case 1:
             if(initIMU) {

@@ -7,12 +7,11 @@
 //====================================//
 // モード関連
 uint8_t	patternTrace = 0;
-bool    modeLCD = true;		// LCD表示可否			false:消灯		true:表示
+bool    modeDSP = true;		// ディスプレイ表示可否			false:消灯		true:表示
 bool 	modeLOG = false;	// ログ取得状況			false:ログ停止	true:ログ取得中
 bool    initMSD = false;	// microSD初期化状況	false:初期化失敗	true:初期化成功
 bool    initLCD = false;    // LCD初期化状況		false:初期化失敗	true:初期化成功
 bool    initIMU = false;    // IMU初期化状況		false:初期化失敗	true:初期化成功
-bool    useIMU = false; 	// IMU使用状況			false:使用停止		true:使用中
 bool    initCurrent = false;    // 電流センサ初期化状況		false:初期化失敗	true:初期化成功
 uint8_t modeCurve = 0;		// カーブ判断			0:直線			1:カーブ進入
 
@@ -78,21 +77,23 @@ void initSystem (void) {
 	initMSD = initMicroSD();
 
 	// Display
-	ssd1306_Init();
-	ssd1306_Fill(Black);
+	if(TACTSW1 == 1) {
+		modeDSP = true;
+		ssd1306_Init();
+		ssd1306_Fill(Black);
+		
+		// トップバー表示
+		// 電池マーク
+		showBatMark();
+		
+		ssd1306_UpdateScreen();
+	} else {
+		modeDSP = false;
+	}
 	
+
 	// Timer interrupt
 	HAL_TIM_Base_Start_IT(&htim6);
-	
-	// トップバー表示
-	// 電池マーク
-	showBatMark();
-	
-	ssd1306_UpdateScreen();
-	HAL_Delay(100);
-	// showBattery();	// バッテリ残量
-
-	// printf("boot Klic_RT_v2\n");
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 systemLoop
@@ -110,8 +111,12 @@ void loopSystem (void) {
 	
 	switch (patternTrace) {
       	case 0:
-			setup();
-
+			if(modeDSP) {
+				setup();
+			} else {
+				caribrateSensors();
+			}
+				
 			if (start) {
 				ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56,28);
@@ -124,30 +129,34 @@ void loopSystem (void) {
 		case 1:
 			// トレース開始
 			motorPwmOutSynth( lineTraceCtrl.pwm, 0, 0, 0);
+
+			
 			// カウントダウンスタート
-			if ( countdown == 4000 ) {
-				ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
-				ssd1306_SetCursor(56,28);
-				ssd1306_printf(Font_16x26,"4");
-				ssd1306_UpdateScreen();  // グラフィック液晶更新
-			}
-			if ( countdown == 3000 ) {
-				ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
-				ssd1306_SetCursor(56,28);
-				ssd1306_printf(Font_16x26,"3");
-				ssd1306_UpdateScreen();  // グラフィック液晶更新
-			}
-			if ( countdown == 2000 ) {
-				ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
-				ssd1306_SetCursor(56,28);
-				ssd1306_printf(Font_16x26,"2");
-				ssd1306_UpdateScreen();  // グラフィック液晶更新
-			}
-			if ( countdown == 1000 ) {
-				ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
-				ssd1306_SetCursor(56,28);
-				ssd1306_printf(Font_16x26,"1");
-				ssd1306_UpdateScreen();  // グラフィック液晶更新
+			if(modeDSP) {
+				if ( countdown == 4000 ) {
+					ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+					ssd1306_SetCursor(56,28);
+					ssd1306_printf(Font_16x26,"4");
+					ssd1306_UpdateScreen();  // グラフィック液晶更新
+				}
+				if ( countdown == 3000 ) {
+					ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+					ssd1306_SetCursor(56,28);
+					ssd1306_printf(Font_16x26,"3");
+					ssd1306_UpdateScreen();  // グラフィック液晶更新
+				}
+				if ( countdown == 2000 ) {
+					ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+					ssd1306_SetCursor(56,28);
+					ssd1306_printf(Font_16x26,"2");
+					ssd1306_UpdateScreen();  // グラフィック液晶更新
+				}
+				if ( countdown == 1000 ) {
+					ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+					ssd1306_SetCursor(56,28);
+					ssd1306_printf(Font_16x26,"1");
+					ssd1306_UpdateScreen();  // グラフィック液晶更新
+				}
 			}
 
 			if ( countdown <= 0 ) {
@@ -236,14 +245,17 @@ void loopSystem (void) {
 			motorPwmOutSynth( lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 			
 			if (encCurrentN == 0 && enc1 >= encMM(500)) {
+				motorPwmOutSynth( 0, 0, 0, 0);
 				if (modeLOG) endLog();	// ログ保存終了
 
-				ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
-				ssd1306_SetCursor(0,25);
-				ssd1306_printf(Font_11x18,"Time");
-				ssd1306_SetCursor(0,45);
-				ssd1306_printf(Font_11x18,"%6.3f[s]",(float)goalTime/1000);
-				ssd1306_UpdateScreen();  // グラフィック液晶更新
+				if(modeDSP) {
+					ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+					ssd1306_SetCursor(0,25);
+					ssd1306_printf(Font_11x18,"Time");
+					ssd1306_SetCursor(0,45);
+					ssd1306_printf(Font_11x18,"%6.3f[s]",(float)goalTime/1000);
+					ssd1306_UpdateScreen();  // グラフィック液晶更新
+				}
 	
 				patternTrace = 102;
 				break;
@@ -273,31 +285,34 @@ void loopSystem (void) {
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
 void emargencyStop (void) {
-
+	motorPwmOutSynth( 0, 0, 0, 0);
 	if (modeLOG) endLog(); // ログ保存終了
 
-	ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+	if(modeDSP) {
+		ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
 
-	ssd1306_SetCursor(36,25);
-	ssd1306_printf(Font_11x18,"EMS!!");
+		ssd1306_SetCursor(36,25);
+		ssd1306_printf(Font_11x18,"EMS!!");
 
-	ssd1306_SetCursor(0,45);
-	switch(emcStop) {
-		case STOP_ANGLE_X:
-			ssd1306_printf(Font_7x10,"ANGLE_X");
-			break;
-		case STOP_ANGLE_Y:
-			ssd1306_printf(Font_7x10,"ANGLE_Y");
-			break;
-		case STOP_ENCODER_STOP:
-			ssd1306_printf(Font_7x10,"ENCODER_STOP");
-			break;
-		case STOP_LINESENSOR:
-			ssd1306_printf(Font_7x10,"LINESENSOR");
-			break;
+		ssd1306_SetCursor(0,45);
+		switch(emcStop) {
+			case STOP_ANGLE_X:
+				ssd1306_printf(Font_7x10,"ANGLE_X");
+				break;
+			case STOP_ANGLE_Y:
+				ssd1306_printf(Font_7x10,"ANGLE_Y");
+				break;
+			case STOP_ENCODER_STOP:
+				ssd1306_printf(Font_7x10,"ENCODER_STOP");
+				break;
+			case STOP_LINESENSOR:
+				ssd1306_printf(Font_7x10,"LINESENSOR");
+				break;
+		}
+		
+		ssd1306_UpdateScreen();  // グラフィック液晶更新
 	}
 	
-	ssd1306_UpdateScreen();  // グラフィック液晶更新
 
 	patternTrace = 102;
 }

@@ -11,7 +11,7 @@
 
 // 速度パラメータ関連
 #define PARAM_STRAIGHT              1.8F
-#define PARAM_CURVE                 1.2F
+#define PARAM_CURVE                 1.4F
 #define PARAM_STOP                  0.8F
 #define PARAM_BOOST_STRAIGHT        2.2F
 #define PARAM_BOOST_1500            2.2F
@@ -47,12 +47,11 @@ typedef struct {
 //====================================//
 // パターン、モード関連
 extern uint8_t  patternTrace;	// パターン番号
-extern bool     modeLCD;		// LCD表示選択
+extern bool     modeDSP;		// LCD表示選択
 extern bool     modeLOG;        // ログ取得状況
 extern bool     initMSD;        // microSD初期化状況
 extern bool     initLCD;        // LCD初期化状況
 extern bool     initIMU;        // IMU初期化状況
-extern bool     useIMU;         // IMU使用状況
 extern bool     initCurrent;    // 電流センサ初期化状況
 extern uint8_t  modeCurve;	    // カーブ判断 0:直線 1:カーブ進入
 

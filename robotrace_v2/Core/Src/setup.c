@@ -41,7 +41,6 @@ uint8_t trace_test = 0;
 int16_t	calTimes = 1;
 int16_t	calTimesNow = 0;
 uint8_t bright = 0;
-uint8_t showDisplay = 1;
 
 // パラメータ関連
 int16_t motorTestPwm = 200;
@@ -93,9 +92,9 @@ void setup( void )
 				case 1:
 					calTimes = 1;
 					setTargetSpeed(0);
-
+					data_select( &trace_test, SW_PUSH );
 					// スイッチ入力待ち
-					if (swValTact == SW_PUSH) {
+					if (trace_test) {
 						veloCtrl.Int = 0;	// I成分リセット
 						if(lSensorOffset[0] > 0) {
 							// キャリブレーション実施済み
@@ -108,6 +107,7 @@ void setup( void )
 							ssd1306_printf(Font_7x10,"Calibration");
 							ssd1306_SetCursor(53,42);
 							ssd1306_printf(Font_7x10,"Now");
+							ssd1306_UpdateScreen();  // グラフィック液晶更新
 
 							cntSetup1 = 0;
 							enc1 = 0;
@@ -123,7 +123,6 @@ void setup( void )
 						veloCtrl.Int = 0;			// I成分リセット
 						BMI088val.angle.z = 0.0;	// 角度リセット
 						yawRateCtrl.Int = 0.0;		// I成分リセット
-						useIMU = true;
 						setTargetSpeed(0);			// 目標速度0[m/s]
 						enc1 = 0;
 						modeCalLinesensors = 1; 	// キャリブレーション開始
@@ -181,6 +180,7 @@ void setup( void )
 					// 停止
 					motorPwmOutSynth( 0, veloCtrl.pwm, 0, 0);
 					if (abs(encCurrentN) == 0) {
+						trace_test = 0;
 						start = 1;
 					}
 					break;
@@ -461,8 +461,6 @@ void setup( void )
 
 			if (swValTact == SW_UP && !modeLOG ) {
 				initLog();
-				modeLOG = true;    // log start
-
 			}
 			if (swValTact == SW_DOWN && modeLOG) {
 				endLog();
@@ -495,9 +493,10 @@ void setup( void )
 				case 1:
 					// スイッチ入力待ち
 					dataTuningUD( &calTimes, 1, 1, 9);
-
 					setTargetSpeed(0);
-					if (swValTact == SW_PUSH) {
+
+					data_select( &trace_test, SW_PUSH );
+					if (trace_test) {
 						cntSetup1 = 0;
 						enc1 = 0;
 						powerLinesensors(1);	// 先に点灯させて安定させる
@@ -511,7 +510,6 @@ void setup( void )
 						veloCtrl.Int = 0;			// I成分リセット
 						BMI088val.angle.z = 0.0;	// 角度リセット
 						yawRateCtrl.Int = 0.0;		// I成分リセット
-						useIMU = true;
 						setTargetSpeed(0);			// 目標速度0[m/s]
 						enc1 = 0;
 						modeCalLinesensors = 1; 	// キャリブレーション開始
@@ -572,7 +570,7 @@ void setup( void )
 						calTimesNow++;
 						if (calTimesNow >= calTimes) {
 							calTimesNow = 0;
-							useIMU = false;
+							trace_test = 0;
 							patternCalibration = 1;
 						} else {
 							patternCalibration = 3;
@@ -606,11 +604,9 @@ void setup( void )
 			data_select( &trace_test, SW_PUSH );
 			// PUSHでトレースON/OFF
 			if ( trace_test == 1 ) {
-				showDisplay = 0;
 				motorPwmOutSynth( lineTraceCtrl.pwm, 0, 0, 0);
 				powerLinesensors(1);
 			} else {
-				showDisplay = 1;
 				motorPwmOutSynth( 0, 0, 0, 0);
 				powerLinesensors(0);
 			}
@@ -672,12 +668,10 @@ void setup( void )
 			data_select( &trace_test, SW_PUSH );
 			// PUSHでトレースON/OFF
 			if ( trace_test == 1 ) {
-				showDisplay = 0;
 				powerLinesensors(1);
 				setTargetSpeed(0.0);
 				motorPwmOutSynth( lineTraceCtrl.pwm, veloCtrl.kp, 0, 0);
 			} else {
-				showDisplay = 1;
 				motorPwmOutSynth( 0, 0, 0, 0);
 				powerLinesensors(0);
 			}
@@ -741,12 +735,8 @@ void setup( void )
 			data_select( &trace_test, SW_PUSH );
 			// PUSHでトレースON/OFF
 			if ( trace_test == 1 ) {
-				showDisplay = 0;
-				useIMU = true;
 				motorPwmOutSynth( 0, veloCtrl.pwm, yawRateCtrl.pwm, 0 );
 			} else {
-				showDisplay = 1;
-				useIMU = false;
 				motorPwmOutSynth( 0, 0, 0, 0 );
 			}
 
@@ -804,7 +794,7 @@ void setup( void )
 	beforeHEX = swValRotary;
 	beforeBATLV= batteryLevel;
 
-	if (showDisplay) {
+	if (!trace_test) {
 		ssd1306_UpdateScreen();  // グラフィック液晶更新
 	}
 }
@@ -947,5 +937,104 @@ void dataTuningUDF ( float *data, float add, float min, float max) {
 		} else if ( *data < min ) {
 			*data = max;
 		}
+	}
+}
+///////////////////////////////////////////////////////////////////////////////////////
+// モジュール名 caribrateSensors
+// 処理概要     機体を超信地旋回させてラインセンサをキャリブレーションする
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////////////////
+void caribrateSensors(void) {
+	switch (patternCalibration) {
+		case 1:
+			calTimes = 1;
+			setTargetSpeed(0);
+
+			// スイッチ入力待ち
+			if (swValMainTact == SW_TACT_L) {
+				veloCtrl.Int = 0;	// I成分リセット
+				if(lSensorOffset[0] > 0) {
+					// キャリブレーション実施済み
+					start = 1;
+				} else {
+					// キャリブレーション未実施
+					cntSetup1 = 0;
+					enc1 = 0;
+					powerLinesensors(1);	// 先に点灯させて安定させる
+					patternCalibration = 2;
+				}
+			}
+			break;
+
+		case 2:
+			// 開始準備
+			if (cntSetup1 > 1000) {
+				veloCtrl.Int = 0;			// I成分リセット
+				BMI088val.angle.z = 0.0;	// 角度リセット
+				yawRateCtrl.Int = 0.0;		// I成分リセット
+				setTargetSpeed(0);			// 目標速度0[m/s]
+				enc1 = 0;
+				modeCalLinesensors = 1; 	// キャリブレーション開始
+				patternCalibration = 3;
+			}
+			break;
+
+		case 3:
+			// 左旋回
+			setTargetAngularVelocity(CALIBRATIONSPEED);
+			motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+			if (BMI088val.angle.z > 35.0) {
+				patternCalibration = 4;
+			}
+			break;
+
+		case 4:
+			// 停止
+			setTargetSpeed(0);
+			motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
+			if (abs(encCurrentN) == 0) {
+				patternCalibration = 5;
+			}
+			break;
+
+		case 5:
+			// 右旋回
+			setTargetAngularVelocity(-CALIBRATIONSPEED);
+			motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+			if (BMI088val.angle.z < -35.0) {
+				patternCalibration = 6;
+			}
+			break;
+
+		case 6:
+			// 停止
+			setTargetSpeed(0);
+			motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
+			if (abs(encCurrentN) == 0) {
+				patternCalibration = 7;
+			}
+			break;
+
+		case 7:
+			// 初期位置に戻る
+			setTargetAngularVelocity(CALIBRATIONSPEED);
+			motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+			if (BMI088val.angle.z > 0) {
+				modeCalLinesensors = 0;
+				patternCalibration = 8;
+			}
+			break;
+
+		case 8:
+			// 停止
+			motorPwmOutSynth( 0, veloCtrl.pwm, 0, 0);
+			if (abs(encCurrentN) == 0) {
+				start = 1;
+			}
+			break;
+	
+		default:
+			break;
 	}
 }

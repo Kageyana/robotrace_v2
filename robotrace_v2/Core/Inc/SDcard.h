@@ -15,13 +15,14 @@
 //====================================//
 extern int16_t  fileNumbers[1000], fileIndexLog, endFileIndex;
 extern uint16_t cntLog;
-
+extern uint32_t logIndex;
 //====================================//
 // プロトタイプ宣言
 //====================================//
 // MicroSD
 bool initMicroSD(void);
 void initLog(void);
+void createLog(void);
 void endLog(void);
 void setLogStr(uint8_t* column, uint8_t* format);
 void writeLogBuffer (void);
