@@ -75,7 +75,7 @@ bool initBMI088(void) {
         // 加速
         
         // ジャイロ
-        BMI088WriteByte(0x10,0x84);	// BANDWIDTHを200Hzに設定
+        BMI088WriteByte(0x10,0x83);	// ODRを200Hzに設定
         // モード変更
  
         return true;
@@ -93,17 +93,15 @@ void BMI088getGyro(void) {
     uint8_t rawData[6];
 	int16_t gyroVal[3], i;
 
-	if (HAL_GPIO_ReadPin(SD_CS_GPIO_Port, SD_CS_Pin) == GPIO_PIN_SET) {
-		// 角速度の生データを取得
-		BMI088ReadAxisData(0x02,rawData);
-		for(i=0;i<3;i++) {
-			gyroVal[i] = (rawData[(i*2)+1] << 8) | rawData[i*2];	// LSBとMSBを結合
-		}
-
-		BMI088val.gyro.x = (float)gyroVal[0] / GYROLSB;
-		BMI088val.gyro.y = (float)gyroVal[1] / GYROLSB;
-		BMI088val.gyro.z = (float)gyroVal[2] / GYROLSB;
+	// 角速度の生データを取得
+	BMI088ReadAxisData(0x02,rawData);
+	for(i=0;i<3;i++) {
+		gyroVal[i] = (rawData[(i*2)+1] << 8) | rawData[i*2];	// LSBとMSBを結合
 	}
+
+	BMI088val.gyro.x = (float)gyroVal[0] / GYROLSB;
+	BMI088val.gyro.y = (float)gyroVal[1] / GYROLSB;
+	BMI088val.gyro.z = (float)gyroVal[2] / GYROLSB;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 calcDegrees

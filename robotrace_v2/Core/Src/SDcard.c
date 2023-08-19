@@ -15,14 +15,25 @@ FIL       fil_R;
 uint8_t   columnTitle[512] = "", formatLog[256] = "";
 
 // ログバッファ
-uint32_t  logBuffer[BUFFER_SIZW_LOG];
+typedef struct {
+    uint16_t time;
+    uint8_t marker;
+    uint8_t speed;
+    float zg;
+    uint32_t distance;
+    uint8_t target;
+    float mcl;
+    float mcr;
+} logData;
+logData logVal[3000];
 uint32_t  logIndex = 0 , sendLogNum = 0;
 
 // ログファイルナンバー
 int16_t fileNumbers[1000], fileIndexLog = 0, endFileIndex = 0;
 
 // カウンタ
-uint32_t    cntLog = 0;
+uint16_t    cntLog = 0;
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 initMicroSD
 // 処理概要     SDカードの初期化
@@ -74,8 +85,7 @@ void initLog(void) {
   FRESULT   fresult;
   DIR dir;                    // Directory
   FILINFO fno;                // File Info
-  uint8_t fileName[10];
-  uint8_t *tp;
+  uint8_t *tp, fileName[10];
   uint16_t fileNumber = 0;
 
   f_opendir(&dir,"/");  // directory open
@@ -107,55 +117,23 @@ void initLog(void) {
   setLogStr("cntlog",       "%d");
   setLogStr("markerSensor",  "%d");
   setLogStr("encCurrentN",  "%d");
-  // setLogStr("gyroVal_Z",   "%d");
+  setLogStr("gyroVal_Z",   "%d");
   setLogStr("encTotalN",    "%d");
   setLogStr("targetSpeed",    "%d");
 
-  // setLogStr("patternTrace", "%d");
-  // setLogStr("encCurrentR",  "%d");
-  // setLogStr("encCurrentL",  "%d");  
-  // setLogStr("encTotalR",    "%d");
-  // setLogStr("encTotalL",    "%d");
-  // setLogStr("angleSensor",  "%d");
-  // setLogStr("modeCurve",    "%d");
-  // setLogStr("motorpwmR",  "%d");
-  // setLogStr("motorpwmL",  "%d");
-  // setLogStr("lineTraceCtrl.pwm",    "%d");
-  // setLogStr("veloCtrl.pwm",    "%d");
-  // strcat(columnTitle,"lSensorf_0,");
-  // strcat(columnTitle,"lSensorf_1,");
-  // strcat(columnTitle,"lSensorf_2,");
-  // strcat(columnTitle,"lSensorf_3,");
-  // strcat(columnTitle,"lSensorf_4,");
-  // strcat(columnTitle,"lSensorf_5,");
-  // strcat(columnTitle,"lSensorf_6,");
-  // strcat(columnTitle,"lSensorf_7,");
-  // strcat(columnTitle,"lSensorf_8,");
-  // strcat(columnTitle,"lSensorf_9,");
-  // strcat(columnTitle,"lSensorf_10,");
-  // strcat(columnTitle,"lSensorf_11,");
-  // setLogStr("gyroVal_X",   "%d");
-  // setLogStr("gyroVal_Y",   "%d");  
-  // setLogStr("angle_X",   "%d");
-  // setLogStr("angle_Y",   "%d");
-  // setLogStr("angle_Z",   "%d");
-  // setLogStr("rawCurrentR",  "%d");
-  // setLogStr("rawCurrentL",  "%d");
+  setLogStr("motorCurrentL",  "%d");
+  setLogStr("motorCurrentR",  "%d");
   // setLogStr("CurvatureRadius",  "%d");
   // setLogStr("cntMarker",  "%d");
   // setLogStr("optimalIndex",  "%d");
   // setLogStr("ROC",  "%d");
-  setLogStr("distL",  "%d");
-  setLogStr("distR",  "%d");
 
   strcat(columnTitle,"\n");
   strcat(formatLog,"\n");
   f_printf(&fil_W, columnTitle);
 
-  // タイマ割り込み開始
-  HAL_TIM_Base_Start_IT(&htim7);
-
   cntLog = 0;
+  modeLOG = true;    // log start
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogBuffer
@@ -163,20 +141,18 @@ void initLog(void) {
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void writeLogBuffer (uint8_t valNum, ...) {
-  va_list args;
-  uint8_t count;
-  // valNum : amount of variable
-
-  va_start( args, valNum );
-  for ( count = 0; count < valNum; count++ ) {
-    // set logdata to logbuffer(ring buffer) ログデータをリングバッファに転送
-    logBuffer[logIndex & BUFFER_SIZW_LOG - 1] = va_arg( args, int32_t );
+void writeLogBuffer (void) {
+  if (modeLOG) {
+    logVal[logIndex].time = cntLog;
+    logVal[logIndex].marker = getMarkerSensor();
+    logVal[logIndex].speed = encCurrentN;
+    logVal[logIndex].zg = BMI088val.gyro.z;
+    logVal[logIndex].distance = encTotalN;
+    logVal[logIndex].target = targetSpeed;
+    logVal[logIndex].mcl = motorCurrentL;
+    logVal[logIndex].mcr = motorCurrentR;
     logIndex++;
   }
-  logBuffer[logIndex & BUFFER_SIZW_LOG - 1] = "\n";
-  logIndex++;
-  va_end( args );
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogPut
@@ -185,18 +161,19 @@ void writeLogBuffer (uint8_t valNum, ...) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void writeLogPut(void) {
-  uint8_t str[32];
+  uint32_t i;
 
-  if (HAL_GPIO_ReadPin(IMU_CSB2_GPIO_Port, IMU_CSB2_Pin) == GPIO_PIN_SET) {
-    if (sendLogNum < logIndex) {
-      if (logBuffer[sendLogNum & BUFFER_SIZW_LOG - 1] == "\n") {
-        f_puts(logBuffer[sendLogNum & BUFFER_SIZW_LOG - 1], &fil_W);
-      } else {
-        sprintf(str,"%d,",logBuffer[sendLogNum & BUFFER_SIZW_LOG - 1]);
-        f_puts(str, &fil_W);
-      }
-      sendLogNum++;
-    }
+  for(i = 0;i<logIndex;i++) {
+    f_printf(&fil_W, formatLog
+      ,logVal[i].time
+      ,logVal[i].marker
+      ,logVal[i].speed
+      ,(int32_t)(logVal[i].zg*10000)
+      ,logVal[i].distance
+      ,logVal[i].target
+      ,(int32_t)(logVal[i].mcl*10000)
+      ,(int32_t)(logVal[i].mcr*10000)
+    );
   }
 }
 /////////////////////////////////////////////////////////////////////
@@ -206,12 +183,13 @@ void writeLogPut(void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void endLog(void) {
+
+  // ログ書き込み
+  writeLogPut();
+  
   modeLOG = false;
   while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );
   f_close(&fil_W);
-
-  // タイマ割り込み終了
-  HAL_TIM_Base_Stop_IT(&htim7);
 
   // if (!optimalTrace) saveLogNumber(fileNumbers[endFileIndex]+1); // 探索走行のとき最新ログ番号を保存する
 }

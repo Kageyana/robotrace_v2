@@ -13,7 +13,9 @@
 //====================================//
 // グローバル変数の宣言
 //====================================//
-extern int16_t fileNumbers[1000], fileIndexLog, endFileIndex;
+extern int16_t  fileNumbers[1000], fileIndexLog, endFileIndex;
+extern uint16_t cntLog;
+
 //====================================//
 // プロトタイプ宣言
 //====================================//
@@ -22,7 +24,7 @@ bool initMicroSD(void);
 void initLog(void);
 void endLog(void);
 void setLogStr(uint8_t* column, uint8_t* format);
-void writeLogBuffer (uint8_t valNum, ...);
+void writeLogBuffer (void);
 void writeLogPut(void);
 void getFileNumbers(void);
 void SDtest(void);

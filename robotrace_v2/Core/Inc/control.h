@@ -10,7 +10,7 @@
 // 機体諸元
 
 // 速度パラメータ関連
-#define PARAM_STRAIGHT              1.2F
+#define PARAM_STRAIGHT              1.8F
 #define PARAM_CURVE                 1.2F
 #define PARAM_STOP                  0.8F
 #define PARAM_BOOST_STRAIGHT        2.2F

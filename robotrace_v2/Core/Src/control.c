@@ -113,7 +113,6 @@ void loopSystem (void) {
 			setup();
 
 			if (start) {
-				// cntRun = 0;
 				ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56,28);
 				ssd1306_printf(Font_16x26,"5");
@@ -153,7 +152,6 @@ void loopSystem (void) {
 
 			if ( countdown <= 0 ) {
 				motorPwmOut(0,0);	// モータドライバICのスリープモードを解除
-				modeLCD = false;	// LCD OFF
 				// Logファイル作成
 				if (initMSD) initLog();
 				
@@ -161,7 +159,7 @@ void loopSystem (void) {
 				encTotalN = 0;
 				// distanceStart = 0;
 				encRightMarker = encMM(600);
-				// cntRun = 0;
+				cntRun = 0;
 				BMI088val.angle.x = 0.0f;
 				BMI088val.angle.y = 0.0f;
 				BMI088val.angle.z = 0.0f;
@@ -169,22 +167,20 @@ void loopSystem (void) {
 				yawRateCtrl.Int = 0.0;
 				yawCtrl.Int = 0.0;
 
-				modeLOG = true;    // log start
 				patternTrace = 11;
 			}
 			break;
 
       	case 11:
 			// 目標速度設定
-			setTargetSpeed(targetParam.straight);
-			// if (optimalTrace == 0){
-			// 	// 探索走行のとき
-			// 	if (modeCurve == 0) {
-			// 		setTargetSpeed(targetParam.straight);
-			// 	} else {
-			// 		setTargetSpeed(targetParam.curve);
-			// 	}
-			// } else if (optimalTrace == BOOST_MARKER) {
+			if (optimalTrace == 0){
+				// 探索走行のとき
+				if (modeCurve == 0) {
+					setTargetSpeed(targetParam.straight);
+				} else {
+					setTargetSpeed(targetParam.curve);
+				}
+			} //else if (optimalTrace == BOOST_MARKER) {
 			// 	// マーカー基準2次走行
 			// 	boostSpeed = PPAM[cntMarker].boostSpeed;
             //     // 次のマーカー区間の曲率半径が小さい時、速度を抑える
@@ -231,6 +227,7 @@ void loopSystem (void) {
 			break;
 
       	case 101:
+			// 停止速度まで減速
 			if (enc1 >= encMM(500)) {
 				setTargetSpeed(0);
 			} else {
@@ -239,13 +236,22 @@ void loopSystem (void) {
 			motorPwmOutSynth( lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 			
 			if (encCurrentN == 0 && enc1 >= encMM(500)) {
-				emargencyStop();
+				if (modeLOG) endLog();	// ログ保存終了
+
+				ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+				ssd1306_SetCursor(0,25);
+				ssd1306_printf(Font_11x18,"Time");
+				ssd1306_SetCursor(0,45);
+				ssd1306_printf(Font_11x18,"%6.3f[s]",(float)goalTime/1000);
+				ssd1306_UpdateScreen();  // グラフィック液晶更新
+	
+				patternTrace = 102;
 				break;
 			}
-			
+
 			break;
 
-      	case 102:
+      	case 102: 
 			motorPwmOutSynth( 0, 0, 0, 0);
 			powerLinesensors(0);
 
@@ -268,13 +274,29 @@ void loopSystem (void) {
 ///////////////////////////////////////////////////////////////////////////
 void emargencyStop (void) {
 
-	if (modeLOG) endLog();
+	if (modeLOG) endLog(); // ログ保存終了
 
 	ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
-	ssd1306_SetCursor(0,25);
-	ssd1306_printf(Font_11x18,"Time");
+
+	ssd1306_SetCursor(36,25);
+	ssd1306_printf(Font_11x18,"EMS!!");
+
 	ssd1306_SetCursor(0,45);
-	ssd1306_printf(Font_11x18,"%2.3f[s]",goalTime/1000);
+	switch(emcStop) {
+		case STOP_ANGLE_X:
+			ssd1306_printf(Font_7x10,"ANGLE_X");
+			break;
+		case STOP_ANGLE_Y:
+			ssd1306_printf(Font_7x10,"ANGLE_Y");
+			break;
+		case STOP_ENCODER_STOP:
+			ssd1306_printf(Font_7x10,"ENCODER_STOP");
+			break;
+		case STOP_LINESENSOR:
+			ssd1306_printf(Font_7x10,"LINESENSOR");
+			break;
+	}
+	
 	ssd1306_UpdateScreen();  // グラフィック液晶更新
 
 	patternTrace = 102;
@@ -295,46 +317,45 @@ void countDown (void) {
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
 void checkCurve(void) {
-	// static uint8_t 	checkStraight, checkRight, checkLeft;
-	// static float	angleCurve;
+	static uint8_t 	checkStraight, checkRight, checkLeft;
+	float zg;
 
-	// angleCurve += BNO055val.gyro.z * DEFF_TIME;
+	zg = BMI088val.gyro.z;
 
-	// if (fabs(BNO055val.gyro.z) < 1.9f) {
-	// 	// ストレート時
-	// 	checkRight = 0;
-	// 	checkLeft = 0;
-	// 	if (checkStraight == 0) {
-	// 		encCurve = 0;
-	// 		checkStraight = 1;
-	// 	}
-	// 	if(checkStraight == 1 && encCurve > encMM(100)){
-	// 		modeCurve = 0;
-	// 		angleCurve = 0;
-	// 	}
-	// } else if (BNO055val.gyro.z > 2.5f) {
-	// 	// 左カーブ時
-	// 	checkStraight = 0;
-	// 	checkRight = 0;
-	// 	if (checkLeft == 0) {
-	// 		encCurve = 0;
-	// 		checkLeft = 1;
-	// 	}
-	// 	if(checkLeft == 1 && encCurve > encMM(20)){
-	// 		modeCurve = 2;
-	// 	}
-	// } else if (BNO055val.gyro.z < -2.5f) {
-	// 	// 右カーブ時
-	// 	checkStraight = 0;
-	// 	checkLeft = 0;
-	// 	if (checkRight == 0) {
-	// 		encCurve = 0;
-	// 		checkRight = 1;
-	// 	}
-	// 	if(checkRight == 1 && encCurve > encMM(20)){
-	// 		modeCurve = 1;
-	// 	}
-	// }
+	if (fabs(zg) < 50.0f) {
+		// ストレート時
+		checkRight = 0;
+		checkLeft = 0;
+		if (checkStraight == 0) {
+			encCurve = 0;
+			checkStraight = 1;
+		}
+		if(checkStraight == 1 && encCurve > encMM(100)){
+			modeCurve = 0;
+		}
+	} else if (zg > 150.0f) {
+		// 左カーブ時
+		checkStraight = 0;
+		checkRight = 0;
+		if (checkLeft == 0) {
+			encCurve = 0;
+			checkLeft = 1;
+		}
+		if(checkLeft == 1 && encCurve > encMM(20)){
+			modeCurve = 2;
+		}
+	} else if (zg < -150.0f) {
+		// 右カーブ時
+		checkStraight = 0;
+		checkLeft = 0;
+		if (checkRight == 0) {
+			encCurve = 0;
+			checkRight = 1;
+		}
+		if(checkRight == 1 && encCurve > encMM(20)){
+			modeCurve = 1;
+		}
+	}
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getADC2

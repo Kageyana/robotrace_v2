@@ -55,6 +55,7 @@ extern "C" {
 #include "lineSensor.h"
 #include "PIDcontrol.h"
 #include "emergencyStop.h"
+#include "courseAnalysis.h"
 #include "control.h"
 
 /* USER CODE END Includes */

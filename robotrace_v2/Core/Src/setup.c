@@ -96,6 +96,7 @@ void setup( void )
 
 					// スイッチ入力待ち
 					if (swValTact == SW_PUSH) {
+						veloCtrl.Int = 0;	// I成分リセット
 						if(lSensorOffset[0] > 0) {
 							// キャリブレーション実施済み
 							start = 1;
@@ -119,6 +120,7 @@ void setup( void )
 				case 2:
 					// 開始準備
 					if (cntSetup1 > 1000) {
+						veloCtrl.Int = 0;			// I成分リセット
 						BMI088val.angle.z = 0.0;	// 角度リセット
 						yawRateCtrl.Int = 0.0;		// I成分リセット
 						useIMU = true;
@@ -495,7 +497,6 @@ void setup( void )
 					dataTuningUD( &calTimes, 1, 1, 9);
 
 					setTargetSpeed(0);
-					motorPwmOutSynth( 0, veloCtrl.pwm, 0, 0);
 					if (swValTact == SW_PUSH) {
 						cntSetup1 = 0;
 						enc1 = 0;
@@ -507,6 +508,7 @@ void setup( void )
 				case 2:
 					// 開始準備
 					if (cntSetup1 > 1000) {
+						veloCtrl.Int = 0;			// I成分リセット
 						BMI088val.angle.z = 0.0;	// 角度リセット
 						yawRateCtrl.Int = 0.0;		// I成分リセット
 						useIMU = true;
@@ -613,10 +615,9 @@ void setup( void )
 				powerLinesensors(0);
 			}
 			
+			// ゲイン表示
 			dataTuningUD( &patternGain, 1, 1, 3);
-
 			if (trace_test == 0) {
-				// ゲイン表示
 				ssd1306_SetCursor(21,44);
 				if (patternGain == 1) 	ssd1306_printfB(Font_7x10,"%3d",lineTraceCtrl.kd);
 				else 					ssd1306_printf(Font_7x10,"%3d",lineTraceCtrl.kd);
@@ -681,10 +682,9 @@ void setup( void )
 				powerLinesensors(0);
 			}
 
+			// ゲイン表示
 			dataTuningUD( &patternGain, 1, 1, 3);
-			
 			if (trace_test == 0) {
-				// ゲイン表示
 				ssd1306_SetCursor(21,44);
 				if (patternGain == 1) 	ssd1306_printfB(Font_7x10,"%3d",veloCtrl.kd);
 				else 					ssd1306_printf(Font_7x10,"%3d",veloCtrl.kd);
@@ -733,10 +733,10 @@ void setup( void )
 				ssd1306_printf(Font_7x10,"kd:");
 				ssd1306_SetCursor(60,30);
 				ssd1306_printf(Font_7x10,"pwm:");
+
+				setTargetAngularVelocity(0);
+				setTargetSpeed(0);
 			}
-			
-			setTargetAngularVelocity(0);
-			setTargetSpeed(0);
 
 			data_select( &trace_test, SW_PUSH );
 			// PUSHでトレースON/OFF
@@ -750,10 +750,9 @@ void setup( void )
 				motorPwmOutSynth( 0, 0, 0, 0 );
 			}
 
-			dataTuningUD( &patternGain, 1, 1, 3);
-			
+			// ゲイン表示
+			dataTuningUD( &patternGain, 1, 1, 3);		
 			if (trace_test == 0) {
-				// ゲイン表示
 				ssd1306_SetCursor(21,44);
 				if (patternGain == 1) 	ssd1306_printfB(Font_7x10,"%3d",yawRateCtrl.kd);
 				else 					ssd1306_printf(Font_7x10,"%3d",yawRateCtrl.kd);

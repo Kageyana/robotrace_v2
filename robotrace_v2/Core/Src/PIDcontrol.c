@@ -10,7 +10,7 @@ pidParam 	veloCtrl = { KP2, KI2, KD2, 0, 0};
 pidParam 	yawRateCtrl = { KP3, KI3, KD3, 0, 0};
 pidParam 	yawCtrl = { KP4, KI4, KD4, 0, 0};
 
-int16_t		targetSpeed;			// 目標速度
+uint8_t		targetSpeed;			// 目標速度
 float 		targetAngle;			// 目標角速度
 float   	targetAngularVelocity;	// 目標角度
 
@@ -98,7 +98,7 @@ void motorControlSpeed( void ) {
 	static int16_t 	targetSpeedBefore, encoderBefore;
 	
 	// 駆動モーター用PWM値計算
-	Dev = targetSpeed - encCurrentN;	// 偏差
+	Dev = (int16_t)targetSpeed - encCurrentN;	// 偏差
 	// 目標値を変更したらI成分リセット
 	if ( targetSpeed != targetSpeedBefore ) veloCtrl.Int = 0;
 	

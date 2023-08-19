@@ -13,7 +13,7 @@
 #define GYROLSB         16.384F
 #define MAGPLSB         16.0F
 
-#define DEFF_TIME       0.01F
+#define DEFF_TIME       0.005F
 
 /*************************************** 自動生成関数 *************************************/
 #define CSB1_RESET 		        HAL_GPIO_WritePin(IMU_CSB1_GPIO_Port, IMU_CSB1_Pin, GPIO_PIN_RESET)

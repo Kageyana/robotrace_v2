@@ -14,13 +14,13 @@
 #define KI1		0
 #define KD1		150
 
-#define KP2		5
-#define KI2		60
+#define KP2		12
+#define KI2		45
 #define KD2		0
 
-#define KP3		5
-#define KI3		60
-#define KD3		20
+#define KP3		3
+#define KI3		50
+#define KD3		50
 
 #define KP4		58
 #define KI4		28
@@ -38,7 +38,7 @@ typedef struct {
 //====================================//
 // グローバル変数の宣言
 //====================================//
-extern int16_t	targetSpeed;	// 目標速度
+extern uint8_t	targetSpeed;	// 目標速度
 extern float 	targetAngle;    // 目標角度
 extern float    targetAngularVelocity;
 

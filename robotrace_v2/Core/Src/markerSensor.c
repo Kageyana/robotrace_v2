@@ -8,8 +8,6 @@
 uint8_t     SGmarker = 0;
 uint8_t  	crossLine = 0;
 
-int32_t  distL, distR, distN;
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getMarksensor
 // 処理概要     マーカーセンサの値を取得
@@ -37,7 +35,7 @@ uint8_t checkMarker( void ) {
 	uint8_t ret = 0;
 	static uint8_t	checkStart, nowMarker, existMarker;
 	static int32_t	encMarkerL, encMarkerR, encMarkerN;
-	// static int32_t  distL, distR, distN;
+	static int32_t  distL, distR, distN;
 
 
 	nowMarker = getMarkerSensor();	// マーカーセンサ値を取得
