@@ -38,7 +38,7 @@ void Interrupt1ms(void) {
         courseMarker = checkMarker();   // マーカー検知
         checkGoalMarker();              // ゴールマーカー処理
 
-        // マーカーを通過した時
+        // カーブマーカーを通過した時
         if (courseMarker == 2 && beforeCourseMarker == 0) {
             cntMarker++;    // マーカーカウント
         }

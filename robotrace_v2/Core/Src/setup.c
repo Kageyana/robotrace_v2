@@ -52,8 +52,9 @@ int16_t motorTestPwm = 200;
 ///////////////////////////////////////////////////////////////
 void setup( void )
 {
-	uint8_t cntLed;
+	uint8_t cntLed,i,j,k;
 	static uint8_t beforePparam, beforeBATLV, beforeHEX = 255;
+	static int16_t x=0,y=0;
 
 	SchmittBatery();    // バッテリレベルを取得
 	if (batteryLevel != beforeBATLV) {
@@ -456,14 +457,43 @@ void setup( void )
 				ssd1306_printf(Font_6x8,"microSD  ");
 			}
 
-			ssd1306_SetCursor(35,24);
-			ssd1306_printf(Font_6x8,"init:%d %d",initMSD, modeLOG);
+			ssd1306_SetCursor(35,16);
+			ssd1306_printf(Font_6x8,"init:%d %d %d",initMSD, modeLOG,numPPADarry);
 
-			if (swValTact == SW_UP && !modeLOG ) {
-				initLog();
-			}
-			if (swValTact == SW_DOWN && modeLOG) {
-				endLog();
+			dataTuningUD( &y, 1, 4, 0);
+			dataTuningLR( &x, 1, 0, 4);
+			
+
+
+			// i-jとx-yが一致したとき文字色反転
+			k = endFileIndex;
+			for(i=0;i<5;i++) {
+				if(0+(20*i) < 128 || k >= 0) {
+					k--;
+					for(j=0;j<5;j++) {
+						if(24+(8*j) < 64 || k >= 0) {
+							ssd1306_SetCursor(0+(20*i),24+(8*j));
+							if ( i == x && j == y ) {
+								if (swValTact == SW_PUSH) {
+									// 距離基準解析
+									numPPADarry = readLogDistance(fileNumbers[k]);
+									if (numPPADarry > 0) {
+										optimalTrace = BOODT_DISTANCE;
+										optimalIndex = 0;
+									}
+								}
+								ssd1306_printfB(Font_6x8,"%d",fileNumbers[k--]);
+							} else {
+								ssd1306_printf(Font_6x8,"%d",fileNumbers[k--]);
+							}
+							
+						} else {
+							break;
+						}
+					}
+				} else {
+					break;
+				}
 			}
 			break;
 		// //------------------------------------------------------------------
@@ -612,19 +642,17 @@ void setup( void )
 			}
 			
 			// ゲイン表示
-			dataTuningUD( &patternGain, 1, 1, 3);
+			dataTuningUD( &patternGain, 1, 3, 1);
 			if (trace_test == 0) {
-				ssd1306_SetCursor(21,44);
-				if (patternGain == 1) 	ssd1306_printfB(Font_7x10,"%3d",lineTraceCtrl.kd);
-				else 					ssd1306_printf(Font_7x10,"%3d",lineTraceCtrl.kd);
-
+				ssd1306_SetCursor(21,18);
+				if (patternGain == 1) 	ssd1306_printfB(Font_7x10,"%3d",lineTraceCtrl.kp);
+				else 					ssd1306_printf(Font_7x10,"%3d",lineTraceCtrl.kp);
 				ssd1306_SetCursor(21,32);
 				if (patternGain == 2)	ssd1306_printfB(Font_7x10,"%3d",lineTraceCtrl.ki);
 				else 					ssd1306_printf(Font_7x10,"%3d",lineTraceCtrl.ki);
-
-				ssd1306_SetCursor(21,18);
-				if (patternGain == 3) 	ssd1306_printfB(Font_7x10,"%3d",lineTraceCtrl.kp);
-				else 					ssd1306_printf(Font_7x10,"%3d",lineTraceCtrl.kp);
+				ssd1306_SetCursor(21,44);
+				if (patternGain == 3) 	ssd1306_printfB(Font_7x10,"%3d",lineTraceCtrl.kd);
+				else 					ssd1306_printf(Font_7x10,"%3d",lineTraceCtrl.kd);
 				
 				// 制御量表示
 				ssd1306_SetCursor(88,30);
@@ -632,16 +660,16 @@ void setup( void )
 			
 				switch( patternGain ) {
 					case 1:
-						// kd
-						dataTuningLR ( &lineTraceCtrl.kd, 1, 0, 255 );
+						// kp
+						dataTuningLR ( &lineTraceCtrl.kp, 1, 0, 255 );
 						break;
 					case 2:
 						// ki
 						dataTuningLR ( &lineTraceCtrl.ki, 1, 0, 255 );
 						break;
 					case 3:
-						// kp
-						dataTuningLR ( &lineTraceCtrl.kp, 1, 0, 255 );
+						// kd
+						dataTuningLR ( &lineTraceCtrl.kd, 1, 0, 255 );
 						break;
 				}
 			}
@@ -677,19 +705,18 @@ void setup( void )
 			}
 
 			// ゲイン表示
-			dataTuningUD( &patternGain, 1, 1, 3);
+			dataTuningUD( &patternGain, 1, 3, 1);
 			if (trace_test == 0) {
-				ssd1306_SetCursor(21,44);
-				if (patternGain == 1) 	ssd1306_printfB(Font_7x10,"%3d",veloCtrl.kd);
-				else 					ssd1306_printf(Font_7x10,"%3d",veloCtrl.kd);
-
+				ssd1306_SetCursor(21,18);
+				if (patternGain == 1) 	ssd1306_printfB(Font_7x10,"%3d",veloCtrl.kp);
+				else 					ssd1306_printf(Font_7x10,"%3d",veloCtrl.kp);
 				ssd1306_SetCursor(21,32);
 				if (patternGain == 2)	ssd1306_printfB(Font_7x10,"%3d",veloCtrl.ki);
 				else 					ssd1306_printf(Font_7x10,"%3d",veloCtrl.ki);
-
-				ssd1306_SetCursor(21,18);
-				if (patternGain == 3) 	ssd1306_printfB(Font_7x10,"%3d",veloCtrl.kp);
-				else 					ssd1306_printf(Font_7x10,"%3d",veloCtrl.kp);
+				ssd1306_SetCursor(21,44);
+				if (patternGain == 3) 	ssd1306_printfB(Font_7x10,"%3d",veloCtrl.kd);
+				else 					ssd1306_printf(Font_7x10,"%3d",veloCtrl.kd);
+				
 				
 				// 制御量表示
 				ssd1306_SetCursor(88,30);
@@ -697,16 +724,16 @@ void setup( void )
 			
 				switch( patternGain ) {
 					case 1:
-						// kd
-						dataTuningLR ( &veloCtrl.kd, 1, 0, 255 );
+						// kp
+						dataTuningLR ( &veloCtrl.kp, 1, 0, 255 );
 						break;
 					case 2:
 						// ki
 						dataTuningLR ( &veloCtrl.ki, 1, 0, 255 );
 						break;
 					case 3:
-						// kp
-						dataTuningLR ( &veloCtrl.kp, 1, 0, 255 );
+						// kd
+						dataTuningLR ( &veloCtrl.kd, 1, 0, 255 );
 						break;
 				}
 			}
@@ -741,19 +768,17 @@ void setup( void )
 			}
 
 			// ゲイン表示
-			dataTuningUD( &patternGain, 1, 1, 3);		
+			dataTuningUD( &patternGain, 1, 3, 1);		
 			if (trace_test == 0) {
-				ssd1306_SetCursor(21,44);
-				if (patternGain == 1) 	ssd1306_printfB(Font_7x10,"%3d",yawRateCtrl.kd);
-				else 					ssd1306_printf(Font_7x10,"%3d",yawRateCtrl.kd);
-
+				ssd1306_SetCursor(21,18);
+				if (patternGain == 1) 	ssd1306_printfB(Font_7x10,"%3d",yawRateCtrl.kp);
+				else 					ssd1306_printf(Font_7x10,"%3d",yawRateCtrl.kp);
 				ssd1306_SetCursor(21,32);
 				if (patternGain == 2)	ssd1306_printfB(Font_7x10,"%3d",yawRateCtrl.ki);
 				else 					ssd1306_printf(Font_7x10,"%3d",yawRateCtrl.ki);
-
-				ssd1306_SetCursor(21,18);
-				if (patternGain == 3) 	ssd1306_printfB(Font_7x10,"%3d",yawRateCtrl.kp);
-				else 					ssd1306_printf(Font_7x10,"%3d",yawRateCtrl.kp);
+				ssd1306_SetCursor(21,44);
+				if (patternGain == 3) 	ssd1306_printfB(Font_7x10,"%3d",yawRateCtrl.kd);
+				else 					ssd1306_printf(Font_7x10,"%3d",yawRateCtrl.kd);
 				
 				// 制御量表示
 				ssd1306_SetCursor(88,30);
@@ -761,16 +786,16 @@ void setup( void )
 			
 				switch( patternGain ) {
 					case 1:
-						// kd
-						dataTuningLR ( &yawRateCtrl.kd, 1, 0, 255 );
+						// kp
+						dataTuningLR ( &yawRateCtrl.kp, 1, 0, 255 );
 						break;
 					case 2:
 						// ki
 						dataTuningLR ( &yawRateCtrl.ki, 1, 0, 255 );
 						break;
 					case 3:
-						// kp
-						dataTuningLR ( &yawRateCtrl.kp, 1, 0, 255 );
+						// kd
+						dataTuningLR ( &yawRateCtrl.kd, 1, 0, 255 );
 						break;
 				}
 			}
@@ -826,24 +851,32 @@ void data_select ( uint8_t *data , uint8_t button ) {
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////////////////
 void dataTuningUD ( int16_t *data, int16_t add, int16_t min, int16_t max) {
+	int16_t sign;
+
+	if(max - min > 0) {
+		sign = 1;
+	} else {
+		sign = -1;
+	}
+
 	if ( cntSwitchUD >= 50 ) {
 		if ( swValTact == SW_UP || swValTact == SW_DOWN ) {
 			cntSwitchUDLong++; // 長押し時間計測
 			if ( swValTact == SW_UP  ) {
 				// インクリメント
 				if ( cntSwitchUDLong >= 20 ) {	// 長押し処理
-					*data += add;
+					*data += sign * add;
 				} else if (pushUD == 0) {	// 1回押し処理
 					pushUD = 1;
-					*data += add;
+					*data += sign * add;
 				}
 			} else if ( swValTact == SW_DOWN  ) {
 				// デクリメント
 				if ( cntSwitchUDLong >= 20 ) {	// 長押し処理
-					*data -= add;
+					*data -= sign * add;
 				} else if (pushUD == 0) {	// 1回押し処理
 					pushUD = 1;
-					*data -= add;
+					*data -= sign * add;
 				}
 			}
 		} else {
@@ -852,11 +885,20 @@ void dataTuningUD ( int16_t *data, int16_t add, int16_t min, int16_t max) {
 		}
 		cntSwitchUD = 0;
 
-		if ( *data > max) {
-			*data = min;
-		} else if ( *data < min ) {
-			*data = max;
+		if (sign > 0) {
+			if ( *data > max) {
+				*data = min;
+			} else if ( *data < min ) {
+				*data = max;
+			}
+		} else {
+			if ( *data > min) {
+				*data = max;
+			} else if ( *data < max ) {
+				*data = min;
+			}
 		}
+		
 	}
 }
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -866,24 +908,32 @@ void dataTuningUD ( int16_t *data, int16_t add, int16_t min, int16_t max) {
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////////////////
 void dataTuningLR ( int16_t *data, int16_t add, int16_t min, int16_t max) {
+	int16_t sign;
+
+	if(max - min > 0) {
+		sign = 1;
+	} else {
+		sign = -1;
+	}
+
 	if ( cntSwitchLR >= 50 ) {
 		if ( swValTact == SW_LEFT || swValTact == SW_RIGHT ) {
 			cntSwitchLRLong++; // 長押し時間計測
 			if ( swValTact == SW_RIGHT  ) {
 				// インクリメント
 				if ( cntSwitchLRLong >= 20 ) {	// 長押し処理
-					*data += add;
+					*data += sign * add;
 				} else if (pushLR == 0) {	// 1回押し処理
 					pushLR = 1;
-					*data += add;
+					*data += sign * add;
 				}
 			} else if ( swValTact == SW_LEFT  ) {
 				// デクリメント
 				if ( cntSwitchLRLong >= 20 ) {	// 長押し処理
-					*data -= add;
+					*data -= sign * add;
 				} else if (pushLR == 0) {	// 1回押し処理
 					pushLR = 1;
-					*data -= add;
+					*data -= sign * add;
 				}
 			}
 		} else {
@@ -892,10 +942,18 @@ void dataTuningLR ( int16_t *data, int16_t add, int16_t min, int16_t max) {
 		}
 		cntSwitchLR = 0;
 
-		if ( *data > max) {
-			*data = min;
-		} else if ( *data < min ) {
-			*data = max;
+		if (sign > 0) {
+			if ( *data > max) {
+				*data = min;
+			} else if ( *data < min ) {
+				*data = max;
+			}
+		} else {
+			if ( *data > min) {
+				*data = max;
+			} else if ( *data < max ) {
+				*data = min;
+			}
 		}
 	}
 }
@@ -906,24 +964,32 @@ void dataTuningLR ( int16_t *data, int16_t add, int16_t min, int16_t max) {
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////////////////
 void dataTuningUDF ( float *data, float add, float min, float max) {
+	int16_t sign;
+
+	if(max - min > 0) {
+		sign = 1;
+	} else {
+		sign = -1;
+	}
+
 	if ( cntSwitchUD >= 50 ) {
 		if ( swValTact == SW_UP || swValTact == SW_DOWN ) {
 			cntSwitchUDLong++; // 長押し時間計測
 			if ( swValTact == SW_UP  ) {
 				// インクリメント
 				if ( cntSwitchUDLong >= 20 ) {	// 長押し処理
-					*data += add;
+					*data += sign * add;
 				} else if (pushUD == 0) {	// 1回押し処理
 					pushUD = 1;
-					*data += add;
+					*data += sign * add;
 				}
 			} else if ( swValTact == SW_DOWN  ) {
 				// デクリメント
 				if ( cntSwitchUDLong >= 20 ) {	// 長押し処理
-					*data -= add;
+					*data -= sign * add;
 				} else if (pushUD == 0) {	// 1回押し処理
 					pushUD = 1;
-					*data -= add;
+					*data -= sign * add;
 				}
 			}
 		} else {
@@ -932,10 +998,18 @@ void dataTuningUDF ( float *data, float add, float min, float max) {
 		}
 		cntSwitchUD = 0;
 
-		if ( *data > max) {
-			*data = min;
-		} else if ( *data < min ) {
-			*data = max;
+		if (sign > 0) {
+			if ( *data > max) {
+				*data = min;
+			} else if ( *data < min ) {
+				*data = max;
+			}
+		} else {
+			if ( *data > min) {
+				*data = max;
+			} else if ( *data < max ) {
+				*data = min;
+			}
 		}
 	}
 }

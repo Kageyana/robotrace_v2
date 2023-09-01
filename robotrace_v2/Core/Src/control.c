@@ -50,7 +50,6 @@ uint32_t 	goalTime = 0;
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
 void initSystem (void) {
-	uint8_t rawData[6];
 
 	// ADC
 	if (HAL_ADC_Start_DMA(&hadc1, analogVal1, 10) != HAL_OK)	Error_Handler();
@@ -76,6 +75,7 @@ void initSystem (void) {
 	// microSD
 	initMSD = initMicroSD();
 
+
 	// Display
 	if(TACTSW1 == 1) {
 		modeDSP = true;
@@ -94,6 +94,8 @@ void initSystem (void) {
 
 	// Timer interrupt
 	HAL_TIM_Base_Start_IT(&htim6);
+
+	printf("hello \n");
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 systemLoop
@@ -166,7 +168,7 @@ void loopSystem (void) {
 				
 				// 変数初期化
 				encTotalN = 0;
-				// distanceStart = 0;
+				distanceStart = 0;
 				encRightMarker = encMM(600);
 				cntRun = 0;
 				BMI088val.angle.x = 0.0f;
@@ -189,40 +191,40 @@ void loopSystem (void) {
 				} else {
 					setTargetSpeed(targetParam.curve);
 				}
-			} //else if (optimalTrace == BOOST_MARKER) {
-			// 	// マーカー基準2次走行
-			// 	boostSpeed = PPAM[cntMarker].boostSpeed;
-            //     // 次のマーカー区間の曲率半径が小さい時、速度を抑える
-            //     if ( cntMarker < numPPADarry && fabs(ROCmarker[cntMarker+1]) <= 200.0F ) {
-            //         boostSpeed = boostSpeed - 4;
-            //     }
-            //     // 最低速度
-            //     if ( boostSpeed < 13 ) boostSpeed = 13;
+			} else if (optimalTrace == BOOST_MARKER) {
+				// マーカー基準2次走行
+				boostSpeed = PPAM[cntMarker].boostSpeed;
+                // 次のマーカー区間の曲率半径が小さい時、速度を抑える
+                if ( cntMarker < numPPADarry && fabs(ROCmarker[cntMarker+1]) <= 200.0F ) {
+                    boostSpeed = boostSpeed - 4;
+                }
+                // 最低速度
+                if ( boostSpeed < 13 ) boostSpeed = 13;
 
-            //     // 目標速度に設定
-            //     setTargetSpeed(boostSpeed);
-			// } else if (optimalTrace == BOODT_DISTANCE) {
-			// 	// 距離基準2次走行
-			// 	// スタートマーカーを超えた時から距離計測開始
-			// 	if (SGmarker > 0 && distanceStart == 0) {
-			// 		distanceStart = encTotalN;
-			// 	}
-			// 	// 一定区間ごとにインデックスを更新
-			// 	if (distanceStart > 0) {
-			// 		if (encTotalN - distanceStart >= encMM(CALCDISTANCE)) {
-			// 			boostSpeed = PPAD[optimalIndex].boostSpeed;	// 目標速度を更新
-			// 			distanceStart = encTotalN;	// 距離計測位置を更新
-			// 			if (optimalIndex+1 <= numPPADarry) {
-			// 				// 配列要素数を超えない範囲でインデックスを更新する
-			// 				optimalIndex++;
-			// 			}
-			// 		}
-			// 	} else if (distanceStart == 0) {
-			// 		boostSpeed = targetParam.boostStraight;
-			// 	}
-			// 	// 目標速度に設定
-			// 	setTargetSpeed(boostSpeed);
-			// }
+                // 目標速度に設定
+                setTargetSpeed(boostSpeed);
+			} else if (optimalTrace == BOODT_DISTANCE) {
+				// 距離基準2次走行
+				// スタートマーカーを超えた時から距離計測開始
+				if (SGmarker > 0 && distanceStart == 0) {
+					distanceStart = encTotalN;
+				}
+				// 一定区間ごとにインデックスを更新
+				if (distanceStart > 0) {
+					if (encTotalN - distanceStart >= encMM(CALCDISTANCE)) {
+						boostSpeed = PPAD[optimalIndex].boostSpeed;	// 目標速度を更新
+						distanceStart = encTotalN;	// 距離計測位置を更新
+						if (optimalIndex+1 <= numPPADarry) {
+							// 配列要素数を超えない範囲でインデックスを更新する
+							optimalIndex++;
+						}
+					}
+				} else if (distanceStart == 0) {
+					boostSpeed = targetParam.boostStraight;
+				}
+				// 目標速度に設定
+				setTargetSpeed(boostSpeed);
+			}
 			
 			// ライントレース
 			motorPwmOutSynth( lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);

@@ -24,6 +24,7 @@ typedef struct {
     uint8_t target;
     float mcl;
     float mcr;
+    uint16_t optimalIndex;
 } logData;
 logData logVal[3000];
 uint32_t  logIndex = 0 , sendLogNum = 0;
@@ -55,13 +56,13 @@ bool initMicroSD(void) {
     printf("SD CARD mounted successfully...\r\n");
 
     // 空き容量を計算
-    f_getfree("", &fre_clust, &pfs); // cluster size
-    total = (uint32_t)((pfs -> n_fatent - 2) * pfs -> csize * 0.5); // total capacity
-    printf("SD_SIZE: \t%lu\r\n", total);
-    free_space = (uint32_t)(fre_clust * pfs->csize*0.5);  // empty capacity
-    printf("SD free space: \t%lu\r\n", free_space);
+//    f_getfree("", &fre_clust, &pfs); // cluster size
+//    total = (uint32_t)((pfs -> n_fatent - 2) * pfs -> csize * 0.5); // total capacity
+//    printf("SD_SIZE: \t%lu\r\n", total);
+//    free_space = (uint32_t)(fre_clust * pfs->csize*0.5);  // empty capacity
+//    printf("SD free space: \t%lu\r\n", free_space);
 
-    // getFileNumbers();
+    getFileNumbers();
 
     return true;
   } else {
@@ -95,15 +96,14 @@ void createLog(void) {
   uint16_t fileNumber = 0;
 
   f_opendir(&dir,"/");  // directory open
+  
   do {
-    f_readdir(&dir,&fno);
-    if(fno.fname[0] != 0) {           // ファイルの有無を確認
-      tp = strtok(fno.fname,".");     // 拡張子削除
-      if ( atoi(tp) > fileNumber ) {  // 番号比較
-        fileNumber = atoi(tp);        // 文字列を数値に変換
-      }
+    f_readdir(&dir,&fno);  
+    tp = strtok(fno.fname,".");     // 拡張子削除
+    if ( atoi(tp) > fileNumber ) {  // 番号比較
+      fileNumber = atoi(tp);        // 文字列を数値に変換
     }
-  } while(fno.fname[0] != 0);
+  } while(fno.fname[0] != 0); // ファイルの有無を確認
 
   f_closedir(&dir);     // directory close
 
@@ -120,6 +120,9 @@ void createLog(void) {
   strcat(fileName, ".csv");           // 拡張子を追加
   fresult = f_open(&fil_W, fileName, FA_OPEN_ALWAYS | FA_WRITE);  // create file 
 
+  strcpy(columnTitle, "");
+  strcpy(formatLog, "");
+
   setLogStr("cntlog",       "%d");
   setLogStr("markerSensor",  "%d");
   setLogStr("encCurrentN",  "%d");
@@ -131,7 +134,7 @@ void createLog(void) {
   setLogStr("motorCurrentR",  "%d");
   // setLogStr("CurvatureRadius",  "%d");
   // setLogStr("cntMarker",  "%d");
-  // setLogStr("optimalIndex",  "%d");
+  setLogStr("optimalIndex",  "%d");
   // setLogStr("ROC",  "%d");
 
   strcat(columnTitle,"\n");
@@ -154,6 +157,7 @@ void writeLogBuffer (void) {
     logVal[logIndex].target = targetSpeed;
     logVal[logIndex].mcl = motorCurrentL;
     logVal[logIndex].mcr = motorCurrentR;
+    logVal[logIndex].optimalIndex = optimalIndex;
     logIndex++;
   }
 }
@@ -176,6 +180,7 @@ void writeLogPut(void) {
       ,logVal[i].target
       ,(int32_t)(logVal[i].mcl*10000)
       ,(int32_t)(logVal[i].mcr*10000)
+      ,optimalIndex
     );
   }
 }
@@ -186,17 +191,18 @@ void writeLogPut(void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void endLog(void) {
-  initIMU = false;
-  createLog(); // ログファイル作成
+
+  initIMU = false;  // IMUの使用を停止
+  modeLOG = false;  // ログ取得停止
+  // IMU用のCSピンがHIGHになるまで待つ
+  while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );
   
-  modeLOG = false;
-  // ログ書き込み
-  writeLogPut();
+  createLog();    // ログファイル作成
+  writeLogPut();  // ログ書き込み
   
-  // while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );
   f_close(&fil_W);
   initIMU = true;
-  // if (!optimalTrace) saveLogNumber(fileNumbers[endFileIndex]+1); // 探索走行のとき最新ログ番号を保存する
+  if (!optimalTrace) saveLogNumber(fileNumbers[endFileIndex]+1); // 探索走行のとき最新ログ番号を保存する
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getFileNumbers
@@ -211,18 +217,17 @@ void getFileNumbers(void) {
   uint8_t *tp, i;
 
   f_opendir(&dir,"/");  // directory open
+  
   do {
-    f_readdir(&dir,&fno);
-    if(fno.fname[0] != 0) {           // ファイルの有無を確認
-      if (strstr(fno.fname,".CSV") != NULL) {
-        // csvファイルのとき
-        tp = strtok(fno.fname,".");     // 拡張子削除
-        fileNumbers[endFileIndex] = atoi(tp);        // 文字列を数値に変換
-        endFileIndex += 1;
-      }
+    f_readdir(&dir,&fno);     
+    if (strstr(fno.fname,".csv") != NULL) {
+      // csvファイルのとき
+      tp = strtok(fno.fname,".");     // 拡張子削除
+      fileNumbers[endFileIndex] = atoi(tp);        // 文字列を数値に変換
+      endFileIndex++;
     }
-  } while(fno.fname[0] != 0);
-  endFileIndex -= 1;
+  } while(fno.fname[0] != 0); // ファイルの有無を確認
+  endFileIndex--;
 
   fileIndexLog = endFileIndex;
 
