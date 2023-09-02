@@ -820,10 +820,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(MOTOR_DIR_R_GPIO_Port, MOTOR_DIR_R_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(IMU_CSB2_GPIO_Port, IMU_CSB2_Pin, GPIO_PIN_SET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(IMU_CSB1_GPIO_Port, IMU_CSB1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, IMU_CSB2_Pin|IMU_CSB1_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(CS_MSD_GPIO_Port, CS_MSD_Pin, GPIO_PIN_SET);

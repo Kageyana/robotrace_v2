@@ -56,11 +56,11 @@ bool initMicroSD(void) {
     printf("SD CARD mounted successfully...\r\n");
 
     // 空き容量を計算
-//    f_getfree("", &fre_clust, &pfs); // cluster size
-//    total = (uint32_t)((pfs -> n_fatent - 2) * pfs -> csize * 0.5); // total capacity
-//    printf("SD_SIZE: \t%lu\r\n", total);
-//    free_space = (uint32_t)(fre_clust * pfs->csize*0.5);  // empty capacity
-//    printf("SD free space: \t%lu\r\n", free_space);
+    f_getfree("", &fre_clust, &pfs); // cluster size
+    total = (uint32_t)((pfs -> n_fatent - 2) * pfs -> csize * 0.5); // total capacity
+    printf("SD_SIZE: \t%lu\r\n", total);
+    free_space = (uint32_t)(fre_clust * pfs->csize*0.5);  // empty capacity
+    printf("SD free space: \t%lu\r\n", free_space);
 
     getFileNumbers();
 
@@ -213,23 +213,24 @@ void endLog(void) {
 void getFileNumbers(void) {
   DIR dir;                    // Directory
   FILINFO fno;                // File Info
+  FRESULT   fresult;
   uint8_t fileName[10];
   uint8_t *tp, i;
 
-  f_opendir(&dir,"/");  // directory open
-  
-  do {
-    f_readdir(&dir,&fno);     
-    if (strstr(fno.fname,".csv") != NULL) {
-      // csvファイルのとき
-      tp = strtok(fno.fname,".");     // 拡張子削除
-      fileNumbers[endFileIndex] = atoi(tp);        // 文字列を数値に変換
-      endFileIndex++;
-    }
-  } while(fno.fname[0] != 0); // ファイルの有無を確認
-  endFileIndex--;
+  fresult = f_opendir(&dir,"/");  // directory open
+  if (fresult == FR_OK) {
+    do {
+      f_readdir(&dir,&fno);     
+      if (strstr(fno.fname,".csv") != NULL) {
+        // csvファイルのとき
+        tp = strtok(fno.fname,".");     // 拡張子削除
+        fileNumbers[endFileIndex] = atoi(tp);        // 文字列を数値に変換
+        endFileIndex++;
+      }
+    } while(fno.fname[0] != 0); // ファイルの有無を確認
 
-  fileIndexLog = endFileIndex;
+    fileIndexLog = endFileIndex;
+  }
 
   f_closedir(&dir);     // directory close
 }
