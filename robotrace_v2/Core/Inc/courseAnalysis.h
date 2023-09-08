@@ -10,8 +10,8 @@
 #define ANALYSISBUFFSIZE    256
 #define DELTATIME           0.01F   // ログ保存周期[s]
 #define CALCDISTANCE        50      // 距離解析ステップ[mm]
-#define MACHINEACCELE       2.7F    // 加速度[m/s^2]
-#define MACHINEDECREACE     2.5F    // 減速度[m/s^2]
+#define MACHINEACCELE       2.0F    // 加速度[m/s^2]
+#define MACHINEDECREACE     2.0F    // 減速度[m/s^2]
 #define BOOST_MARKER        1
 #define BOODT_DISTANCE      2
 #define SEARCHRANGE         150     // 距離補正時の距離検索範囲[mm]

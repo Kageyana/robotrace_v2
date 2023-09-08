@@ -51,7 +51,9 @@ void saveLogNumber(int16_t fileNumber) {
 
     f_chdir("/setting");    // settingフォルダに移動
     fresult = f_open(&fil, "analiz.txt", FA_OPEN_ALWAYS | FA_WRITE);  // create file
-    f_printf(&fil, "%d",fileNumber);
+    if(fresult == FR_OK) {
+        f_printf(&fil, "%d",fileNumber);
+    }
     f_close(&fil);
     f_chdir("/");           // ルートディレクトリに移動
 }
@@ -260,7 +262,7 @@ uint16_t readLogDistance(int logNumber) {
                     PPAD[numD].distance = distance;
                     PPAD[numD].boostSpeed = asignVelocity(PPAD[numD].ROC);   // 曲率半径ごとの速度を計算する
 
-                    printf("%f\n",PPAD[numD].ROC);
+                    printf("%f\n",PPAD[numD].boostSpeed);
 
                     startEnc = distance;    // 距離計測開始位置を更新
                     numD++;          // 距離解析インデックス更新
@@ -282,6 +284,8 @@ uint16_t readLogDistance(int logNumber) {
 
         // 最初の要素は調整しない
         dl = (float)CALCDISTANCE / 1000;
+
+        // 加速 インデックス2から開始
         for (i=2;i<=numD;i++) {
             dv = (PPAD[i].boostSpeed - PPAD[i-1].boostSpeed);
             elapsedTime = fabs(dl /dv);
@@ -289,9 +293,10 @@ uint16_t readLogDistance(int logNumber) {
             if (acceleration > MACHINEACCELE) {
                 PPAD[i].boostSpeed = PPAD[i-1].boostSpeed + (MACHINEACCELE*dl);
             }
-            // printf("%f\n",PPAD[i].boostSpeed);
+//             printf("%f\n",PPAD[i].boostSpeed);
         }
 
+        // 減速 インデックス末尾から開始
         for (i=numD-1;i>=1;i--) { 
             dv = (PPAD[i].boostSpeed - PPAD[i+1].boostSpeed);
             elapsedTime = fabs(dl /dv);
@@ -302,9 +307,9 @@ uint16_t readLogDistance(int logNumber) {
             // printf("%f\n",PPAD[i].boostSpeed);
         }
 
-        for (i=0;i<=numD;i++) {
-            printf("%f\n",PPAD[i].boostSpeed);
-        }
+         for (i=0;i<=numD;i++) {
+             printf("%f\n",PPAD[i].boostSpeed);
+         }
         
         numPPAMarry = numM;
         numPPADarry = numD;
@@ -316,7 +321,7 @@ uint16_t readLogDistance(int logNumber) {
     printf("Analysis distance end\n");
 
     // 解析済みのログ番号を保存
-    saveLogNumber(logNumber);
+    // saveLogNumber(logNumber);
     analizedNumber = logNumber;
 
     return ret;

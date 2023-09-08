@@ -26,9 +26,13 @@ speedParam targetParam = {
 	PARAM_BOOST_STRAIGHT,
 	PARAM_BOOST_1500,
 	PARAM_BOOST_800,
+	PARAM_BOOST_700,
+	PARAM_BOOST_600,
 	PARAM_BOOST_600,
 	PARAM_BOOST_400,
-	PARAM_BOOST_200
+	PARAM_BOOST_300,
+	PARAM_BOOST_200,
+	PARAM_BOOST_100,
 	};
 
 // タイマ関連
@@ -74,7 +78,7 @@ void initSystem (void) {
 	initIMU = initBMI088();
 	// microSD
 	initMSD = initMicroSD();
-
+	getLogNumber(); // 前回の解析ログナンバーを取得
 
 	// Display
 	if(TACTSW1 == 1) {
@@ -120,9 +124,9 @@ void loopSystem (void) {
 			}
 				
 			if (start) {
-				ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
-				ssd1306_SetCursor(56,28);
-				ssd1306_printf(Font_16x26,"5");
+				// ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+				// ssd1306_SetCursor(56,28);
+				// ssd1306_printf(Font_16x26,"5");
 				countdown = 5000;		// カウントダウンスタート
 				powerLinesensors(1);	// ラインセンサ ON
 				patternTrace = 1;

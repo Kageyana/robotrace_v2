@@ -171,7 +171,7 @@ void setup( void )
 					// 初期位置に戻る
 					setTargetAngularVelocity(CALIBRATIONSPEED);
 					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-					if (BMI088val.angle.z > 0) {
+					if (lSensor[5] < 1000) {
 						modeCalLinesensors = 0;
 						patternCalibration = 8;
 					}
@@ -287,7 +287,7 @@ void setup( void )
 						ssd1306_FillRectangle(0,16,127,63, Black); // 黒塗り
 						ssd1306_SetCursor(47,16);
 						ssd1306_printf(Font_6x8,"Motor");
-					}
+						motor_test = 0;					}
 					// Duty
 					ssd1306_SetCursor(35,30);
 					ssd1306_printf(Font_6x8,"Duty:%4d",motorTestPwm);
@@ -389,6 +389,7 @@ void setup( void )
 						ssd1306_DrawArc(64,81,35,90,270,White);
 						ssd1306_Line(2,63,34,63,White);
 						ssd1306_Line(93,63,126,63,White);
+						motor_test = 0;
 					}
 
 					if (lSensorOffset[0] > 0 && modeCalLinesensors == 0) {
@@ -437,8 +438,8 @@ void setup( void )
 						ssd1306_printf(Font_6x8,"%4d",lSensor[9]);
 					}
 
-					data_select( &trace_test, SW_PUSH );
-					if ( trace_test == 1 ) {
+					data_select( &motor_test, SW_PUSH );
+					if ( motor_test == 1 ) {
 						powerLinesensors(1);
 					} else {
 						powerLinesensors(0);
@@ -480,6 +481,8 @@ void setup( void )
 									if (numPPADarry > 0) {
 										optimalTrace = BOODT_DISTANCE;
 										optimalIndex = 0;
+										saveLogNumber(fileNumbers[k]);
+										HAL_Delay(500);
 									}
 								}
 								ssd1306_printfB(Font_6x8,"%d",fileNumbers[k--]);
@@ -1020,13 +1023,20 @@ void dataTuningUDF ( float *data, float add, float min, float max) {
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////////////////
 void caribrateSensors(void) {
+	static uint8_t mode = 0;
+
 	switch (patternCalibration) {
 		case 1:
 			calTimes = 1;
 			setTargetSpeed(0);
 
 			// スイッチ入力待ち
-			if (swValMainTact == SW_TACT_L) {
+			if (swValMainTact == SW_TACT_L || swValMainTact == SW_TACT_R) {
+				if (swValMainTact == SW_TACT_L) {
+					mode = START_SERACH;
+				} else if (swValMainTact == SW_TACT_R) {
+					mode = START_OPTIMAL;
+				}
 				veloCtrl.Int = 0;	// I成分リセット
 				if(lSensorOffset[0] > 0) {
 					// キャリブレーション実施済み
@@ -1094,7 +1104,7 @@ void caribrateSensors(void) {
 			// 初期位置に戻る
 			setTargetAngularVelocity(CALIBRATIONSPEED);
 			motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-			if (BMI088val.angle.z > 0) {
+			if (lSensor[5] < 1000) {
 				modeCalLinesensors = 0;
 				patternCalibration = 8;
 			}
@@ -1104,7 +1114,15 @@ void caribrateSensors(void) {
 			// 停止
 			motorPwmOutSynth( 0, veloCtrl.pwm, 0, 0);
 			if (abs(encCurrentN) == 0) {
-				start = 1;
+				if(mode == START_OPTIMAL) {
+					// 距離基準解析
+					numPPADarry = readLogDistance(analizedNumber);
+					if (numPPADarry > 0) {
+						optimalTrace = BOODT_DISTANCE;
+						optimalIndex = 0;
+					}
+				}
+				start = mode;
 			}
 			break;
 	

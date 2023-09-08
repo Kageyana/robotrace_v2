@@ -202,7 +202,6 @@ void endLog(void) {
   
   f_close(&fil_W);
   initIMU = true;
-  if (!optimalTrace) saveLogNumber(fileNumbers[endFileIndex]+1); // 探索走行のとき最新ログ番号を保存する
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getFileNumbers

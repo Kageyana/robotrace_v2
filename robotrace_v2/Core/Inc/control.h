@@ -13,19 +13,23 @@
 #define PARAM_STRAIGHT              1.8F
 #define PARAM_CURVE                 1.4F
 #define PARAM_STOP                  0.8F
-#define PARAM_BOOST_STRAIGHT        2.2F
+#define PARAM_BOOST_STRAIGHT        2.4F
 #define PARAM_BOOST_1500            2.2F
 #define PARAM_BOOST_800             2.0F
-#define PARAM_BOOST_700             1.8
-#define PARAM_BOOST_600             1.7F
-#define PARAM_BOOST_500             1.6F
-#define PARAM_BOOST_400             1.5F
-#define PARAM_BOOST_300             1.4F
-#define PARAM_BOOST_200             1.3F
-#define PARAM_BOOST_100             1.1F
+#define PARAM_BOOST_700             1.9F
+#define PARAM_BOOST_600             1.9F
+#define PARAM_BOOST_500             1.9F
+#define PARAM_BOOST_400             1.8F
+#define PARAM_BOOST_300             1.8F
+#define PARAM_BOOST_200             1.7F
+#define PARAM_BOOST_100             1.5F
 
 // ゴール
 #define COUNT_GOAL              2       // ゴールマーカーを読む回数
+
+// スタートモード
+#define START_SERACH            3
+#define START_OPTIMAL           4
 
 typedef struct {
     float straight;
