@@ -99,6 +99,8 @@ void initSystem (void) {
 	// Timer interrupt
 	HAL_TIM_Base_Start_IT(&htim6);
 
+	// ledset(100,0,0);
+
 	printf("hello \n");
 }
 ///////////////////////////////////////////////////////////////////////////
@@ -207,7 +209,7 @@ void loopSystem (void) {
 
                 // 目標速度に設定
                 setTargetSpeed(boostSpeed);
-			} else if (optimalTrace == BOODT_DISTANCE) {
+			} else if (optimalTrace == BOOST_DISTANCE) {
 				// 距離基準2次走行
 				// スタートマーカーを超えた時から距離計測開始
 				if (SGmarker > 0 && distanceStart == 0) {
@@ -257,7 +259,7 @@ void loopSystem (void) {
 				if(modeDSP) {
 					ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
 					ssd1306_SetCursor(0,25);
-					ssd1306_printf(Font_11x18,"Time");
+					ssd1306_printf(Font_11x18,"Time %d",optimalTrace);
 					ssd1306_SetCursor(0,45);
 					ssd1306_printf(Font_11x18,"%6.3f[s]",(float)goalTime/1000);
 					ssd1306_UpdateScreen();  // グラフィック液晶更新
@@ -298,7 +300,7 @@ void emargencyStop (void) {
 		ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
 
 		ssd1306_SetCursor(36,25);
-		ssd1306_printf(Font_11x18,"EMS!!");
+		ssd1306_printf(Font_11x18,"EMS!! %d",optimalTrace);
 
 		ssd1306_SetCursor(0,45);
 		switch(emcStop) {

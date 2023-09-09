@@ -262,7 +262,7 @@ void setup( void )
 					ssd1306_printf(Font_6x8,"BST 200:%3gm/s", targetParam.boost200);
 					break;
 				case 10:
-					// 2次走行_R200
+					// 2次走行_R100
 					dataTuningUDF( &targetParam.boost100, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
 					ssd1306_printf(Font_6x8,"BST 100:%3gm/s", targetParam.boost100);
@@ -459,7 +459,7 @@ void setup( void )
 			}
 
 			ssd1306_SetCursor(35,16);
-			ssd1306_printf(Font_6x8,"init:%d %d %d",initMSD, modeLOG,numPPADarry);
+			ssd1306_printf(Font_6x8,"init:%d %7d",initMSD,numPPADarry);
 
 			dataTuningUD( &y, 1, 4, 0);
 			dataTuningLR( &x, 1, 0, 4);
@@ -479,10 +479,10 @@ void setup( void )
 									// 距離基準解析
 									numPPADarry = readLogDistance(fileNumbers[k]);
 									if (numPPADarry > 0) {
-										optimalTrace = BOODT_DISTANCE;
+										optimalTrace = BOOST_DISTANCE;
 										optimalIndex = 0;
-										saveLogNumber(fileNumbers[k]);
-										HAL_Delay(500);
+										// saveLogNumber(fileNumbers[k]);
+										HAL_Delay(100);
 									}
 								}
 								ssd1306_printfB(Font_6x8,"%d",fileNumbers[k--]);
@@ -1118,7 +1118,7 @@ void caribrateSensors(void) {
 					// 距離基準解析
 					numPPADarry = readLogDistance(analizedNumber);
 					if (numPPADarry > 0) {
-						optimalTrace = BOODT_DISTANCE;
+						optimalTrace = BOOST_DISTANCE;
 						optimalIndex = 0;
 					}
 				}

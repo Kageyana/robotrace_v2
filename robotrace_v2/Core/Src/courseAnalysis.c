@@ -9,8 +9,8 @@
 float       ROCmarker[ANALYSISBUFFSIZE] = {0}; // マーカー区間ごとの曲率半径 ROC(Radius Of Curvature)
 uint8_t     optimalTrace = 0;
 uint16_t    optimalIndex;
-uint16_t    numPPADarry;                    // path palanning analysis distance (PPAD)
-uint16_t    numPPAMarry;                    // path palanning analysis marker (PPAM)
+int16_t     numPPADarry;                    // path palanning analysis distance (PPAD)
+int16_t     numPPAMarry;                    // path palanning analysis marker (PPAM)
 float       boostSpeed;
 int32_t     distanceStart, distanceEnd; 
 int16_t     analizedNumber = 0;             // 前回解析したログ番号
@@ -28,7 +28,7 @@ float calcROC(float velo, float angvelo) {
     float dl, drad, ret;
     
     dl = velo / PALSE_MILLIMETER * 1000 * DELTATIME; // [pilse] → [mm/s] → [mm] 
-    drad = angvelo * DELTATIME;            // [rad/s] → [rad]
+    drad = angvelo * DPS2RDS * DELTATIME;            // [deg/s] → [rad]
     ret = dl / drad;
     // 曲率半径が大きい＝直線の場合は極大にする
     if (fabs(ret) > 1500.0F) {
@@ -180,12 +180,12 @@ uint16_t readLogMarker(int logNumber) {
 // 引数         ログ番号(ファイル名)
 // 戻り値       最適速度配列の最大要素数
 /////////////////////////////////////////////////////////////////////
-uint16_t readLogDistance(int logNumber) {
+int16_t readLogDistance(int logNumber) {
     // ファイル読み込み
     FIL         fil_Read;
     FRESULT     fresult;
     uint8_t     fileName[10];
-    uint16_t    ret = 0;
+    int16_t     ret = 0;
     uint32_t    i;
 
     snprintf(fileName,sizeof(fileName),"%d",logNumber);   // 数値を文字列に変換
@@ -193,7 +193,7 @@ uint16_t readLogDistance(int logNumber) {
     fresult = f_open(&fil_Read, fileName, FA_OPEN_ALWAYS | FA_READ);  // csvファイルを開く
 
     if (fresult == FR_OK) {
-        printf("Analysis distance start\n");
+        // printf("Analysis distance start\n");
 
         // // ヘッダーの取得
         // TCHAR     header[256];
@@ -213,13 +213,14 @@ uint16_t readLogDistance(int logNumber) {
         int32_t   time, marker,velo,angVelo,distance,null;
         int32_t   startEnc=0, numD=0, numM=0, cntCurR=0,beforeMarker=0;
         bool      analysis=false;
-        float     ROCbuff[500] = {0};
+        float     ROCbuff[600] = {0};
         float*    sortROC;
 
         // 前処理
         // 構造体配列の初期化
         memset(&PPAD, 0, sizeof(AnalysisData) * ANALYSISBUFFSIZE);
         memset(&PPAM, 0, sizeof(AnalysisData) * ANALYSISBUFFSIZE);
+        // memset(&ROCbuff, 0, sizeof(float) * 500);
 
         // ログデータ取得開始
         while (f_gets(log,256,&fil_Read) != NULL) {
@@ -262,23 +263,24 @@ uint16_t readLogDistance(int logNumber) {
                     PPAD[numD].distance = distance;
                     PPAD[numD].boostSpeed = asignVelocity(PPAD[numD].ROC);   // 曲率半径ごとの速度を計算する
 
-                    printf("%f\n",PPAD[numD].boostSpeed);
+                    // printf("%f\n",PPAD[numD].boostSpeed);
 
                     startEnc = distance;    // 距離計測開始位置を更新
                     numD++;          // 距離解析インデックス更新
+                    if(numD >= ANALYSISBUFFSIZE) return -1;
                 }
                 // 曲率半径の計算
                 ROCbuff[cntCurR] = calcROC((float)velo, (float)angVelo/10000);
                 cntCurR++;  // 曲率半径用配列のカウント
+                if(cntCurR >= 500) return -2;
             }
-
             beforeMarker = marker;  // 前回マーカーを記録
         }
         // インデックスが1多くなるので調整
         numM--;
         numD--; 
 
-        printf("fix velocity\n");
+        // printf("fix velocity\n");
         // 目標速度配列の整形 加減速が間に合うように距離を調整する
         float acceleration, elapsedTime, dv, dl;
 
@@ -307,9 +309,9 @@ uint16_t readLogDistance(int logNumber) {
             // printf("%f\n",PPAD[i].boostSpeed);
         }
 
-         for (i=0;i<=numD;i++) {
-             printf("%f\n",PPAD[i].boostSpeed);
-         }
+        //  for (i=0;i<=numD;i++) {
+        //      printf("%f\n",PPAD[i].boostSpeed);
+        //  }
         
         numPPAMarry = numM;
         numPPADarry = numD;
@@ -318,7 +320,7 @@ uint16_t readLogDistance(int logNumber) {
     }
     f_close(&fil_Read);
 
-    printf("Analysis distance end\n");
+    // printf("Analysis distance end\n");
 
     // 解析済みのログ番号を保存
     // saveLogNumber(logNumber);

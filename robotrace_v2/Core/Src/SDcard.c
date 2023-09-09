@@ -22,8 +22,6 @@ typedef struct {
     float zg;
     uint32_t distance;
     uint8_t target;
-    float mcl;
-    float mcr;
     uint16_t optimalIndex;
 } logData;
 logData logVal[3000];
@@ -130,12 +128,12 @@ void createLog(void) {
   setLogStr("encTotalN",    "%d");
   setLogStr("targetSpeed",    "%d");
 
-  setLogStr("motorCurrentL",  "%d");
-  setLogStr("motorCurrentR",  "%d");
+  // setLogStr("motorCurrentL",  "%d");
+  // setLogStr("motorCurrentR",  "%d");
   // setLogStr("CurvatureRadius",  "%d");
   // setLogStr("cntMarker",  "%d");
   setLogStr("optimalIndex",  "%d");
-  // setLogStr("ROC",  "%d");
+  setLogStr("ROC",  "%d");
 
   strcat(columnTitle,"\n");
   strcat(formatLog,"\n");
@@ -155,8 +153,8 @@ void writeLogBuffer (void) {
     logVal[logIndex].zg = BMI088val.gyro.z;
     logVal[logIndex].distance = encTotalN;
     logVal[logIndex].target = targetSpeed;
-    logVal[logIndex].mcl = motorCurrentL;
-    logVal[logIndex].mcr = motorCurrentR;
+    // logVal[logIndex].mcl = motorCurrentL;
+    // logVal[logIndex].mcr = motorCurrentR;
     logVal[logIndex].optimalIndex = optimalIndex;
     logIndex++;
   }
@@ -172,15 +170,16 @@ void writeLogPut(void) {
 
   for(i = 0;i<logIndex;i++) {
     f_printf(&fil_W, formatLog
-      ,logVal[i].time 
+      ,logVal[i].time
       ,logVal[i].marker
       ,logVal[i].speed
       ,(int32_t)(logVal[i].zg*10000)
       ,logVal[i].distance
       ,logVal[i].target
-      ,(int32_t)(logVal[i].mcl*10000)
-      ,(int32_t)(logVal[i].mcr*10000)
-      ,optimalIndex
+      // ,(int32_t)(logVal[i].mcl*10000)
+      // ,(int32_t)(logVal[i].mcr*10000)
+      ,logVal[i].optimalIndex
+      ,(int32_t)(calcROC(logVal[i].speed,logVal[i].zg)*10)
     );
   }
 }
