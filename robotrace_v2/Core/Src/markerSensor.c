@@ -77,54 +77,6 @@ uint8_t checkMarker( void ) {
 	if (distR > encMM(40) && distR <= encMM(50) && distL > encMM(140)) {
 		ret = RIGHTMARKER;
 	}
-
-	// // クロスライン判定
-	// if (checkCrossLine() == true) {
-	// 	crossLine = 1;
-	// 	encMarkerN = encTotalN;
-	// 	checkStart = 0;
-	// 	ret = CROSSLINE;
-	// } else {
-	// 	nowMarker = getMarkerSensor();	// マーカーセンサ値を取得
-
-	// 	if (crossLine == 1 && encTotalN - encMarkerN >= encMM(120)) {
-	// 		// クロスライン通過後180mm(ラインセンサからマーカーセンサまで80mm)以内はマーカー検知をしない
-	// 		crossLine = 0;
-	// 	} else {
-	// 		if (nowMarker > 0 && checkStart == 0) {
-	// 			existMarker = nowMarker;// 最初に検知したマーカーを記録
-	// 			checkStart = 1;			// 読み飛ばし判定開始
-	// 			encMarkerN = encTotalN;	// 距離計測開始
-	// 		}
-			
-	// 		// マーカー判定
-	// 		if (checkStart == 1) {
-	// 			if (encTotalN - encMarkerN <= encMM(50)) {
-	// 				if (encTotalN - encMarkerN <= encMM(10)) {
-	// 					// 10mm以内で反応が消えたら誤検出防止判定
-	// 					if(nowMarker == 0) {
-	// 						ret = 100;
-	// 					}
-	// 				}
-	// 				// 反対側のマーカーが反応したらクロスライン
-	// 				if(nowMarker != existMarker && nowMarker > 0) {
-	// 					crossLine = 1;
-	// 					ret = CROSSLINE;
-	// 				}
-	// 			} else {
-	// 				ret = existMarker;
-	// 			}
-	// 			// マーカー検知終了処理
-	// 			if (ret > 0) {
-	// 				checkStart = 0;
-	// 				encMarkerN = encTotalN;
-	// 				if (ret == 100) {
-	// 					ret = 0;
-	// 				}
-	// 			}
-	// 		}
-	// 	}	
-	// }
 	
 	return ret;
 }

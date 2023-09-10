@@ -295,7 +295,6 @@ int16_t readLogDistance(int logNumber) {
             if (acceleration > MACHINEACCELE) {
                 PPAD[i].boostSpeed = PPAD[i-1].boostSpeed + (MACHINEACCELE*dl);
             }
-//             printf("%f\n",PPAD[i].boostSpeed);
         }
 
         // 減速 インデックス末尾から開始
@@ -306,7 +305,6 @@ int16_t readLogDistance(int logNumber) {
             if (acceleration > MACHINEDECREACE) {
                 PPAD[i].boostSpeed = PPAD[i+1].boostSpeed + (MACHINEDECREACE*dl);
             }
-            // printf("%f\n",PPAD[i].boostSpeed);
         }
 
         //  for (i=0;i<=numD;i++) {

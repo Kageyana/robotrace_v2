@@ -21,8 +21,8 @@
 #define PARAM_BOOST_500             1.6F
 #define PARAM_BOOST_400             1.5F
 #define PARAM_BOOST_300             1.3F
-#define PARAM_BOOST_200             1.3F
-#define PARAM_BOOST_100             1.3F
+#define PARAM_BOOST_200             1.2F
+#define PARAM_BOOST_100             1.1F
 
 // ゴール
 #define COUNT_GOAL              2       // ゴールマーカーを読む回数
