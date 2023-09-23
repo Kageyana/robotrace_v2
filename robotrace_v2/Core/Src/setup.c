@@ -179,7 +179,7 @@ void setup( void )
 
 				case 8:
 					// 停止
-					motorPwmOutSynth( 0, veloCtrl.pwm, 0, 0);
+					motorPwmOutSynth( lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 					if (abs(encCurrentN) == 0) {
 						trace_test = 0;
 						start = 1;
@@ -464,7 +464,19 @@ void setup( void )
 			dataTuningUD( &y, 1, 4, 0);
 			dataTuningLR( &x, 1, 0, 4);
 			
-
+			// if (swValTact == SW_PUSH) {
+			// 	// 距離基準解析
+			// 	initIMU = 0;
+			// 	numPPADarry = readLogTest(35);
+			// 	initIMU = 1;
+			// 	if (numPPADarry > 0) {
+			// 		optimalTrace = BOOST_DISTANCE;
+			// 		optimalIndex = 0;
+			// 		// saveLogNumber(fileNumbers[k]);
+					
+			// 	}
+			// 	HAL_Delay(100);
+			// }
 
 			// i-jとx-yが一致したとき文字色反転
 			k = endFileIndex;
@@ -478,6 +490,7 @@ void setup( void )
 								if (swValTact == SW_PUSH) {
 									// 距離基準解析
 									numPPADarry = readLogDistance(fileNumbers[k]);
+									// numPPADarry = readLogTest(fileNumbers[k]);
 									if (numPPADarry > 0) {
 										optimalTrace = BOOST_DISTANCE;
 										optimalIndex = 0;

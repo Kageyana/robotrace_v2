@@ -39,11 +39,13 @@ void getEncoder(void) {
     encTotalR += encCurrentR;
     encTotalL += encCurrentL;
     encTotalN += encCurrentN;
-
+    
     // 外部変数
     enc1 += encCurrentN;
     encRightMarker += encCurrentN;
     encCurve += encCurrentN;
+    encTotalOptimal += encCurrentN;
+
     // 前回値を更新
     encBufR = encRawR;
     encBufL = encRawL;

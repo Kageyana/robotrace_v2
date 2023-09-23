@@ -69,6 +69,7 @@ extern speedParam targetParam;
 extern uint8_t  courseMarker;
 extern uint8_t  beforeCourseMarker;
 extern uint32_t cntMarker;
+extern uint8_t  courseMarkerLog;
 
 // タイマ関連
 extern uint32_t cntRun;

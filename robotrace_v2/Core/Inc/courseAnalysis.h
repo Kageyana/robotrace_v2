@@ -4,6 +4,7 @@
 // インクルード
 //====================================//
 #include "main.h"
+#include "stdlib.h"
 //====================================//
 // シンボル定義
 //====================================//
@@ -39,9 +40,11 @@ extern uint8_t  optimalTrace;
 extern uint16_t optimalIndex;
 extern int16_t  numPPADarry;
 extern int16_t  numPPAMarry;
+extern int16_t  pathedMarker;
 extern float    boostSpeed;
 extern int32_t  distanceStart, distanceEnd;
 extern int16_t  analizedNumber;
+extern int32_t      encTotalOptimal;
 
 // 解析関係
 extern AnalysisData PPAM[ANALYSISBUFFSIZE];
@@ -54,8 +57,8 @@ extern float        ROCmarker[ANALYSISBUFFSIZE];
 float       calcROC(float velo, float angvelo);
 void        saveLogNumber(int16_t fileNumber);
 void        getLogNumber(void);
-uint16_t    readLogMarker(int logNumber);
-int16_t    readLogDistance(int logNumber);
+int16_t     readLogDistance(int logNumber);
 float       asignVelocity(float ROC);
 int         cmpfloat(const void * n1, const void * n2);
+int16_t     readLogTest(int logNumber);
 #endif // COURSEANALYSIS_H_

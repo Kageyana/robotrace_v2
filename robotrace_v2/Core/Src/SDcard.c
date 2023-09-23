@@ -122,7 +122,7 @@ void createLog(void) {
   strcpy(formatLog, "");
 
   setLogStr("cntlog",       "%d");
-  setLogStr("markerSensor",  "%d");
+  setLogStr("courseMarker",  "%d");
   setLogStr("encCurrentN",  "%d");
   setLogStr("gyroVal_Z",   "%d");
   setLogStr("encTotalN",    "%d");
@@ -148,10 +148,10 @@ void createLog(void) {
 void writeLogBuffer (void) {
   if (modeLOG) {
     logVal[logIndex].time = cntLog;
-    logVal[logIndex].marker = getMarkerSensor();
+    logVal[logIndex].marker = courseMarkerLog;
     logVal[logIndex].speed = encCurrentN;
     logVal[logIndex].zg = BMI088val.gyro.z;
-    logVal[logIndex].distance = encTotalN;
+    logVal[logIndex].distance = encTotalOptimal;
     logVal[logIndex].target = targetSpeed;
     // logVal[logIndex].mcl = motorCurrentL;
     // logVal[logIndex].mcr = motorCurrentR;

@@ -34,20 +34,21 @@ uint8_t getMarkerSensor ( void ) {
 uint8_t checkMarker( void ) {
 	uint8_t ret = 0;
 	static uint8_t	checkStart, nowMarker, existMarker;
-	static int32_t	encMarkerL, encMarkerR, encMarkerN;
+	static int32_t	encMarkerL=0, encMarkerR=1, encMarkerN, nowEncTotalN;
 	static int32_t  distL, distR, distN;
 
 
 	nowMarker = getMarkerSensor();	// マーカーセンサ値を取得
+	nowEncTotalN = encTotalN;
 
 	// 反応があればマーカー幅計測開始
 	if (nowMarker > 0 && checkStart == 0) {
 		existMarker = nowMarker;// 最初に検知したマーカーを記録
-		checkStart = 1;			// 読み飛ばし判定開始
-		encMarkerN = encTotalN;	// 距離計測開始
+		checkStart = 1;			// マーカー幅計測開始
+		encMarkerN = nowEncTotalN;	// 距離計測開始
 	}
 	if (checkStart == 1) {
-		if (encTotalN - encMarkerN <= encMM(10)) {
+		if (nowEncTotalN - encMarkerN <= encMM(10)) {
 			// 10mm以内で反応が消えたら誤検出判定
 			if (nowMarker == 0) {
 				existMarker = 0;
@@ -56,26 +57,36 @@ uint8_t checkMarker( void ) {
 			if (nowMarker != existMarker) {
 				existMarker = nowMarker;
 			}
-		} else if(encTotalN - encMarkerN > encMM(10)) {
-			// マーカーセンサが反応した位置
+		} else if(nowEncTotalN - encMarkerN > encMM(10)) {
+			// 10mm以上センサが反応し続けたらマーカーと判定
+			// マーカー位置を記録
 			if(existMarker == 0x1) {
-				encMarkerR = encTotalN;
+				encMarkerR = nowEncTotalN;
 			} else if(existMarker == 0x2) {
-				encMarkerL = encTotalN;
+				encMarkerL = nowEncTotalN;
 			} else if (existMarker == 0x3) {
-				encMarkerR = encTotalN;
-				encMarkerL = encTotalN;
+				encMarkerR = nowEncTotalN;
+				encMarkerL = nowEncTotalN;
 			}
 			checkStart = 0;
 		}
 	}
 
-	// 反応してからの距離
-	distL = encTotalN - encMarkerL;
-	distR = encTotalN - encMarkerR;
+	// 現在地からマーカー位置までの距離
+	distL = nowEncTotalN - encMarkerL;
+	distR = nowEncTotalN - encMarkerR;
 
+	// ゴールマーカーを検出してから40~50mm走行後かつカーブマーカーを140mm検出していないとき
 	if (distR > encMM(40) && distR <= encMM(50) && distL > encMM(140)) {
 		ret = RIGHTMARKER;
+	}
+	// カーブマーカーを検出してから40~50mm走行後かつゴールマーカーを40mm検出していないとき
+	if (distL > encMM(20) && distL <= encMM(30) && distR > encMM(40)) {
+		ret = LEFTMARKER;
+	}
+
+	if (distL > encMM(20) && distL <= encMM(30) && distR == distL) {
+		ret = CROSSLINE;
 	}
 	
 	return ret;

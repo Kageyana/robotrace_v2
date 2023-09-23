@@ -10,10 +10,12 @@ float       ROCmarker[ANALYSISBUFFSIZE] = {0}; // マーカー区間ごとの曲
 uint8_t     optimalTrace = 0;
 uint16_t    optimalIndex;
 int16_t     numPPADarry;                    // path palanning analysis distance (PPAD)
-int16_t     numPPAMarry;                    // path palanning analysis marker (PPAM)
+int16_t     numPPAMarry;                    // path palanning analysis marker (PPAM1)
+int16_t     pathedMarker = 0;
 float       boostSpeed;
 int32_t     distanceStart, distanceEnd; 
 int16_t     analizedNumber = 0;             // 前回解析したログ番号
+int32_t     encTotalOptimal = 0;            // 2次走行用の距離変数(距離補正をする)
 
 AnalysisData PPAM[ANALYSISBUFFSIZE];
 AnalysisData PPAD[ANALYSISBUFFSIZE];
@@ -88,93 +90,6 @@ void getLogNumber(void) {
     f_chdir("/");           // ルートディレクトリに移動
 }
 /////////////////////////////////////////////////////////////////////
-// モジュール名 readLogMarker
-// 処理概要     マーカー基準2次走行
-// 引数         ログ番号(ファイル名)
-// 戻り値       最適速度配列の最大要素数
-/////////////////////////////////////////////////////////////////////
-uint16_t readLogMarker(int logNumber) {
-    // ファイル読み込み
-    FIL         fil_Read;
-    FRESULT     fresult;
-    uint8_t     fileName[10];
-    uint16_t    ret = 0;
-
-
-    snprintf(fileName,sizeof(fileName),"%d",logNumber);   // 数値を文字列に変換
-    strcat(fileName,".csv");                              // 拡張子を追加
-    fresult = f_open(&fil_Read, fileName, FA_OPEN_ALWAYS | FA_READ);  // csvファイルを開く
-
-    if (fresult == FR_OK) {
-        printf("Analysis marker start\n");
-
-        // // ヘッダーの取得
-        // TCHAR     header[256];
-        // uint8_t   formatLogRead[256] = "", *tmpStr;
-
-        // f_gets(header,256,&fil_Read);
-        // tmpStr = header;
-        // while(*tmpStr != '\0') {
-        //     if (*tmpStr == (uint8_t)',') {
-        //         strcat(formatLogRead,"%d,");
-        //     }
-        //     tmpStr++;
-        // }
-
-        // ログデータの取得
-        TCHAR     log[512];
-        int32_t   time, marker,velo,angVelo,distance,null;
-        int32_t   i,numM=0,cntCurR=0,cnt1 = 0;
-        uint8_t   beforeMarker;
-        float     ROCbuff[500];
-        float*    sortROC;
-
-        // 取得開始
-        while (f_gets(log,256,&fil_Read) != NULL) {
-            sscanf(log,"%d,%d,%d,%d,%d",&time,&marker,&velo,&angVelo,&distance);
-            // 解析処理
-            // 曲率変化マーカーを通過したとき
-            if (marker == 0 && beforeMarker == 2) {
-                sortROC = (float*)malloc(sizeof(float) * cntCurR); // 計算した曲率半径カウント分の配列を作成
-                memcpy(sortROC,ROCbuff,sizeof(float) * cntCurR);  // 作成した配列に曲率半径をコピーする
-                qsort(sortROC, cntCurR, sizeof(float), cmpfloat); // ソート
-                // 曲率半径を記録する
-                if (cntCurR % 2 == 0) {
-                    // 中央値を記録(配列要素数が偶数のとき) 中央2つの平均値
-                    PPAM[numM].ROC = (sortROC[cntCurR/2]+sortROC[cntCurR/2-1])/2;
-                } else {
-                    // 中央値を記録(配列要素数が奇数のとき)
-                    PPAM[numM].ROC = sortROC[cntCurR/2];
-                }
-                // printf("%f\n",PPAM[numM].ROC);
-                cntCurR = 0;  // 曲率半径用配列のカウント初期化
-
-                PPAD[numM].time = time;
-                PPAD[numM].marker = marker;
-                PPAD[numM].velocity = (float)velo/PALSE_MILLIMETER;
-                PPAD[numM].angularVelocity = (float)angVelo/10000;
-                PPAD[numM].distance = distance;
-                PPAD[numM].boostSpeed = (float)asignVelocity(ROCmarker[numM])/10;   // 曲率半径ごとの速度を記録する
-                numM++;     // マーカーカウント加算
-            }
-            beforeMarker = marker;  // 前回マーカーを記録
-
-            // 曲率半径の計算
-            ROCbuff[cntCurR] = calcROC((float)velo, (float)angVelo/10000);
-            cntCurR++;  // 曲率半径用配列のカウント
-            cnt1++;
-        //    printf("%s",log);
-        }
-
-        ret = numM-1;
-    }
-    f_close(&fil_Read);
-
-    printf("Analysis marker end\n");
-
-    return ret;
-}
-/////////////////////////////////////////////////////////////////////
 // モジュール名 readLogDistance
 // 処理概要     距離基準2次走行の解析
 // 引数         ログ番号(ファイル名)
@@ -190,7 +105,7 @@ int16_t readLogDistance(int logNumber) {
 
     snprintf(fileName,sizeof(fileName),"%d",logNumber);   // 数値を文字列に変換
     strcat(fileName,".csv");                              // 拡張子を追加
-    fresult = f_open(&fil_Read, fileName, FA_OPEN_ALWAYS | FA_READ);  // csvファイルを開く
+    fresult = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ);  // csvファイルを開く
 
     if (fresult == FR_OK) {
         // printf("Analysis distance start\n");
@@ -210,11 +125,11 @@ int16_t readLogDistance(int logNumber) {
 
         // ログデータの取得
         TCHAR     log[512];
-        int32_t   time, marker,velo,angVelo,distance,null;
+        int32_t   time=0, marker=0,velo=0,angVelo=0,distance=0;
         int32_t   startEnc=0, numD=0, numM=0, cntCurR=0,beforeMarker=0;
         bool      analysis=false;
-        float     ROCbuff[600] = {0};
-        float*    sortROC;
+        static float     ROCbuff[600] = {0};
+        static float*    sortROC;
 
         // 前処理
         // 構造体配列の初期化
@@ -223,7 +138,7 @@ int16_t readLogDistance(int logNumber) {
         // memset(&ROCbuff, 0, sizeof(float) * 500);
 
         // ログデータ取得開始
-        while (f_gets(log,256,&fil_Read) != NULL) {
+        while (f_gets(log,sizeof(log),&fil_Read)) {
             sscanf(log,"%d,%d,%d,%d,%d",&time,&marker,&velo,&angVelo,&distance);
             // 解析処理
             if (marker == 1 && beforeMarker == 0) {
@@ -236,6 +151,8 @@ int16_t readLogDistance(int logNumber) {
                 markerPos[numM].indexPPAD = numD;
                 numM++;     // マーカー解析インデックス更新
             }
+            // ゴールしたらループ終了
+            if(!analysis && startEnc > 0) break;
             
             if (analysis == true) {
                 // スタートマーカー通過後から解析開始
@@ -276,6 +193,10 @@ int16_t readLogDistance(int logNumber) {
             }
             beforeMarker = marker;  // 前回マーカーを記録
         }
+
+        if(analysis && startEnc > 0) {
+            return -3;
+        }
         // インデックスが1多くなるので調整
         numM--;
         numD--; 
@@ -315,6 +236,8 @@ int16_t readLogDistance(int logNumber) {
         numPPADarry = numD;
         // printf("num %d\n",numPPAMarry);
         ret = numD;
+    } else {
+        ret = -4;
     }
     f_close(&fil_Read);
 
@@ -360,4 +283,65 @@ int cmpfloat(const void * n1, const void * n2) {
 	if (*(float *)n1 > *(float *)n2) return 1;
 	else if (*(float *)n1 < *(float *)n2) return -1;
 	else return 0;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 readLogDistance
+// 処理概要     距離基準2次走行の解析
+// 引数         ログ番号(ファイル名)
+// 戻り値       最適速度配列の最大要素数
+/////////////////////////////////////////////////////////////////////
+int16_t readLogTest(int logNumber) {
+    // ファイル読み込み
+    FIL         fil_Read;
+    FRESULT     fresult;
+    uint8_t     fileName[10];
+    int16_t     ret = 0;
+    uint32_t    i;
+
+    snprintf(fileName,sizeof(fileName),"%d",logNumber);   // 数値を文字列に変換
+    strcat(fileName,".csv");                              // 拡張子を追加
+    fresult = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ);  // csvファイルを開く
+
+    if (fresult == FR_OK) {
+        TCHAR     log[512];
+        int32_t   time, marker,velo,angVelo,distance;
+        int32_t   startEnc=0, numD=0, numM=0, cntCurR=0,beforeMarker=0;
+        bool      analysis=false;
+        float     ROCbuff[600] = {0};
+        float*    sortROC;
+
+        // 前処理
+        // 構造体配列の初期化
+        memset(&PPAD, 0, sizeof(AnalysisData) * ANALYSISBUFFSIZE);
+        memset(&PPAM, 0, sizeof(AnalysisData) * ANALYSISBUFFSIZE);
+
+        // ログデータ取得開始
+        while (f_gets(log,sizeof(log),&fil_Read)) {
+            sscanf(log,"%d,%d,%d,%d,%d",&time,&marker,&velo,&angVelo,&distance);
+
+            // 解析処理
+            if (marker == 1 && beforeMarker == 0) {
+                // ゴールマーカーを通過したときにフラグ反転
+                analysis = !analysis;
+                startEnc = distance;
+            } else if (marker == 0 && beforeMarker == 2) {
+                // カーブマーカーを通過したときにマーカー位置を記録
+                markerPos[numM].distance = distance;
+                markerPos[numM].indexPPAD = numD;
+                numM++;     // マーカー解析インデックス更新
+            }
+            if(!analysis && startEnc > 0) break;
+            numD++;
+        } 
+        ret = numD;
+    } else {
+        ret = -1;
+    }
+    f_close(&fil_Read);
+
+    // 解析済みのログ番号を保存
+    // saveLogNumber(logNumber);
+    analizedNumber = logNumber;
+
+    return ret;
 }

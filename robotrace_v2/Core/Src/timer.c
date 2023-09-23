@@ -38,9 +38,29 @@ void Interrupt1ms(void) {
         courseMarker = checkMarker();   // マーカー検知
         checkGoalMarker();              // ゴールマーカー処理
 
+        if( courseMarker > 0) {
+            courseMarkerLog = courseMarker;
+        }
+
         // カーブマーカーを通過した時
         if (courseMarker == 2 && beforeCourseMarker == 0) {
             cntMarker++;    // マーカーカウント
+            if (optimalTrace == BOOST_DISTANCE) {
+                int32_t i, j, errorDistance, upperLimit, lowerLimit;
+
+                for(i=pathedMarker;i<=numPPAMarry;i++) {
+                    // 現在地から一番近いマーカーを探す
+                    if (abs(encTotalOptimal - markerPos[i].distance) < encMM(50)) {
+                        errorDistance = encTotalOptimal - distanceStart;  // 現在の差を計算
+                        encTotalOptimal = markerPos[i].distance;               // 距離を補正
+                        distanceStart = encTotalOptimal - errorDistance;  // 補正後の現在距離からの差分
+                        optimalIndex = markerPos[i].indexPPAD;      // インデックス更新
+
+                        pathedMarker = i;
+                        break;
+                    }
+                }
+            }
         }
         beforeCourseMarker = courseMarker;
     }
@@ -77,6 +97,7 @@ void Interrupt1ms(void) {
             break;
         case 9:
             writeLogBuffer(); // バッファにログを保存
+            courseMarkerLog = 0;
             break;
         case 10:
             cnt10 = 0;
