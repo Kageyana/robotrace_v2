@@ -29,7 +29,7 @@ EventPos     markerPos[ANALYSISBUFFSIZE];
 float calcROC(float velo, float angvelo) {
     float dl, drad, ret;
     
-    dl = velo / PALSE_MILLIMETER * 1000 * DELTATIME; // [pilse] → [mm/s] → [mm] 
+    dl = velo / PALSE_MILLIMETER * 10.0F; // [palse] → [mm/s] → [mm] 
     drad = angvelo * DPS2RDS * DELTATIME;            // [deg/s] → [rad]
     ret = dl / drad;
     // 曲率半径が大きい＝直線の場合は極大にする

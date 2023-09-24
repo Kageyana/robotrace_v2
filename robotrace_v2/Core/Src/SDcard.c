@@ -179,7 +179,7 @@ void writeLogPut(void) {
       // ,(int32_t)(logVal[i].mcl*10000)
       // ,(int32_t)(logVal[i].mcr*10000)
       ,logVal[i].optimalIndex
-      ,(int32_t)(calcROC(logVal[i].speed,logVal[i].zg)*10)
+      ,(int32_t)(calcROC(logVal[i].speed,logVal[i].zg))
     );
   }
 }

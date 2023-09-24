@@ -33,6 +33,8 @@ speedParam targetParam = {
 	PARAM_BOOST_300,
 	PARAM_BOOST_200,
 	PARAM_BOOST_100,
+	MACHINEACCELE,
+	MACHINEDECREACE,
 	};
 
 // タイマ関連
@@ -216,7 +218,7 @@ void loopSystem (void) {
 						}
 					}
 				} else if (distanceStart == 0) {
-					boostSpeed = targetParam.boostStraight;
+					boostSpeed = targetParam.straight;
 				}
 				// 目標速度に設定
 				setTargetSpeed(boostSpeed);

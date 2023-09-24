@@ -10,15 +10,15 @@
 //====================================//
 // シンボル定義
 //====================================//
-#define KP1		38
+#define KP1		37
 #define KI1		0
-#define KD1		159
+#define KD1		170
 
 #define KP2		20
-#define KI2		45
+#define KI2		80
 #define KD2		0
 
-#define KP3		35
+#define KP3		38
 #define KI3		100
 #define KD3		8
 

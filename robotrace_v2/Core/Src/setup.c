@@ -199,7 +199,7 @@ void setup( void )
 				ssd1306_printf(Font_6x8,"Parameter");
 			}
 
-			dataTuningLR( &patternParameter1, 1, 1, 10);
+			dataTuningLR( &patternParameter1, 1, 1, 12);
 
 			beforePparam = patternParameter1;
 			if (beforePparam != patternParameter1) {
@@ -266,6 +266,18 @@ void setup( void )
 					dataTuningUDF( &targetParam.boost100, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
 					ssd1306_printf(Font_6x8,"BST 100:%3gm/s", targetParam.boost100);
+					break;
+				case 11:
+					// 2次走行_加速度
+					dataTuningUDF( &targetParam.acceleF, 0.1, 0.0, 10.0 );
+					ssd1306_SetCursor(0,24);
+					ssd1306_printf(Font_6x8,"BST accelF:%3gm/ss", targetParam.acceleF);
+					break;
+				case 12:
+					// 2次走行_減速度
+					dataTuningUDF( &targetParam.acceleD, 0.1, 0.0, 10.0 );
+					ssd1306_SetCursor(0,24);
+					ssd1306_printf(Font_6x8,"BST acceleD:%3gm/ss", targetParam.acceleD);
 					break;
 			}
 			break;

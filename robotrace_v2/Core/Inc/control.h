@@ -10,19 +10,19 @@
 // 機体諸元
 
 // 速度パラメータ関連
-#define PARAM_STRAIGHT              1.5F
-#define PARAM_CURVE                 1.3F
+#define PARAM_STRAIGHT              1.8F
+#define PARAM_CURVE                 1.5F
 #define PARAM_STOP                  0.8F
-#define PARAM_BOOST_STRAIGHT        2.2F
-#define PARAM_BOOST_1500            2.0F
-#define PARAM_BOOST_800             1.9F
-#define PARAM_BOOST_700             1.8F
-#define PARAM_BOOST_600             1.7F
-#define PARAM_BOOST_500             1.6F
-#define PARAM_BOOST_400             1.5F
-#define PARAM_BOOST_300             1.3F
-#define PARAM_BOOST_200             1.2F
-#define PARAM_BOOST_100             1.1F
+#define PARAM_BOOST_STRAIGHT        3.5F
+#define PARAM_BOOST_1500            3.0F
+#define PARAM_BOOST_800             2.8F
+#define PARAM_BOOST_700             2.8F
+#define PARAM_BOOST_600             2.6F
+#define PARAM_BOOST_500             2.6F
+#define PARAM_BOOST_400             2.2F
+#define PARAM_BOOST_300             2.0F
+#define PARAM_BOOST_200             1.8F
+#define PARAM_BOOST_100             1.4F
 
 // ゴール
 #define COUNT_GOAL              2       // ゴールマーカーを読む回数
@@ -45,6 +45,8 @@ typedef struct {
     float boost300;
     float boost200;
     float boost100;
+    float acceleF;
+    float acceleD;
 } speedParam;
 //====================================//
 // グローバル変数の宣言
