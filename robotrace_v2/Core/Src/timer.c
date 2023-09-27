@@ -79,10 +79,17 @@ void Interrupt1ms(void) {
         case 1:
             if(initIMU) {
                 BMI088getGyro();
+                
                 calcDegrees();
                 checkCurve();
+
                 motorControlYawRate();
                 motorControlYaw();
+            }
+            break;
+        case 2:
+            if(initIMU) {
+                // BMI088getTemp();
             }
             break;
         case 5:

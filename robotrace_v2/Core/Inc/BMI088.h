@@ -9,11 +9,25 @@
 // シンボル定義
 //====================================//
 //  unit settings
-#define ACCELELSB       100.0F
+#define ACCELELSB       5460.0F
 #define GYROLSB         16.384F
 #define MAGPLSB         16.0F
 
 #define DEFF_TIME       0.005F
+#define COEFF_DPD       0.998F
+
+/*レジスタアドレス*/
+#define REG_GYRO_CHIP_ID    0x00
+#define REG_RATE_X          0x02
+#define REG_GYRO_BANDWISTH  0x10
+#define REG_GYRO_SOFTRESET  0x14
+
+#define REG_ACC_CHIP_ID     0x00
+#define REG_ACC_X_LSB       0x12
+#define REG_ACC_CONF        0x40
+#define REG_ACC_RANGE       0x41
+#define REG_ACC_PWR_CTRL    0x7D
+#define REG_ACC_SOFTRESET   0x7E
 
 /*************************************** 自動生成関数 *************************************/
 #define CSB1_RESET 		        HAL_GPIO_WritePin(IMU_CSB1_GPIO_Port, IMU_CSB1_Pin, GPIO_PIN_RESET)
@@ -41,11 +55,15 @@ extern IMUval 	BMI088val;
 //====================================//
 // プロトタイプ宣言
 //====================================//
-uint8_t BMI088ReadByteByte( uint8_t reg );
-void    BMI088WriteByte( uint8_t reg, uint8_t val );
-void    BMI088ReadAxisData(uint8_t reg, uint8_t *rxData );
+uint8_t BMI088ReadByteG( uint8_t reg );
+void    BMI088WriteByteG( uint8_t reg, uint8_t val );
+uint8_t BMI088ReadByteA( uint8_t reg );
+void    BMI088WriteByteA( uint8_t reg, uint8_t val );
+void    BMI088ReadAxisDataG(uint8_t reg, uint8_t *rxData, uint8_t rxNum );
+void    BMI088ReadAxisDataA(uint8_t reg, uint8_t *rxData, uint8_t rxNum );
 bool    initBMI088(void);
 void    BMI088getGyro(void);
+void    BMI088getTemp(void);
 void    calcDegrees(void);
 
 #endif // BMI088_H_

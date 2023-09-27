@@ -291,7 +291,7 @@ void setup( void )
 				beforeSensors = 100;
 			}
 
-			dataTuningLR( &patternSensors, 1, 1, 6 );
+			dataTuningLR( &patternSensors, 1, 1, 7 );
 			switch( patternSensors ) {
 				case 1:
 					if (patternSensors != beforeSensors) 	{
@@ -357,6 +357,34 @@ void setup( void )
 					if (patternSensors != beforeSensors) 	{
 						// 切替時に実行
 						ssd1306_FillRectangle(0,16,127,63, Black); // 黒塗り
+						ssd1306_SetCursor(36,16);
+						ssd1306_printf(Font_7x10,"IMU[g]");
+					}
+					
+					ssd1306_SetCursor(0,30);
+					ssd1306_printf(Font_7x10,"xa:%6.1f",BMI088val.accele.x);
+					ssd1306_SetCursor(0,42);
+					ssd1306_printf(Font_7x10,"ya:%6.1f",BMI088val.accele.y);
+					ssd1306_SetCursor(0,54);
+					ssd1306_printf(Font_7x10,"za:%6.1f",BMI088val.accele.z);
+
+					// ssd1306_SetCursor(64,30);
+					// ssd1306_printf(Font_7x10,"xd:%6.1f",BMI088val.angle.x);
+					// ssd1306_SetCursor(64,42);
+					// ssd1306_printf(Font_7x10,"yd:%6.1f",BMI088val.angle.y);
+					// ssd1306_SetCursor(64,54);
+					// ssd1306_printf(Font_7x10,"zd:%6.1f",BMI088val.angle.z);
+
+					// if (swValTact == SW_PUSH) {
+					// 	BMI088val.angle.x = 0;
+					// 	BMI088val.angle.y = 0;
+					// 	BMI088val.angle.z = 0;
+					// }
+					break;
+				case 4:
+					if (patternSensors != beforeSensors) 	{
+						// 切替時に実行
+						ssd1306_FillRectangle(0,16,127,63, Black); // 黒塗り
 						ssd1306_SetCursor(32,16);
 						ssd1306_printf(Font_7x10,"Side sensors");
 					}
@@ -364,7 +392,7 @@ void setup( void )
 					ssd1306_printf(Font_7x10,"Marker sensors:%d",getMarkerSensor());
 
 					break;
-				case 4:
+				case 5:
 					if (patternSensors != beforeSensors) 	{
 						// 切替時に実行
 						ssd1306_FillRectangle(0,16,127,63, Black); // 黒塗り
@@ -378,7 +406,7 @@ void setup( void )
 					ssd1306_printf(Font_7x10,"5axis SW:%d",swValTact);
 
 					break;
-				case 5:
+				case 6:
 					if (patternSensors != beforeSensors) 	{
 						// 切替時に実行
 						ssd1306_FillRectangle(0,16,127,63, Black); // 黒塗り
@@ -392,7 +420,7 @@ void setup( void )
 					ssd1306_printf(Font_7x10,"BatteryLv:%d",batteryLevel);
 
 					break;
-				case 6:
+				case 7:
 					if (patternSensors != beforeSensors) 	{
 						// 切替時に実行
 						ssd1306_FillRectangle(0,16,127,63, Black); // 黒塗り
