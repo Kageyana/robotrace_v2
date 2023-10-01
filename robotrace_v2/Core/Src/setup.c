@@ -135,50 +135,23 @@ void setup( void )
 					// 左旋回
 					setTargetAngularVelocity(CALIBRATIONSPEED);
 					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-					if (BMI088val.angle.z > 35.0) {
+					if (BMI088val.angle.z > 320.0) {
 						patternCalibration = 4;
 					}
 					break;
 
 				case 4:
-					// 停止
-					setTargetSpeed(0);
-					motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
-					if (abs(encCurrentN) == 0) {
+					// 初期位置に戻る
+					setTargetAngularVelocity(400.0F);
+					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+					if (lSensor[5] < 1000) {
+						modeCalLinesensors = 0;
+						countdown = 500;
 						patternCalibration = 5;
 					}
 					break;
 
 				case 5:
-					// 右旋回
-					setTargetAngularVelocity(-CALIBRATIONSPEED);
-					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-					if (BMI088val.angle.z < -35.0) {
-						patternCalibration = 6;
-					}
-					break;
-
-				case 6:
-					// 停止
-					setTargetSpeed(0);
-					motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
-					if (abs(encCurrentN) == 0) {
-						patternCalibration = 7;
-					}
-					break;
-
-				case 7:
-					// 初期位置に戻る
-					setTargetAngularVelocity(CALIBRATIONSPEED);
-					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-					if (lSensor[5] < 1000) {
-						modeCalLinesensors = 0;
-						countdown = 500;
-						patternCalibration = 8;
-					}
-					break;
-
-				case 8:
 					// 停止
 					motorPwmOutSynth( lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 					if (countdown <= 0) {

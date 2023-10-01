@@ -10,8 +10,8 @@
 // 機体諸元
 
 // 速度パラメータ関連
-#define PARAM_STRAIGHT              1.8F
-#define PARAM_CURVE                 1.5F
+#define PARAM_STRAIGHT              1.5F
+#define PARAM_CURVE                 1.3F
 #define PARAM_STOP                  0.8F
 #define PARAM_BOOST_STRAIGHT        3.5F
 #define PARAM_BOOST_1500            3.0F
@@ -25,7 +25,7 @@
 #define PARAM_BOOST_100             1.4F
 
 // ゴール
-#define COUNT_GOAL              10       // ゴールマーカーを読む回数
+#define COUNT_GOAL              8       // ゴールマーカーを読む回数
 
 // スタートモード
 #define START_SERACH            3
