@@ -173,6 +173,7 @@ void setup( void )
 					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 					if (lSensor[5] < 1000) {
 						modeCalLinesensors = 0;
+						countdown = 500;
 						patternCalibration = 8;
 					}
 					break;
@@ -180,8 +181,7 @@ void setup( void )
 				case 8:
 					// 停止
 					motorPwmOutSynth( lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
-					if (abs(encCurrentN) == 0) {
-						trace_test = 0;
+					if (countdown <= 0) {
 						start = 1;
 					}
 					break;
@@ -333,24 +333,39 @@ void setup( void )
 						ssd1306_printf(Font_7x10,"IMU[deg]");
 					}
 					
-					ssd1306_SetCursor(0,30);
-					ssd1306_printf(Font_7x10,"xg:%6.1f",BMI088val.gyro.x);
-					ssd1306_SetCursor(0,42);
-					ssd1306_printf(Font_7x10,"yg:%6.1f",BMI088val.gyro.y);
-					ssd1306_SetCursor(0,54);
-					ssd1306_printf(Font_7x10,"zg:%6.1f",BMI088val.gyro.z);
+					if(!calibratIMU) {
+						// ssd1306_SetCursor(0,30);
+						// ssd1306_printf(Font_7x10,"xg:%6.1f",BMI088val.gyro.x);
+						// ssd1306_SetCursor(0,42);
+						// ssd1306_printf(Font_7x10,"yg:%6.1f",BMI088val.gyro.y);
+						// ssd1306_SetCursor(0,54);
+						// ssd1306_printf(Font_7x10,"zg:%6.1f",BMI088val.gyro.z);
 
-					ssd1306_SetCursor(64,30);
-					ssd1306_printf(Font_7x10,"xd:%6.1f",BMI088val.angle.x);
-					ssd1306_SetCursor(64,42);
-					ssd1306_printf(Font_7x10,"yd:%6.1f",BMI088val.angle.y);
-					ssd1306_SetCursor(64,54);
-					ssd1306_printf(Font_7x10,"zd:%6.1f",BMI088val.angle.z);
+						ssd1306_SetCursor(64,30);
+						ssd1306_printf(Font_7x10,"xd:%6.1f",BMI088val.angle.x);
+						ssd1306_SetCursor(64,42);
+						ssd1306_printf(Font_7x10,"yd:%6.1f",BMI088val.angle.y);
+						ssd1306_SetCursor(64,54);
+						ssd1306_printf(Font_7x10,"zd:%6.1f",BMI088val.angle.z);
+					}
+					
 
 					if (swValTact == SW_PUSH) {
 						BMI088val.angle.x = 0;
 						BMI088val.angle.y = 0;
 						BMI088val.angle.z = 0;
+					}
+
+					if (swValTact == SW_UP) {
+						ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+						ssd1306_SetCursor(22,28);
+						ssd1306_printf(Font_7x10,"Calibration");
+						ssd1306_SetCursor(53,42);
+						ssd1306_printf(Font_7x10,"Now");
+						ssd1306_UpdateScreen();
+
+						calibratIMU = true;
+						HAL_Delay(800);
 					}
 					break;
 				case 3:
@@ -368,18 +383,8 @@ void setup( void )
 					ssd1306_SetCursor(0,54);
 					ssd1306_printf(Font_7x10,"za:%6.1f",BMI088val.accele.z);
 
-					// ssd1306_SetCursor(64,30);
-					// ssd1306_printf(Font_7x10,"xd:%6.1f",BMI088val.angle.x);
-					// ssd1306_SetCursor(64,42);
-					// ssd1306_printf(Font_7x10,"yd:%6.1f",BMI088val.angle.y);
-					// ssd1306_SetCursor(64,54);
-					// ssd1306_printf(Font_7x10,"zd:%6.1f",BMI088val.angle.z);
-
-					// if (swValTact == SW_PUSH) {
-					// 	BMI088val.angle.x = 0;
-					// 	BMI088val.angle.y = 0;
-					// 	BMI088val.angle.z = 0;
-					// }
+					ssd1306_SetCursor(64,30);
+					ssd1306_printf(Font_7x10,"T:%4.1f",BMI088val.temp);
 					break;
 				case 4:
 					if (patternSensors != beforeSensors) 	{
@@ -875,7 +880,7 @@ void setup( void )
 	beforeHEX = swValRotary;
 	beforeBATLV= batteryLevel;
 
-	if (!trace_test) {
+	if (!trace_test && !calibratIMU) {
 		ssd1306_UpdateScreen();  // グラフィック液晶更新
 	}
 }

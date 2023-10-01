@@ -14,7 +14,7 @@
 #define MAGPLSB         16.0F
 
 #define DEFF_TIME       0.005F
-#define COEFF_DPD       0.998F
+#define COEFF_DPD       0.9996F
 
 /*レジスタアドレス*/
 #define REG_GYRO_CHIP_ID    0x00
@@ -28,6 +28,8 @@
 #define REG_ACC_RANGE       0x41
 #define REG_ACC_PWR_CTRL    0x7D
 #define REG_ACC_SOFTRESET   0x7E
+
+#define REG_TEMP_MSB        0x22
 
 /*************************************** 自動生成関数 *************************************/
 #define CSB1_RESET 		        HAL_GPIO_WritePin(IMU_CSB1_GPIO_Port, IMU_CSB1_Pin, GPIO_PIN_RESET)
@@ -47,11 +49,14 @@ typedef struct {
     axis accele;
     axis gyro;
     axis angle;
+    float temp;
+    uint16_t id;
 } IMUval;
 //====================================//
 // グローバル変数の宣言
 //====================================//
 extern IMUval 	BMI088val;
+extern bool     calibratIMU;
 //====================================//
 // プロトタイプ宣言
 //====================================//
@@ -63,7 +68,9 @@ void    BMI088ReadAxisDataG(uint8_t reg, uint8_t *rxData, uint8_t rxNum );
 void    BMI088ReadAxisDataA(uint8_t reg, uint8_t *rxData, uint8_t rxNum );
 bool    initBMI088(void);
 void    BMI088getGyro(void);
+void    BMI088getAccele(void);
 void    BMI088getTemp(void);
 void    calcDegrees(void);
+void    calibrationIMU (void);
 
 #endif // BMI088_H_

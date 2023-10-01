@@ -78,21 +78,26 @@ void Interrupt1ms(void) {
     switch(cnt5) {
         case 1:
             if(initIMU) {
-                BMI088getGyro();
-                
-                calcDegrees();
-                checkCurve();
+                if(!calibratIMU) {
+                    BMI088getGyro();    // 角速度取得
+                    calcDegrees();      // 角度計算
+                    if(optimalTrace == 0) checkCurve(); // 1次走行 カーブ検出
 
-                motorControlYawRate();
-                motorControlYaw();
+                    motorControlYawRate();  // 角速度制御
+                    motorControlYaw();      // 角度制御
+                } else {
+                    calibrationIMU();
+                }
             }
             break;
         case 2:
-            if(initIMU) {
-                // BMI088getTemp();
-            }
+            break;
+        case 3:
             break;
         case 5:
+            if(initIMU) {
+                // BMI088getAccele();
+            }
             cnt5 = 0;
             break;
     }
@@ -102,9 +107,16 @@ void Interrupt1ms(void) {
             getADC2();
             getMotorCurrent();
             break;
+        case 2:
+            if(initIMU) {
+                BMI088getTemp();
+            }
+            break;
         case 9:
-            writeLogBuffer(); // バッファにログを保存
-            courseMarkerLog = 0;
+            if(patternTrace < 100) {
+                writeLogBuffer(); // バッファにログを保存
+                courseMarkerLog = 0;
+            }
             break;
         case 10:
             cnt10 = 0;

@@ -132,45 +132,44 @@ void loopSystem (void) {
 				// ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
 				// ssd1306_SetCursor(56,28);
 				// ssd1306_printf(Font_16x26,"5");
+				motorPwmOut(0,0);
 				countdown = 5000;		// カウントダウンスタート
-				powerLinesensors(1);	// ラインセンサ ON
+				// HAL_Delay(500);
+				calibratIMU = true;
 				patternTrace = 1;
 			}
 			break;
-		case 1:
-			// トレース開始
-			motorPwmOutSynth( lineTraceCtrl.pwm, 0, 0, 0);
-
-			
+		case 1:	
 			// カウントダウンスタート
-			if(modeDSP) {
-				if ( countdown == 4000 ) {
-					ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
-					ssd1306_SetCursor(56,28);
-					ssd1306_printf(Font_16x26,"4");
-					ssd1306_UpdateScreen();  // グラフィック液晶更新
-				}
-				if ( countdown == 3000 ) {
-					ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
-					ssd1306_SetCursor(56,28);
-					ssd1306_printf(Font_16x26,"3");
-					ssd1306_UpdateScreen();  // グラフィック液晶更新
-				}
-				if ( countdown == 2000 ) {
-					ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
-					ssd1306_SetCursor(56,28);
-					ssd1306_printf(Font_16x26,"2");
-					ssd1306_UpdateScreen();  // グラフィック液晶更新
-				}
-				if ( countdown == 1000 ) {
-					ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
-					ssd1306_SetCursor(56,28);
-					ssd1306_printf(Font_16x26,"1");
-					ssd1306_UpdateScreen();  // グラフィック液晶更新
-				}
-			}
+			// if(modeDSP) {
+			// 	if ( countdown == 4000 ) {
+			// 		ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+			// 		ssd1306_SetCursor(56,28);
+			// 		ssd1306_printf(Font_16x26,"4");
+			// 		ssd1306_UpdateScreen();  // グラフィック液晶更新
+			// 	}
+			// 	if ( countdown == 3000 ) {
+			// 		ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+			// 		ssd1306_SetCursor(56,28);
+			// 		ssd1306_printf(Font_16x26,"3");
+			// 		ssd1306_UpdateScreen();  // グラフィック液晶更新
+			// 	}
+			// 	if ( countdown == 2000 ) {
+			// 		ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+			// 		ssd1306_SetCursor(56,28);
+			// 		ssd1306_printf(Font_16x26,"2");
+			// 		ssd1306_UpdateScreen();  // グラフィック液晶更新
+			// 	}
+			// 	if ( countdown == 1000 ) {
+			// 		ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+			// 		ssd1306_SetCursor(56,28);
+			// 		ssd1306_printf(Font_16x26,"1");
+			// 		ssd1306_UpdateScreen();  // グラフィック液晶更新
+			// 	}
+			// }
 
-			if ( countdown <= 0 ) {
+			if ( !calibratIMU ) {
+			// if ( countdown <= 0 ) {
 				motorPwmOut(0,0);	// モータドライバICのスリープモードを解除
 				// Logファイル作成
 				if (initMSD) initLog();
