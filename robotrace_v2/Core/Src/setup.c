@@ -509,20 +509,6 @@ void setup( void )
 			dataTuningUD( &y, 1, 4, 0);
 			dataTuningLR( &x, 1, 0, 4);
 			
-			// if (swValTact == SW_PUSH) {
-			// 	// 距離基準解析
-			// 	initIMU = 0;
-			// 	numPPADarry = readLogTest(35);
-			// 	initIMU = 1;
-			// 	if (numPPADarry > 0) {
-			// 		optimalTrace = BOOST_DISTANCE;
-			// 		optimalIndex = 0;
-			// 		// saveLogNumber(fileNumbers[k]);
-					
-			// 	}
-			// 	HAL_Delay(100);
-			// }
-
 			// i-jとx-yが一致したとき文字色反転
 			k = endFileIndex;
 			for(i=0;i<5;i++) {
@@ -566,19 +552,6 @@ void setup( void )
 				ssd1306_printf(Font_6x8,"Calibrate");
 				patternCalibration = 1;
 			}
-			// data_select( &trace_test, SW_PUSH );
-			// // PUSHでトレースON/OFF
-			// if ( trace_test == 1 ) {
-			// 	modeCalLinesensors = 1; 	// キャリブレーション開始
-			// 	powerLinesensors(1);
-			// } else {
-			// 	modeCalLinesensors = 0; 	// キャリブレーション終了
-			// 	powerLinesensors(0);
-			// }
-
-			// ssd1306_SetCursor(0,24);
-			// ssd1306_printf(Font_7x10,"flag:%d",modeCalLinesensors);
-			// break;
 
 			switch (patternCalibration) {
 				case 1:

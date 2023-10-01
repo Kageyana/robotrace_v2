@@ -129,12 +129,8 @@ void loopSystem (void) {
 			}
 				
 			if (start) {
-				// ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
-				// ssd1306_SetCursor(56,28);
-				// ssd1306_printf(Font_16x26,"5");
 				motorPwmOut(0,0);
 				countdown = 5000;		// カウントダウンスタート
-				// HAL_Delay(500);
 				calibratIMU = true;
 				patternTrace = 1;
 			}
