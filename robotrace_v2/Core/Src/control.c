@@ -113,6 +113,7 @@ void initSystem (void) {
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
 void loopSystem (void) {
+	uint8_t beforeSGmarker;
 
 	// 緊急停止処理
 	if (patternTrace > 10 && patternTrace < 100 && emcStop > 0) {
@@ -164,11 +165,10 @@ void loopSystem (void) {
 				}
 			}
 
+			// IMUのキャリブレーションが終了したら走行開始
 			if ( !calibratIMU ) {
-			// if ( countdown <= 0 ) {
-				motorPwmOut(0,0);	// モータドライバICのスリープモードを解除
-				// Logファイル作成
-				if (initMSD) initLog();
+				motorPwmOut(0,0);
+				if (initMSD) initLog();	// ログ記録開始
 				
 				// 変数初期化
 				encTotalN = 0;
@@ -221,6 +221,16 @@ void loopSystem (void) {
 			
 			// ライントレース
 			motorPwmOutSynth( lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+
+			if(SGmarker == 1 && beforeSGmarker == 0) {
+				BMI088val.angle.x = 0.0f;
+				BMI088val.angle.y = 0.0f;
+				BMI088val.angle.z = 0.0f;
+			} else if(SGmarker == 0){
+				BMI088val.angle.x = 0.0f;
+				BMI088val.angle.y = 0.0f;
+				BMI088val.angle.z = 0.0f;
+			}
 	 
 			// ゴール判定
 			if (SGmarker >= COUNT_GOAL ) {
@@ -228,6 +238,8 @@ void loopSystem (void) {
 				enc1 = 0;
 				patternTrace = 101;
 			}
+
+			beforeSGmarker = SGmarker;
 			break;
 
       	case 101:
