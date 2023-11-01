@@ -45,17 +45,13 @@ float calcROC(float velo, float angvelo) {
 /////////////////////////////////////////////////////////////////////
 void saveLogNumber(int16_t fileNumber) {
     FRESULT   fresult;
-    FATFS     fs_lognum;
     FIL       fil;
-    uint8_t str[32] = "Hello";
 
-    f_chdir("/setting");    // settingフォルダに移動
-    fresult = f_open(&fil, "analiz.txt", FA_OPEN_ALWAYS | FA_WRITE);  // create file
+    fresult = f_open(&fil, "./setting/analiz.txt", FA_OPEN_ALWAYS | FA_WRITE);  // create file
     if(fresult == FR_OK) {
         f_printf(&fil, "%d",fileNumber);
     }
     f_close(&fil);
-    f_chdir("/");           // ルートディレクトリに移動
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getLogNumber
@@ -65,13 +61,10 @@ void saveLogNumber(int16_t fileNumber) {
 /////////////////////////////////////////////////////////////////////
 void getLogNumber(void) {
     FRESULT   fresult;
-    FATFS     fs_lognum;
     FIL       fil;
     TCHAR     log[512];
-    uint8_t str[32] = "Hello";
 
-    f_chdir("/setting");    // settingフォルダに移動
-    fresult = f_open(&fil, "analiz.txt", FA_OPEN_ALWAYS | FA_READ);  // csvファイルを開く
+    fresult = f_open(&fil, "./setting/analiz.txt", FA_OPEN_ALWAYS | FA_READ);  // csvファイルを開く
     if (fresult == FR_OK) {
         f_gets(log,256,&fil);
         sscanf(log,"%d",&analizedNumber);
@@ -84,8 +77,6 @@ void getLogNumber(void) {
             break;
         }
     }
-
-    f_chdir("/");           // ルートディレクトリに移動
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 readLogDistance
@@ -358,7 +349,7 @@ int16_t calcXYpotisions(int logNumber) {
     snprintf(fileName,sizeof(fileName),"%d",logNumber);   // 数値を文字列に変換
     strcat(fileName,".csv");                              // 拡張子を追加
     fresult1 = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ);  // ログファイルを開く
-    fresult2 = f_open(&fil_Plot, "plot.csv", FA_OPEN_ALWAYS | FA_WRITE);  // csvファイルを開く
+    fresult2 = f_open(&fil_Plot, "./plot/plot.csv", FA_OPEN_ALWAYS | FA_WRITE);  // csvファイルを開く
 
     if (fresult2 == FR_OK) {
         // ログデータの取得
@@ -377,7 +368,6 @@ int16_t calcXYpotisions(int logNumber) {
             y = y + (velocity * cos(degzR));
 
             f_printf(&fil_Plot, "%d,%d\n",(int32_t)(x*10000),(int32_t)(y*10000));
-			// f_printf(&fil_Plot, "helo world\n");
             i++;
         }
         

@@ -474,6 +474,31 @@ void setup( void )
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
 				ssd1306_printf(Font_6x8,"microSD  ");
+
+				// 前回解析したログ番号を探す
+				k = endFileIndex;
+				for(i=0;i<5;i++) {
+					if(0+(20*i) < 128 || k >= 0) {
+						k--;
+						for(j=0;j<5;j++) {
+							if(24+(8*j) < 64 || k >= 0) {
+								if(k == fileIndexLog) {
+									x = i;
+									y = j;
+									break;
+								}
+								k--;
+							} else {
+								break;
+							}
+						}
+						if(k == fileIndexLog) {
+							break;
+						}
+					} else {
+						break;
+					}
+				}
 			}
 
 			ssd1306_SetCursor(35,16);
@@ -494,21 +519,26 @@ void setup( void )
 								if (swValTact == SW_PUSH) {
 									initIMU = false;
 									// 距離基準解析
-									numPPADarry = calcXYpotisions(fileNumbers[k]);
+									// numPPADarry = k;
+									// numPPADarry = calcXYpotisions(fileNumbers[k]);
+									numPPADarry = readLogDistance(fileNumbers[k]);
 									// numPPADarry = readLogTest(fileNumbers[k]);
+
 									if (numPPADarry > 0) {
 										optimalTrace = BOOST_DISTANCE;
 										optimalIndex = 0;
-										// saveLogNumber(fileNumbers[k]);
+										saveLogNumber(fileNumbers[k]);
 										HAL_Delay(100);
 									}
 									initIMU = true;
 								}
-								ssd1306_printfB(Font_6x8,"%d",fileNumbers[k--]);
+								ssd1306_printfB(Font_6x8,"%d",fileNumbers[k]);
 							} else {
-								ssd1306_printf(Font_6x8,"%d",fileNumbers[k--]);
+								ssd1306_printf(Font_6x8,"%d",fileNumbers[k]);
 							}
-							
+
+							k--;
+
 						} else {
 							break;
 						}

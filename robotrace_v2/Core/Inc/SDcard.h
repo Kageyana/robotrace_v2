@@ -30,4 +30,5 @@ void writeLogBuffer (void);
 void writeLogPut(void);
 void getFileNumbers(void);
 void SDtest(void);
+void createDir(uint8_t *dirName);
 #endif // SDCARD_H_

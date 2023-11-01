@@ -66,21 +66,9 @@ bool initMicroSD(void) {
 
 		getFileNumbers();
 
-		// settingディレクトリを作成
-		fresult = f_opendir(&dir,"/");  // directory open
-		if (fresult == FR_OK) {
-			do {
-				f_readdir(&dir,&fno);     
-				if (strcmp(fno.fname,"setting") == 0) {
-					dirSetting = 1;	// settingディレクトリが存在する
-					break;
-				}
-			} while(fno.fname[0] != 0); // ファイルの有無を確認
-
-			if (!dirSetting) {
-				f_mkdir("setting");	// settingディレクトリを作成する
-			}
-		}
+		// ディレクトリを作成
+		createDir("setting");
+		createDir("plot");
 
 		return true;
 	} else {
@@ -239,10 +227,10 @@ void getFileNumbers(void) {
 		do {
 			f_readdir(&dir,&fno);     
 			if (strstr(fno.fname,".csv") != NULL) {
-			// csvファイルのとき
-			tp = strtok(fno.fname,".");     // 拡張子削除
-			fileNumbers[endFileIndex] = atoi(tp);        // 文字列を数値に変換
-			endFileIndex++;
+				// csvファイルのとき
+				tp = strtok(fno.fname,".");     // 拡張子削除
+				fileNumbers[endFileIndex] = atoi(tp);        // 文字列を数値に変換
+				endFileIndex++;
 			}
 		} while(fno.fname[0] != 0); // ファイルの有無を確認
 
@@ -282,4 +270,31 @@ void SDtest(void) {
 	fresult = f_open(&fil_T, "test.csv", FA_OPEN_ALWAYS | FA_WRITE);  // create file
 	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );
 	f_close(&fil_T);
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 createDir
+// 処理概要     ホームディレクトリに指定されたディレクトリが存在しなければ作成する
+// 引数         ディレクトリ名
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void createDir(uint8_t *dirName) {
+	FRESULT		fresult;
+	DIR			dir;			// Directory
+	FILINFO		fno;			// File Info
+	uint8_t		exist = 0;
+
+	fresult = f_opendir(&dir,"/");  // directory open
+	if (fresult == FR_OK) {
+		do {
+			f_readdir(&dir,&fno);     
+			if (strcmp(fno.fname,dirName) == 0) {
+				exist = 1;	// settingディレクトリが存在する
+				break;
+			}
+		} while(fno.fname[0] != 0); // ファイルの有無を確認
+
+		if (!exist) {
+			f_mkdir(dirName);	// settingディレクトリを作成する
+		}
+	}
 }
