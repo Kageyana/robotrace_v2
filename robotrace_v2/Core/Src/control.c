@@ -7,7 +7,7 @@
 //====================================//
 // モード関連
 uint8_t	patternTrace = 0;
-bool    modeDSP = true;		// ディスプレイ表示可否			false:消灯		true:表示
+bool    modeDSP = false;		// ディスプレイ表示可否			false:消灯		true:表示
 bool 	modeLOG = false;	// ログ取得状況			false:ログ停止	true:ログ取得中
 bool    initMSD = false;	// microSD初期化状況	false:初期化失敗	true:初期化成功
 bool    initLCD = false;    // LCD初期化状況		false:初期化失敗	true:初期化成功
@@ -113,7 +113,6 @@ void initSystem (void) {
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
 void loopSystem (void) {
-	uint8_t beforeSGmarker;
 
 	// 緊急停止処理
 	if (patternTrace > 10 && patternTrace < 100 && emcStop > 0) {
@@ -167,18 +166,8 @@ void loopSystem (void) {
 
 			// IMUのキャリブレーションが終了したら走行開始
 			if ( !calibratIMU ) {
-				motorPwmOut(0,0);
-				if (initMSD) initLog();	// ログ記録開始
-				
 				// 変数初期化
-				encTotalN = 0;
-				encTotalOptimal = 0;
-				distanceStart = 0;
 				encRightMarker = encMM(600);
-				cntRun = 0;
-				BMI088val.angle.x = 0.0f;
-				BMI088val.angle.y = 0.0f;
-				BMI088val.angle.z = 0.0f;
 				veloCtrl.Int = 0.0;
 				yawRateCtrl.Int = 0.0;
 				yawCtrl.Int = 0.0;
@@ -187,7 +176,30 @@ void loopSystem (void) {
 			}
 			break;
 
-      	case 11:
+		case 11:
+			// スタートマーカー通過までの走行
+			setTargetSpeed(targetParam.straight); // 目標速度
+			// ライントレース
+			motorPwmOutSynth( lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+
+			// スタートマーカーを読んだら本走行に移行
+			if(SGmarker > 0) {
+				// 変数初期化
+				encTotalN = 0;
+				encTotalOptimal = 0;
+				DistanceOptimal = 0;
+				encLog = 0;
+				cntRun = 0;
+				BMI088val.angle.x = 0.0F;
+				BMI088val.angle.y = 0.0F;
+				BMI088val.angle.z = 0.0F;
+				
+				if (initMSD) initLog();	// ログ記録開始
+				patternTrace = 12;
+			}
+			break;
+
+      	case 12:
 			// 目標速度設定
 			if (optimalTrace == 0){
 				// 探索走行のとき
@@ -199,20 +211,20 @@ void loopSystem (void) {
 			} else if (optimalTrace == BOOST_DISTANCE) {
 				// 距離基準2次走行
 				// スタートマーカーを超えた時から距離計測開始
-				if (SGmarker > 0 && distanceStart == 0) {
-					distanceStart = encTotalOptimal;
+				if (SGmarker > 0 && DistanceOptimal == 0) {
+					DistanceOptimal = encTotalOptimal;
 				}
 				// 一定区間ごとにインデックスを更新
-				if (distanceStart > 0) {
-					if (encTotalOptimal - distanceStart >= encMM(CALCDISTANCE)) {
+				if (DistanceOptimal > 0) {
+					if (encTotalOptimal - DistanceOptimal >= encMM(CALCDISTANCE)) {
 						boostSpeed = PPAD[optimalIndex].boostSpeed;	// 目標速度を更新
-						distanceStart = encTotalOptimal;	// 距離計測位置を更新
+						DistanceOptimal = encTotalOptimal;	// 距離計測位置を更新
 						if (optimalIndex+1 <= numPPADarry) {
 							// 配列要素数を超えない範囲でインデックスを更新する
 							optimalIndex++;
 						}
 					}
-				} else if (distanceStart == 0) {
+				} else if (DistanceOptimal == 0) {
 					boostSpeed = targetParam.straight;
 				}
 				// 目標速度に設定
@@ -222,24 +234,12 @@ void loopSystem (void) {
 			// ライントレース
 			motorPwmOutSynth( lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 
-			if(SGmarker == 1 && beforeSGmarker == 0) {
-				BMI088val.angle.x = 0.0f;
-				BMI088val.angle.y = 0.0f;
-				BMI088val.angle.z = 0.0f;
-			} else if(SGmarker == 0){
-				BMI088val.angle.x = 0.0f;
-				BMI088val.angle.y = 0.0f;
-				BMI088val.angle.z = 0.0f;
-			}
-	 
 			// ゴール判定
 			if (SGmarker >= COUNT_GOAL ) {
 				goalTime = cntRun;
 				enc1 = 0;
 				patternTrace = 101;
 			}
-
-			beforeSGmarker = SGmarker;
 			break;
 
       	case 101:

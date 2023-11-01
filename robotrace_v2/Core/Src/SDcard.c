@@ -32,6 +32,7 @@ int16_t fileNumbers[1000], fileIndexLog = 0, endFileIndex = 0;
 
 // カウンタ
 uint16_t    cntLog = 0;
+int32_t     encLog = 0;
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 initMicroSD
@@ -40,35 +41,54 @@ uint16_t    cntLog = 0;
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 bool initMicroSD(void) {
-  FATFS     *pfs;
-  FRESULT   fresult;
-  DWORD     fre_clust;
-  uint32_t  total, free_space;
-  FIL       fil_T;
+	FATFS		*pfs;
+	FRESULT		fresult;
+	DIR			dir;			// Directory
+	FILINFO		fno;			// File Info
+	DWORD		fre_clust;
+	uint32_t	total, free_space;
+	uint8_t		dirSetting = 0;
+	FIL			fil_T;
 
-  // SDcardをマウント
-  fresult = f_mount(&fs, "", 0);
-  if (fresult == FR_OK) {
-    // マウント成功
-    initMSD = true;
-    printf("SD CARD mounted successfully...\r\n");
+	// SDcardをマウント
+	fresult = f_mount(&fs, "", 0);
+	if (fresult == FR_OK) {
+		// マウント成功
+		initMSD = true;
+		printf("SD CARD mounted successfully...\r\n");
 
-    // 空き容量を計算
-    f_getfree("", &fre_clust, &pfs); // cluster size
-    total = (uint32_t)((pfs -> n_fatent - 2) * pfs -> csize * 0.5); // total capacity
-    printf("SD_SIZE: \t%lu\r\n", total);
-    free_space = (uint32_t)(fre_clust * pfs->csize*0.5);  // empty capacity
-    printf("SD free space: \t%lu\r\n", free_space);
+		// 空き容量を計算
+		f_getfree("", &fre_clust, &pfs); // cluster size
+		total = (uint32_t)((pfs -> n_fatent - 2) * pfs -> csize * 0.5); // total capacity
+		printf("SD_SIZE: \t%lu\r\n", total);
+		free_space = (uint32_t)(fre_clust * pfs->csize*0.5);  // empty capacity
+		printf("SD free space: \t%lu\r\n", free_space);
 
-    getFileNumbers();
+		getFileNumbers();
 
-    return true;
-  } else {
-    // マウント失敗
-    initMSD = false;
-    printf ("error in mounting SD CARD...\r\n");
-    return false;
-  }
+		// settingディレクトリを作成
+		fresult = f_opendir(&dir,"/");  // directory open
+		if (fresult == FR_OK) {
+			do {
+				f_readdir(&dir,&fno);     
+				if (strcmp(fno.fname,"setting") == 0) {
+					dirSetting = 1;	// settingディレクトリが存在する
+					break;
+				}
+			} while(fno.fname[0] != 0); // ファイルの有無を確認
+
+			if (!dirSetting) {
+				f_mkdir("setting");	// settingディレクトリを作成する
+			}
+		}
+
+		return true;
+	} else {
+		// マウント失敗
+		initMSD = false;
+		printf ("error in mounting SD CARD...\r\n");
+		return false;
+	}
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 initLog
@@ -77,8 +97,8 @@ bool initMicroSD(void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void initLog(void){
-  cntLog = 0;
-  modeLOG = true;    // log start
+	cntLog = 0;
+	modeLOG = true;    // log start
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 createLog
@@ -87,57 +107,57 @@ void initLog(void){
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void createLog(void) {
-  FRESULT   fresult;
-  DIR dir;                    // Directory
-  FILINFO fno;                // File Info
-  uint8_t *tp, fileName[10];
-  uint16_t fileNumber = 0;
+	FRESULT   fresult;
+	DIR dir;                    // Directory
+	FILINFO fno;                // File Info
+	uint8_t *tp, fileName[10];
+	uint16_t fileNumber = 0;
 
-  f_opendir(&dir,"/");  // directory open
-  
-  do {
-    f_readdir(&dir,&fno);  
-    tp = strtok(fno.fname,".");     // 拡張子削除
-    if ( atoi(tp) > fileNumber ) {  // 番号比較
-      fileNumber = atoi(tp);        // 文字列を数値に変換
-    }
-  } while(fno.fname[0] != 0); // ファイルの有無を確認
+	f_opendir(&dir,"/");  // directory open
+	
+	do {
+		f_readdir(&dir,&fno);  
+		tp = strtok(fno.fname,".");     // 拡張子削除
+		if ( atoi(tp) > fileNumber ) {  // 番号比較
+		fileNumber = atoi(tp);        // 文字列を数値に変換
+		}
+	} while(fno.fname[0] != 0); // ファイルの有無を確認
 
-  f_closedir(&dir);     // directory close
+	f_closedir(&dir);     // directory close
 
-  // ファイルナンバー作成
-  if (fileNumber == 0) {
-    // ファイルが無いとき
-    fileNumber = 1;
-  } else {
-    // ファイルが有るとき
-    fileNumber++;         // index pulus
-  }
+	// ファイルナンバー作成
+	if (fileNumber == 0) {
+		// ファイルが無いとき
+		fileNumber = 1;
+	} else {
+		// ファイルが有るとき
+		fileNumber++;         // index pulus
+	}
 
-  sprintf(fileName,"%d",fileNumber);  // 数値を文字列に変換
-  strcat(fileName, ".csv");           // 拡張子を追加
-  fresult = f_open(&fil_W, fileName, FA_OPEN_ALWAYS | FA_WRITE);  // create file 
+	sprintf(fileName,"%d",fileNumber);  // 数値を文字列に変換
+	strcat(fileName, ".csv");           // 拡張子を追加
+	fresult = f_open(&fil_W, fileName, FA_OPEN_ALWAYS | FA_WRITE);  // create file 
 
-  strcpy(columnTitle, "");
-  strcpy(formatLog, "");
+	strcpy(columnTitle, "");
+	strcpy(formatLog, "");
 
-  setLogStr("cntlog",       "%d");
-  setLogStr("courseMarker",  "%d");
-  setLogStr("encCurrentN",  "%d");
-  setLogStr("gyroVal_Z",   "%d");
-  setLogStr("encTotalN",    "%d");
-  setLogStr("targetSpeed",    "%d");
+	setLogStr("cntlog",       "%d");
+	setLogStr("courseMarker",  "%d");
+	setLogStr("encCurrentN",  "%d");
+	setLogStr("gyroVal_Z",   "%d");
+	setLogStr("encTotalN",    "%d");
+	setLogStr("targetSpeed",    "%d");
 
-  // setLogStr("motorCurrentL",  "%d");
-  // setLogStr("motorCurrentR",  "%d");
-  // setLogStr("CurvatureRadius",  "%d");
-  // setLogStr("cntMarker",  "%d");
-  setLogStr("optimalIndex",  "%d");
-  setLogStr("ROC",  "%d");
+	// setLogStr("motorCurrentL",  "%d");
+	// setLogStr("motorCurrentR",  "%d");
+	// setLogStr("CurvatureRadius",  "%d");
+	// setLogStr("cntMarker",  "%d");
+	setLogStr("optimalIndex",  "%d");
+	setLogStr("ROC",  "%d");
 
-  strcat(columnTitle,"\n");
-  strcat(formatLog,"\n");
-  f_printf(&fil_W, columnTitle);
+	strcat(columnTitle,"\n");
+	strcat(formatLog,"\n");
+	f_printf(&fil_W, columnTitle);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogBuffer
@@ -166,22 +186,22 @@ void writeLogBuffer (void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void writeLogPut(void) {
-  uint32_t i,length = 0;
+	uint32_t i,length = 0;
 
-  for(i = 0;i<logIndex;i++) {
-    f_printf(&fil_W, formatLog
-      ,logVal[i].time
-      ,logVal[i].marker
-      ,logVal[i].speed
-      ,(int32_t)(logVal[i].zg*10000)
-      ,logVal[i].distance
-      ,logVal[i].target
-      // ,(int32_t)(logVal[i].mcl*10000)
-      // ,(int32_t)(logVal[i].mcr*10000)
-      ,logVal[i].optimalIndex
-      ,(int32_t)(calcROC(logVal[i].speed,logVal[i].zg))
-    );
-  }
+	for(i = 0;i<logIndex;i++) {
+	f_printf(&fil_W, formatLog
+		,logVal[i].time
+		,logVal[i].marker
+		,logVal[i].speed
+		,(int32_t)(logVal[i].zg*10000)
+		,logVal[i].distance
+		,logVal[i].target
+		// ,(int32_t)(logVal[i].mcl*10000)
+		// ,(int32_t)(logVal[i].mcr*10000)
+		,logVal[i].optimalIndex
+		,(int32_t)(calcROC(logVal[i].speed,logVal[i].zg))
+	);
+	}
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 endLog
@@ -190,17 +210,16 @@ void writeLogPut(void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void endLog(void) {
+	initIMU = false;  // IMUの使用を停止
+	modeLOG = false;  // ログ取得停止
+	// IMU用のCSピンがHIGHになるまで待つ
+	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );
 
-  initIMU = false;  // IMUの使用を停止
-  modeLOG = false;  // ログ取得停止
-  // IMU用のCSピンがHIGHになるまで待つ
-  while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );
-  
-  createLog();    // ログファイル作成
-  writeLogPut();  // ログ書き込み
-  
-  f_close(&fil_W);
-  initIMU = true;
+	createLog();    // ログファイル作成
+	writeLogPut();  // ログ書き込み
+
+	f_close(&fil_W);
+	initIMU = true;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getFileNumbers
@@ -209,28 +228,28 @@ void endLog(void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void getFileNumbers(void) {
-  DIR dir;                    // Directory
-  FILINFO fno;                // File Info
-  FRESULT   fresult;
-  uint8_t fileName[10];
-  uint8_t *tp, i;
+	DIR dir;                    // Directory
+	FILINFO fno;                // File Info
+	FRESULT   fresult;
+	uint8_t fileName[10];
+	uint8_t *tp, i;
 
-  fresult = f_opendir(&dir,"/");  // directory open
-  if (fresult == FR_OK) {
-    do {
-      f_readdir(&dir,&fno);     
-      if (strstr(fno.fname,".csv") != NULL) {
-        // csvファイルのとき
-        tp = strtok(fno.fname,".");     // 拡張子削除
-        fileNumbers[endFileIndex] = atoi(tp);        // 文字列を数値に変換
-        endFileIndex++;
-      }
-    } while(fno.fname[0] != 0); // ファイルの有無を確認
+	fresult = f_opendir(&dir,"/");  // directory open
+	if (fresult == FR_OK) {
+		do {
+			f_readdir(&dir,&fno);     
+			if (strstr(fno.fname,".csv") != NULL) {
+			// csvファイルのとき
+			tp = strtok(fno.fname,".");     // 拡張子削除
+			fileNumbers[endFileIndex] = atoi(tp);        // 文字列を数値に変換
+			endFileIndex++;
+			}
+		} while(fno.fname[0] != 0); // ファイルの有無を確認
 
-    fileIndexLog = endFileIndex;
-  }
+		fileIndexLog = endFileIndex;
+	}
 
-  f_closedir(&dir);     // directory close
+	f_closedir(&dir);     // directory close
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setLogStr
@@ -239,16 +258,16 @@ void getFileNumbers(void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void setLogStr(uint8_t* column, uint8_t* format) {
-  uint8_t* columnStr[30], formatStr[30];
+	uint8_t* columnStr[30], formatStr[30];
 
-  // copy str to local variable
-  strcpy(columnStr,column);
-  strcpy(formatStr,format);
+	// copy str to local variable
+	strcpy(columnStr,column);
+	strcpy(formatStr,format);
 
-  strcat(columnStr,",");
-  strcat(formatStr,",");
-  strcat(columnTitle,columnStr);
-  strcat(formatLog,formatStr);
+	strcat(columnStr,",");
+	strcat(formatStr,",");
+	strcat(columnTitle,columnStr);
+	strcat(formatLog,formatStr);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SDtest
@@ -257,10 +276,10 @@ void setLogStr(uint8_t* column, uint8_t* format) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void SDtest(void) {
-  FIL       fil_T;
-  FRESULT   fresult;
+	FIL       fil_T;
+	FRESULT   fresult;
 
-  fresult = f_open(&fil_T, "test.csv", FA_OPEN_ALWAYS | FA_WRITE);  // create file
-  while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );
-  f_close(&fil_T);
+	fresult = f_open(&fil_T, "test.csv", FA_OPEN_ALWAYS | FA_WRITE);  // create file
+	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );
+	f_close(&fil_T);
 }

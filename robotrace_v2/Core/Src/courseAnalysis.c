@@ -6,18 +6,16 @@
 //====================================//
 // グローバル変数の宣
 //====================================//
-float       ROCmarker[ANALYSISBUFFSIZE] = {0}; // マーカー区間ごとの曲率半径 ROC(Radius Of Curvature)
 uint8_t     optimalTrace = 0;
 uint16_t    optimalIndex;
 int16_t     numPPADarry;                    // path palanning analysis distance (PPAD)
 int16_t     numPPAMarry;                    // path palanning analysis marker (PPAM1)
 int16_t     pathedMarker = 0;
 float       boostSpeed;
-int32_t     distanceStart, distanceEnd; 
+int32_t     DistanceOptimal = 0;                 // 2次走行用走行距離変数
 int16_t     analizedNumber = 0;             // 前回解析したログ番号
 int32_t     encTotalOptimal = 0;            // 2次走行用の距離変数(距離補正をする)
 
-AnalysisData PPAM[ANALYSISBUFFSIZE];
 AnalysisData PPAD[ANALYSISBUFFSIZE];
 EventPos     markerPos[ANALYSISBUFFSIZE];
 /////////////////////////////////////////////////////////////////////
@@ -34,7 +32,7 @@ float calcROC(float velo, float angvelo) {
     ret = dl / drad;
     // 曲率半径が大きい＝直線の場合は極大にする
     if (fabs(ret) > 1500.0F) {
-        ret = 10000.0;
+        ret = 2000.0;
     }
 
     return ret;
@@ -134,7 +132,6 @@ int16_t readLogDistance(int logNumber) {
         // 前処理
         // 構造体配列の初期化
         memset(&PPAD, 0, sizeof(AnalysisData) * ANALYSISBUFFSIZE);
-        memset(&PPAM, 0, sizeof(AnalysisData) * ANALYSISBUFFSIZE);
         // memset(&ROCbuff, 0, sizeof(float) * 500);
 
         // ログデータ取得開始
@@ -234,7 +231,6 @@ int16_t readLogDistance(int logNumber) {
         
         numPPAMarry = numM;
         numPPADarry = numD;
-        // printf("num %d\n",numPPAMarry);
         ret = numD;
     } else {
         ret = -4;
@@ -313,7 +309,6 @@ int16_t readLogTest(int logNumber) {
         // 前処理
         // 構造体配列の初期化
         memset(&PPAD, 0, sizeof(AnalysisData) * ANALYSISBUFFSIZE);
-        memset(&PPAM, 0, sizeof(AnalysisData) * ANALYSISBUFFSIZE);
 
         // ログデータ取得開始
         while (f_gets(log,sizeof(log),&fil_Read)) {
@@ -342,6 +337,57 @@ int16_t readLogTest(int logNumber) {
     // 解析済みのログ番号を保存
     // saveLogNumber(logNumber);
     analizedNumber = logNumber;
+
+    return ret;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 calcXYpotisions
+// 処理概要     ログから走行軌跡のXY座標を計算する
+// 引数         ログ番号(ファイル名)
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+int16_t calcXYpotisions(int logNumber) {
+    FIL         fil_Read,fil_Plot;
+    FRESULT     fresult1,fresult2;
+    uint8_t     fileName[10];
+    int16_t     ret = 0, i = 0;
+    float		degz = 0, degzR, velocity = 0;
+    float		x=0, y = 0;
+
+    // ファイル読み込み
+    snprintf(fileName,sizeof(fileName),"%d",logNumber);   // 数値を文字列に変換
+    strcat(fileName,".csv");                              // 拡張子を追加
+    fresult1 = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ);  // ログファイルを開く
+    fresult2 = f_open(&fil_Plot, "plot.csv", FA_OPEN_ALWAYS | FA_WRITE);  // csvファイルを開く
+
+    if (fresult2 == FR_OK) {
+        // ログデータの取得
+        TCHAR     log[512];
+        int32_t   time=0, marker=0,velo=0,angVelo=0,distance=0;
+
+        // ログデータ取得開始
+        while (f_gets(log,sizeof(log),&fil_Read)) {
+            sscanf(log,"%d,%d,%d,%d,%d",&time,&marker,&velo,&angVelo,&distance);
+
+            degz = degz + ((float)angVelo/10000 * DELTATIME);   // 角度
+            degzR = degz * (M_PI/180.0F);
+            velocity = (float)velo/PALSE_MILLIMETER;    // 速度
+
+            x = x + (velocity * sin(degzR));
+            y = y + (velocity * cos(degzR));
+
+            f_printf(&fil_Plot, "%d,%d\n",(int32_t)(x*10000),(int32_t)(y*10000));
+			// f_printf(&fil_Plot, "helo world\n");
+            i++;
+        }
+        
+        ret = i;
+    } else {
+        ret = -1;
+    }
+
+    f_close(&fil_Read);
+    f_close(&fil_Plot);
 
     return ret;
 }

@@ -77,9 +77,9 @@ void setup( void )
 
 	// ディップスイッチで項目選択
 	switch ( swValRotary ) {
-		// //------------------------------------------------------------------
-		// // スタート待ち
-		// //------------------------------------------------------------------
+		//------------------------------------------------------------------
+		// スタート待ち
+		//------------------------------------------------------------------
 		case HEX_START:
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
@@ -163,9 +163,9 @@ void setup( void )
 					break;
 			}
 			break;
-		// //------------------------------------------------------------------
-		// // パラメータ調整(通常トレース)
-		// //------------------------------------------------------------------
+		//------------------------------------------------------------------
+		// パラメータ調整(通常トレース)
+		//------------------------------------------------------------------
 		case HEX_SPEED_PARAM:
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
@@ -467,9 +467,9 @@ void setup( void )
 			}
 			beforeSensors = patternSensors;
 			break;
-		// //------------------------------------------------------------------
-		// // Log
-		// //------------------------------------------------------------------
+		//------------------------------------------------------------------
+		// Log
+		//------------------------------------------------------------------
 		case HEX_LOG:
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
@@ -492,8 +492,9 @@ void setup( void )
 							ssd1306_SetCursor(0+(20*i),24+(8*j));
 							if ( i == x && j == y ) {
 								if (swValTact == SW_PUSH) {
+									initIMU = false;
 									// 距離基準解析
-									numPPADarry = readLogDistance(fileNumbers[k]);
+									numPPADarry = calcXYpotisions(fileNumbers[k]);
 									// numPPADarry = readLogTest(fileNumbers[k]);
 									if (numPPADarry > 0) {
 										optimalTrace = BOOST_DISTANCE;
@@ -501,6 +502,7 @@ void setup( void )
 										// saveLogNumber(fileNumbers[k]);
 										HAL_Delay(100);
 									}
+									initIMU = true;
 								}
 								ssd1306_printfB(Font_6x8,"%d",fileNumbers[k--]);
 							} else {
@@ -516,9 +518,9 @@ void setup( void )
 				}
 			}
 			break;
-		// //------------------------------------------------------------------
-		// // キャリブレーション(ラインセンサ) 
-		// //------------------------------------------------------------------
+		//------------------------------------------------------------------
+		// キャリブレーション(ラインセンサ) 
+		//------------------------------------------------------------------
 		case HEX_CALIBRATION:
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
@@ -531,6 +533,8 @@ void setup( void )
 					// スイッチ入力待ち
 					dataTuningUD( &calTimes, 1, 1, 9);
 					setTargetSpeed(0);
+					ssd1306_SetCursor(65,22);
+					ssd1306_printf(Font_6x8,"%4d",lSensorOffset[0]);
 
 					data_select( &trace_test, SW_PUSH );
 					if (trace_test) {
@@ -553,52 +557,72 @@ void setup( void )
 						patternCalibration = 3;
 					}
 					break;
-
+				
 				case 3:
 					// 左旋回
-					setTargetAngularVelocity(CALIBRATIONSPEED);
+					setTargetAngularVelocity(1500);
 					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-					if (BMI088val.angle.z > 35.0) {
+					if (BMI088val.angle.z > 320.0) {
 						patternCalibration = 4;
 					}
 					break;
 
 				case 4:
-					// 停止
-					setTargetSpeed(0);
-					motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
-					if (abs(encCurrentN) == 0) {
-						patternCalibration = 5;
-					}
-					break;
-
-				case 5:
-					// 右旋回
-					setTargetAngularVelocity(-CALIBRATIONSPEED);
-					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-					if (BMI088val.angle.z < -35) {
-						patternCalibration = 6;
-					}
-					break;
-
-				case 6:
-					// 停止
-					setTargetSpeed(0);
-					motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
-					if (abs(encCurrentN) == 0) {
-						patternCalibration = 7;
-					}
-					break;
-
-				case 7:
 					// 初期位置に戻る
-					setTargetAngularVelocity(CALIBRATIONSPEED);
+					setTargetAngularVelocity(400.0F);
 					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-					if (BMI088val.angle.z > 0) {
+					if (lSensor[5] < 1000) {
 						modeCalLinesensors = 0;
+						countdown = 500;
 						patternCalibration = 8;
 					}
 					break;
+
+				// case 3:
+				// 	// 左旋回
+				// 	setTargetAngularVelocity(500);
+				// 	motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+				// 	if (BMI088val.angle.z > 35.0) {
+				// 		patternCalibration = 4;
+				// 	}
+				// 	break;
+
+				// case 4:
+				// 	// 停止
+				// 	setTargetSpeed(0);
+				// 	motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
+				// 	if (abs(encCurrentN) == 0) {
+				// 		patternCalibration = 5;
+				// 	}
+				// 	break;
+
+				// case 5:
+				// 	// 右旋回
+				// 	setTargetAngularVelocity(-500);
+				// 	motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+				// 	if (BMI088val.angle.z < -35) {
+				// 		patternCalibration = 6;
+				// 	}
+				// 	break;
+
+				// case 6:
+				// 	// 停止
+				// 	setTargetSpeed(0);
+				// 	motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
+				// 	if (abs(encCurrentN) == 0) {
+				// 		patternCalibration = 7;
+				// 	}
+				// 	break;
+
+				// case 7:
+				// 	// 初期位置に戻る
+				// 	setTargetAngularVelocity(500);
+				// 	motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+				// 	if (BMI088val.angle.z > 0) {
+				// 		modeCalLinesensors = 0;
+				// 		patternCalibration = 8;
+				// 	}
+				// 	break;
 
 				case 8:
 					// 停止
@@ -619,9 +643,9 @@ void setup( void )
 					break;
 				}
 			break;
-		// //------------------------------------------------------------------
-		// // ゲイン調整(直線トレース)
-		// //------------------------------------------------------------------
+		//------------------------------------------------------------------
+		// ゲイン調整(直線トレース)
+		//------------------------------------------------------------------
 		case HEX_PID_TRACE:
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
@@ -682,9 +706,9 @@ void setup( void )
 			}
 			
 			break;
-		// //------------------------------------------------------------------
-		// // ゲイン調整(速度)
-		// //------------------------------------------------------------------
+		//------------------------------------------------------------------
+		// ゲイン調整(速度)
+		//------------------------------------------------------------------
 		case HEX_PID_SPEED:
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
@@ -745,9 +769,9 @@ void setup( void )
 				}
 			}
 		break;
-		// //------------------------------------------------------------------
-		// // ゲイン調整(角速度)
-		// //------------------------------------------------------------------
+		//------------------------------------------------------------------
+		// ゲイン調整(角速度)
+		//------------------------------------------------------------------
 		case HEX_PID_ANGULAR:
 			if (swValRotary != beforeHEX) 	{
 				// 切替時に実行
@@ -807,9 +831,9 @@ void setup( void )
 				}
 			}
 			break;
-		// //------------------------------------------------------------------
-		// // ゲイン調整(角度)
-		// //------------------------------------------------------------------
+		//------------------------------------------------------------------
+		// ゲイン調整(角度)
+		//------------------------------------------------------------------
 		// case HEX_PID_ANGLE:
 			
 		// 	break;

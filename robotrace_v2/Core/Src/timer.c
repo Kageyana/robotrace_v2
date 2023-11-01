@@ -51,9 +51,9 @@ void Interrupt1ms(void) {
                 for(i=pathedMarker;i<=numPPAMarry;i++) {
                     // 現在地から一番近いマーカーを探す
                     if (abs(encTotalOptimal - markerPos[i].distance) < encMM(50)) {
-                        errorDistance = encTotalOptimal - distanceStart;  // 現在の差を計算
+                        errorDistance = encTotalOptimal - DistanceOptimal;  // 現在の差を計算
                         encTotalOptimal = markerPos[i].distance;               // 距離を補正
-                        distanceStart = encTotalOptimal - errorDistance;  // 補正後の現在距離からの差分
+                        DistanceOptimal = encTotalOptimal - errorDistance;  // 補正後の現在距離からの差分
                         optimalIndex = markerPos[i].indexPPAD;      // インデックス更新
 
                         pathedMarker = i;
@@ -101,6 +101,15 @@ void Interrupt1ms(void) {
             cnt5 = 0;
             break;
     }
+
+    // if(patternTrace >= 12) {
+    //     if( encLog >= encMM(CALCDISTANCE) ) {
+    //         // CALCDISTANCEごとにログを保存
+    //         writeLogBuffer(); // バッファにログを保存
+    //         courseMarkerLog = 0;
+    //         encLog = 0;
+    //     }
+    // }
 
     switch (cnt10) {
         case 1:

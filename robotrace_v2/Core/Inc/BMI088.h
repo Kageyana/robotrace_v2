@@ -14,7 +14,7 @@
 #define MAGPLSB         16.0F
 
 #define DEFF_TIME       0.005F
-#define COEFF_DPD       0.9996F
+#define COEFF_DPD       1.0035F
 
 /*レジスタアドレス*/
 #define REG_GYRO_CHIP_ID    0x00

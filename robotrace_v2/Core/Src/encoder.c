@@ -26,8 +26,8 @@ void getEncoder(void) {
     uint16_t encRawR=0, encRawL=0;
     static encBufR=0, encBufL=0;
 
-    // エンコーダカウントを取得
-    encRawR = TIM8 -> CNT;
+	// エンコーダカウントを取得
+	encRawR = TIM8 -> CNT;
 	encRawL = TIM3 -> CNT;
 
     // 1msあたりのカウント
@@ -41,14 +41,15 @@ void getEncoder(void) {
     encTotalN += encCurrentN;
     
     // 外部変数
-    enc1 += encCurrentN;
-    encRightMarker += encCurrentN;
-    encCurve += encCurrentN;
-    encTotalOptimal += encCurrentN;
+	enc1 += encCurrentN;
+	encRightMarker += encCurrentN;
+	encCurve += encCurrentN;
+	encTotalOptimal += encCurrentN;
+	encLog += encCurrentN;
 
     // 前回値を更新
-    encBufR = encRawR;
-    encBufL = encRawL;
+	encBufR = encRawR;
+	encBufL = encRawL;
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 encMM

@@ -163,9 +163,9 @@ void BMI088getGyro(void) {
 	gyroVal[1] = ((rawData[3] << 8) | rawData[2]) - angleOffset[1];
 	gyroVal[2] = ((rawData[5] << 8) | rawData[4]) - angleOffset[2];
 
-	BMI088val.gyro.x = (float)gyroVal[0] / GYROLSB;
-	BMI088val.gyro.y = (float)gyroVal[1] / GYROLSB;
-	BMI088val.gyro.z = (float)gyroVal[2] / GYROLSB;
+	BMI088val.gyro.x = (float)gyroVal[0] / GYROLSB * COEFF_DPD;
+	BMI088val.gyro.y = (float)gyroVal[1] / GYROLSB * COEFF_DPD;
+	BMI088val.gyro.z = (float)gyroVal[2] / GYROLSB * COEFF_DPD;
 	
 }
 /////////////////////////////////////////////////////////////////////
