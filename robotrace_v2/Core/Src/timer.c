@@ -65,6 +65,12 @@ void Interrupt1ms(void) {
         beforeCourseMarker = courseMarker;
     }
 
+
+    if(patternTrace > 11 && patternTrace < 100) {
+        // xy座標計算
+        calcXYcie(encCurrentN,BMI088val.gyro.z);
+    }
+
     // 走行前に処理
     if (patternTrace < 10 || patternTrace > 100) {
         getSwitches();  // スイッチの入力を取得
@@ -91,6 +97,7 @@ void Interrupt1ms(void) {
             }
             break;
         case 2:
+            
             break;
         case 3:
             break;
@@ -110,16 +117,16 @@ void Interrupt1ms(void) {
     //         encLog = 0;
     //     }
     // }
-
+    
     switch (cnt10) {
         case 1:
             getADC2();
             getMotorCurrent();
             break;
         case 2:
-            if(initIMU) {
-                BMI088getTemp();
-            }
+            // if(initIMU) {
+            //     BMI088getTemp();
+            // }
             break;
         case 9:
             if(patternTrace < 100) {

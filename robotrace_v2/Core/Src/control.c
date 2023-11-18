@@ -193,6 +193,8 @@ void loopSystem (void) {
 				BMI088val.angle.x = 0.0F;
 				BMI088val.angle.y = 0.0F;
 				BMI088val.angle.z = 0.0F;
+
+				clearXYcie();	// 座標計算変数初期化
 				
 				if (initMSD) initLog();	// ログ記録開始
 				patternTrace = 12;

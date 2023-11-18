@@ -16,13 +16,13 @@ uint8_t   columnTitle[512] = "", formatLog[256] = "";
 
 // ログバッファ
 typedef struct {
-    uint16_t time;
-    uint8_t marker;
-    uint8_t speed;
-    float zg;
-    uint32_t distance;
-    uint8_t target;
-    uint16_t optimalIndex;
+    uint16_t 	time;
+    uint8_t 	marker;
+    uint8_t 	speed;
+    float 		zg;
+    uint32_t 	distance;
+    uint8_t 	target;
+    uint16_t 	optimalIndex;
 } logData;
 logData logVal[3000];
 uint32_t  logIndex = 0 , sendLogNum = 0;
@@ -142,6 +142,8 @@ void createLog(void) {
 	// setLogStr("cntMarker",  "%d");
 	setLogStr("optimalIndex",  "%d");
 	setLogStr("ROC",  "%d");
+	setLogStr("x",  "%d");
+	setLogStr("y",  "%d");
 
 	strcat(columnTitle,"\n");
 	strcat(formatLog,"\n");
@@ -176,19 +178,23 @@ void writeLogBuffer (void) {
 void writeLogPut(void) {
 	uint32_t i,length = 0;
 
+	clearXYcie();
 	for(i = 0;i<logIndex;i++) {
-	f_printf(&fil_W, formatLog
-		,logVal[i].time
-		,logVal[i].marker
-		,logVal[i].speed
-		,(int32_t)(logVal[i].zg*10000)
-		,logVal[i].distance
-		,logVal[i].target
-		// ,(int32_t)(logVal[i].mcl*10000)
-		// ,(int32_t)(logVal[i].mcr*10000)
-		,logVal[i].optimalIndex
-		,(int32_t)(calcROC(logVal[i].speed,logVal[i].zg))
-	);
+		calcXYcie(logVal[i].speed,logVal[i].zg);
+		f_printf(&fil_W, formatLog
+			,logVal[i].time
+			,logVal[i].marker
+			,logVal[i].speed
+			,(int32_t)(logVal[i].zg*10000)
+			,logVal[i].distance
+			,logVal[i].target
+			// ,(int32_t)(logVal[i].mcl*10000)
+			// ,(int32_t)(logVal[i].mcr*10000)
+			,logVal[i].optimalIndex
+			,(int32_t)(calcROC(logVal[i].speed,logVal[i].zg))
+			,(int32_t)(xycie.x*10000)
+			,(int32_t)(xycie.y*10000)
+		);
 	}
 }
 /////////////////////////////////////////////////////////////////////
