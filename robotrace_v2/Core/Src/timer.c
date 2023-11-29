@@ -26,6 +26,7 @@ void Interrupt1ms(void) {
     // PID制御処理
     motorControlTrace();
     motorControlSpeed();
+    motorControldist();
 
     // 走行中に処理
     if (patternTrace > 10 && patternTrace < 100) {
@@ -33,7 +34,7 @@ void Interrupt1ms(void) {
         // if (cntEmcStopAngleX()) emcStop = STOP_ANGLE_X;
         // if (cntEmcStopAngleY()) emcStop = STOP_ANGLE_Y;
         if (cntEmcStopEncStop()) emcStop = STOP_ENCODER_STOP;
-        if (cntEmcStopLineSensor()) emcStop = STOP_LINESENSOR;
+        // if (cntEmcStopLineSensor()) emcStop = STOP_LINESENSOR;
         
         courseMarker = checkMarker();   // マーカー検知
         checkGoalMarker();              // ゴールマーカー処理
@@ -46,6 +47,7 @@ void Interrupt1ms(void) {
         if (courseMarker == 2 && beforeCourseMarker == 0) {
             cntMarker++;    // マーカーカウント
             if (optimalTrace == BOOST_DISTANCE) {
+                // 距離基準2次走行のとき
                 int32_t i, j, errorDistance, upperLimit, lowerLimit;
 
                 for(i=pathedMarker;i<=numPPAMarry;i++) {
@@ -63,10 +65,7 @@ void Interrupt1ms(void) {
             }
         }
         beforeCourseMarker = courseMarker;
-    }
 
-
-    if(patternTrace > 11 && patternTrace < 100) {
         // xy座標計算
         calcXYcie(encCurrentN,BMI088val.gyro.z);
     }
@@ -80,6 +79,8 @@ void Interrupt1ms(void) {
         cntSwitchUD++;
         cntSwitchLR++;
     }
+
+    float distLen;
     
     switch(cnt5) {
         case 1:
@@ -97,7 +98,12 @@ void Interrupt1ms(void) {
             }
             break;
         case 2:
-            
+            if (optimalTrace == BOOST_SHORTCUT && DistanceOptimal > 0) {
+                // distLen = (float)encCurrentN * PALSE_MILLIMETER * 0.005; // 現在速度から5ms後の移動距離を計算
+                optimalIndex = (int32_t)( encTotalOptimal / PALSE_MILLIMETER ) / 50; // 50mmごとにショートカット配列を作っているので移動距離[mm]を50mmで割った商がインデクス
+                optimalIndex += 1;
+                setShortCutTarget();
+            }
             break;
         case 3:
             break;

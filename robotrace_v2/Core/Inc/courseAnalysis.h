@@ -18,7 +18,8 @@
 #define BOOST_DISTANCE      2       // 距離基準2次走行
 #define BOOST_SHORTCUT      3       // ショートカット2次走行
 #define SEARCHRANGE         150     // 距離補正時の距離検索範囲[mm]
-#define DPS2RDS             0.0174533F  // deg/s→rad/s
+#define DEG2RAD             M_PI/180.0F  // deg→rad
+#define RAD2DEG             180.0F/M_PI  // rad→deg
 #define SHORTCUTWINDOW      32      // ショートカットコース生成時の移動平均サンプル数
 
 typedef struct {
@@ -34,6 +35,8 @@ typedef struct {
 typedef struct {
     float x;
     float y;
+    float w;
+    float dist;
 } Courseplot;
 //====================================//
 // グローバル変数の宣言
@@ -48,11 +51,13 @@ extern float    boostSpeed;
 extern int32_t  DistanceOptimal;
 extern int16_t  analizedNumber;
 extern int32_t  encTotalOptimal;
+extern int32_t  encPID;
 
 // 解析関係
 extern AnalysisData PPAD[ANALYSISBUFFSIZE];
 extern EventPos     markerPos[ANALYSISBUFFSIZE];
 extern Courseplot   xycie;
+extern Courseplot   shortCutxycie[ANALYSISBUFFSIZE];
 //====================================//
 // プロトタイプ宣言
 //====================================//
@@ -66,5 +71,6 @@ int16_t		readLogTest(int logNumber);
 int16_t		calcXYcies(int logNumber);
 void		calcXYcie(float encpulse, float angVelo);
 void        clearXYcie(void);
+void        setShortCutTarget(void);
 
 #endif // COURSEANALYSIS_H_

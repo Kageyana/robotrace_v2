@@ -210,6 +210,8 @@ void loopSystem (void) {
 				} else {
 					setTargetSpeed(targetParam.curve);
 				}
+				// ライントレース
+				motorPwmOutSynth( lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 			} else if (optimalTrace == BOOST_DISTANCE) {
 				// 距離基準2次走行
 				// スタートマーカーを超えた時から距離計測開始
@@ -231,17 +233,39 @@ void loopSystem (void) {
 				}
 				// 目標速度に設定
 				setTargetSpeed(boostSpeed);
+				// ライントレース
+				motorPwmOutSynth( lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+			} else if (optimalTrace == BOOST_SHORTCUT) {
+				// ショートカット2次走行
+				// スタートマーカーを超えた時から距離計測開始
+				if (SGmarker > 0 && DistanceOptimal == 0) {
+					DistanceOptimal = encTotalOptimal;
+					// 初期目標値をセット
+					optimalIndex = 1;
+					setShortCutTarget();
+				}
+				boostSpeed = 0.3;
+				// 目標速度に設定
+				setTargetSpeed(boostSpeed);
+				// ライントレース
+				motorPwmOutSynth( 0, veloCtrl.pwm, yawCtrl.pwm, distCtrl.pwm);
 			}
 			
-			// ライントレース
-			motorPwmOutSynth( lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
-
 			// ゴール判定
-			if (SGmarker >= COUNT_GOAL ) {
-				goalTime = cntRun;
-				enc1 = 0;
-				patternTrace = 101;
+			if(optimalTrace != BOOST_SHORTCUT) {
+				if (SGmarker >= COUNT_GOAL ) {
+					goalTime = cntRun;
+					enc1 = 0;
+					patternTrace = 101;
+				}
+			} else {
+				if (optimalIndex >= numPPADarry) {
+					goalTime = cntRun;
+					enc1 = 0;
+					patternTrace = 101;
+				}
 			}
+			
 			break;
 
       	case 101:
@@ -357,7 +381,7 @@ void checkCurve(void) {
 		if(checkStraight == 1 && encCurve > encMM(100)){
 			modeCurve = 0;
 		}
-	} else if (zg > 150.0f) {
+	} else if (zg < -150.0f) {
 		// 左カーブ時
 		checkStraight = 0;
 		checkRight = 0;
@@ -368,7 +392,7 @@ void checkCurve(void) {
 		if(checkLeft == 1 && encCurve > encMM(20)){
 			modeCurve = 2;
 		}
-	} else if (zg < -150.0f) {
+	} else if (zg > 150.0f) {
 		// 右カーブ時
 		checkStraight = 0;
 		checkLeft = 0;

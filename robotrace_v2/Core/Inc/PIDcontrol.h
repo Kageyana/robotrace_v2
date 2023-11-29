@@ -22,10 +22,13 @@
 #define KI3		100
 #define KD3		8
 
-#define KP4		58
-#define KI4		28
+#define KP4		1
+#define KI4		0
 #define KD4		0
 
+#define KP5		1
+#define KI5		0
+#define KD5		0
 
 typedef struct {
     int16_t kp;
@@ -40,21 +43,25 @@ typedef struct {
 //====================================//
 extern uint8_t	targetSpeed;	// 目標速度
 extern float 	targetAngle;    // 目標角度
-extern float    targetAngularVelocity;
+extern float    targetAngularVelocity;  // 目標角速度
+extern uint16_t targetDist;		        // 目標X座標
 
 extern pidParam lineTraceCtrl;
 extern pidParam veloCtrl;
 extern pidParam yawRateCtrl;
 extern pidParam yawCtrl;
+extern pidParam distCtrl;
 //====================================//
 // プロトタイプ宣言
 //====================================//
 void setTargetSpeed (float speed);
 void setTargetAngularVelocity (float angularVelocity);
 void setTargetAngle (float angle);
-void motorControlTrace( void );
-void motorControlSpeed( void );
-void motorControlYawRate( void );
-void motorControlYaw( void );
+void setTargetDist (float dist);
+void motorControlTrace(void);
+void motorControlSpeed(void);
+void motorControlYawRate(void);
+void motorControlYaw(void);
+void motorControldist(void);
 
 #endif // LINETRACE_H_

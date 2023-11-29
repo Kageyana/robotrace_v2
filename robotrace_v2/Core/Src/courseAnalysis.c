@@ -15,6 +15,7 @@ float       boostSpeed;
 int32_t     DistanceOptimal = 0;            // 2次走行用走行距離変数
 int16_t     analizedNumber = 0;             // 前回解析したログ番号
 int32_t     encTotalOptimal = 0;            // 2次走行用の距離変数(距離補正をする)
+int32_t     encPID = 0;                     // 距離制御用の距離変数
 float       xydegz = 0;
 
 AnalysisData PPAD[ANALYSISBUFFSIZE];
@@ -31,7 +32,7 @@ float calcROC(float velo, float angvelo) {
     float dl, drad, ret;
     
     dl = velo / PALSE_MILLIMETER * 10.0F; // [palse] → [mm/s] → [mm] 
-    drad = angvelo * DPS2RDS * DELTATIME;            // [deg/s] → [rad]
+    drad = angvelo * DEG2RAD * DELTATIME;            // [deg/s] → [rad]
     ret = dl / drad;
     // 曲率半径が大きい＝直線の場合は極大にする
     if (fabs(ret) > 1500.0F) {
@@ -325,7 +326,7 @@ int16_t calcXYcies(int logNumber) {
     FIL         fil_Read,fil_Plot;
     FRESULT     fresult1,fresult2;
     uint8_t     fileName[10];
-    int16_t     ret=0, i=0, j=0, k=0;
+    int16_t     ret=0;
     
 
     // ファイル読み込み
@@ -341,19 +342,29 @@ int16_t calcXYcies(int logNumber) {
         int32_t time=0, marker=0,velo=0,angVelo=0,distance=0;
         int32_t startEnc=0;
         float   degz=0, degzR, velocity=0;
-        float   x=0, y=0, xm=0, ym=0;
-        float   xValues[SHORTCUTWINDOW], yValues[SHORTCUTWINDOW];
+        float   x=0, y=0, xm=0, ym=0, degzm=0;
+        float   xValues[SHORTCUTWINDOW], yValues[SHORTCUTWINDOW], degzValues[SHORTCUTWINDOW];
+        int16_t i=0, j=0, indexSC=0;
 
         // 配列の初期化
         memset(&xValues, 0, sizeof(float) * SHORTCUTWINDOW);
         memset(&yValues, 0, sizeof(float) * SHORTCUTWINDOW);
+        memset(&degzValues, 0, sizeof(float) * SHORTCUTWINDOW);
+
+        // ショートカット軌跡初期値の設定
+        shortCutxycie[indexSC].x = 0;
+        shortCutxycie[indexSC].y = 0;
+        shortCutxycie[indexSC].w = 0;
+        indexSC++;
+
+        f_printf(&fil_Plot, "xm,ym,degzm\n");
 
         // ログデータ取得開始
         while (f_gets(log,sizeof(log),&fil_Read) != NULL) {
             sscanf(log,"%d,%d,%d,%d,%d",&time,&marker,&velo,&angVelo,&distance);
 
             degz = degz + ((float)angVelo/10000 * DELTATIME);   // 角度
-            degzR = degz * (M_PI/180.0F);                       // [rad]に変換
+            degzR = degz * DEG2RAD;                             // [rad]に変換
             velocity = (float)velo/PALSE_MILLIMETER;            // 速度
 
             // 座標計算
@@ -363,34 +374,76 @@ int16_t calcXYcies(int logNumber) {
             // リングバッファに座標を保存
             xValues[i & SHORTCUTWINDOW-1] = x;
             yValues[i & SHORTCUTWINDOW-1] = y;
+            degzValues[i & SHORTCUTWINDOW-1] = degz;
 
             // リングバッファの総和を計算
             for(j=0;j<SHORTCUTWINDOW;j++) {
                 xm += xValues[j];
                 ym += yValues[j];
+                degzm += degzValues[j];
             }
 
             // 移動平均を計算(ショートカット座標)
             xm /= SHORTCUTWINDOW;
             ym /= SHORTCUTWINDOW;
+            degzm /= SHORTCUTWINDOW;
 
             if ( distance-startEnc >= encMM(CALCDISTANCE)) {
-                // f_printf(&fil_Plot, "%d,%d,%d,%d\n",(int32_t)(x*10000),(int32_t)(y*10000),(int32_t)(xm*10000),(int32_t)(ym*10000));
-                shortCutxycie[k].x = xm;
-                shortCutxycie[k].y = ym;
+                // f_printf(&fil_Plot, "%d,%d,%d,%d,%d,%d\n",time,(int32_t)(x*10000),(int32_t)(y*10000),(int32_t)(xm*10000),(int32_t)(ym*10000),(int32_t)(degzm*10000));
+                shortCutxycie[indexSC].x = xm;
+                shortCutxycie[indexSC].y = ym;
                 startEnc = distance;    // 距離計測開始位置を更新
-                k++;
+                indexSC++;
             }
             i++;
         }
-        
-        ret = k;
+
+        // ショートカット座標からyaw軸角度を計算
+        float   xe=0, ye=0;
+        float   theta=0, thetaBefore=90, thetae, tanc;
+
+        degz = 0;
+
+        f_printf(&fil_Plot, "%d,%d,%d\n",(int32_t)(shortCutxycie[0].x*10000),(int32_t)(shortCutxycie[0].y*10000),(int32_t)(shortCutxycie[0].w*10000));
+
+        for(i=1;i<=indexSC;i++) {
+            xe = shortCutxycie[i].x - shortCutxycie[i-1].x; // x座標の移動量
+            ye = shortCutxycie[i].y - shortCutxycie[i-1].y; // y座標の移動量
+
+            theta = atan2(ye,xe) * RAD2DEG;     // [deg]に変換
+
+            // 2直線のなす角を計算
+            thetae = thetaBefore - theta;
+            if(thetae > 180) {
+                thetae -= 360;        
+            } else if(thetae < -180) {
+                thetae += 360;
+            }
+            degz += thetae;
+
+            shortCutxycie[i].w = degz;    // yaw軸角度
+
+            f_printf(&fil_Plot, "%d,%d,%d\n",(int32_t)(shortCutxycie[i].x*10000),(int32_t)(shortCutxycie[i].y*10000),(int32_t)(shortCutxycie[i].w*10000));
+            // f_printf(&fil_Plot, "%d,%d\n",(int32_t)(thetaBefore*10000),(int32_t)(theta*10000));
+
+            thetaBefore = theta;        // 前回のyaw軸角度を更新
+        }
+      
+        ret = indexSC;
     } else {
         ret = -1;
     }
 
+    // ファイルクローズ
     f_close(&fil_Read);
     f_close(&fil_Plot);
+
+    // 解析済みのログ番号を保存
+    saveLogNumber(logNumber);
+    analizedNumber = logNumber;
+
+    // 2次走行フラグ 距離基準2次走行
+    optimalTrace = BOOST_SHORTCUT;
 
     return ret;
 }
@@ -420,4 +473,21 @@ void clearXYcie(void) {
     xycie.x = 0;
     xycie.y = 0;
     xydegz = 0;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 setShortCutTarget
+// 処理概要     グローバル変数xycieの初期化
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void setShortCutTarget(void) {
+    float xe,ye,dist;
+    setTargetAngle(shortCutxycie[optimalIndex].w);
+
+    xe = shortCutxycie[optimalIndex].x - xycie.x;
+    ye = shortCutxycie[optimalIndex].y - xycie.y;
+
+    dist = sqrt(pow(xe,2) + pow(ye,2));
+
+    setTargetDist(dist);
 }
