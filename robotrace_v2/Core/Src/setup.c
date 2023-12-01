@@ -544,6 +544,19 @@ void setup( void )
 					break;
 				}
 			}
+
+			// if (swValTact == SW_PUSH) {
+			// 	initIMU = false;
+			// 	// 距離基準解析
+			// 	numPPADarry = calcXYcies(fileNumbers[fileIndexLog]);
+
+			// 	if (numPPADarry > 0) {
+			// 		optimalIndex = 0;
+			// 		HAL_Delay(100);
+			// 	}
+			// 	initIMU = true;
+			// }
+
 			break;
 		//------------------------------------------------------------------
 		// キャリブレーション(ラインセンサ) 

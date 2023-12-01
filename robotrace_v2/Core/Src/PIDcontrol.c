@@ -180,7 +180,7 @@ void motorControlYaw(void) {
 	// I成分積算
 	yawCtrl.Int += Dev * 0.005;
 	// 目標値を変更したらI成分リセット
-	if ( targetAngle != targetAngleBefore ) yawCtrl.Int = 0;
+	// if ( targetAngle != targetAngleBefore ) yawCtrl.Int = 0;
 	Dif = ( Dev - angleBefore ) * 1;	// dゲイン1/1000倍
 
 	iP = yawCtrl.kp * Dev;	// 比例
@@ -211,7 +211,7 @@ void motorControldist(void) {
 	// I成分積算
 	distCtrl.Int += Dev * 0.001;
 	// 目標値を変更したらI成分リセット
-	if ( targetDist != targetDistBefore ) distCtrl.Int = 0;
+	// if ( targetDist != targetDistBefore ) distCtrl.Int = 0;
 	Dif = ( Dev - distBefore ) * 1;	// dゲイン1/1000倍
 
 	iP = distCtrl.kp * Dev;				// 比例

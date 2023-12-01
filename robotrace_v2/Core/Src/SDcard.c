@@ -15,14 +15,23 @@ FIL       fil_R;
 uint8_t   columnTitle[512] = "", formatLog[256] = "";
 
 // ログバッファ
+// typedef struct {
+//     uint16_t 	time;
+//     uint8_t 	marker;
+//     uint8_t 	speed;
+//     float 		zg;
+//     uint32_t 	distance;
+//     uint8_t 	target;
+//     uint16_t 	optimalIndex;
+// } logData;
 typedef struct {
     uint16_t 	time;
-    uint8_t 	marker;
-    uint8_t 	speed;
-    float 		zg;
-    uint32_t 	distance;
-    uint8_t 	target;
+    int16_t 	targetDist;
+    int16_t 	dist;
+	float 		targetAngle;
+    float 		angle_z;
     uint16_t 	optimalIndex;
+	uint32_t 	encTotalOptimal;
 } logData;
 logData logVal[3000];
 uint32_t  logIndex = 0 , sendLogNum = 0;
@@ -129,21 +138,29 @@ void createLog(void) {
 	strcpy(columnTitle, "");
 	strcpy(formatLog, "");
 
-	setLogStr("cntlog",       "%d");
-	setLogStr("courseMarker",  "%d");
-	setLogStr("encCurrentN",  "%d");
-	setLogStr("gyroVal_Z",   "%d");
-	setLogStr("encTotalN",    "%d");
-	setLogStr("targetSpeed",    "%d");
+	// setLogStr("cntlog",       "%d");
+	// setLogStr("courseMarker",  "%d");
+	// setLogStr("encCurrentN",  "%d");
+	// setLogStr("gyroVal_Z",   "%d");
+	// setLogStr("encTotalN",    "%d");
+	// setLogStr("targetSpeed",    "%d");
 
-	// setLogStr("motorCurrentL",  "%d");
-	// setLogStr("motorCurrentR",  "%d");
-	// setLogStr("CurvatureRadius",  "%d");
-	// setLogStr("cntMarker",  "%d");
-	setLogStr("optimalIndex",  "%d");
-	setLogStr("ROC",  "%d");
-	setLogStr("x",  "%d");
-	setLogStr("y",  "%d");
+	// // setLogStr("motorCurrentL",  "%d");
+	// // setLogStr("motorCurrentR",  "%d");
+	// // setLogStr("CurvatureRadius",  "%d");
+	// // setLogStr("cntMarker",  "%d");
+	// setLogStr("optimalIndex",  "%d");
+	// setLogStr("ROC",  "%d");
+	// setLogStr("x",  "%d");
+	// setLogStr("y",  "%d");
+
+	setLogStr("cntlog",       "%d");
+	setLogStr("targetDist",       "%d");
+	setLogStr("dist",       "%d");
+	setLogStr("targetAngle",       "%d");
+	setLogStr("angle_z",       "%d");
+	setLogStr("optimalIndex",       "%d");
+	setLogStr("encTotalOptimal",       "%d");
 
 	strcat(columnTitle,"\n");
 	strcat(formatLog,"\n");
@@ -157,15 +174,24 @@ void createLog(void) {
 /////////////////////////////////////////////////////////////////////
 void writeLogBuffer (void) {
   if (modeLOG) {
-    logVal[logIndex].time = cntLog;
-    logVal[logIndex].marker = courseMarkerLog;
-    logVal[logIndex].speed = encCurrentN;
-    logVal[logIndex].zg = BMI088val.gyro.z;
-    logVal[logIndex].distance = encTotalOptimal;
-    logVal[logIndex].target = targetSpeed;
-    // logVal[logIndex].mcl = motorCurrentL;
-    // logVal[logIndex].mcr = motorCurrentR;
+    // logVal[logIndex].time = cntLog;
+    // logVal[logIndex].marker = courseMarkerLog;
+    // logVal[logIndex].speed = encCurrentN;
+    // logVal[logIndex].zg = BMI088val.gyro.z;
+    // logVal[logIndex].distance = encTotalOptimal;
+    // logVal[logIndex].target = targetSpeed;
+    // // logVal[logIndex].mcl = motorCurrentL;
+    // // logVal[logIndex].mcr = motorCurrentR;
+    // logVal[logIndex].optimalIndex = optimalIndex;
+
+	logVal[logIndex].time = cntLog;
+    logVal[logIndex].targetDist = targetDist;
+    logVal[logIndex].dist = encPID;
+    logVal[logIndex].targetAngle = targetAngle;
+	logVal[logIndex].angle_z = BMI088val.angle.z;
     logVal[logIndex].optimalIndex = optimalIndex;
+	logVal[logIndex].encTotalOptimal = encTotalOptimal;
+
     logIndex++;
   }
 }
@@ -180,20 +206,30 @@ void writeLogPut(void) {
 
 	clearXYcie();
 	for(i = 0;i<logIndex;i++) {
-		calcXYcie(logVal[i].speed,logVal[i].zg);
+		// calcXYcie(logVal[i].speed,logVal[i].zg);
+		// f_printf(&fil_W, formatLog
+		// 	,logVal[i].time
+		// 	,logVal[i].marker
+		// 	,logVal[i].speed
+		// 	,(int32_t)(logVal[i].zg*10000)
+		// 	,logVal[i].distance
+		// 	,logVal[i].target
+		// 	// ,(int32_t)(logVal[i].mcl*10000)
+		// 	// ,(int32_t)(logVal[i].mcr*10000)
+		// 	,logVal[i].optimalIndex
+		// 	,(int32_t)(calcROC(logVal[i].speed,logVal[i].zg))
+		// 	,(int32_t)(xycie.x*10000)
+		// 	,(int32_t)(xycie.y*10000)
+		// );
+
 		f_printf(&fil_W, formatLog
 			,logVal[i].time
-			,logVal[i].marker
-			,logVal[i].speed
-			,(int32_t)(logVal[i].zg*10000)
-			,logVal[i].distance
-			,logVal[i].target
-			// ,(int32_t)(logVal[i].mcl*10000)
-			// ,(int32_t)(logVal[i].mcr*10000)
+			,logVal[i].targetDist
+			,logVal[i].dist
+			,(int32_t)(logVal[i].targetAngle*10000)
+			,(int32_t)(logVal[i].angle_z*10000)
 			,logVal[i].optimalIndex
-			,(int32_t)(calcROC(logVal[i].speed,logVal[i].zg))
-			,(int32_t)(xycie.x*10000)
-			,(int32_t)(xycie.y*10000)
+			,logVal[i].encTotalOptimal
 		);
 	}
 }

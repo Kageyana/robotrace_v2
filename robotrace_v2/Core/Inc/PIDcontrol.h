@@ -22,13 +22,13 @@
 #define KI3		100
 #define KD3		8
 
-#define KP4		1
-#define KI4		0
-#define KD4		0
+#define KP4		5
+#define KI4		1
+#define KD4		5
 
-#define KP5		1
-#define KI5		0
-#define KD5		0
+#define KP5		100
+#define KI5		1
+#define KD5		5
 
 typedef struct {
     int16_t kp;
