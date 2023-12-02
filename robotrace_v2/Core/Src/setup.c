@@ -476,10 +476,9 @@ void setup( void )
 				ssd1306_printf(Font_6x8,"microSD  ");
 
 				// 前回解析したログ番号を探す
-				k = endFileIndex;
+				k = endFileIndex-1;
 				for(i=0;i<5;i++) {
 					if(0+(20*i) < 128 || k >= 0) {
-						k--;
 						for(j=0;j<5;j++) {
 							if(24+(8*j) < 64 || k >= 0) {
 								if(k == fileIndexLog) {
@@ -508,13 +507,12 @@ void setup( void )
 			dataTuningLR( &x, 1, 0, 4);
 			
 			// i-jとx-yが一致したとき文字色反転
-			k = endFileIndex;
+			k = endFileIndex-1;
 			for(i=0;i<5;i++) {
 				if(0+(20*i) < 128 || k >= 0) {
-					k--;
 					for(j=0;j<5;j++) {
 						if(24+(8*j) < 64 || k >= 0) {
-							ssd1306_SetCursor(0+(20*i),24+(8*j));
+							ssd1306_SetCursor(0+(20*i),24+(8*j));	// 原点 0,24
 							if ( i == x && j == y ) {
 								if (swValTact == SW_PUSH) {
 									initIMU = false;
@@ -535,7 +533,6 @@ void setup( void )
 								ssd1306_printf(Font_6x8,"%d",fileNumbers[k]);
 							}
 							k--;
-
 						} else {
 							break;
 						}
@@ -544,18 +541,6 @@ void setup( void )
 					break;
 				}
 			}
-
-			// if (swValTact == SW_PUSH) {
-			// 	initIMU = false;
-			// 	// 距離基準解析
-			// 	numPPADarry = calcXYcies(fileNumbers[fileIndexLog]);
-
-			// 	if (numPPADarry > 0) {
-			// 		optimalIndex = 0;
-			// 		HAL_Delay(100);
-			// 	}
-			// 	initIMU = true;
-			// }
 
 			break;
 		//------------------------------------------------------------------
@@ -955,7 +940,14 @@ void setup( void )
 				setTargetSpeed(0.3);
 			}
 
-			data_select( &trace_test, SW_PUSH );
+
+			// if (swValTact == SW_PUSH) {
+			// 	writePIDparameters(&distCtrl);
+			// 	HAL_Delay(100);
+			// }
+
+			// data_select( &trace_test, SW_PUSH );
+
 			// PUSHでトレースON/OFF
 			// if ( trace_test == 1 ) {
 			// 	motorPwmOutSynth( 0, veloCtrl.pwm, distCtrl.pwm, 0 );

@@ -10,6 +10,9 @@
 //====================================//
 #define PERIOD_LOG  2
 #define BUFFER_SIZW_LOG  1024
+
+#define PATH_SETTING    "./setting/"
+// #define SD_SHORTCUT
 //====================================//
 // グローバル変数の宣言
 //====================================//

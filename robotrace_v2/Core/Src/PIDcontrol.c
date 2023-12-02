@@ -2,14 +2,15 @@
 // インクルード
 //====================================//
 #include "PIDcontrol.h"
+#include "fatfs.h"
 //====================================//
 // グローバル変数の宣言
 //====================================//
-pidParam 	lineTraceCtrl = { KP1, KI1, KD1, 0, 0};
-pidParam 	veloCtrl = { KP2, KI2, KD2, 0, 0};
-pidParam 	yawRateCtrl = { KP3, KI3, KD3, 0, 0};
-pidParam 	yawCtrl = { KP4, KI4, KD4, 0, 0};
-pidParam 	distCtrl = { KP5, KI5, KD5, 0, 0};
+pidParam 	lineTraceCtrl = { "line", KP1, KI1, KD1, 0, 0};
+pidParam 	veloCtrl = { "speed", KP2, KI2, KD2, 0, 0};
+pidParam 	yawRateCtrl = { "yawRate", KP3, KI3, KD3, 0, 0};
+pidParam 	yawCtrl = { "yaw", KP4, KI4, KD4, 0, 0};
+pidParam 	distCtrl = { "dist", KP5, KI5, KD5, 0, 0};
 
 uint8_t		targetSpeed;			// 目標速度
 float 		targetAngle;			// 目標角速度
@@ -227,4 +228,53 @@ void motorControldist(void) {
 	distCtrl.pwm = iRet;
 	distBefore = Dev;				// 次回はこの値が1ms前の値となる
 	targetDistBefore = targetDist;	// 前回の目標値を記録
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 writePIDparameters
+// 処理概要     PIDゲインをSDカードに記録する
+// 引数         pid:pidParam型の変数
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void writePIDparameters(pidParam *pid) {
+	FIL         fil;
+    FRESULT     fresult;
+	uint8_t     fileName[20] = PATH_SETTING;
+    int16_t     ret=0;
+
+	// ファイル読み込み
+	strcat(fileName,pid->name); // ファイル名追加
+	strcat(fileName,".txt");   // 拡張子追加
+    fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_WRITE);  	// csvファイルを開く
+	// fresult = f_lseek(&fil, f_size(&fil));							// ファイルの末尾へ移動
+	if(fresult == FR_OK) {
+		f_printf(&fil, "%03d,%03d,%03d",pid->kp, pid->ki, pid->kd);
+	}
+
+	f_close(&fil);
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 readPIDparameters
+// 処理概要     PIDゲインをSDカードから読み取る
+// 引数         pid:pidParam型の変数
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void readPIDparameters(pidParam *pid) {
+	FIL         fil;
+    FRESULT     fresult;
+	uint8_t     fileName[20] = PATH_SETTING;
+	TCHAR     	gain[20];
+    int16_t     ret=0;
+
+	// ファイル読み込み
+	strcat(fileName,pid->name); // ファイル名追加
+	strcat(fileName,".txt");   // 拡張子追加
+    fresult = f_open(&fil, fileName, FA_OPEN_EXISTING | FA_READ);  // csvファイルを開く
+
+	// fresult = f_lseek(&fil, f_size(&fil) - 12);		// 最後の行に移動 ゲイン3桁×3+カンマ×2+改行コード
+	if(fresult == FR_OK) {
+		f_gets(gain,sizeof(gain),&fil);							// 文字列取得
+		sscanf(gain,"%d,%d,%d",&pid->kp,&pid->ki,&pid->kd);		// 文字列→数値
+	}
+
+	f_close(&fil);
 }

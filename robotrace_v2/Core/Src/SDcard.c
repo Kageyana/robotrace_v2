@@ -15,15 +15,17 @@ FIL       fil_R;
 uint8_t   columnTitle[512] = "", formatLog[256] = "";
 
 // ログバッファ
-// typedef struct {
-//     uint16_t 	time;
-//     uint8_t 	marker;
-//     uint8_t 	speed;
-//     float 		zg;
-//     uint32_t 	distance;
-//     uint8_t 	target;
-//     uint16_t 	optimalIndex;
-// } logData;
+#ifndef SD_SHORTCUT
+typedef struct {
+    uint16_t 	time;
+    uint8_t 	marker;
+    uint8_t 	speed;
+    float 		zg;
+    uint32_t 	distance;
+    uint8_t 	target;
+    uint16_t 	optimalIndex;
+} logData;
+#else
 typedef struct {
     uint16_t 	time;
     int16_t 	targetDist;
@@ -33,8 +35,10 @@ typedef struct {
     uint16_t 	optimalIndex;
 	uint32_t 	encTotalOptimal;
 } logData;
+#endif
 logData logVal[3000];
 uint32_t  logIndex = 0 , sendLogNum = 0;
+
 
 // ログファイルナンバー
 int16_t fileNumbers[1000], fileIndexLog = 0, endFileIndex = 0;
@@ -138,22 +142,23 @@ void createLog(void) {
 	strcpy(columnTitle, "");
 	strcpy(formatLog, "");
 
-	// setLogStr("cntlog",       "%d");
-	// setLogStr("courseMarker",  "%d");
-	// setLogStr("encCurrentN",  "%d");
-	// setLogStr("gyroVal_Z",   "%d");
-	// setLogStr("encTotalN",    "%d");
-	// setLogStr("targetSpeed",    "%d");
+#ifndef SD_SHORTCUT
+	setLogStr("cntlog",       "%d");
+	setLogStr("courseMarker",  "%d");
+	setLogStr("encCurrentN",  "%d");
+	setLogStr("gyroVal_Z",   "%d");
+	setLogStr("encTotalN",    "%d");
+	setLogStr("targetSpeed",    "%d");
 
-	// // setLogStr("motorCurrentL",  "%d");
-	// // setLogStr("motorCurrentR",  "%d");
-	// // setLogStr("CurvatureRadius",  "%d");
-	// // setLogStr("cntMarker",  "%d");
-	// setLogStr("optimalIndex",  "%d");
-	// setLogStr("ROC",  "%d");
-	// setLogStr("x",  "%d");
-	// setLogStr("y",  "%d");
-
+	// setLogStr("motorCurrentL",  "%d");
+	// setLogStr("motorCurrentR",  "%d");
+	// setLogStr("CurvatureRadius",  "%d");
+	// setLogStr("cntMarker",  "%d");
+	setLogStr("optimalIndex",  "%d");
+	setLogStr("ROC",  "%d");
+	setLogStr("x",  "%d");
+	setLogStr("y",  "%d");
+#else
 	setLogStr("cntlog",       "%d");
 	setLogStr("targetDist",       "%d");
 	setLogStr("dist",       "%d");
@@ -161,6 +166,7 @@ void createLog(void) {
 	setLogStr("angle_z",       "%d");
 	setLogStr("optimalIndex",       "%d");
 	setLogStr("encTotalOptimal",       "%d");
+#endif
 
 	strcat(columnTitle,"\n");
 	strcat(formatLog,"\n");
@@ -174,16 +180,17 @@ void createLog(void) {
 /////////////////////////////////////////////////////////////////////
 void writeLogBuffer (void) {
   if (modeLOG) {
-    // logVal[logIndex].time = cntLog;
-    // logVal[logIndex].marker = courseMarkerLog;
-    // logVal[logIndex].speed = encCurrentN;
-    // logVal[logIndex].zg = BMI088val.gyro.z;
-    // logVal[logIndex].distance = encTotalOptimal;
-    // logVal[logIndex].target = targetSpeed;
-    // // logVal[logIndex].mcl = motorCurrentL;
-    // // logVal[logIndex].mcr = motorCurrentR;
-    // logVal[logIndex].optimalIndex = optimalIndex;
-
+#ifndef SD_SHORTCUT
+    logVal[logIndex].time = cntLog;
+    logVal[logIndex].marker = courseMarkerLog;
+    logVal[logIndex].speed = encCurrentN;
+    logVal[logIndex].zg = BMI088val.gyro.z;
+    logVal[logIndex].distance = encTotalOptimal;
+    logVal[logIndex].target = targetSpeed;
+    // logVal[logIndex].mcl = motorCurrentL;
+    // logVal[logIndex].mcr = motorCurrentR;
+    logVal[logIndex].optimalIndex = optimalIndex;
+#else
 	logVal[logIndex].time = cntLog;
     logVal[logIndex].targetDist = targetDist;
     logVal[logIndex].dist = encPID;
@@ -191,7 +198,7 @@ void writeLogBuffer (void) {
 	logVal[logIndex].angle_z = BMI088val.angle.z;
     logVal[logIndex].optimalIndex = optimalIndex;
 	logVal[logIndex].encTotalOptimal = encTotalOptimal;
-
+#endif
     logIndex++;
   }
 }
@@ -206,22 +213,23 @@ void writeLogPut(void) {
 
 	clearXYcie();
 	for(i = 0;i<logIndex;i++) {
-		// calcXYcie(logVal[i].speed,logVal[i].zg);
-		// f_printf(&fil_W, formatLog
-		// 	,logVal[i].time
-		// 	,logVal[i].marker
-		// 	,logVal[i].speed
-		// 	,(int32_t)(logVal[i].zg*10000)
-		// 	,logVal[i].distance
-		// 	,logVal[i].target
-		// 	// ,(int32_t)(logVal[i].mcl*10000)
-		// 	// ,(int32_t)(logVal[i].mcr*10000)
-		// 	,logVal[i].optimalIndex
-		// 	,(int32_t)(calcROC(logVal[i].speed,logVal[i].zg))
-		// 	,(int32_t)(xycie.x*10000)
-		// 	,(int32_t)(xycie.y*10000)
-		// );
-
+#ifndef SD_SHORTCUT
+		calcXYcie(logVal[i].speed,logVal[i].zg);
+		f_printf(&fil_W, formatLog
+			,logVal[i].time
+			,logVal[i].marker
+			,logVal[i].speed
+			,(int32_t)(logVal[i].zg*10000)
+			,logVal[i].distance
+			,logVal[i].target
+			// ,(int32_t)(logVal[i].mcl*10000)
+			// ,(int32_t)(logVal[i].mcr*10000)
+			,logVal[i].optimalIndex
+			,(int32_t)(calcROC(logVal[i].speed,logVal[i].zg))
+			,(int32_t)(xycie.x*10000)
+			,(int32_t)(xycie.y*10000)
+		);
+#else
 		f_printf(&fil_W, formatLog
 			,logVal[i].time
 			,logVal[i].targetDist
@@ -231,6 +239,7 @@ void writeLogPut(void) {
 			,logVal[i].optimalIndex
 			,logVal[i].encTotalOptimal
 		);
+#endif
 	}
 }
 /////////////////////////////////////////////////////////////////////
@@ -240,7 +249,7 @@ void writeLogPut(void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void endLog(void) {
-	initIMU = false;  // IMUの使用を停止
+	initIMU = false;  // IMUの使用を停止(SPIが競合するため)
 	modeLOG = false;  // ログ取得停止
 	// IMU用のCSピンがHIGHになるまで待つ
 	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );
@@ -330,13 +339,14 @@ void createDir(uint8_t *dirName) {
 		do {
 			f_readdir(&dir,&fno);     
 			if (strcmp(fno.fname,dirName) == 0) {
-				exist = 1;	// settingディレクトリが存在する
+				exist = 1;	// dirNameディレクトリが存在する
 				break;
 			}
 		} while(fno.fname[0] != 0); // ファイルの有無を確認
 
 		if (!exist) {
-			f_mkdir(dirName);	// settingディレクトリを作成する
+			// dirNameディレクトリが存在しない場合は作成する
+			f_mkdir(dirName);	
 		}
 	}
 }

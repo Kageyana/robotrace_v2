@@ -48,12 +48,15 @@ float calcROC(float velo, float angvelo) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void saveLogNumber(int16_t fileNumber) {
-    FRESULT   fresult;
-    FIL       fil;
+    FRESULT     fresult;
+    FIL         fil;
+    uint8_t     fileName[20] = PATH_SETTING;
 
-    fresult = f_open(&fil, "./setting/analiz.txt", FA_OPEN_ALWAYS | FA_WRITE);  // create file
+    strcat(fileName,"analize"); // ファイル名追加
+	strcat(fileName,".txt");   // 拡張子追加
+    fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_WRITE);  // create file
     if(fresult == FR_OK) {
-        f_printf(&fil, "%d",fileNumber);
+        f_printf(&fil, "%04d",fileNumber);
     }
     f_close(&fil);
 }
@@ -64,13 +67,16 @@ void saveLogNumber(int16_t fileNumber) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void getLogNumber(void) {
-    FRESULT   fresult;
-    FIL       fil;
-    TCHAR     log[512];
+    FRESULT     fresult;
+    FIL         fil;
+    TCHAR       log[20];
+    uint8_t     fileName[20] = PATH_SETTING;
 
-    fresult = f_open(&fil, "./setting/analiz.txt", FA_OPEN_ALWAYS | FA_READ);  // csvファイルを開く
+    strcat(fileName,"analize"); // ファイル名追加
+	strcat(fileName,".txt");   // 拡張子追加
+    fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_READ);  // csvファイルを開く
     if (fresult == FR_OK) {
-        f_gets(log,256,&fil);
+        f_gets(log,sizeof(log),&fil);
         sscanf(log,"%d",&analizedNumber);
         f_close(&fil);
     }

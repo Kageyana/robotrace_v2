@@ -77,12 +77,22 @@ void initSystem (void) {
 	if (HAL_TIM_PWM_Start_IT(&htim13, TIM_CHANNEL_1) != HAL_OK) Error_Handler();
 	powerLinesensors(0);
 
-	// IMU
-	initIMU = initBMI088();
 	// microSD
 	initMSD = initMicroSD();
-	getLogNumber(); // 前回の解析ログナンバーを取得
+	if(initMSD) {
+		getLogNumber(); // 前回の解析ログナンバーを取得
 
+		// 前回のPIDゲインを取得
+		readPIDparameters(&lineTraceCtrl);
+		readPIDparameters(&veloCtrl);
+		readPIDparameters(&yawRateCtrl);
+		readPIDparameters(&yawCtrl);
+		readPIDparameters(&distCtrl);
+	}
+	
+	// IMU
+	initIMU = initBMI088();
+	
 	// Display
 	if(TACTSW1 == 1) {
 		modeDSP = true;
@@ -131,7 +141,7 @@ void loopSystem (void) {
 			if (start) {
 				motorPwmOut(0,0);
 				countdown = 5000;		// カウントダウンスタート
-				calibratIMU = true;
+				calibratIMU = true;		// IMUキャリブレーションを開始
 				patternTrace = 1;
 			}
 			break;
@@ -166,11 +176,21 @@ void loopSystem (void) {
 
 			// IMUのキャリブレーションが終了したら走行開始
 			if ( !calibratIMU ) {
+				// PIDゲインを記録
+				initIMU = false;
+				writePIDparameters(&lineTraceCtrl);
+				writePIDparameters(&veloCtrl);
+				writePIDparameters(&yawRateCtrl);
+				writePIDparameters(&yawCtrl);
+				writePIDparameters(&distCtrl);
+				initIMU = true;
+
 				// 変数初期化
 				encRightMarker = encMM(600);
 				veloCtrl.Int = 0.0;
 				yawRateCtrl.Int = 0.0;
 				yawCtrl.Int = 0.0;
+				distCtrl.Int = 0.0;
 
 				patternTrace = 11;
 			}
@@ -182,7 +202,7 @@ void loopSystem (void) {
 			// ライントレース
 			motorPwmOutSynth( lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 
-			// スタートマーカーを読んだら本走行に移行
+			// スタートマーカーを通過したら本走行に移行
 			if(SGmarker > 0) {
 				// 変数初期化
 				encTotalN = 0;

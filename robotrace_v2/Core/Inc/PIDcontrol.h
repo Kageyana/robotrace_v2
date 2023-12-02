@@ -31,6 +31,7 @@
 #define KD5		5
 
 typedef struct {
+    uint8_t *name;
     int16_t kp;
     int16_t ki;
     int16_t kd;
@@ -58,6 +59,8 @@ void setTargetSpeed (float speed);
 void setTargetAngularVelocity (float angularVelocity);
 void setTargetAngle (float angle);
 void setTargetDist (float dist);
+void writePIDparameters(pidParam *pid);
+void readPIDparameters(pidParam *pid);
 void motorControlTrace(void);
 void motorControlSpeed(void);
 void motorControlYawRate(void);
