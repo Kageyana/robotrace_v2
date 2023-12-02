@@ -69,15 +69,7 @@ void Interrupt1ms(void) {
         // xy座標計算
         calcXYcie(encCurrentN,BMI088val.gyro.z);
 
-        if (optimalTrace == BOOST_SHORTCUT && DistanceOptimal > 0) {
-            // distLen = (float)encCurrentN * PALSE_MILLIMETER * 0.005; // 現在速度から5ms後の移動距離を計算
-            optimalIndex = (int32_t)( encTotalOptimal / PALSE_MILLIMETER ) / 50; // 50mmごとにショートカット配列を作っているので移動距離[mm]を50mmで割った商がインデクス
-            if(optimalIndex+1 <= numPPADarry) {
-                optimalIndex++;
-            }
-            
-            setShortCutTarget();
-        }
+        
     }
 
     // 走行前に処理
@@ -90,21 +82,29 @@ void Interrupt1ms(void) {
         cntSwitchLR++;
     }
 
-    float distLen;
+    if(initIMU) {
+        if(!calibratIMU) {
+            BMI088getGyro();    // 角速度取得
+            calcDegrees();      // 角度計算
+            if(optimalTrace == 0) checkCurve(); // 1次走行 カーブ検出
+
+            motorControlYawRate();  // 角速度制御
+            motorControlYaw();      // 角度制御
+        } else {
+            calibrationIMU();
+        }
+    }
     
     switch(cnt5) {
         case 1:
-            if(initIMU) {
-                if(!calibratIMU) {
-                    BMI088getGyro();    // 角速度取得
-                    calcDegrees();      // 角度計算
-                    if(optimalTrace == 0) checkCurve(); // 1次走行 カーブ検出
-
-                    motorControlYawRate();  // 角速度制御
-                    motorControlYaw();      // 角度制御
-                } else {
-                    calibrationIMU();
+            if (optimalTrace == BOOST_SHORTCUT && DistanceOptimal > 0) {
+                // distLen = (float)encCurrentN * PALSE_MILLIMETER * 0.005; // 現在速度から5ms後の移動距離を計算
+                optimalIndex = (int32_t)( encTotalOptimal / PALSE_MILLIMETER ) / CALCDISTANCE; // 50mmごとにショートカット配列を作っているので移動距離[mm]を50mmで割った商がインデクス
+                if(optimalIndex+1 <= numPPADarry) {
+                    optimalIndex++;
                 }
+                
+                setShortCutTarget();
             }
             break;
         case 2:

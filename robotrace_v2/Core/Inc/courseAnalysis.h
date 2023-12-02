@@ -11,7 +11,7 @@
 //====================================//
 #define ANALYSISBUFFSIZE    512
 #define DELTATIME           0.01F   // ログ保存周期[s]
-#define CALCDISTANCE        50      // 距離解析ステップ[mm]
+#define CALCDISTANCE        10      // 距離解析ステップ[mm]
 #define MACHINEACCELE       3.4F    // 加速度[m/s^2]
 #define MACHINEDECREACE     3.4F    // 減速度[m/s^2]
 #define BOOST_MARKER        1       // マーカー基準2次走行

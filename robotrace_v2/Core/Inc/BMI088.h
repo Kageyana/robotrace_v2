@@ -13,7 +13,7 @@
 #define GYROLSB         16.384F
 #define MAGPLSB         16.0F
 
-#define DEFF_TIME       0.005F
+#define DEFF_TIME       0.001F
 #define COEFF_DPD       -1.00F
 
 /*レジスタアドレス*/

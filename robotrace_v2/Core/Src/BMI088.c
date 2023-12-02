@@ -236,7 +236,7 @@ void calibrationIMU (void) {
 	int16_t gyroVal[3];
 
 	
-	if(i<1000) {
+	if(i<5000) {
 		// 角速度の生データを取得
 		BMI088ReadAxisDataG(REG_RATE_X,rawData,6);
 		// LSBとMSBを結合
