@@ -8,11 +8,10 @@
 //====================================//
 // シンボル定義
 //====================================//
-#define PERIOD_LOG  2
-#define BUFFER_SIZW_LOG  1024
+#define NUM_LOGDATA         7
+#define BUFFER_SIZW_LOG     1024
 
 #define PATH_SETTING    "./setting/"
-// #define SD_SHORTCUT
 //====================================//
 // グローバル変数の宣言
 //====================================//
@@ -29,8 +28,10 @@ void initLog(void);
 void createLog(void);
 void endLog(void);
 void setLogStr(uint8_t* column, uint8_t* format);
-void writeLogBuffer (void);
-void writeLogPut(void);
+void writeLogBufferPuts (uint8_t valNum, ...);
+void writeLogPuts(void);
+void writeLogBufferPrint (void);
+void writeLogPrint(void);
 void getFileNumbers(void);
 void SDtest(void);
 void createDir(uint8_t *dirName);

@@ -25,7 +25,7 @@
 #define PARAM_BOOST_100             1.4F
 
 // ゴール
-#define COUNT_GOAL              2       // ゴールマーカーを読む回数
+#define COUNT_GOAL              6       // ゴールマーカーを読む回数
 
 // スタートモード
 #define START_SERACH            3

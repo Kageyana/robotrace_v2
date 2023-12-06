@@ -66,10 +66,6 @@ void Interrupt1ms(void) {
         }
         beforeCourseMarker = courseMarker;
 
-        // xy座標計算
-        calcXYcie(encCurrentN,BMI088val.gyro.z);
-
-        
     }
 
     // 走行前に処理
@@ -82,35 +78,43 @@ void Interrupt1ms(void) {
         cntSwitchLR++;
     }
 
-    if(initIMU) {
-        if(!calibratIMU) {
-            BMI088getGyro();    // 角速度取得
-            calcDegrees();      // 角度計算
-            if(optimalTrace == 0) checkCurve(); // 1次走行 カーブ検出
-
-            motorControlYawRate();  // 角速度制御
-            motorControlYaw();      // 角度制御
-        } else {
-            calibrationIMU();
-        }
-    }
+    
     
     switch(cnt5) {
         case 1:
+            // ショートカット走行の目標値インデックスを更新
             if (optimalTrace == BOOST_SHORTCUT && DistanceOptimal > 0) {
                 // distLen = (float)encCurrentN * PALSE_MILLIMETER * 0.005; // 現在速度から5ms後の移動距離を計算
                 optimalIndex = (int32_t)( encTotalOptimal / PALSE_MILLIMETER ) / CALCDISTANCE; // 50mmごとにショートカット配列を作っているので移動距離[mm]を50mmで割った商がインデクス
                 if(optimalIndex+1 <= numPPADarry) {
                     optimalIndex++;
                 }
-                
-                setShortCutTarget();
+                // xy座標計算
+                calcXYcie(encCurrentN,BMI088val.gyro.z);
+
+                setShortCutTarget(); // 目標値更新
             }
             break;
         case 2:
-            
+            if(initIMU) {
+                IMUstate = IMU_TRANSMIT;
+
+                if(!calibratIMU) {
+                    BMI088getGyro();    // 角速度取得
+                    calcDegrees();      // 角度計算
+                    if(optimalTrace == 0) checkCurve(); // 1次走行 カーブ検出
+
+                    motorControlYawRate();  // 角速度制御
+                    motorControlYaw();      // 角度制御
+                } else {
+                    calibrationIMU();
+                }
+
+                IMUstate = IMU_STOP;
+            }
             break;
         case 3:
+            
             break;
         case 5:
             if(initIMU) {
@@ -119,7 +123,8 @@ void Interrupt1ms(void) {
             cnt5 = 0;
             break;
     }
-
+    
+    
     // if(patternTrace >= 12) {
     //     if( encLog >= encMM(CALCDISTANCE) ) {
     //         // CALCDISTANCEごとにログを保存
@@ -128,7 +133,15 @@ void Interrupt1ms(void) {
     //         encLog = 0;
     //     }
     // }
-    
+
+    if (IMUstate == IMU_STOP ) {
+        if (patternTrace < 100) {
+            setLogstr();
+            writeLogPuts();
+
+        }
+    }
+
     switch (cnt10) {
         case 1:
             getADC2();
@@ -138,14 +151,31 @@ void Interrupt1ms(void) {
             // if(initIMU) {
             //     BMI088getTemp();
             // }
+
+            
             break;
         case 9:
-            if(patternTrace < 100) {
-                writeLogBuffer(); // バッファにログを保存
+            // if(patternTrace < 100) {
+            //     writeLogBufferPrint(); // バッファにログを保存
+            //     courseMarkerLog = 0;
+            // }
+
+            if (patternTrace < 100) {
+                writeLogBufferPuts(
+                    NUM_LOGDATA,
+                    cntLog,
+                    courseMarkerLog,
+                    encCurrentN,
+                    (int32_t)(BMI088val.gyro.z*10000),
+                    encTotalOptimal,
+                    targetSpeed,
+                    optimalIndex
+                );
                 courseMarkerLog = 0;
             }
             break;
         case 10:
+            
             cnt10 = 0;
             break;
     }
@@ -157,8 +187,10 @@ void Interrupt1ms(void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void Interrupt100us(void) {
-    
-}
+    if (IMUstate == IMU_STOP ) {
+        writeLogPuts();
+    }
+}   
 /////////////////////////////////////////////////////////////////////
 // モジュール名 Interrupt300ns
 // 処理概要     タイマー割り込み(300ns)
@@ -167,5 +199,5 @@ void Interrupt100us(void) {
 /////////////////////////////////////////////////////////////////////
 void Interrupt300ns(void) {
     // Interrupt 300ns
-    sendColorData();
+    // sendColorData();
 }

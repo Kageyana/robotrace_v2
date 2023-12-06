@@ -10,8 +10,9 @@ axis gyro = { 0.0F, 0.0F, 0.0F};
 axis angle = { 0.0F, 0.0F, 0.0F};
 IMUval 	BMI088val;
 
-int16_t angleOffset[3] = {0,0,0};
+int16_t	angleOffset[3] = {0,0,0};
 bool  	calibratIMU = false;
+bool    IMUstate = IMU_STOP;
 /////////////////////////////////////////////////////////////////////
 // モジュール名 BMI088ReadByteG
 // 処理概要     指定レジスタの値を読み出す(ジャイロセンサ部)
@@ -236,7 +237,7 @@ void calibrationIMU (void) {
 	int16_t gyroVal[3];
 
 	
-	if(i<5000) {
+	if(i<(uint32_t)(5.0/DEFF_TIME)) {
 		// 角速度の生データを取得
 		BMI088ReadAxisDataG(REG_RATE_X,rawData,6);
 		// LSBとMSBを結合

@@ -111,6 +111,7 @@ void initSystem (void) {
 
 	// Timer interrupt
 	HAL_TIM_Base_Start_IT(&htim6);
+	// HAL_TIM_Base_Start_IT(&htim7);
 
 	// ledset(100,0,0);
 
@@ -176,6 +177,9 @@ void loopSystem (void) {
 
 			// IMUのキャリブレーションが終了したら走行開始
 			if ( !calibratIMU ) {
+				// ログファイル作成
+				if (initMSD) initLog();
+
 				// PIDゲインを記録
 				initIMU = false;
 				writePIDparameters(&lineTraceCtrl);
@@ -207,16 +211,18 @@ void loopSystem (void) {
 				// 変数初期化
 				encTotalN = 0;
 				encTotalOptimal = 0;
-				DistanceOptimal = 0;
 				encLog = 0;
+				DistanceOptimal = 0;
 				cntRun = 0;
+				cntLog = 0;
 				BMI088val.angle.x = 0.0F;
 				BMI088val.angle.y = 0.0F;
 				BMI088val.angle.z = 0.0F;
 
 				clearXYcie();	// 座標計算変数初期化
+
+				modeLOG = true;    // log start
 				
-				if (initMSD) initLog();	// ログ記録開始
 				patternTrace = 12;
 			}
 			break;
@@ -264,7 +270,7 @@ void loopSystem (void) {
 					optimalIndex = 1;
 					setShortCutTarget();
 				}
-				boostSpeed = 0.3;
+				boostSpeed = 0.8;
 				// 目標速度に設定
 				setTargetSpeed(boostSpeed);
 				// ライントレース
@@ -338,7 +344,9 @@ void loopSystem (void) {
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
 void emargencyStop (void) {
+	
 	motorPwmOutSynth( 0, 0, 0, 0);
+
 	if (modeLOG) endLog(); // ログ保存終了
 
 	if(modeDSP) {
@@ -365,7 +373,6 @@ void emargencyStop (void) {
 		
 		ssd1306_UpdateScreen();  // グラフィック液晶更新
 	}
-	
 
 	patternTrace = 102;
 }

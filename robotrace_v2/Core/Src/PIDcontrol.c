@@ -179,7 +179,7 @@ void motorControlYaw(void) {
 	
 	Dev = (targetAngle - BMI088val.angle.z) * 20;	// 目標値-現在値
 	// I成分積算
-	yawCtrl.Int += Dev * 0.001;
+	yawCtrl.Int += Dev * 0.005;
 	// 目標値を変更したらI成分リセット
 	// if ( targetAngle != targetAngleBefore ) yawCtrl.Int = 0;
 	Dif = ( Dev - angleBefore ) * 1;	// dゲイン1/1000倍
