@@ -178,7 +178,7 @@ void loopSystem (void) {
 			// IMUのキャリブレーションが終了したら走行開始
 			if ( !calibratIMU ) {
 				// ログファイル作成
-				if (initMSD) initLog();
+				// if (initMSD) initLog();
 
 				// PIDゲインを記録
 				initIMU = false;
@@ -316,6 +316,7 @@ void loopSystem (void) {
 					ssd1306_UpdateScreen();  // グラフィック液晶更新
 				}
 	
+				goalTime = cntRun;
 				patternTrace = 102;
 				break;
 			}
@@ -344,7 +345,7 @@ void loopSystem (void) {
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
 void emargencyStop (void) {
-	
+
 	motorPwmOutSynth( 0, 0, 0, 0);
 
 	if (modeLOG) endLog(); // ログ保存終了

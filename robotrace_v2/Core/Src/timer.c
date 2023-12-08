@@ -76,9 +76,7 @@ void Interrupt1ms(void) {
         cntSetup2++;
         cntSwitchUD++;
         cntSwitchLR++;
-    }
-
-    
+    }  
     
     switch(cnt5) {
         case 1:
@@ -90,7 +88,7 @@ void Interrupt1ms(void) {
                     optimalIndex++;
                 }
                 // xy座標計算
-                calcXYcie(encCurrentN,BMI088val.gyro.z);
+                // calcXYcie(encCurrentN,BMI088val.gyro.z);
 
                 setShortCutTarget(); // 目標値更新
             }
@@ -114,12 +112,11 @@ void Interrupt1ms(void) {
             }
             break;
         case 3:
-            
             break;
         case 5:
-            if(initIMU) {
-                // BMI088getAccele();
-            }
+            // if(initIMU) {
+            //     BMI088getAccele();
+            // }
             cnt5 = 0;
             break;
     }
@@ -134,14 +131,10 @@ void Interrupt1ms(void) {
     //     }
     // }
 
-    if (IMUstate == IMU_STOP ) {
-        if (patternTrace < 100) {
-            setLogstr();
-            writeLogPuts();
-
-        }
+    if (patternTrace < 100) {
+        setLogstr();
     }
-
+    
     switch (cnt10) {
         case 1:
             getADC2();
@@ -151,31 +144,30 @@ void Interrupt1ms(void) {
             // if(initIMU) {
             //     BMI088getTemp();
             // }
-
+            
             
             break;
         case 9:
-            // if(patternTrace < 100) {
-            //     writeLogBufferPrint(); // バッファにログを保存
-            //     courseMarkerLog = 0;
-            // }
-
-            if (patternTrace < 100) {
-                writeLogBufferPuts(
-                    NUM_LOGDATA,
-                    cntLog,
-                    courseMarkerLog,
-                    encCurrentN,
-                    (int32_t)(BMI088val.gyro.z*10000),
-                    encTotalOptimal,
-                    targetSpeed,
-                    optimalIndex
-                );
+            if(patternTrace < 100) {
+                writeLogBufferPrint(); // バッファにログを保存
                 courseMarkerLog = 0;
             }
+
+            // if (patternTrace < 100) {
+            //     writeLogBufferPuts(
+            //         NUM_LOGDATA,
+            //         cntLog,
+            //         courseMarkerLog,
+            //         encCurrentN,
+            //         (int32_t)(BMI088val.gyro.z*10000),
+            //         encTotalOptimal,
+            //         targetSpeed,
+            //         optimalIndex
+            //     );
+            //     courseMarkerLog = 0;
+            // }
             break;
         case 10:
-            
             cnt10 = 0;
             break;
     }
@@ -187,9 +179,9 @@ void Interrupt1ms(void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void Interrupt100us(void) {
-    if (IMUstate == IMU_STOP ) {
-        writeLogPuts();
-    }
+    // if (IMUstate == IMU_STOP ) {
+    //     writeLogPuts();
+    // }
 }   
 /////////////////////////////////////////////////////////////////////
 // モジュール名 Interrupt300ns

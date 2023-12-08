@@ -102,7 +102,6 @@ void setup( void )
 							start = 1;
 						} else {
 							// キャリブレーション未実施
-
 							ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
 							ssd1306_SetCursor(22,28);
 							ssd1306_printf(Font_7x10,"Calibration");

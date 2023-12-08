@@ -27,8 +27,9 @@ typedef struct {
 logData logVal[3000];
 
 uint32_t	logBuffer[BUFFER_SIZW_LOG];
-uint8_t		logStr[600]; 
-uint32_t	logIndex=0, logStrNum=0, sendLogNum=0;
+uint8_t		logStr[BUFFER_SIZW_LOG][10]; 
+uint32_t	logBuffwrite=0, logBuffread=0;
+uint32_t	logstrwrite=0, logstrread=0;
 uint32_t	cntSend=0;
 
 // ログファイルナンバー
@@ -152,11 +153,11 @@ void writeLogBufferPuts (uint8_t valNum, ...) {
 		va_start( args, valNum );
 		for ( count = 0; count < valNum; count++ ) {
 			// set logdata to logbuffer(ring buffer) ログデータをリングバッファに転送
-			logBuffer[logIndex & (BUFFER_SIZW_LOG - 1)] = va_arg( args, int32_t );
-			logIndex++;
+			logBuffer[logBuffwrite & (BUFFER_SIZW_LOG - 1)] = va_arg( args, int32_t );
+			logBuffwrite++;
 		}
-		logBuffer[logIndex & (BUFFER_SIZW_LOG - 1)] = "\n";
-		logIndex++;
+		logBuffer[logBuffwrite & (BUFFER_SIZW_LOG - 1)] = "\n";
+		logBuffwrite++;
 		va_end( args );
 	}
 }
@@ -167,26 +168,18 @@ void writeLogBufferPuts (uint8_t valNum, ...) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void setLogstr(void) {
-	uint8_t str[32];
-	uint32_t loglen=0;
 
 	if (modeLOG) {
-		if (logStrNum < logIndex) {
-			if (logBuffer[logStrNum & (BUFFER_SIZW_LOG - 1)] == "\n") {
-				strcpy(str, logBuffer[logStrNum & (BUFFER_SIZW_LOG - 1)]);
-				loglen = strlen(str);			
+		if (logBuffread < logBuffwrite) {
+			if (logBuffer[logBuffread & (BUFFER_SIZW_LOG - 1)] == "\n") {
+				strcpy(logStr[logstrwrite & (BUFFER_SIZW_LOG - 1)], logBuffer[logBuffread & (BUFFER_SIZW_LOG - 1)]);
+							
 			} else {
-				sprintf(str,"%d,",logBuffer[logStrNum & (BUFFER_SIZW_LOG - 1)]);
-				loglen = strlen(str);
+				sprintf(logStr[logstrwrite & (BUFFER_SIZW_LOG - 1)],"%d,",logBuffer[logBuffread & (BUFFER_SIZW_LOG - 1)]);
+				
 			}
-
-			if(loglen + cntSend < 512) {
-				strcat(logStr,str);
-				cntSend += loglen;
-				logStrNum++;
-			} else {
-				cntSend = 600;
-			}
+			logBuffread++;
+			logstrwrite++;
 		}
 	}
 	
@@ -198,25 +191,11 @@ void setLogstr(void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void writeLogPuts(void) {
-	uint8_t str[32];
-	uint32_t writtern;
 
 	if (modeLOG) {
-		// if (sendLogNum < logIndex) {
-		// 	if (logBuffer[sendLogNum & (BUFFER_SIZW_LOG - 1)] == "\n") {
-		// 		f_puts(logBuffer[sendLogNum & (BUFFER_SIZW_LOG - 1)], &fil_W);
-		// 	} else {
-		// 		sprintf(str,"%d,",logBuffer[sendLogNum & (BUFFER_SIZW_LOG - 1)]);
-		// 		f_puts(str, &fil_W);
-		// 	}
-		// 	sendLogNum++;
-		// }
-		if(cntSend >= 512) {
-			f_write(&fil_W,logStr,strlen(logStr),&writtern);
-
-			// 配列初期化
-			memset(&logStr, 0, sizeof(uint8_t) * 600);
-			cntSend = 0;
+		if(logstrread < logstrwrite) {
+			f_puts(logStr[logstrread & (BUFFER_SIZW_LOG - 1)], &fil_W);
+			logstrread++;
 		}
 	}
 }
@@ -228,14 +207,14 @@ void writeLogPuts(void) {
 /////////////////////////////////////////////////////////////////////
 void writeLogBufferPrint(void) {
   if (modeLOG) {
-    logVal[logIndex].time = cntLog;
-    logVal[logIndex].marker = courseMarkerLog;
-    logVal[logIndex].speed = encCurrentN;
-    logVal[logIndex].zg = BMI088val.gyro.z;
-    logVal[logIndex].distance = encTotalOptimal;
-    logVal[logIndex].target = targetSpeed;
-    logVal[logIndex].optimalIndex = optimalIndex;
-    logIndex++;
+    logVal[logBuffwrite].time = cntLog;
+    logVal[logBuffwrite].marker = courseMarkerLog;
+    logVal[logBuffwrite].speed = encCurrentN;
+    logVal[logBuffwrite].zg = BMI088val.gyro.z;
+    logVal[logBuffwrite].distance = encTotalOptimal;
+    logVal[logBuffwrite].target = targetSpeed;
+    logVal[logBuffwrite].optimalIndex = optimalIndex;
+    logBuffwrite++;
   }
 }
 /////////////////////////////////////////////////////////////////////
@@ -248,7 +227,7 @@ void writeLogPrint(void) {
 	uint32_t i,length = 0;
 
 	clearXYcie();
-	for(i = 0;i<logIndex;i++) {
+	for(i = 0;i<logBuffwrite;i++) {
 		calcXYcie(logVal[i].speed,logVal[i].zg);
 		f_printf(&fil_W, formatLog
 			,logVal[i].time
@@ -272,16 +251,12 @@ void writeLogPrint(void) {
 /////////////////////////////////////////////////////////////////////
 void endLog(void) {
 	initIMU = false;  // IMUの使用を停止(SPIが競合するため)
-	// modeLOG = false;  // ログ取得停止
-	// IMU用のCSピンがHIGHになるまで待つ
-	// while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );
+	modeLOG = false;  // ログ取得停止
+	// SPIバスが空くまで待つ
+	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );
 
-	// while(sendLogNum < logIndex) {
-	// 	writeLogPuts();
-	// }
-
-	// createLog();    // ログファイル作成
-	// writeLogPrint();  // ログ書き込み
+	createLog();    // ログファイル作成
+	writeLogPrint();  // ログ書き込み
 
 	f_close(&fil_W);
 	initIMU = true;

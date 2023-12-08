@@ -450,8 +450,8 @@ static void MX_SPI3_Init(void)
   hspi3.Init.Mode = SPI_MODE_MASTER;
   hspi3.Init.Direction = SPI_DIRECTION_2LINES;
   hspi3.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi3.Init.CLKPolarity = SPI_POLARITY_HIGH;
-  hspi3.Init.CLKPhase = SPI_PHASE_2EDGE;
+  hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi3.Init.NSS = SPI_NSS_SOFT;
   hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
   hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
@@ -859,9 +859,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     if(htim->Instance == TIM6){
       Interrupt1ms();
     }
-    // if(htim->Instance == TIM7){
-    //   Interrupt100us();
-    // }
+    if(htim->Instance == TIM7){
+      Interrupt100us();
+    }
 }
 
 int _write(int file, char *ptr, int len)

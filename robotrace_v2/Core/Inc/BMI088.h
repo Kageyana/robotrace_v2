@@ -20,7 +20,12 @@
 
 /*レジスタアドレス*/
 #define REG_GYRO_CHIP_ID    0x00
-#define REG_RATE_X          0x02
+#define REG_RATE_X_LSB      0x02
+#define REG_RATE_X_MSB      0x03
+#define REG_RATE_Y_LSB      0x04
+#define REG_RATE_Y_MSB      0x05
+#define REG_RATE_Z_LSB      0x06
+#define REG_RATE_Z_MSB      0x07
 #define REG_GYRO_BANDWISTH  0x10
 #define REG_GYRO_SOFTRESET  0x14
 

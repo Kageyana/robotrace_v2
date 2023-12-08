@@ -158,14 +158,14 @@ void BMI088getGyro(void) {
 	int16_t gyroVal[3];
 
 	// 角速度の生データを取得
-	BMI088ReadAxisDataG(REG_RATE_X,rawData,6);
+	BMI088ReadAxisDataG(REG_RATE_Z_LSB,rawData,2);
 	// LSBとMSBを結合
-	gyroVal[0] = ((rawData[1] << 8) | rawData[0]) - angleOffset[0];
-	gyroVal[1] = ((rawData[3] << 8) | rawData[2]) - angleOffset[1];
-	gyroVal[2] = ((rawData[5] << 8) | rawData[4]) - angleOffset[2];
+	// gyroVal[0] = ((rawData[1] << 8) | rawData[0]) - angleOffset[0];
+	// gyroVal[1] = ((rawData[3] << 8) | rawData[2]) - angleOffset[1];
+	gyroVal[2] = ((rawData[1] << 8) | rawData[0]) - angleOffset[2];
 
-	BMI088val.gyro.x = (float)gyroVal[0] / GYROLSB * COEFF_DPD;
-	BMI088val.gyro.y = (float)gyroVal[1] / GYROLSB * COEFF_DPD;
+	// BMI088val.gyro.x = (float)gyroVal[0] / GYROLSB * COEFF_DPD;
+	// BMI088val.gyro.y = (float)gyroVal[1] / GYROLSB * COEFF_DPD;
 	BMI088val.gyro.z = (float)gyroVal[2] / GYROLSB * COEFF_DPD;
 	
 }
@@ -239,7 +239,7 @@ void calibrationIMU (void) {
 	
 	if(i<(uint32_t)(5.0/DEFF_TIME)) {
 		// 角速度の生データを取得
-		BMI088ReadAxisDataG(REG_RATE_X,rawData,6);
+		BMI088ReadAxisDataG(REG_RATE_X_LSB,rawData,6);
 		// LSBとMSBを結合
 		gyroVal[0] = (rawData[1] << 8) | rawData[0];
 		gyroVal[1] = (rawData[3] << 8) | rawData[2];

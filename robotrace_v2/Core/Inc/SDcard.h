@@ -18,7 +18,6 @@
 extern int16_t  fileNumbers[1000], fileIndexLog, endFileIndex;
 extern uint16_t cntLog;
 extern int32_t  encLog;
-extern uint32_t logIndex;
 //====================================//
 // プロトタイプ宣言
 //====================================//
