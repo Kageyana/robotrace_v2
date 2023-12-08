@@ -144,28 +144,12 @@ void Interrupt1ms(void) {
             // if(initIMU) {
             //     BMI088getTemp();
             // }
-            
-            
             break;
         case 9:
             if(patternTrace < 100) {
                 writeLogBufferPrint(); // バッファにログを保存
                 courseMarkerLog = 0;
             }
-
-            // if (patternTrace < 100) {
-            //     writeLogBufferPuts(
-            //         NUM_LOGDATA,
-            //         cntLog,
-            //         courseMarkerLog,
-            //         encCurrentN,
-            //         (int32_t)(BMI088val.gyro.z*10000),
-            //         encTotalOptimal,
-            //         targetSpeed,
-            //         optimalIndex
-            //     );
-            //     courseMarkerLog = 0;
-            // }
             break;
         case 10:
             cnt10 = 0;

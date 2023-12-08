@@ -84,29 +84,27 @@ bool initMicroSD(void) {
 	}
 }
 /////////////////////////////////////////////////////////////////////
-// モジュール名 initLog
-// 処理概要     ログ初期設定
+// モジュール名 createLog
+// 処理概要     ログファイルを作成する
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void initLog(void){
+void createLog(void) {
 	FRESULT   fresult;
 	DIR dir;                    // Directory
 	FILINFO fno;                // File Info
-	uint8_t fileName[10];
-	uint8_t *tp;
+	uint8_t *tp, fileName[10];
 	uint16_t fileNumber = 0;
 
 	f_opendir(&dir,"/");  // directory open
+	
 	do {
-		f_readdir(&dir,&fno);
-		if(fno.fname[0] != 0) {           // ファイルの有無を確認
+		f_readdir(&dir,&fno);  
 		tp = strtok(fno.fname,".");     // 拡張子削除
 		if ( atoi(tp) > fileNumber ) {  // 番号比較
-			fileNumber = atoi(tp);        // 文字列を数値に変換
+		fileNumber = atoi(tp);        // 文字列を数値に変換
 		}
-		}
-	} while(fno.fname[0] != 0);
+	} while(fno.fname[0] != 0); // ファイルの有無を確認
 
 	f_closedir(&dir);     // directory close
 
@@ -123,16 +121,20 @@ void initLog(void){
 	strcat(fileName, ".csv");           // 拡張子を追加
 	fresult = f_open(&fil_W, fileName, FA_OPEN_ALWAYS | FA_WRITE);  // create file 
 
+	strcpy(columnTitle, "");
+	strcpy(formatLog, "");
+
 	setLogStr("cntlog",       "%d");
 	setLogStr("courseMarker",  "%d");
 	setLogStr("encCurrentN",  "%d");
 	setLogStr("gyroVal_Z",   "%d");
 	setLogStr("encTotalN",    "%d");
 	setLogStr("targetSpeed",    "%d");
+
 	setLogStr("optimalIndex",  "%d");
-	// setLogStr("ROC",  "%d");
-	// setLogStr("x",  "%d");
-	// setLogStr("y",  "%d");
+	setLogStr("ROC",  "%d");
+	setLogStr("x",  "%d");
+	setLogStr("y",  "%d");
 
 	strcat(columnTitle,"\n");
 	strcat(formatLog,"\n");
@@ -182,7 +184,6 @@ void setLogstr(void) {
 			logstrwrite++;
 		}
 	}
-	
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogPuts
@@ -350,61 +351,4 @@ void createDir(uint8_t *dirName) {
 			f_mkdir(dirName);	
 		}
 	}
-}
-/////////////////////////////////////////////////////////////////////
-// モジュール名 createLog
-// 処理概要     ログファイル初期設定
-// 引数         なし
-// 戻り値       なし
-/////////////////////////////////////////////////////////////////////
-void createLog(void) {
-	FRESULT   fresult;
-	DIR dir;                    // Directory
-	FILINFO fno;                // File Info
-	uint8_t *tp, fileName[10];
-	uint16_t fileNumber = 0;
-
-	f_opendir(&dir,"/");  // directory open
-	
-	do {
-		f_readdir(&dir,&fno);  
-		tp = strtok(fno.fname,".");     // 拡張子削除
-		if ( atoi(tp) > fileNumber ) {  // 番号比較
-		fileNumber = atoi(tp);        // 文字列を数値に変換
-		}
-	} while(fno.fname[0] != 0); // ファイルの有無を確認
-
-	f_closedir(&dir);     // directory close
-
-	// ファイルナンバー作成
-	if (fileNumber == 0) {
-		// ファイルが無いとき
-		fileNumber = 1;
-	} else {
-		// ファイルが有るとき
-		fileNumber++;         // index pulus
-	}
-
-	sprintf(fileName,"%d",fileNumber);  // 数値を文字列に変換
-	strcat(fileName, ".csv");           // 拡張子を追加
-	fresult = f_open(&fil_W, fileName, FA_OPEN_ALWAYS | FA_WRITE);  // create file 
-
-	strcpy(columnTitle, "");
-	strcpy(formatLog, "");
-
-	setLogStr("cntlog",       "%d");
-	setLogStr("courseMarker",  "%d");
-	setLogStr("encCurrentN",  "%d");
-	setLogStr("gyroVal_Z",   "%d");
-	setLogStr("encTotalN",    "%d");
-	setLogStr("targetSpeed",    "%d");
-
-	setLogStr("optimalIndex",  "%d");
-	setLogStr("ROC",  "%d");
-	setLogStr("x",  "%d");
-	setLogStr("y",  "%d");
-
-	strcat(columnTitle,"\n");
-	strcat(formatLog,"\n");
-	f_printf(&fil_W, columnTitle);
 }

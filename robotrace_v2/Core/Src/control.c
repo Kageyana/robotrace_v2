@@ -177,8 +177,7 @@ void loopSystem (void) {
 
 			// IMUのキャリブレーションが終了したら走行開始
 			if ( !calibratIMU ) {
-				// ログファイル作成
-				// if (initMSD) initLog();
+				powerLinesensors(1);	// ラインセンサ点灯
 
 				// PIDゲインを記録
 				initIMU = false;

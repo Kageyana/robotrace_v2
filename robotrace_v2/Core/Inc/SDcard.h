@@ -23,7 +23,6 @@ extern int32_t  encLog;
 //====================================//
 // MicroSD
 bool initMicroSD(void);
-void initLog(void);
 void createLog(void);
 void endLog(void);
 void setLogStr(uint8_t* column, uint8_t* format);

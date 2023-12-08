@@ -145,6 +145,7 @@ void setup( void )
 					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 					if (lSensor[5] < 1000) {
 						modeCalLinesensors = 0;
+						powerLinesensors(0);	// ラインセンサ消灯
 						countdown = 500;
 						patternCalibration = 5;
 					}
@@ -563,8 +564,6 @@ void setup( void )
 					data_select( &trace_test, SW_PUSH );
 					if (trace_test) {
 						cntSetup1 = 0;
-						enc1 = 0;
-						powerLinesensors(1);	// 先に点灯させて安定させる
 						patternCalibration = 2;
 					}
 					break;
@@ -572,97 +571,37 @@ void setup( void )
 				case 2:
 					// 開始準備
 					if (cntSetup1 > 1000) {
-						veloCtrl.Int = 0;			// I成分リセット
-						BMI088val.angle.z = 0.0;	// 角度リセット
-						yawRateCtrl.Int = 0.0;		// I成分リセット
-						setTargetSpeed(0);			// 目標速度0[m/s]
-						enc1 = 0;
+						ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+						ssd1306_SetCursor(22,28);
+						ssd1306_printf(Font_7x10,"Calibration");
+						ssd1306_SetCursor(53,42);
+						ssd1306_printf(Font_7x10,"Now");
+						ssd1306_UpdateScreen();  // グラフィック液晶更新
+
+						// 配列初期化
+						memset(&lSensorOffset, 0, sizeof(uint16_t) * NUM_SENSORS);
+
+						powerLinesensors(1);		// ラインセンサ点灯
 						modeCalLinesensors = 1; 	// キャリブレーション開始
+
+						// 手動で機体を動かしキャリブレーションする
+						
 						patternCalibration = 3;
 					}
 					break;
 				
 				case 3:
-					// 左旋回
-					setTargetAngularVelocity(-1500);
-					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-					if (BMI088val.angle.z < -320.0) {
-						patternCalibration = 4;
+					// スイッチ押下で終了
+					data_select( &trace_test, SW_PUSH );
+					if (!trace_test) {
+						modeCalLinesensors = 0; 	// キャリブレーション終了
+						powerLinesensors(0);		// ラインセンサ消灯
+						ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+						ssd1306_UpdateScreen();  // グラフィック液晶更新
+						patternCalibration = 1;
 					}
 					break;
-
-				case 4:
-					// 初期位置に戻る
-					setTargetAngularVelocity(-400.0F);
-					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-					if (lSensor[5] < 1000) {
-						modeCalLinesensors = 0;
-						countdown = 500;
-						patternCalibration = 8;
-					}
-					break;
-
-				// case 3:
-				// 	// 左旋回
-				// 	setTargetAngularVelocity(500);
-				// 	motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-				// 	if (BMI088val.angle.z < -35.0) {
-				// 		patternCalibration = 4;
-				// 	}
-				// 	break;
-
-				// case 4:
-				// 	// 停止
-				// 	setTargetSpeed(0);
-				// 	motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
-				// 	if (abs(encCurrentN) == 0) {
-				// 		patternCalibration = 5;
-				// 	}
-				// 	break;
-
-				// case 5:
-				// 	// 右旋回
-				// 	setTargetAngularVelocity(-500);
-				// 	motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-				// 	if (BMI088val.angle.z > 35) {
-				// 		patternCalibration = 6;
-				// 	}
-				// 	break;
-
-				// case 6:
-				// 	// 停止
-				// 	setTargetSpeed(0);
-				// 	motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
-				// 	if (abs(encCurrentN) == 0) {
-				// 		patternCalibration = 7;
-				// 	}
-				// 	break;
-
-				// case 7:
-				// 	// 初期位置に戻る
-				// 	setTargetAngularVelocity(500);
-				// 	motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-				// 	if (BMI088val.angle.z > 0) {
-				// 		modeCalLinesensors = 0;
-				// 		patternCalibration = 8;
-				// 	}
-				// 	break;
-
-				case 8:
-					// 停止
-					motorPwmOutSynth( 0, veloCtrl.pwm, 0, 0);
-					if (abs(encCurrentN) == 0) {
-						calTimesNow++;
-						if (calTimesNow >= calTimes) {
-							calTimesNow = 0;
-							trace_test = 0;
-							patternCalibration = 1;
-						} else {
-							patternCalibration = 3;
-						}
-					}
-					break;
-			
+		
 				default:
 					break;
 				}
