@@ -244,8 +244,8 @@ void writePIDparameters(pidParam *pid) {
 	// ファイル読み込み
 	strcat(fileName,pid->name); // ファイル名追加
 	strcat(fileName,".txt");   // 拡張子追加
-    fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_WRITE);  	// csvファイルを開く
-	// fresult = f_lseek(&fil, f_size(&fil));							// ファイルの末尾へ移動
+    fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_WRITE);  	// ファイルを開く
+
 	if(fresult == FR_OK) {
 		f_printf(&fil, "%03d,%03d,%03d",pid->kp, pid->ki, pid->kd);
 	}
@@ -268,9 +268,8 @@ void readPIDparameters(pidParam *pid) {
 	// ファイル読み込み
 	strcat(fileName,pid->name); // ファイル名追加
 	strcat(fileName,".txt");   // 拡張子追加
-    fresult = f_open(&fil, fileName, FA_OPEN_EXISTING | FA_READ);  // csvファイルを開く
+    fresult = f_open(&fil, fileName, FA_OPEN_EXISTING | FA_READ);  // ファイルを開く
 
-	// fresult = f_lseek(&fil, f_size(&fil) - 12);		// 最後の行に移動 ゲイン3桁×3+カンマ×2+改行コード
 	if(fresult == FR_OK) {
 		f_gets(gain,sizeof(gain),&fil);							// 文字列取得
 		sscanf(gain,"%d,%d,%d",&pid->kp,&pid->ki,&pid->kd);		// 文字列→数値

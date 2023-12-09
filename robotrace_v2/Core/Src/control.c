@@ -88,6 +88,8 @@ void initSystem (void) {
 		readPIDparameters(&yawRateCtrl);
 		readPIDparameters(&yawCtrl);
 		readPIDparameters(&distCtrl);
+
+		readLinesenval();	// ラインセンサオフセット値を取得
 	}
 	
 	// IMU
@@ -220,7 +222,7 @@ void loopSystem (void) {
 
 				clearXYcie();	// 座標計算変数初期化
 
-				modeLOG = true;    // log start
+				if(initMSD) modeLOG = true;    // log start
 				
 				patternTrace = 12;
 			}

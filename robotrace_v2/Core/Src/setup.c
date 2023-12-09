@@ -70,8 +70,8 @@ void setup( void )
 		ssd1306_printf(Font_6x8,"No.%x",swValRotary);
 
 		
-		ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
-		ssd1306_FillRectangle(24,0,94,13, Black); // ヘッダ表示空白埋め
+		ssd1306_FillRectangle(0,15,127,63, Black);	// メイン表示空白埋め
+		ssd1306_FillRectangle(24,0,94,13, Black);	// ヘッダ表示空白埋め
 		ssd1306_SetCursor(30,3); // ヘッダタイトル位置
 	}
 
@@ -598,6 +598,12 @@ void setup( void )
 						powerLinesensors(0);		// ラインセンサ消灯
 						ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
 						ssd1306_UpdateScreen();  // グラフィック液晶更新
+
+						if(initMSD) {
+							initIMU = false;
+							writeLinesenval();	// オフセット値をSDカードに書き込み
+							initIMU = true;
+						}
 						patternCalibration = 1;
 					}
 					break;

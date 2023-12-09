@@ -13,6 +13,8 @@
 #define BASEVAL          4095.0F
 #define LS_COUNTERPERIOD htim13.Init.Period
 #define LS_TIMER         htim13
+
+#define LS_VAL_FILENAME "lsval"
 //====================================//
 // グローバル変数の宣言
 //====================================//
@@ -31,5 +33,7 @@ void powerLinesensors(uint8_t onoff);
 void getLineSensor(void);
 void getAngleSensor(void);
 void calibrationLinesensor (void);
+void writeLinesenval(void);
+void readLinesenval(void) ;
 
 #endif // LINESENSOR_H_

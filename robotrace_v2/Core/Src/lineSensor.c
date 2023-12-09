@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "lineSensor.h"
+#include "fatfs.h"
 //====================================//
 // グローバル変数の宣言
 //====================================//
@@ -121,4 +122,57 @@ void calibrationLinesensor (void) {
 			lSensorOffset[i] = lSensor[i];
 		}
 	}
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 writeLinesenval
+// 処理概要     ラインセンサの最大値をSDカードに書き込む
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void writeLinesenval(void) {
+	FIL         fil;
+    FRESULT     fresult;
+	uint8_t     str[10],fileName[20] = PATH_SETTING;
+    int16_t     i, ret=0;
+
+	// ファイル読み込み
+	strcat(fileName,LS_VAL_FILENAME); // ファイル名追加
+	strcat(fileName,".txt");   // 拡張子追加
+    fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_WRITE);  	// ファイルを開く
+	
+	if(fresult == FR_OK) {
+		for(i=0;i<NUM_SENSORS;i++){
+			sprintf(str,"%04d,",lSensorOffset[i]);
+			f_puts(str, &fil);
+		}
+	}
+
+	f_close(&fil);
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 readLinesenval
+// 処理概要     ラインセンサの最大値をSDカードから読み取る
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void readLinesenval(void)  {
+	FIL         fil;
+    FRESULT     fresult;
+	uint8_t     fileName[20] = PATH_SETTING;
+	TCHAR     	str[10];
+    int16_t     i, ret=0;
+
+	// ファイル読み込み
+	strcat(fileName,LS_VAL_FILENAME); // ファイル名追加
+	strcat(fileName,".txt");   // 拡張子追加
+    fresult = f_open(&fil, fileName, FA_OPEN_EXISTING | FA_READ);  // ファイルを開く
+
+	if(fresult == FR_OK) {
+		for(i=0;i<NUM_SENSORS;i++){
+			f_gets(str,6,&fil);							// 文字列取得 カンマ含む
+			sscanf(str,"%d,",&lSensorOffset[i]);		// 文字列→数値
+		}
+	}
+
+	f_close(&fil);
 }
