@@ -9,9 +9,11 @@
 // シンボル定義
 //====================================//
 #define NUM_LOGDATA         7
-#define BUFFER_SIZW_LOG     1024
+#define BUFFER_SIZW_LOG     3000
 
 #define PATH_SETTING    "./setting/"
+
+// #define LOG_RUNNING_WRITE
 //====================================//
 // グローバル変数の宣言
 //====================================//
@@ -25,12 +27,15 @@ extern int32_t  encLog;
 bool initMicroSD(void);
 void createLog(void);
 void endLog(void);
-void setLogStr(uint8_t* column, uint8_t* format);
+#ifdef	LOG_RUNNING_WRITE
 void writeLogBufferPuts (uint8_t valNum, ...);
+void setLogtostr(void);
 void writeLogPuts(void);
+#endif
 void writeLogBufferPrint (void);
 void writeLogPrint(void);
 void getFileNumbers(void);
+void setLogStr(uint8_t* column, uint8_t* format);
 void SDtest(void);
 void createDir(uint8_t *dirName);
 #endif // SDCARD_H_

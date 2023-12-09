@@ -120,21 +120,16 @@ void Interrupt1ms(void) {
             cnt5 = 0;
             break;
     }
-    
-    
-    // if(patternTrace >= 12) {
-    //     if( encLog >= encMM(CALCDISTANCE) ) {
-    //         // CALCDISTANCEごとにログを保存
-    //         writeLogBuffer(); // バッファにログを保存
-    //         courseMarkerLog = 0;
-    //         encLog = 0;
-    //     }
-    // }
-
-    if (patternTrace < 100) {
-        setLogstr();
+        
+    if(patternTrace >= 12 && patternTrace < 100) {
+        if( encLog >= encMM(CALCDISTANCE) ) {
+            // CALCDISTANCEごとにログを保存
+            writeLogBufferPrint(); // バッファにログを保存
+            courseMarkerLog = 0;
+            encLog = 0;
+        }
     }
-    
+   
     switch (cnt10) {
         case 1:
             getADC2();
@@ -146,10 +141,10 @@ void Interrupt1ms(void) {
             // }
             break;
         case 9:
-            if(patternTrace < 100) {
-                writeLogBufferPrint(); // バッファにログを保存
-                courseMarkerLog = 0;
-            }
+            // if(patternTrace < 100) {
+            //     writeLogBufferPrint(); // バッファにログを保存
+            //     courseMarkerLog = 0;
+            // }
             break;
         case 10:
             cnt10 = 0;

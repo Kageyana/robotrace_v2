@@ -24,13 +24,16 @@ typedef struct {
     uint8_t 	target;
     uint16_t 	optimalIndex;
 } logData;
-logData logVal[3000];
+logData logVal[BUFFER_SIZW_LOG];
+uint32_t	logValIndex=0;
 
+#ifdef	LOG_RUNNING_WRITE
 uint32_t	logBuffer[BUFFER_SIZW_LOG];
 uint8_t		logStr[BUFFER_SIZW_LOG][10]; 
 uint32_t	logBuffwrite=0, logBuffread=0;
 uint32_t	logstrwrite=0, logstrread=0;
 uint32_t	cntSend=0;
+#endif
 
 // ログファイルナンバー
 int16_t 	fileNumbers[1000], fileIndexLog = 0, endFileIndex = 0;
@@ -140,6 +143,7 @@ void createLog(void) {
 	strcat(formatLog,"\n");
 	f_printf(&fil_W, columnTitle);
 }
+#ifdef	LOG_RUNNING_WRITE
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogBufferPuts
 // 処理概要     保存する変数の値をバッファに転送する
@@ -169,7 +173,7 @@ void writeLogBufferPuts (uint8_t valNum, ...) {
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void setLogstr(void) {
+void setLogtostr(void) {
 
 	if (modeLOG) {
 		if (logBuffread < logBuffwrite) {
@@ -200,6 +204,7 @@ void writeLogPuts(void) {
 		}
 	}
 }
+#endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogBufferPrint
 // 処理概要     保存する変数の値をバッファに転送する
@@ -208,14 +213,14 @@ void writeLogPuts(void) {
 /////////////////////////////////////////////////////////////////////
 void writeLogBufferPrint(void) {
   if (modeLOG) {
-    logVal[logBuffwrite].time = cntLog;
-    logVal[logBuffwrite].marker = courseMarkerLog;
-    logVal[logBuffwrite].speed = encCurrentN;
-    logVal[logBuffwrite].zg = BMI088val.gyro.z;
-    logVal[logBuffwrite].distance = encTotalOptimal;
-    logVal[logBuffwrite].target = targetSpeed;
-    logVal[logBuffwrite].optimalIndex = optimalIndex;
-    logBuffwrite++;
+    logVal[logValIndex].time = cntLog;
+    logVal[logValIndex].marker = courseMarkerLog;
+    logVal[logValIndex].speed = encCurrentN;
+    logVal[logValIndex].zg = BMI088val.gyro.z;
+    logVal[logValIndex].distance = encTotalOptimal;
+    logVal[logValIndex].target = targetSpeed;
+    logVal[logValIndex].optimalIndex = optimalIndex;
+    logValIndex++;
   }
 }
 /////////////////////////////////////////////////////////////////////
@@ -228,7 +233,7 @@ void writeLogPrint(void) {
 	uint32_t i,length = 0;
 
 	clearXYcie();
-	for(i = 0;i<logBuffwrite;i++) {
+	for(i = 0;i<logValIndex;i++) {
 		calcXYcie(logVal[i].speed,logVal[i].zg);
 		f_printf(&fil_W, formatLog
 			,logVal[i].time
