@@ -47,6 +47,7 @@ void getEncoder(void) {
 	encTotalOptimal += encCurrentN;     // 2次走行用
 	encLog += encCurrentN;              // 一定距離ごとにログを保存する用
     encPID += encCurrentN;              // 距離制御用
+    encClick += encCurrentL;            // ホイールクリック用
 
     // 前回値を更新
 	encBufR = encRawR;

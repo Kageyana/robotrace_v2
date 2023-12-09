@@ -76,6 +76,8 @@ void Interrupt1ms(void) {
         cntSetup2++;
         cntSwitchUD++;
         cntSwitchLR++;
+
+        wheelClick();
     }  
     
     switch(cnt5) {

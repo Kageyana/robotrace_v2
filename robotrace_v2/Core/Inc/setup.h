@@ -12,6 +12,8 @@
 
 #define CALIBRATIONSPEED -1500.0F   // ラインセンサのキャリブレーション時の角速度[rad/s]
 
+#define USE_WHEEL       // ホイールをロータリスイッチの代わりに使用する(使用しないときはコメントアウトする)
+
 #define HEX_START       0x0
 #define HEX_SPEED_PARAM 0x1
 #define HEX_LOG         0x2
@@ -22,6 +24,7 @@
 #define HEX_PID_ANGULAR 0x7
 #define HEX_PID_ANGLE   0x8
 #define HEX_PID_DIST    0x9
+#define HEX_TEST        0xa
 
 //======================================//
 // グローバル変数の宣言
@@ -39,6 +42,7 @@ extern uint16_t		cntSwitchLRLong;	// スイッチ長押し判定用左
 
 // パラメータ関連
 extern uint8_t      fixSpeed;
+extern int32_t      encClick;
 
 // フラグ関連
 extern uint8_t      trace_test;
@@ -52,5 +56,6 @@ void dataTuningUD ( int16_t *data, int16_t add, int16_t min, int16_t max);
 void dataTuningLR ( int16_t *data, int16_t add, int16_t min, int16_t max);
 void dataTuningUDF ( float *data, float add, float min, float max);
 void caribrateSensors(void);
+void wheelClick(void);
 
 #endif /* SETUP_H_ */

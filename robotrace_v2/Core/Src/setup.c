@@ -21,6 +21,7 @@ int8_t pushUD = 0;
 
 // パターン関連
 uint8_t push1 = 0;
+int16_t patternDisplay = 0;
 int16_t patternSensors = 1;
 int16_t beforeSensors = 0;
 int16_t patternSensorLine = 1;
@@ -34,16 +35,16 @@ int16_t patternGain = 3;
 int16_t patternSpeedseting = 1;
 int16_t patternLog = 1;
 int16_t patternCalibration = 1;
+int16_t patternClick=1;
 
 // フラグ関連
 uint8_t motor_test = 0;
 uint8_t trace_test = 0;
-int16_t	calTimes = 1;
-int16_t	calTimesNow = 0;
-uint8_t bright = 0;
+uint8_t clickStart=0;
 
 // パラメータ関連
 int16_t motorTestPwm = 200;
+int32_t encClick = 0;
 ///////////////////////////////////////////////////////////////
 // モジュール名 setup
 // 処理概要     走行前設定
@@ -62,26 +63,47 @@ void setup( void )
 		showBattery();	// バッテリ残量表示
 	}
 
-	if (swValRotary != beforeHEX) 	{
+#ifdef USE_WHEEL
+	// 右ホイールをロータリスイッチ代わりに使用する
+	if (!trace_test && !motor_test ) {
+		if(abs(encClick) > 400) {
+			if(encClick > 400) patternDisplay++;
+			else if(encClick < -400) patternDisplay--;
+
+			if(patternDisplay > 0xf) patternDisplay = 0;
+			else if(patternDisplay < 0) patternDisplay = 0xf;
+
+			clickStart = 1;
+			encClick = 0;
+		}
+	}
+#else
+	// ロータリスイッチ値を使用する
+	patternDisplay = swValRotary;
+#endif
+
+	if (patternDisplay != beforeHEX) 	{
 		// ロータリスイッチ切替時に実行
 
 		// ロータリスイッチ値を表示
 		ssd1306_SetCursor(0,3);
-		ssd1306_printf(Font_6x8,"No.%x",swValRotary);
+		ssd1306_printf(Font_6x8,"No.%x",patternDisplay);
 
 		
 		ssd1306_FillRectangle(0,15,127,63, Black);	// メイン表示空白埋め
 		ssd1306_FillRectangle(24,0,94,13, Black);	// ヘッダ表示空白埋め
 		ssd1306_SetCursor(30,3); // ヘッダタイトル位置
+
+		showBattery();	// バッテリ残量表示
 	}
 
 	// ディップスイッチで項目選択
-	switch ( swValRotary ) {
+	switch ( patternDisplay ) {
 		//------------------------------------------------------------------
 		// スタート待ち
 		//------------------------------------------------------------------
 		case HEX_START:
-			if (swValRotary != beforeHEX) 	{
+			if (patternDisplay != beforeHEX) 	{
 				// 切替時に実行
 				ssd1306_printf(Font_6x8,"Start  ");
 				ssd1306_SetCursor(30,25);
@@ -91,7 +113,6 @@ void setup( void )
 			
 			switch (patternCalibration) {
 				case 1:
-					calTimes = 1;
 					setTargetSpeed(0);
 					data_select( &trace_test, SW_PUSH );
 					// スイッチ入力待ち
@@ -167,7 +188,7 @@ void setup( void )
 		// パラメータ調整(通常トレース)
 		//------------------------------------------------------------------
 		case HEX_SPEED_PARAM:
-			if (swValRotary != beforeHEX) 	{
+			if (patternDisplay != beforeHEX) 	{
 				// 切替時に実行
 				ssd1306_printf(Font_6x8,"Parameter");
 			}
@@ -258,7 +279,7 @@ void setup( void )
 		// Sensors test
 		//------------------------------------------------------------------
 		case HEX_SENSORS:
-			if (swValRotary != beforeHEX) 	{
+			if (patternDisplay != beforeHEX) 	{
 				// 切替時に実行
 				ssd1306_printf(Font_6x8,"SENSORS  ");
 				beforeSensors = 100;
@@ -272,7 +293,8 @@ void setup( void )
 						ssd1306_FillRectangle(0,16,127,63, Black); // 黒塗り
 						ssd1306_SetCursor(47,16);
 						ssd1306_printf(Font_6x8,"Motor");
-						motor_test = 0;					}
+						motor_test = 0;					
+					}
 					// Duty
 					ssd1306_SetCursor(35,30);
 					ssd1306_printf(Font_6x8,"Duty:%4d",motorTestPwm);
@@ -471,7 +493,7 @@ void setup( void )
 		// Log analysis
 		//------------------------------------------------------------------
 		case HEX_LOG:
-			if (swValRotary != beforeHEX) 	{
+			if (patternDisplay != beforeHEX) 	{
 				// 切替時に実行
 				ssd1306_printf(Font_6x8,"microSD  ");
 
@@ -547,7 +569,7 @@ void setup( void )
 		// キャリブレーション(ラインセンサ) 
 		//------------------------------------------------------------------
 		case HEX_CALIBRATION:
-			if (swValRotary != beforeHEX) 	{
+			if (patternDisplay != beforeHEX) 	{
 				// 切替時に実行
 				ssd1306_printf(Font_6x8,"Calibrate");
 				patternCalibration = 1;
@@ -556,7 +578,6 @@ void setup( void )
 			switch (patternCalibration) {
 				case 1:
 					// スイッチ入力待ち
-					dataTuningUD( &calTimes, 1, 1, 9);
 					setTargetSpeed(0);
 					ssd1306_SetCursor(65,22);
 					ssd1306_printf(Font_6x8,"%4d",lSensorOffset[0]);
@@ -616,7 +637,7 @@ void setup( void )
 		// ゲイン調整(直線トレース)
 		//------------------------------------------------------------------
 		case HEX_PID_TRACE:
-			if (swValRotary != beforeHEX) 	{
+			if (patternDisplay != beforeHEX) 	{
 				// 切替時に実行
 				ssd1306_printf(Font_6x8,"Trace PID");
 
@@ -679,7 +700,7 @@ void setup( void )
 		// ゲイン調整(速度)
 		//------------------------------------------------------------------
 		case HEX_PID_SPEED:
-			if (swValRotary != beforeHEX) 	{
+			if (patternDisplay != beforeHEX) 	{
 				// 切替時に実行
 				ssd1306_printf(Font_6x8,"Speed PID");
 
@@ -742,7 +763,7 @@ void setup( void )
 		// ゲイン調整(角速度)
 		//------------------------------------------------------------------
 		case HEX_PID_ANGULAR:
-			if (swValRotary != beforeHEX) 	{
+			if (patternDisplay != beforeHEX) 	{
 				// 切替時に実行
 				ssd1306_printf(Font_6x8,"YawRate PID");
 
@@ -805,7 +826,7 @@ void setup( void )
 		// ゲイン調整(角度)
 		//------------------------------------------------------------------
 		case HEX_PID_ANGLE:
-			if (swValRotary != beforeHEX) 	{
+			if (patternDisplay != beforeHEX) 	{
 				// 切替時に実行
 				ssd1306_printf(Font_6x8,"Yaw PID");
 
@@ -867,7 +888,7 @@ void setup( void )
 		// ゲイン調整(距離)
 		//------------------------------------------------------------------
 		case HEX_PID_DIST:
-			if (swValRotary != beforeHEX) 	{
+			if (patternDisplay != beforeHEX) 	{
 				// 切替時に実行
 				ssd1306_printf(Font_6x8,"Dist PID");
 
@@ -883,21 +904,6 @@ void setup( void )
 				setTargetDist(50.0);
 				setTargetSpeed(0.3);
 			}
-
-
-			// if (swValTact == SW_PUSH) {
-			// 	writePIDparameters(&distCtrl);
-			// 	HAL_Delay(100);
-			// }
-
-			// data_select( &trace_test, SW_PUSH );
-
-			// PUSHでトレースON/OFF
-			// if ( trace_test == 1 ) {
-			// 	motorPwmOutSynth( 0, veloCtrl.pwm, distCtrl.pwm, 0 );
-			// } else {
-			// 	motorPwmOutSynth( 0, 0, 0, 0 );
-			// }
 
 			// ゲイン表示
 			dataTuningUD( &patternGain, 1, 3, 1);		
@@ -933,6 +939,36 @@ void setup( void )
 			}
 			break;
 
+		//------------------------------------------------------------------
+		// モータクリックテスト
+		//------------------------------------------------------------------
+		case HEX_TEST:
+			if (patternDisplay != beforeHEX) 	{
+				// 切替時に実行
+				ssd1306_printf(Font_6x8,"test");
+				ssd1306_SetCursor(47,16);
+				ssd1306_printf(Font_6x8,"Motor");
+				encClick = 0;
+			}
+			// Left
+			ssd1306_SetCursor(0,42);
+			ssd1306_printf(Font_6x8,"enc:%6d",encTotalL);	// Encoder
+
+			// // Right
+			ssd1306_SetCursor(64,42);
+			ssd1306_printf(Font_6x8,"enc:%6d",encTotalR); 	// Encoder
+
+			// if ( swValTact == SW_PUSH ) {
+			// 	encTotalL = 0;
+			// 	encTotalR = 0;
+			// }
+
+			// if(abs(encClick) > 400) {
+			// 	clickStart = 1;
+			// 	encClick = 0;
+			// }
+
+			break;
 	default:
 		ssd1306_SetCursor(30,5);
 		ssd1306_printf(Font_6x8,"None      ");
@@ -942,8 +978,8 @@ void setup( void )
 	} // switch
 
 	// 前回値更新
-	beforeHEX = swValRotary;
-	beforeBATLV= batteryLevel;
+	beforeHEX = patternDisplay;
+	beforeBATLV = batteryLevel;
 
 	if (!trace_test && !calibratIMU) {
 		ssd1306_UpdateScreen();  // グラフィック液晶更新
@@ -1150,7 +1186,6 @@ void caribrateSensors(void) {
 
 	switch (patternCalibration) {
 		case 1:
-			calTimes = 1;
 			setTargetSpeed(0);
 
 			// スイッチ入力待ち
@@ -1237,6 +1272,7 @@ void caribrateSensors(void) {
 			// 停止
 			motorPwmOutSynth( 0, veloCtrl.pwm, 0, 0);
 			if (abs(encCurrentN) == 0) {
+				powerLinesensors(0);	// ラインセンサ消灯
 				if(mode == START_OPTIMAL) {
 					// 距離基準解析
 					numPPADarry = readLogDistance(analizedNumber);
@@ -1250,6 +1286,47 @@ void caribrateSensors(void) {
 			break;
 	
 		default:
+			break;
+	}
+}
+///////////////////////////////////////////////////////////////////////////////////////
+// モジュール名 wheelClick
+// 処理概要     ホイールを短時間回転させクリック感を出す
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////////////////
+void wheelClick(void) {
+	static uint8_t cnt=0;
+
+	switch(patternClick) {
+		case 1:
+			if(clickStart == 1) {
+				patternClick = 2;
+			}
+			break;
+
+		case 2:
+			motorPwmOut(200,0);
+			cnt++;
+			if(cnt >= 3) {
+				cnt = 0;
+				patternClick = 3;
+			}
+			break;
+
+		case 3:
+			motorPwmOut(-200,0);
+			cnt++;
+			if(cnt >= 3) {
+				cnt = 0;
+				patternClick = 4;
+			}
+			break;
+
+		case 4:
+			motorPwmOut(0,0);
+			clickStart = 0;
+			patternClick = 1;
 			break;
 	}
 }
