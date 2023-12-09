@@ -18,10 +18,10 @@ int32_t     encTotalOptimal = 0;            // 2次走行用の距離変数(距�
 int32_t     encPID = 0;                     // 距離制御用の距離変数
 float       xydegz = 0;
 
-AnalysisData PPAD[ANALYSISBUFFSIZE];
-EventPos     markerPos[ANALYSISBUFFSIZE];
+AnalysisData PPAD[OPT_BUFF_SIZE];
+EventPos     markerPos[OPT_BUFF_SIZE];
 Courseplot   xycie;                         // xy座標値(走行中計算、ログ保存用)
-Courseplot   shortCutxycie[ANALYSISBUFFSIZE];   // xy座標値(走行中計算、ログ保存用)
+Courseplot   shortCutxycie[OPT_SHORT_BUFF_SIZE];   // xy座標値(走行中計算、ログ保存用)
 /////////////////////////////////////////////////////////////////////
 // モジュール名 calcROC
 // 処理概要     曲率半径の計算
@@ -132,7 +132,7 @@ int16_t readLogDistance(int logNumber) {
 
         // 前処理
         // 構造体配列の初期化
-        memset(&PPAD, 0, sizeof(AnalysisData) * ANALYSISBUFFSIZE);
+        memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
         // memset(&ROCbuff, 0, sizeof(float) * 500);
 
         // ログデータ取得開始
@@ -166,7 +166,7 @@ int16_t readLogDistance(int logNumber) {
                 cntCurR = 0;            // 曲率半径用配列のカウントクリア
                 startEnc = distance;    // 距離計測開始位置を更新
                 numD++;                 // 距離解析インデックス更新
-                if(numD >= ANALYSISBUFFSIZE) return -1;
+                if(numD >= OPT_BUFF_SIZE) return -1;
             }
             // 曲率半径の計算
             ROCbuff[cntCurR] = calcROC((float)velo, (float)angVelo/10000);
@@ -238,16 +238,16 @@ float asignVelocity(float ROC) {
     float ret; 
 
     absROC = fabs(ROC);
-    if ( absROC > 1500.0F ) ret = targetParam.boostStraight;
-    if ( absROC <= 1500.0F ) ret = targetParam.boost1500;
-    if ( absROC <= 800.0F )  ret = targetParam.boost800;
-    if ( absROC <= 700.0F )  ret = targetParam.boost700;
-    if ( absROC <= 600.0F )  ret = targetParam.boost600;
-    if ( absROC <= 500.0F )  ret = targetParam.boost500;
-    if ( absROC <= 400.0F )  ret = targetParam.boost400;
-    if ( absROC <= 300.0F )  ret = targetParam.boost300;
-    if ( absROC <= 200.0F )  ret = targetParam.boost200;
-    if ( absROC <= 100.0F )  ret = targetParam.boost100;
+    if ( absROC > 1500.0F ) ret = tgtParam.bstStraight;
+    if ( absROC <= 1500.0F ) ret = tgtParam.bst1500;
+    if ( absROC <= 800.0F )  ret = tgtParam.bst800;
+    if ( absROC <= 700.0F )  ret = tgtParam.bst700;
+    if ( absROC <= 600.0F )  ret = tgtParam.bst600;
+    if ( absROC <= 500.0F )  ret = tgtParam.bst500;
+    if ( absROC <= 400.0F )  ret = tgtParam.bst400;
+    if ( absROC <= 300.0F )  ret = tgtParam.bst300;
+    if ( absROC <= 200.0F )  ret = tgtParam.bst200;
+    if ( absROC <= 100.0F )  ret = tgtParam.bst100;
 
     return ret;
 }
@@ -290,7 +290,7 @@ int16_t readLogTest(int logNumber) {
 
         // 前処理
         // 構造体配列の初期化
-        memset(&PPAD, 0, sizeof(AnalysisData) * ANALYSISBUFFSIZE);
+        memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
 
         // ログデータ取得開始
         while (f_gets(log,sizeof(log),&fil_Read)) {
@@ -346,8 +346,8 @@ int16_t calcXYcies(int logNumber) {
         // ログデータの取得
         TCHAR     log[512];
         int32_t time=0, marker=0,velo=0,angVelo=0,distance=0;
-        int32_t startEnc=0;
-        float   degz=0, degzR, velocity=0;
+        int32_t beforeTime=0, startEnc=0;
+        float   degz=0, degzR, velocity=0, dt;
         float   x=0, y=0, xm=0, ym=0, degzm=0;
         float   xValues[SHORTCUTWINDOW], yValues[SHORTCUTWINDOW], degzValues[SHORTCUTWINDOW];
         int16_t i=0, j=0, indexSC=0;
@@ -369,7 +369,9 @@ int16_t calcXYcies(int logNumber) {
         while (f_gets(log,sizeof(log),&fil_Read) != NULL) {
             sscanf(log,"%d,%d,%d,%d,%d",&time,&marker,&velo,&angVelo,&distance);
 
-            degz = degz + ((float)angVelo/10000 * DELTATIME);   // 角度
+            dt = (float)(time - beforeTime)/1000;
+
+            degz = degz + ((float)angVelo/10000 * dt);   // 角度
             degzR = degz * DEG2RAD;                             // [rad]に変換
             velocity = (float)velo/PALSE_MILLIMETER;            // 速度
 
@@ -378,9 +380,9 @@ int16_t calcXYcies(int logNumber) {
             y = y + (velocity * cos(degzR));
 
             // リングバッファに座標を保存
-            xValues[i & SHORTCUTWINDOW-1] = x;
-            yValues[i & SHORTCUTWINDOW-1] = y;
-            degzValues[i & SHORTCUTWINDOW-1] = degz;
+            xValues[i & (SHORTCUTWINDOW-1)] = x;
+            yValues[i & (SHORTCUTWINDOW-1)] = y;
+            degzValues[i & (SHORTCUTWINDOW-1)] = degz;
 
             // リングバッファの総和を計算
             for(j=0;j<SHORTCUTWINDOW;j++) {
@@ -394,14 +396,16 @@ int16_t calcXYcies(int logNumber) {
             ym /= SHORTCUTWINDOW;
             degzm /= SHORTCUTWINDOW;
 
-            if ( distance-startEnc >= encMM(CALCDISTANCE)) {
+            if ( distance-startEnc >= encMM(CALCDISTANCE_SHORTCUT)) {
                 // f_printf(&fil_Plot, "%d,%d,%d,%d,%d,%d\n",time,(int32_t)(x*10000),(int32_t)(y*10000),(int32_t)(xm*10000),(int32_t)(ym*10000),(int32_t)(degzm*10000));
                 shortCutxycie[indexSC].x = xm;
                 shortCutxycie[indexSC].y = ym;
                 startEnc = distance;    // 距離計測開始位置を更新
                 indexSC++;
             }
+
             i++;
+            beforeTime = time;
         }
 
         // ショートカット座標からyaw軸角度を計算
@@ -459,10 +463,10 @@ int16_t calcXYcies(int logNumber) {
 // 引数         encpulse:エンコーダパルス angVelo:角速度[deg/s]
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void calcXYcie(float encpulse, float angVelo) {
+void calcXYcie(float encpulse, float angVelo, float dt) {
     static float velocity, degzR;
 
-    xydegz = xydegz + (angVelo * DELTATIME);    // 角度
+    xydegz = xydegz + (angVelo * dt);           // 角度
     degzR = xydegz * (M_PI/180.0F);             // [rad]に変換
     velocity = encpulse/PALSE_MILLIMETER;       // 速度
 

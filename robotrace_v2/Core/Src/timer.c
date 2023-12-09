@@ -83,12 +83,12 @@ void Interrupt1ms(void) {
             // ショートカット走行の目標値インデックスを更新
             if (optimalTrace == BOOST_SHORTCUT && DistanceOptimal > 0) {
                 // distLen = (float)encCurrentN * PALSE_MILLIMETER * 0.005; // 現在速度から5ms後の移動距離を計算
-                optimalIndex = (int32_t)( encTotalOptimal / PALSE_MILLIMETER ) / CALCDISTANCE; // 50mmごとにショートカット配列を作っているので移動距離[mm]を50mmで割った商がインデクス
+                optimalIndex = (int32_t)( encTotalOptimal / PALSE_MILLIMETER ) / CALCDISTANCE_SHORTCUT; // 50mmごとにショートカット配列を作っているので移動距離[mm]を50mmで割った商がインデクス
                 if(optimalIndex+1 <= numPPADarry) {
                     optimalIndex++;
                 }
                 // xy座標計算
-                // calcXYcie(encCurrentN,BMI088val.gyro.z);
+                calcXYcie(encCurrentN,BMI088val.gyro.z, DEFF_TIME);
 
                 setShortCutTarget(); // 目標値更新
             }
@@ -122,7 +122,7 @@ void Interrupt1ms(void) {
     }
         
     if(patternTrace >= 12 && patternTrace < 100) {
-        if( encLog >= encMM(CALCDISTANCE) ) {
+        if( encLog >= encMM(CALCDISTANCE_SHORTCUT) ) {
             // CALCDISTANCEごとにログを保存
             writeLogBufferPrint(); // バッファにログを保存
             courseMarkerLog = 0;

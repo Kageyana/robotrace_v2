@@ -9,9 +9,11 @@
 //====================================//
 // シンボル定義
 //====================================//
-#define ANALYSISBUFFSIZE    512
-#define DELTATIME           0.01F   // ログ保存周期[s]
-#define CALCDISTANCE        10      // 距離解析ステップ[mm]
+#define OPT_BUFF_SIZE           700
+#define OPT_SHORT_BUFF_SIZE     2000
+#define DELTATIME               0.01F   // ログ保存周期[s]
+#define CALCDISTANCE            50      // 距離解析ステップ[mm]
+#define CALCDISTANCE_SHORTCUT   10      // 距離解析ステップ(ショートカット走行)[mm]
 #define MACHINEACCELE       3.4F    // 加速度[m/s^2]
 #define MACHINEDECREACE     3.4F    // 減速度[m/s^2]
 #define BOOST_MARKER        1       // マーカー基準2次走行
@@ -36,7 +38,6 @@ typedef struct {
     float x;
     float y;
     float w;
-    float dist;
 } Courseplot;
 //====================================//
 // グローバル変数の宣言
@@ -54,10 +55,10 @@ extern int32_t  encTotalOptimal;
 extern int32_t  encPID;
 
 // 解析関係
-extern AnalysisData PPAD[ANALYSISBUFFSIZE];
-extern EventPos     markerPos[ANALYSISBUFFSIZE];
+extern AnalysisData PPAD[OPT_BUFF_SIZE];
+extern EventPos     markerPos[OPT_BUFF_SIZE];
 extern Courseplot   xycie;
-extern Courseplot   shortCutxycie[ANALYSISBUFFSIZE];
+extern Courseplot   shortCutxycie[OPT_SHORT_BUFF_SIZE];
 //====================================//
 // プロトタイプ宣言
 //====================================//
@@ -69,7 +70,7 @@ float		asignVelocity(float ROC);
 int			cmpfloat(const void * n1, const void * n2);
 int16_t		readLogTest(int logNumber);
 int16_t		calcXYcies(int logNumber);
-void		calcXYcie(float encpulse, float angVelo);
+void		calcXYcie(float encpulse, float angVelo, float dt);
 void        clearXYcie(void);
 void        setShortCutTarget(void);
 

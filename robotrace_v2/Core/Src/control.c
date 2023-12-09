@@ -19,7 +19,7 @@ uint16_t 	analogVal1[NUM_SENSORS];		// ADC結果格納配列
 uint16_t 	analogVal2[3];		// ADC結果格納配列
 
 // 速度パラメータ関連
-speedParam targetParam = {	
+speedParam tgtParam = {	
 	PARAM_STRAIGHT, 
 	PARAM_CURVE,
 	PARAM_STOP,
@@ -194,8 +194,6 @@ void loopSystem (void) {
 				encRightMarker = encMM(600);
 				veloCtrl.Int = 0.0;
 				yawRateCtrl.Int = 0.0;
-				yawCtrl.Int = 0.0;
-				distCtrl.Int = 0.0;
 
 				patternTrace = 11;
 			}
@@ -203,7 +201,7 @@ void loopSystem (void) {
 
 		case 11:
 			// スタートマーカー通過までの走行
-			setTargetSpeed(targetParam.straight); // 目標速度
+			setTargetSpeed(tgtParam.straight); // 目標速度
 			// ライントレース
 			motorPwmOutSynth( lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 
@@ -219,6 +217,8 @@ void loopSystem (void) {
 				BMI088val.angle.x = 0.0F;
 				BMI088val.angle.y = 0.0F;
 				BMI088val.angle.z = 0.0F;
+				yawCtrl.Int = 0.0;
+				distCtrl.Int = 0.0;
 
 				clearXYcie();	// 座標計算変数初期化
 
@@ -233,9 +233,9 @@ void loopSystem (void) {
 			if (optimalTrace == 0){
 				// 探索走行のとき
 				if (modeCurve == 0) {
-					setTargetSpeed(targetParam.straight);
+					setTargetSpeed(tgtParam.straight);
 				} else {
-					setTargetSpeed(targetParam.curve);
+					setTargetSpeed(tgtParam.curve);
 				}
 				// ライントレース
 				motorPwmOutSynth( lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
@@ -256,7 +256,7 @@ void loopSystem (void) {
 						}
 					}
 				} else if (DistanceOptimal == 0) {
-					boostSpeed = targetParam.straight;
+					boostSpeed = tgtParam.straight;
 				}
 				// 目標速度に設定
 				setTargetSpeed(boostSpeed);
@@ -271,7 +271,7 @@ void loopSystem (void) {
 					optimalIndex = 1;
 					setShortCutTarget();
 				}
-				boostSpeed = 0.8;
+				boostSpeed = 0.3;
 				// 目標速度に設定
 				setTargetSpeed(boostSpeed);
 				// ライントレース
@@ -300,7 +300,7 @@ void loopSystem (void) {
 			if (enc1 >= encMM(500)) {
 				setTargetSpeed(0);
 			} else {
-				setTargetSpeed(targetParam.stop);
+				setTargetSpeed(tgtParam.stop);
 			}
 			motorPwmOutSynth( lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 			

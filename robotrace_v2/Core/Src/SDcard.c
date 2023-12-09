@@ -230,11 +230,14 @@ void writeLogBufferPrint(void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void writeLogPrint(void) {
-	uint32_t i,length = 0;
+	uint32_t 	i,length = 0, beforeTime=0;
+	float 		dt;
 
 	clearXYcie();
 	for(i = 0;i<logValIndex;i++) {
-		calcXYcie(logVal[i].speed,logVal[i].zg);
+		dt = (float)(logVal[i].time - beforeTime) / 1000;
+		calcXYcie(logVal[i].speed,logVal[i].zg, dt);
+
 		f_printf(&fil_W, formatLog
 			,logVal[i].time
 			,logVal[i].marker
@@ -247,6 +250,8 @@ void writeLogPrint(void) {
 			,(int32_t)(xycie.x*10000)
 			,(int32_t)(xycie.y*10000)
 		);
+
+		beforeTime = logVal[i].time;
 	}
 }
 /////////////////////////////////////////////////////////////////////

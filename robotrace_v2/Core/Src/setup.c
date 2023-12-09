@@ -182,75 +182,75 @@ void setup( void )
 			switch( patternParameter1 ) {
 				case 1:
 					// 通常走行速度
-					dataTuningUDF( &targetParam.straight, 0.1, 0.0, 10.0 );
+					dataTuningUDF( &tgtParam.straight, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
-					ssd1306_printf(Font_6x8,"STRAIGHT:%3gm/s", targetParam.straight);
+					ssd1306_printf(Font_6x8,"STRAIGHT:%3gm/s", tgtParam.straight);
 					break;
 				case 2:
 					// 停止速度
-					dataTuningUDF( &targetParam.curve, 0.1, 0.0, 10.0 );
+					dataTuningUDF( &tgtParam.curve, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
-					ssd1306_printf(Font_6x8,"CURVE:%3gm/s", targetParam.curve);
+					ssd1306_printf(Font_6x8,"CURVE:%3gm/s", tgtParam.curve);
 					break;
 				case 3:
 					// 停止速度
-					dataTuningUDF( &targetParam.stop, 0.1, 0.0, 10.0 );
+					dataTuningUDF( &tgtParam.stop, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
-					ssd1306_printf(Font_6x8,"STOP:%3gm/s", targetParam.stop);
+					ssd1306_printf(Font_6x8,"STOP:%3gm/s", tgtParam.stop);
 					break;
 				case 4:
 					// 2次走行_直線
-					dataTuningUDF( &targetParam.boostStraight, 0.1, 0.0, 10.0 );
+					dataTuningUDF( &tgtParam.bstStraight, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
-					ssd1306_printf(Font_6x8,"BST STRT:%3gm/s", targetParam.boostStraight);
+					ssd1306_printf(Font_6x8,"BST STRT:%3gm/s", tgtParam.bstStraight);
 					break;
 				case 5:
 					// 2次走行_R1500
-					dataTuningUDF( &targetParam.boost1500, 0.1, 0.0, 10.0 );
+					dataTuningUDF( &tgtParam.bst1500, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
-					ssd1306_printf(Font_6x8,"BST 1500:%3gm/s", targetParam.boost1500);
+					ssd1306_printf(Font_6x8,"BST 1500:%3gm/s", tgtParam.bst1500);
 					break;
 				case 6:
 					// 2次走行_R800
-					dataTuningUDF( &targetParam.boost800, 0.1, 0.0, 10.0 );
+					dataTuningUDF( &tgtParam.bst800, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
-					ssd1306_printf(Font_6x8,"BST 800:%3gm/s", targetParam.boost800);
+					ssd1306_printf(Font_6x8,"BST 800:%3gm/s", tgtParam.bst800);
 					break;
 				case 7:
 					// 2次走行_R1600
-					dataTuningUDF( &targetParam.boost600, 0.1, 0.0, 10.0 );
+					dataTuningUDF( &tgtParam.bst600, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
-					ssd1306_printf(Font_6x8,"BST 600:%3gm/s", targetParam.boost600);
+					ssd1306_printf(Font_6x8,"BST 600:%3gm/s", tgtParam.bst600);
 					break;
 				case 8:
 					// 2次走行_R400
-					dataTuningUDF( &targetParam.boost400, 0.1, 0.0, 10.0 );
+					dataTuningUDF( &tgtParam.bst400, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
-					ssd1306_printf(Font_6x8,"BST 400:%3gm/s", targetParam.boost400);
+					ssd1306_printf(Font_6x8,"BST 400:%3gm/s", tgtParam.bst400);
 					break;
 				case 9:
 					// 2次走行_R200
-					dataTuningUDF( &targetParam.boost200, 0.1, 0.0, 10.0 );
+					dataTuningUDF( &tgtParam.bst200, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
-					ssd1306_printf(Font_6x8,"BST 200:%3gm/s", targetParam.boost200);
+					ssd1306_printf(Font_6x8,"BST 200:%3gm/s", tgtParam.bst200);
 					break;
 				case 10:
 					// 2次走行_R100
-					dataTuningUDF( &targetParam.boost100, 0.1, 0.0, 10.0 );
+					dataTuningUDF( &tgtParam.bst100, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
-					ssd1306_printf(Font_6x8,"BST 100:%3gm/s", targetParam.boost100);
+					ssd1306_printf(Font_6x8,"BST 100:%3gm/s", tgtParam.bst100);
 					break;
 				case 11:
 					// 2次走行_加速度
-					dataTuningUDF( &targetParam.acceleF, 0.1, 0.0, 10.0 );
+					dataTuningUDF( &tgtParam.acceleF, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
-					ssd1306_printf(Font_6x8,"BST accelF:%3gm/ss", targetParam.acceleF);
+					ssd1306_printf(Font_6x8,"BST accelF:%3gm/ss", tgtParam.acceleF);
 					break;
 				case 12:
 					// 2次走行_減速度
-					dataTuningUDF( &targetParam.acceleD, 0.1, 0.0, 10.0 );
+					dataTuningUDF( &tgtParam.acceleD, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
-					ssd1306_printf(Font_6x8,"BST acceleD:%3gm/ss", targetParam.acceleD);
+					ssd1306_printf(Font_6x8,"BST acceleD:%3gm/ss", tgtParam.acceleD);
 					break;
 			}
 			break;

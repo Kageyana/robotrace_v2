@@ -25,7 +25,7 @@
 #define PARAM_BOOST_100             1.4F
 
 // ゴール
-#define COUNT_GOAL              6       // ゴールマーカーを読む回数
+#define COUNT_GOAL              2       // ゴールマーカーを読む回数
 
 // スタートモード
 #define START_SERACH            3
@@ -35,16 +35,16 @@ typedef struct {
     float straight;
     float curve;
     float stop;
-    float boostStraight;
-    float boost1500;
-    float boost800;
-    float boost700;
-    float boost600;
-    float boost500;
-    float boost400;
-    float boost300;
-    float boost200;
-    float boost100;
+    float bstStraight;
+    float bst1500;
+    float bst800;
+    float bst700;
+    float bst600;
+    float bst500;
+    float bst400;
+    float bst300;
+    float bst200;
+    float bst100;
     float acceleF;
     float acceleD;
 } speedParam;
@@ -65,7 +65,7 @@ extern uint16_t analogVal1[10];         // ADC結果格納配列
 extern uint16_t analogVal2[3];         // ADC結果格納配列
 
 // パラメータ関連
-extern speedParam targetParam;
+extern speedParam tgtParam;
 
 // マーカー関連
 extern uint8_t  courseMarker;
