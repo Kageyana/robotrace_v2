@@ -70,8 +70,8 @@ void setup( void )
 			if(encClick > 400) patternDisplay++;
 			else if(encClick < -400) patternDisplay--;
 
-			if(patternDisplay > 0xf) patternDisplay = 0;
-			else if(patternDisplay < 0) patternDisplay = 0xf;
+			if(patternDisplay > 0x9) patternDisplay = 0;
+			else if(patternDisplay < 0) patternDisplay = 0x9;
 
 			clickStart = 1;
 			encClick = 0;
@@ -193,9 +193,8 @@ void setup( void )
 				ssd1306_printf(Font_6x8,"Parameter");
 			}
 
-			dataTuningLR( &patternParameter1, 1, 1, 12);
+			dataTuningLR( &patternParameter1, 1, 1, 13);
 
-			beforePparam = patternParameter1;
 			if (beforePparam != patternParameter1) {
 				ssd1306_FillRectangle(0,16,127,63, Black);
 			}
@@ -265,7 +264,7 @@ void setup( void )
 					// 2次走行_加速度
 					dataTuningUDF( &tgtParam.acceleF, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
-					ssd1306_printf(Font_6x8,"BST accelF:%3gm/ss", tgtParam.acceleF);
+					ssd1306_printf(Font_6x8,"BST acceleF:%3gm/ss", tgtParam.acceleF);
 					break;
 				case 12:
 					// 2次走行_減速度
@@ -273,7 +272,14 @@ void setup( void )
 					ssd1306_SetCursor(0,24);
 					ssd1306_printf(Font_6x8,"BST acceleD:%3gm/ss", tgtParam.acceleD);
 					break;
+				case 13:
+					// 2次走行_減速度
+					dataTuningUDF( &tgtParam.shortCut, 0.1, 0.0, 10.0 );
+					ssd1306_SetCursor(0,24);
+					ssd1306_printf(Font_6x8,"BST shortCut:%3gm/s", tgtParam.shortCut);
+					break;
 			}
+			beforePparam = patternParameter1;
 			break;
 		//------------------------------------------------------------------
 		// Sensors test
@@ -939,36 +945,7 @@ void setup( void )
 			}
 			break;
 
-		//------------------------------------------------------------------
-		// モータクリックテスト
-		//------------------------------------------------------------------
-		case HEX_TEST:
-			if (patternDisplay != beforeHEX) 	{
-				// 切替時に実行
-				ssd1306_printf(Font_6x8,"test");
-				ssd1306_SetCursor(47,16);
-				ssd1306_printf(Font_6x8,"Motor");
-				encClick = 0;
-			}
-			// Left
-			ssd1306_SetCursor(0,42);
-			ssd1306_printf(Font_6x8,"enc:%6d",encTotalL);	// Encoder
 
-			// // Right
-			ssd1306_SetCursor(64,42);
-			ssd1306_printf(Font_6x8,"enc:%6d",encTotalR); 	// Encoder
-
-			// if ( swValTact == SW_PUSH ) {
-			// 	encTotalL = 0;
-			// 	encTotalR = 0;
-			// }
-
-			// if(abs(encClick) > 400) {
-			// 	clickStart = 1;
-			// 	encClick = 0;
-			// }
-
-			break;
 	default:
 		ssd1306_SetCursor(30,5);
 		ssd1306_printf(Font_6x8,"None      ");

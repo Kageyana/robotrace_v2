@@ -136,7 +136,7 @@ void writeLinesenval(void) {
     int16_t     i, ret=0;
 
 	// ファイル読み込み
-	strcat(fileName,LS_VAL_FILENAME); // ファイル名追加
+	strcat(fileName,FILENAME_LS_VAL); // ファイル名追加
 	strcat(fileName,".txt");   // 拡張子追加
     fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_WRITE);  	// ファイルを開く
 	
@@ -163,7 +163,7 @@ void readLinesenval(void)  {
     int16_t     i, ret=0;
 
 	// ファイル読み込み
-	strcat(fileName,LS_VAL_FILENAME); // ファイル名追加
+	strcat(fileName,FILENAME_LS_VAL); // ファイル名追加
 	strcat(fileName,".txt");   // 拡張子追加
     fresult = f_open(&fil, fileName, FA_OPEN_EXISTING | FA_READ);  // ファイルを開く
 

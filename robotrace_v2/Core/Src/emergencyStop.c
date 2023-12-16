@@ -71,3 +71,19 @@ bool cntEmcStopLineSensor(void) {
     if (cntLineSensor > STOP_COUNT_LINESENSOR) return true;
     else return false;
 }
+/////////////////////////////////////////////////////////////////////
+// モジュール名 judgeOverSpeed
+// 処理概要     緊急停止要因のカウント ラインセンサ飽和
+// 引数         なし
+// 戻り値       true:緊急停止 false:異常なし
+/////////////////////////////////////////////////////////////////////
+bool judgeOverSpeed(void) {
+    static uint16_t cntOverSpeed = 0;
+
+    // 緊急停止条件
+    if (encCurrentN > (uint32_t)(targetSpeed * 2)) cntOverSpeed++;
+    else    cntOverSpeed = 0;
+
+    if (cntOverSpeed > STOP_COUNT_OVERSPEED) return true;
+    else return false;
+}

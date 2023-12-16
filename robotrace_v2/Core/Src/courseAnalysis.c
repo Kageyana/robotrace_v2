@@ -52,7 +52,7 @@ void saveLogNumber(int16_t fileNumber) {
     FIL         fil;
     uint8_t     fileName[20] = PATH_SETTING;
 
-    strcat(fileName,"analize"); // ファイル名追加
+    strcat(fileName,FILENAME_ANALIZENUMBER); // ファイル名追加
 	strcat(fileName,".txt");   // 拡張子追加
     fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_WRITE);  // create file
     if(fresult == FR_OK) {
@@ -72,7 +72,7 @@ void getLogNumber(void) {
     TCHAR       log[20];
     uint8_t     fileName[20] = PATH_SETTING;
 
-    strcat(fileName,"analize"); // ファイル名追加
+    strcat(fileName,FILENAME_ANALIZENUMBER); // ファイル名追加
 	strcat(fileName,".txt");   // 拡張子追加
     fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_READ);  // csvファイルを開く
     if (fresult == FR_OK) {
@@ -397,7 +397,6 @@ int16_t calcXYcies(int logNumber) {
             degzm /= SHORTCUTWINDOW;
 
             if ( distance-startEnc >= encMM(CALCDISTANCE_SHORTCUT)) {
-                // f_printf(&fil_Plot, "%d,%d,%d,%d,%d,%d\n",time,(int32_t)(x*10000),(int32_t)(y*10000),(int32_t)(xm*10000),(int32_t)(ym*10000),(int32_t)(degzm*10000));
                 shortCutxycie[indexSC].x = xm;
                 shortCutxycie[indexSC].y = ym;
                 startEnc = distance;    // 距離計測開始位置を更新
@@ -413,7 +412,7 @@ int16_t calcXYcies(int logNumber) {
         float   theta=0, thetaBefore=90, thetae, tanc;
 
         degz = 0;
-
+        // 初期値記録
         f_printf(&fil_Plot, "%d,%d,%d\n",(int32_t)(shortCutxycie[0].x*10000),(int32_t)(shortCutxycie[0].y*10000),(int32_t)(shortCutxycie[0].w*10000));
 
         for(i=1;i<=indexSC;i++) {

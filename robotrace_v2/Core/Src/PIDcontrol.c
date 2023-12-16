@@ -15,7 +15,7 @@ pidParam 	distCtrl = { "dist", KP5, KI5, KD5, 0, 0};
 uint8_t		targetSpeed;			// 目標速度
 float 		targetAngle;			// 目標角速度
 float   	targetAngularVelocity;	// 目標角度
-uint16_t	targetDist;				// 目標X座標
+int16_t		targetDist;				// 目標X座標
 
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 setTargetSpeed

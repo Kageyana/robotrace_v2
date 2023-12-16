@@ -24,7 +24,6 @@
 #define HEX_PID_ANGULAR 0x7
 #define HEX_PID_ANGLE   0x8
 #define HEX_PID_DIST    0x9
-#define HEX_TEST        0xa
 
 //======================================//
 // グローバル変数の宣言

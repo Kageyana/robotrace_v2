@@ -13,6 +13,7 @@
 #define PARAM_STRAIGHT              1.5F
 #define PARAM_CURVE                 1.3F
 #define PARAM_STOP                  0.8F
+#define PARAM_SHORTCUT              0.5F
 #define PARAM_BOOST_STRAIGHT        2.8F
 #define PARAM_BOOST_1500            2.6F
 #define PARAM_BOOST_800             2.5F
@@ -31,6 +32,9 @@
 #define START_SERACH            3
 #define START_OPTIMAL           4
 
+// ファイル名
+#define FILENAME_TARGET_SPEED "targetSpeeds"
+
 typedef struct {
     float straight;
     float curve;
@@ -47,6 +51,7 @@ typedef struct {
     float bst100;
     float acceleF;
     float acceleD;
+    float shortCut;
 } speedParam;
 //====================================//
 // グローバル変数の宣言
@@ -85,5 +90,7 @@ void emargencyStop (void);
 void countDown (void);
 void checkCurve(void);
 void getADC2(void);
+void writeTgtspeeds(void);
+void readTgtspeeds(void);
 
 #endif // CONTROL_H_

@@ -14,7 +14,8 @@
 #define LS_COUNTERPERIOD htim13.Init.Period
 #define LS_TIMER         htim13
 
-#define LS_VAL_FILENAME "lsval"
+// ファイル名
+#define FILENAME_LS_VAL "lsval"
 //====================================//
 // グローバル変数の宣言
 //====================================//

@@ -20,7 +20,7 @@ typedef struct {
     uint8_t 	marker;
     uint8_t 	speed;
     float 		zg;
-    uint32_t 	distance;
+    int32_t 	distance;
     uint8_t 	target;
     uint16_t 	optimalIndex;
 } logData;
@@ -218,8 +218,10 @@ void writeLogBufferPrint(void) {
     logVal[logValIndex].speed = encCurrentN;
     logVal[logValIndex].zg = BMI088val.gyro.z;
     logVal[logValIndex].distance = encTotalOptimal;
+	// logVal[logValIndex].distance = distCtrl.pwm;
     logVal[logValIndex].target = targetSpeed;
     logVal[logValIndex].optimalIndex = optimalIndex;
+	// logVal[logValIndex].optimalIndex = targetDist;
     logValIndex++;
   }
 }

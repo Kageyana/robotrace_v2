@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "control.h"
+#include "fatfs.h"
 //====================================//
 // グローバル変数の宣言
 //====================================//
@@ -35,6 +36,7 @@ speedParam tgtParam = {
 	PARAM_BOOST_100,
 	MACHINEACCELE,
 	MACHINEDECREACE,
+	PARAM_SHORTCUT
 	};
 
 // タイマ関連
@@ -90,8 +92,8 @@ void initSystem (void) {
 		readPIDparameters(&distCtrl);
 
 		readLinesenval();	// ラインセンサオフセット値を取得
+		readTgtspeeds();	// 目標速度を取得
 	}
-	
 	// IMU
 	initIMU = initBMI088();
 	
@@ -181,13 +183,17 @@ void loopSystem (void) {
 			if ( !calibratIMU ) {
 				powerLinesensors(1);	// ラインセンサ点灯
 
-				// PIDゲインを記録
+				// SDカードに変数保存
 				initIMU = false;
+
+				// PIDゲインを記録
 				writePIDparameters(&lineTraceCtrl);
 				writePIDparameters(&veloCtrl);
 				writePIDparameters(&yawRateCtrl);
 				writePIDparameters(&yawCtrl);
 				writePIDparameters(&distCtrl);
+
+				writeTgtspeeds();	// 目標速度を記録
 				initIMU = true;
 
 				// 変数初期化
@@ -271,7 +277,7 @@ void loopSystem (void) {
 					optimalIndex = 1;
 					setShortCutTarget();
 				}
-				boostSpeed = 0.3;
+				boostSpeed = tgtParam.shortCut;
 				// 目標速度に設定
 				setTargetSpeed(boostSpeed);
 				// ライントレース
@@ -371,6 +377,9 @@ void emargencyStop (void) {
 			case STOP_LINESENSOR:
 				ssd1306_printf(Font_7x10,"LINESENSOR");
 				break;
+			case STOP_OVERSPEED:
+				ssd1306_printf(Font_7x10,"OVERSPEED");
+				break;
 		}
 		
 		ssd1306_UpdateScreen();  // グラフィック液晶更新
@@ -444,4 +453,93 @@ void getADC2(void) {
 	motorCurrentValL = analogVal2[0];
 	motorCurrentValR = analogVal2[1];
 	batteryVal = analogVal2[2];
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 writePIDparameters
+// 処理概要     PIDゲインをSDカードに記録する
+// 引数         pid:pidParam型の変数
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void writeTgtspeeds(void) {
+	FIL         fil;
+    FRESULT     fresult;
+	uint8_t     format[100]="", fileName[30] = PATH_SETTING;
+    int16_t     i, ret=0;
+
+	// ファイル読み込み
+	strcat(fileName,FILENAME_TARGET_SPEED); // ファイル名追加
+	strcat(fileName,".txt");   // 拡張子追加
+    fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_WRITE);  	// ファイルを開く
+	
+	if(fresult == FR_OK) {
+		for(i=0;i<sizeof(speedParam)/sizeof(float);i++) {
+			strcat(format,"%03d,");
+		}
+
+		f_printf(&fil, format
+			,(int32_t)(round(tgtParam.straight*100))
+			,(int32_t)(round(tgtParam.curve*100))
+			,(int32_t)(round(tgtParam.stop*100))
+			,(int32_t)(round(tgtParam.bstStraight*100))
+			,(int32_t)(round(tgtParam.bst1500*100))
+			,(int32_t)(round(tgtParam.bst800*100))
+			,(int32_t)(round(tgtParam.bst700*100))
+			,(int32_t)(round(tgtParam.bst600*100))
+			,(int32_t)(round(tgtParam.bst500*100))
+			,(int32_t)(round(tgtParam.bst400*100))
+			,(int32_t)(round(tgtParam.bst300*100))
+			,(int32_t)(round(tgtParam.bst200*100))
+			,(int32_t)(round(tgtParam.bst100*100))
+			,(int32_t)(round(tgtParam.acceleF*100))
+			,(int32_t)(round(tgtParam.acceleD*100))
+			,(int32_t)(round(tgtParam.shortCut*100))
+		);
+	}
+
+	f_close(&fil);
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 readPIDparameters
+// 処理概要     PIDゲインをSDカードから読み取る
+// 引数         pid:pidParam型の変数
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void readTgtspeeds(void) {
+	FIL         fil;
+    FRESULT     fresult;
+	uint8_t     format[100]="", fileName[30] = PATH_SETTING;
+	int16_t 	param[20];
+	TCHAR     	paramStr[100];
+    int16_t     i, ret=0;
+
+	// ファイル読み込み
+	strcat(fileName,FILENAME_TARGET_SPEED); // ファイル名追加
+	strcat(fileName,".txt");   // 拡張子追加
+    fresult = f_open(&fil, fileName, FA_OPEN_EXISTING | FA_READ);  // ファイルを開く
+
+	if(fresult == FR_OK) {
+		for(i=0;i<sizeof(speedParam)/sizeof(float);i++) {
+			f_gets(paramStr,5,&fil);				// 文字列取得 カンマ含む
+			sscanf(paramStr,"%d,",&param[i]);		// 文字列→数値
+		}
+
+		tgtParam.straight		= (float)param[0]/100;
+		tgtParam.curve			= (float)param[1]/100;
+		tgtParam.stop			= (float)param[2]/100;
+		tgtParam.bstStraight	= (float)param[3]/100;
+		tgtParam.bst1500		= (float)param[4]/100;
+		tgtParam.bst800			= (float)param[5]/100;
+		tgtParam.bst700			= (float)param[6]/100;
+		tgtParam.bst600			= (float)param[7]/100;
+		tgtParam.bst500			= (float)param[8]/100;
+		tgtParam.bst400			= (float)param[9]/100;
+		tgtParam.bst300			= (float)param[10]/100;
+		tgtParam.bst200			= (float)param[11]/100;
+		tgtParam.bst100			= (float)param[12]/100;
+		tgtParam.acceleF		= (float)param[13]/100;
+		tgtParam.acceleD		= (float)param[14]/100;
+		tgtParam.shortCut		= (float)param[15]/100;
+	}
+
+	f_close(&fil);
 }

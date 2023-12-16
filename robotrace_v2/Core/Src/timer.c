@@ -35,6 +35,7 @@ void Interrupt1ms(void) {
         // if (cntEmcStopAngleY()) emcStop = STOP_ANGLE_Y;
         if (cntEmcStopEncStop()) emcStop = STOP_ENCODER_STOP;
         // if (cntEmcStopLineSensor()) emcStop = STOP_LINESENSOR;
+        if (judgeOverSpeed()) emcStop = STOP_OVERSPEED;
         
         courseMarker = checkMarker();   // マーカー検知
         checkGoalMarker();              // ゴールマーカー処理
@@ -82,16 +83,22 @@ void Interrupt1ms(void) {
     
     switch(cnt5) {
         case 1:
+            // xy座標計算
+            calcXYcie(encCurrentN,BMI088val.gyro.z, DEFF_TIME);
             // ショートカット走行の目標値インデックスを更新
             if (optimalTrace == BOOST_SHORTCUT && DistanceOptimal > 0) {
                 // distLen = (float)encCurrentN * PALSE_MILLIMETER * 0.005; // 現在速度から5ms後の移動距離を計算
-                optimalIndex = (int32_t)( encTotalOptimal / PALSE_MILLIMETER ) / CALCDISTANCE_SHORTCUT; // 50mmごとにショートカット配列を作っているので移動距離[mm]を50mmで割った商がインデクス
-                if(optimalIndex+1 <= numPPADarry) {
-                    optimalIndex++;
-                }
-                // xy座標計算
-                calcXYcie(encCurrentN,BMI088val.gyro.z, DEFF_TIME);
+                // optimalIndex = (int32_t)( encTotalOptimal / PALSE_MILLIMETER ) / CALCDISTANCE_SHORTCUT; // 50mmごとにショートカット配列を作っているので移動距離[mm]を50mmで割った商がインデクス
+                // if(optimalIndex+1 <= numPPADarry) {
+                //     optimalIndex++;
+                // }
 
+                if(targetDist - encPID < 200) {
+                    if(optimalIndex+1 <= numPPADarry) {
+                        optimalIndex++;
+                    } 
+                }
+                
                 setShortCutTarget(); // 目標値更新
             }
             break;

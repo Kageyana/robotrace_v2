@@ -24,6 +24,9 @@
 #define RAD2DEG             180.0F/M_PI  // rad→deg
 #define SHORTCUTWINDOW      32      // ショートカットコース生成時の移動平均サンプル数
 
+// ファイル名
+#define FILENAME_ANALIZENUMBER "analize"
+
 typedef struct {
     float   ROC;
     float   boostSpeed;
