@@ -115,7 +115,7 @@ void initSystem (void) {
 
 	// Timer interrupt
 	HAL_TIM_Base_Start_IT(&htim6);
-	// HAL_TIM_Base_Start_IT(&htim7);
+	HAL_TIM_Base_Start_IT(&htim7);
 
 	// ledset(100,0,0);
 
@@ -180,7 +180,7 @@ void loopSystem (void) {
 			}
 
 			// IMUのキャリブレーションが終了したら走行開始
-			if ( !calibratIMU ) {
+			// if ( !calibratIMU ) {
 				powerLinesensors(1);	// ラインセンサ点灯
 
 				// SDカードに変数保存
@@ -194,6 +194,10 @@ void loopSystem (void) {
 				writePIDparameters(&distCtrl);
 
 				writeTgtspeeds();	// 目標速度を記録
+
+#ifdef LOG_RUNNING_WRITE
+				if(initMSD) createLog();    // ログファイル作成
+#endif
 				initIMU = true;
 
 				// 変数初期化
@@ -201,8 +205,10 @@ void loopSystem (void) {
 				veloCtrl.Int = 0.0;
 				yawRateCtrl.Int = 0.0;
 
+
+
 				patternTrace = 11;
-			}
+			// }
 			break;
 
 		case 11:

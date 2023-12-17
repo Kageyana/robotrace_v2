@@ -110,7 +110,7 @@ void setup( void )
 				ssd1306_printf(Font_11x18,"Ready?");
 				patternCalibration = 1;
 			}
-			
+		
 			switch (patternCalibration) {
 				case 1:
 					setTargetSpeed(0);

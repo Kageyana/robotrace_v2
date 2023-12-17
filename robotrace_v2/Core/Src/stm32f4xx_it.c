@@ -96,10 +96,11 @@ void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
   motorPwmOut(0,0);
+  if (modeLOG) endLog();
   ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
   ssd1306_SetCursor(34,28);
   ssd1306_printf(Font_16x26,"Fault");
-  ssd1306_UpdateScreen();  // グラフィ�?ク液晶更新
+  ssd1306_UpdateScreen();  // グラフィ?��?ク液晶更新
   /* USER CODE END HardFault_IRQn 0 */
   while (1)
   {

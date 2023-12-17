@@ -14,6 +14,7 @@ int32_t cnt10 = 0;
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void Interrupt1ms(void) {
+
     // Interrupt 1ms
     cntRun++;
     cnt5++;
@@ -84,23 +85,23 @@ void Interrupt1ms(void) {
     switch(cnt5) {
         case 1:
             // xy座標計算
-            calcXYcie(encCurrentN,BMI088val.gyro.z, DEFF_TIME);
-            // ショートカット走行の目標値インデックスを更新
-            if (optimalTrace == BOOST_SHORTCUT && DistanceOptimal > 0) {
-                // distLen = (float)encCurrentN * PALSE_MILLIMETER * 0.005; // 現在速度から5ms後の移動距離を計算
-                // optimalIndex = (int32_t)( encTotalOptimal / PALSE_MILLIMETER ) / CALCDISTANCE_SHORTCUT; // 50mmごとにショートカット配列を作っているので移動距離[mm]を50mmで割った商がインデクス
-                // if(optimalIndex+1 <= numPPADarry) {
-                //     optimalIndex++;
-                // }
+            // calcXYcie(encCurrentN,BMI088val.gyro.z, DEFF_TIME);
+            // // ショートカット走行の目標値インデックスを更新
+            // if (optimalTrace == BOOST_SHORTCUT && DistanceOptimal > 0) {
+            //     // distLen = (float)encCurrentN * PALSE_MILLIMETER * 0.005; // 現在速度から5ms後の移動距離を計算
+            //     // optimalIndex = (int32_t)( encTotalOptimal / PALSE_MILLIMETER ) / CALCDISTANCE_SHORTCUT; // 50mmごとにショートカット配列を作っているので移動距離[mm]を50mmで割った商がインデクス
+            //     // if(optimalIndex+1 <= numPPADarry) {
+            //     //     optimalIndex++;
+            //     // }
 
-                if(targetDist - encPID < 200) {
-                    if(optimalIndex+1 <= numPPADarry) {
-                        optimalIndex++;
-                    } 
-                }
+            //     if(targetDist - encPID < 200) {
+            //         if(optimalIndex+1 <= numPPADarry) {
+            //             optimalIndex++;
+            //         } 
+            //     }
                 
-                setShortCutTarget(); // 目標値更新
-            }
+            //     setShortCutTarget(); // 目標値更新
+            // }
             break;
         case 2:
             if(initIMU) {
@@ -130,10 +131,24 @@ void Interrupt1ms(void) {
             break;
     }
         
-    if(patternTrace >= 12 && patternTrace < 100) {
+    if (modeLOG) {
         if( encLog >= encMM(CALCDISTANCE_SHORTCUT) ) {
             // CALCDISTANCEごとにログを保存
-            writeLogBufferPrint(); // バッファにログを保存
+            // writeLogBufferPrint(); // バッファにログを保存
+            writeLogBufferPuts(
+                2,3,1,1
+                // 8bit
+                ,courseMarkerLog
+                ,targetSpeed
+                // 16bit
+                ,cntLog
+                ,encCurrentN
+                ,optimalIndex
+                // 32bit
+                ,encTotalOptimal
+                // float型
+                ,BMI088val.gyro.z
+            );
             courseMarkerLog = 0;
             encLog = 0;
         }
@@ -142,7 +157,7 @@ void Interrupt1ms(void) {
     switch (cnt10) {
         case 1:
             getADC2();
-            getMotorCurrent();
+            // getMotorCurrent();
             break;
         case 2:
             // if(initIMU) {
@@ -150,10 +165,6 @@ void Interrupt1ms(void) {
             // }
             break;
         case 9:
-            // if(patternTrace < 100) {
-            //     writeLogBufferPrint(); // バッファにログを保存
-            //     courseMarkerLog = 0;
-            // }
             break;
         case 10:
             cnt10 = 0;
@@ -167,9 +178,9 @@ void Interrupt1ms(void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void Interrupt100us(void) {
-    // if (IMUstate == IMU_STOP ) {
-    //     writeLogPuts();
-    // }
+    if (IMUstate == IMU_STOP ) {
+        writeLogPuts();
+    }
 }   
 /////////////////////////////////////////////////////////////////////
 // モジュール名 Interrupt300ns

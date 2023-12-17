@@ -15,6 +15,13 @@ FIL       fil_R;
 uint8_t   columnTitle[512] = "", formatLog[256] = "";
 
 // ログバッファ
+#ifdef	LOG_RUNNING_WRITE
+uint8_t		logBuffer[BUFFER_SIZE_LOG], logBufferSend[BUFFER_SIZE_LOG];
+uint8_t		*logBufferPointa;		// RAM保存バッファ用ポインタ
+int16_t		logBuffIndex=0;			// 一時記録バッファ書込アドレス
+uint32_t	logBuffSendIndex=0;
+bool		sendSD = false;
+#else
 typedef struct {
     uint16_t 	time;
     uint8_t 	marker;
@@ -26,14 +33,8 @@ typedef struct {
 } logData;
 logData logVal[BUFFER_SIZW_LOG];
 uint32_t	logValIndex=0;
-
-#ifdef	LOG_RUNNING_WRITE
-uint32_t	logBuffer[BUFFER_SIZW_LOG];
-uint8_t		logStr[BUFFER_SIZW_LOG][10]; 
-uint32_t	logBuffwrite=0, logBuffread=0;
-uint32_t	logstrwrite=0, logstrread=0;
-uint32_t	cntSend=0;
 #endif
+
 
 // ログファイルナンバー
 int16_t 	fileNumbers[1000], fileIndexLog = 0, endFileIndex = 0;
@@ -135,82 +136,77 @@ void createLog(void) {
 	setLogStr("targetSpeed",    "%d");
 
 	setLogStr("optimalIndex",  "%d");
-	setLogStr("ROC",  "%d");
-	setLogStr("x",  "%d");
-	setLogStr("y",  "%d");
+	// setLogStr("ROC",  "%d");
+	// setLogStr("x",  "%d");
+	// setLogStr("y",  "%d");
 
 	strcat(columnTitle,"\n");
 	strcat(formatLog,"\n");
-	f_printf(&fil_W, columnTitle);
+	// f_printf(&fil_W, columnTitle);
+
 }
-#ifdef	LOG_RUNNING_WRITE
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogBufferPuts
-// 処理概要     保存する変数の値をバッファに転送する
-// 引数         なし
+// 処理概要     保存する変数をバッファに転送する
+// 引数         c:8bit変数の数s:16bit変数の数i:32bit変数の数f:float変数の数
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void writeLogBufferPuts (uint8_t valNum, ...) {
+#ifdef	LOG_RUNNING_WRITE
+void writeLogBufferPuts (uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...) {
 	va_list args;
-	uint8_t count;
-	// valNum : amount of variable
+	uint8_t cnt=0;
+	static union {float f; uint32_t i;} ftoi;
 
 	if (modeLOG) {
-		va_start( args, valNum );
-		for ( count = 0; count < valNum; count++ ) {
-			// set logdata to logbuffer(ring buffer) ログデータをリングバッファに転送
-			logBuffer[logBuffwrite & (BUFFER_SIZW_LOG - 1)] = va_arg( args, int32_t );
-			logBuffwrite++;
+		// 	バッファ配列に保存
+		va_start( args, f );
+		// logBuffer[0] = va_arg( args, uint8_t* );
+		for ( cnt=0; cnt<c; cnt++ ) send8bit( va_arg( args, uint32_t ) );
+		for ( cnt=0; cnt<s; cnt++ ) send16bit( va_arg( args, uint32_t ) );
+		for ( cnt=0; cnt<i; cnt++ ) send32bit( va_arg( args, uint32_t ) );
+		for ( cnt=0; cnt<f; cnt++ ) {
+			ftoi.f = va_arg( args, double );	// 共用体を使用してfloat型のビット操作をできるようにする
+			send32bit( ftoi.i );
 		}
-		logBuffer[logBuffwrite & (BUFFER_SIZW_LOG - 1)] = "\n";
-		logBuffwrite++;
-		va_end( args );
-	}
-}
-/////////////////////////////////////////////////////////////////////
-// モジュール名 setLogstr
-// 処理概要     バッファを文字列に変換
-// 引数         なし
-// 戻り値       なし
-/////////////////////////////////////////////////////////////////////
-void setLogtostr(void) {
+		va_end(args);
 
-	if (modeLOG) {
-		if (logBuffread < logBuffwrite) {
-			if (logBuffer[logBuffread & (BUFFER_SIZW_LOG - 1)] == "\n") {
-				strcpy(logStr[logstrwrite & (BUFFER_SIZW_LOG - 1)], logBuffer[logBuffread & (BUFFER_SIZW_LOG - 1)]);
-							
-			} else {
-				sprintf(logStr[logstrwrite & (BUFFER_SIZW_LOG - 1)],"%d,",logBuffer[logBuffread & (BUFFER_SIZW_LOG - 1)]);
-				
-			}
-			logBuffread++;
-			logstrwrite++;
+		// バッファが512バイト付近まで溜まったら確認
+		if( logBuffIndex + LOG_SIZE > 32) {
+			logBuffSendIndex = logBuffIndex;		// バッファのバイト数を記録
+			memcpy(logBufferSend, logBuffer, logBuffSendIndex);		// 送信用配列にコピー
+			
+			logBuffIndex = 0;	// バイト数リセット
+			logBufferPointa = logBuffer;	// バッファ配列の先頭アドレスを設定
+			sendSD = true;		// 送信開始
 		}
 	}
 }
+#endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogPuts
 // 処理概要     バッファをSDカードに転送する
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
+#ifdef	LOG_RUNNING_WRITE
 void writeLogPuts(void) {
+	uint32_t	writtenlog = 0;
 
 	if (modeLOG) {
-		if(logstrread < logstrwrite) {
-			f_puts(logStr[logstrread & (BUFFER_SIZW_LOG - 1)], &fil_W);
-			logstrread++;
+		if (sendSD) {
+			sendSD = false;
+			f_write(&fil_W,logBufferSend,logBuffSendIndex,writtenlog);
 		}
 	}
 }
 #endif
-/////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogBufferPrint
 // 処理概要     保存する変数の値をバッファに転送する
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
+#ifndef	LOG_RUNNING_WRITE
 void writeLogBufferPrint(void) {
   if (modeLOG) {
     logVal[logValIndex].time = cntLog;
@@ -225,12 +221,14 @@ void writeLogBufferPrint(void) {
     logValIndex++;
   }
 }
+#endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogPrint
 // 処理概要     バッファをSDカードに転送する
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
+#ifndef	LOG_RUNNING_WRITE
 void writeLogPrint(void) {
 	uint32_t 	i,length = 0, beforeTime=0;
 	float 		dt;
@@ -256,6 +254,7 @@ void writeLogPrint(void) {
 		beforeTime = logVal[i].time;
 	}
 }
+#endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 endLog
 // 処理概要     ロギング終了処理
@@ -265,11 +264,15 @@ void writeLogPrint(void) {
 void endLog(void) {
 	initIMU = false;  // IMUの使用を停止(SPIが競合するため)
 	modeLOG = false;  // ログ取得停止
+
+#ifdef LOG_RUNNING_WRITE
+
+#else
 	// SPIバスが空くまで待つ
 	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );
-
 	createLog();    // ログファイル作成
 	writeLogPrint();  // ログ書き込み
+#endif
 
 	f_close(&fil_W);
 	initIMU = true;
@@ -364,3 +367,70 @@ void createDir(uint8_t *dirName) {
 		}
 	}
 }
+/////////////////////////////////////////////////////////////////////
+// モジュール名 send8bit
+// 処理概要     8bit変数をlogBufferに送る
+// 引数         変換する8bit変数
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+#ifdef LOG_RUNNING_WRITE
+void send8bit (uint8_t data) {
+	logBuffer[logBuffIndex++] = data;
+}
+#endif
+/////////////////////////////////////////////////////////////////////
+// モジュール名 send16bit
+// 処理概要     16bit変数を1バイトごとに分割してlogBufferに送る
+// 引数         変換する16bit変数
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+#ifdef LOG_RUNNING_WRITE
+void send16bit (uint16_t data) {
+	logBuffer[logBuffIndex++] = data >> 8;
+	logBuffer[logBuffIndex++] = data & 0xff;
+}
+#endif
+/////////////////////////////////////////////////////////////////////
+// モジュール名 send32bit
+// 処理概要     32bit変数を1バイトごとに分割してlogBufferに送る
+// 引数         変換する32bit変数
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+#ifdef LOG_RUNNING_WRITE
+void send32bit (uint32_t data) {
+	logBuffer[logBuffIndex++] = data >> 24;
+	logBuffer[logBuffIndex++] = ( data & 0x00ff0000 ) >> 16;
+	logBuffer[logBuffIndex++] = ( data & 0x0000ff00 ) >> 8;
+	logBuffer[logBuffIndex++] = data & 0x000000ff;
+}
+#endif
+// /////////////////////////////////////////////////////////////////////
+// // モジュール名 CharToShort
+// // 処理概要     unsigned char型変数をshort型に変換する
+// // 引数         data:変換するsigned char型変数	offsetaddress: MicroSD内の順番
+// // 戻り値       変換したshort型
+// /////////////////////////////////////////////////////////////////////
+// short CharToShort(unsigned char offsetaddress) {
+// 	volatile short s;
+	
+// 	s = (short)( (unsigned char)msdBuff[msdBuffaddress + offsetaddress] * 0x100 + 
+// 			(unsigned char)msdBuff[msdBuffaddress + offsetaddress + 1] );
+					
+// 	return s;				
+// }
+// /////////////////////////////////////////////////////////////////////
+// // モジュール名 CharTouInt
+// // 処理概要     unsigned char型変数をunsigned int型に変換する
+// // 引数         data:変換するsigned char型変数	offsetaddress: MicroSD内の順番
+// // 戻り値       変換したunsigned int型
+// /////////////////////////////////////////////////////////////////////
+// unsigned int CharTouInt(unsigned char offsetaddress) {
+// 	volatile unsigned int i;
+	
+// 	i = (unsigned int)(unsigned char)msdBuff[msdBuffaddress + offsetaddress] * 0x1000000;
+// 	i += (unsigned int)(unsigned char)msdBuff[msdBuffaddress + offsetaddress + 1] * 0x10000;
+// 	i += (unsigned int)(unsigned char)msdBuff[msdBuffaddress + offsetaddress + 2] * 0x100;
+// 	i += (unsigned int)(unsigned char)msdBuff[msdBuffaddress + offsetaddress + 3];
+					
+// 	return i;				
+// }

@@ -8,12 +8,22 @@
 //====================================//
 // シンボル定義
 //====================================//
-#define NUM_LOGDATA         7
+#define LOG_RUNNING_WRITE
+
+
+#ifdef LOG_RUNNING_WRITE
+
+#define BUFFER_SIZE_LOG         512
+#define LOG_SIZE                16
+
+#else
+
 #define BUFFER_SIZW_LOG     3000
+
+#endif
 
 #define PATH_SETTING    "./setting/"
 
-// #define LOG_RUNNING_WRITE
 //====================================//
 // グローバル変数の宣言
 //====================================//
@@ -28,12 +38,15 @@ bool initMicroSD(void);
 void createLog(void);
 void endLog(void);
 #ifdef	LOG_RUNNING_WRITE
-void writeLogBufferPuts (uint8_t valNum, ...);
-void setLogtostr(void);
+void writeLogBufferPuts (uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...);
 void writeLogPuts(void);
-#endif
+void send8bit (uint8_t data);
+void send16bit (uint16_t data);
+void send32bit (uint32_t data);
+#else
 void writeLogBufferPrint (void);
 void writeLogPrint(void);
+#endif
 void getFileNumbers(void);
 void setLogStr(uint8_t* column, uint8_t* format);
 void SDtest(void);
