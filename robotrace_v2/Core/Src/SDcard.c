@@ -21,6 +21,8 @@ uint8_t		*logBufferPointa;		// RAM保存バッファ用ポインタ
 int16_t		logBuffIndex=0;			// 一時記録バッファ書込アドレス
 uint32_t	logBuffSendIndex=0;
 bool		sendSD = false;
+uint16_t	cntSend=0;
+uint8_t		*logaddress;
 #else
 typedef struct {
     uint16_t 	time;
@@ -104,9 +106,9 @@ void createLog(void) {
 	
 	do {
 		f_readdir(&dir,&fno);  
-		tp = strtok(fno.fname,".");     // 拡張子削除
-		if ( atoi(tp) > fileNumber ) {  // 番号比較
-		fileNumber = atoi(tp);        // 文字列を数値に変換
+		tp = strtok(fno.fname,".");		// 拡張子削除
+		if ( atoi(tp) > fileNumber ) {	// 番号比較
+			fileNumber = atoi(tp);		// 文字列を数値に変換
 		}
 	} while(fno.fname[0] != 0); // ファイルの有無を確認
 
@@ -128,23 +130,37 @@ void createLog(void) {
 	strcpy(columnTitle, "");
 	strcpy(formatLog, "");
 
-	setLogStr("cntlog",       "%d");
 	setLogStr("courseMarker",  "%d");
-	setLogStr("encCurrentN",  "%d");
-	setLogStr("gyroVal_Z",   "%d");
-	setLogStr("encTotalN",    "%d");
 	setLogStr("targetSpeed",    "%d");
 
+	setLogStr("cntlog",       "%d");
+	setLogStr("encCurrentN",  "%d");
 	setLogStr("optimalIndex",  "%d");
-	// setLogStr("ROC",  "%d");
-	// setLogStr("x",  "%d");
-	// setLogStr("y",  "%d");
+	
+	setLogStr("encTotalN",    "%d");
+	setLogStr("gyroVal_Z",   "%f");
+	
+	setLogStr("ROC",  "%f");
+	setLogStr("x",  "%f");
+	setLogStr("y",  "%f");
 
 	strcat(columnTitle,"\n");
 	strcat(formatLog,"\n");
-	// f_printf(&fil_W, columnTitle);
-
+	f_printf(&fil_W, columnTitle);
 }
+/////////////////////////////////////////////////////////////////////
+// モジュール名 initLog
+// 処理概要     バイナリ保存用のファイルを作成
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+#ifdef	LOG_RUNNING_WRITE
+void initLog(void) {
+	FRESULT   fresult;
+	
+	fresult = f_open(&fil_W, "temp", FA_OPEN_ALWAYS | FA_WRITE);  // create file
+}
+#endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogBufferPuts
 // 処理概要     保存する変数をバッファに転送する
@@ -152,7 +168,7 @@ void createLog(void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 #ifdef	LOG_RUNNING_WRITE
-void writeLogBufferPuts (uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...) {
+void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...) {
 	va_list args;
 	uint8_t cnt=0;
 	static union {float f; uint32_t i;} ftoi;
@@ -169,6 +185,7 @@ void writeLogBufferPuts (uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...) {
 			send32bit( ftoi.i );
 		}
 		va_end(args);
+		cntSend++;
 
 		// バッファが512バイト付近まで溜まったら確認
 		if( logBuffIndex + LOG_SIZE > 32) {
@@ -233,7 +250,7 @@ void writeLogPrint(void) {
 	uint32_t 	i,length = 0, beforeTime=0;
 	float 		dt;
 
-	clearXYcie();
+	clearXYcie();	// xy座標クリア
 	for(i = 0;i<logValIndex;i++) {
 		dt = (float)(logVal[i].time - beforeTime) / 1000;
 		calcXYcie(logVal[i].speed,logVal[i].zg, dt);
@@ -262,19 +279,86 @@ void writeLogPrint(void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void endLog(void) {
+	FRESULT		fresult;
+	FIL			fil;
+	uint8_t 	log[LOG_SIZE];
+	uint8_t		logStr[256];
+	uint16_t	readByte, writtenlog;
+	uint16_t	j,c,s,i,f,cnt,beforeTime=0;
+	static union {float f; uint32_t i;} ftoi;
+
+	uint8_t		logval8[10];
+	uint16_t 	logval16[10];
+	uint32_t 	logval32[10];
+	float		logvalf[10],dt;
+
 	initIMU = false;  // IMUの使用を停止(SPIが競合するため)
 	modeLOG = false;  // ログ取得停止
 
 #ifdef LOG_RUNNING_WRITE
+	logBuffSendIndex = logBuffIndex;		// バッファのバイト数を記録
+	memcpy(logBufferSend, logBuffer, logBuffSendIndex);		// 送信用配列にコピー
+	f_write(&fil_W,logBufferSend,logBuffSendIndex,writtenlog);	// 残りのログをSDカードに送信
+	f_close(&fil_W);	// 一時ファイルを閉じる
 
+	createLog();		// ログファイル(csv)を作成
+
+	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ);  // ログファイルを開く
+
+	c=2;
+	s=3;
+	i=1;
+	f=1;
+	clearXYcie();	// xy座標クリア
+	for (j=0; j<cntSend; j++) {
+		f_read(&fil, log, sizeof(log), readByte);
+		logaddress = log;	// 読み込んだ配列の先頭アドレスを取得
+
+		// 型ごとに変数を復元
+		for ( cnt=0; cnt<c; cnt++ ) logval8[cnt] = logPut8bit();
+		for ( cnt=0; cnt<s; cnt++ ) logval16[cnt] = logPut16bit();
+		for ( cnt=0; cnt<i; cnt++ ) logval32[cnt] = logPut32bit();
+		for ( cnt=0; cnt<f; cnt++ ) {
+			ftoi.i = logPut32bit();	// 共用体を使用してfloat型のビット操作をできるようにする
+			logvalf[cnt] = ftoi.f;
+		}
+
+		cnt=f;
+		logvalf[cnt++] = calcROC(logval16[1],logvalf[0]);
+
+		dt = (float)(logval16[0]-beforeTime) / 1000;
+		calcXYcie(logval16[1],logvalf[0], dt);
+		logvalf[cnt++] = xycie.x;
+		logvalf[cnt++] = xycie.y;
+		beforeTime = logval16[0];
+
+		sprintf(logStr, formatLog
+			,logval8[0]
+			,logval8[1]
+			,logval16[0]
+			,logval16[1]
+			,logval16[2]
+			,logval32[0]
+			,logvalf[0]
+			,logvalf[1]
+			,logvalf[2]
+			,logvalf[3]
+		);
+
+		f_puts(logStr, &fil_W);
+	}
+
+	f_close(&fil_W);	// ログファイル(csv)
+	f_close(&fil);		// 一時ファイル
+	
 #else
 	// SPIバスが空くまで待つ
 	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );
 	createLog();    // ログファイル作成
 	writeLogPrint();  // ログ書き込み
+	f_close(&fil_W);
 #endif
 
-	f_close(&fil_W);
 	initIMU = true;
 }
 /////////////////////////////////////////////////////////////////////
@@ -374,7 +458,7 @@ void createDir(uint8_t *dirName) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 #ifdef LOG_RUNNING_WRITE
-void send8bit (uint8_t data) {
+void send8bit(uint8_t data) {
 	logBuffer[logBuffIndex++] = data;
 }
 #endif
@@ -385,7 +469,7 @@ void send8bit (uint8_t data) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 #ifdef LOG_RUNNING_WRITE
-void send16bit (uint16_t data) {
+void send16bit(uint16_t data) {
 	logBuffer[logBuffIndex++] = data >> 8;
 	logBuffer[logBuffIndex++] = data & 0xff;
 }
@@ -397,40 +481,49 @@ void send16bit (uint16_t data) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 #ifdef LOG_RUNNING_WRITE
-void send32bit (uint32_t data) {
+void send32bit(uint32_t data) {
 	logBuffer[logBuffIndex++] = data >> 24;
 	logBuffer[logBuffIndex++] = ( data & 0x00ff0000 ) >> 16;
 	logBuffer[logBuffIndex++] = ( data & 0x0000ff00 ) >> 8;
 	logBuffer[logBuffIndex++] = data & 0x000000ff;
 }
 #endif
-// /////////////////////////////////////////////////////////////////////
-// // モジュール名 CharToShort
-// // 処理概要     unsigned char型変数をshort型に変換する
-// // 引数         data:変換するsigned char型変数	offsetaddress: MicroSD内の順番
-// // 戻り値       変換したshort型
-// /////////////////////////////////////////////////////////////////////
-// short CharToShort(unsigned char offsetaddress) {
-// 	volatile short s;
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logPut8bit
+// 処理概要     8bit変数を16bitに変換する
+// 引数         data:変換する8bit変数	offsetaddress: MicroSD内の順番
+// 戻り値       変換したshort型
+/////////////////////////////////////////////////////////////////////
+uint8_t logPut8bit(void) {
+	return *logaddress++;				
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logPut16bit
+// 処理概要     8bit変数を16bitに変換する
+// 引数         data:変換する8bit変数	offsetaddress: MicroSD内の順番
+// 戻り値       変換したshort型
+/////////////////////////////////////////////////////////////////////
+uint16_t logPut16bit(void) {
+	uint16_t s;
 	
-// 	s = (short)( (unsigned char)msdBuff[msdBuffaddress + offsetaddress] * 0x100 + 
-// 			(unsigned char)msdBuff[msdBuffaddress + offsetaddress + 1] );
-					
-// 	return s;				
-// }
-// /////////////////////////////////////////////////////////////////////
-// // モジュール名 CharTouInt
-// // 処理概要     unsigned char型変数をunsigned int型に変換する
-// // 引数         data:変換するsigned char型変数	offsetaddress: MicroSD内の順番
-// // 戻り値       変換したunsigned int型
-// /////////////////////////////////////////////////////////////////////
-// unsigned int CharTouInt(unsigned char offsetaddress) {
-// 	volatile unsigned int i;
+	s = (uint16_t)((uint8_t)*logaddress++ * 0x100 + 
+					(uint8_t)*logaddress++ );
 	
-// 	i = (unsigned int)(unsigned char)msdBuff[msdBuffaddress + offsetaddress] * 0x1000000;
-// 	i += (unsigned int)(unsigned char)msdBuff[msdBuffaddress + offsetaddress + 1] * 0x10000;
-// 	i += (unsigned int)(unsigned char)msdBuff[msdBuffaddress + offsetaddress + 2] * 0x100;
-// 	i += (unsigned int)(unsigned char)msdBuff[msdBuffaddress + offsetaddress + 3];
+	return s;				
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 CharTouInt
+// 処理概要     unsigned char型変数をunsigned int型に変換する
+// 引数         data:変換するsigned char型変数	offsetaddress: MicroSD内の順番
+// 戻り値       変換したunsigned int型
+/////////////////////////////////////////////////////////////////////
+uint32_t logPut32bit(void) {
+	uint32_t i;
+	
+	i = (uint32_t)(uint8_t)*logaddress++ * 0x1000000;
+	i += (uint32_t)(uint8_t)*logaddress++ * 0x10000;
+	i += (uint32_t)(uint8_t)*logaddress++ * 0x100;
+	i += (uint32_t)(uint8_t)*logaddress++;
 					
-// 	return i;				
-// }
+	return i;				
+}

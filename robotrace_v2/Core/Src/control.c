@@ -180,7 +180,7 @@ void loopSystem (void) {
 			}
 
 			// IMUのキャリブレーションが終了したら走行開始
-			// if ( !calibratIMU ) {
+			if ( !calibratIMU ) {
 				powerLinesensors(1);	// ラインセンサ点灯
 
 				// SDカードに変数保存
@@ -196,7 +196,7 @@ void loopSystem (void) {
 				writeTgtspeeds();	// 目標速度を記録
 
 #ifdef LOG_RUNNING_WRITE
-				if(initMSD) createLog();    // ログファイル作成
+				if(initMSD) initLog();    // ログ一時ファイル作成
 #endif
 				initIMU = true;
 
@@ -208,7 +208,7 @@ void loopSystem (void) {
 
 
 				patternTrace = 11;
-			// }
+			}
 			break;
 
 		case 11:

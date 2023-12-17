@@ -38,11 +38,15 @@ bool initMicroSD(void);
 void createLog(void);
 void endLog(void);
 #ifdef	LOG_RUNNING_WRITE
-void writeLogBufferPuts (uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...);
+void initLog(void);
+void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...);
 void writeLogPuts(void);
-void send8bit (uint8_t data);
-void send16bit (uint16_t data);
-void send32bit (uint32_t data);
+void send8bit(uint8_t data);
+void send16bit(uint16_t data);
+void send32bit(uint32_t data);
+uint8_t logPut8bit(void);
+uint16_t logPut16bit(void);
+uint32_t logPut32bit(void);
 #else
 void writeLogBufferPrint (void);
 void writeLogPrint(void);
