@@ -136,6 +136,8 @@ void createLog(void) {
 	setLogStr("cntlog",       "%d");
 	setLogStr("encCurrentN",  "%d");
 	setLogStr("optimalIndex",  "%d");
+	setLogStr("CurrentL",  "%f");
+	setLogStr("CurrentR",  "%f");
 	
 	setLogStr("encTotalN",    "%d");
 	setLogStr("gyroVal_Z",   "%f");
@@ -279,23 +281,24 @@ void writeLogPrint(void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void endLog(void) {
+	initIMU = false;  // IMUの使用を停止(SPIが競合するため)
+	modeLOG = false;  // ログ取得停止
+	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );	// SPIバスが空くまで待つ
+
+#ifdef LOG_RUNNING_WRITE
 	FRESULT		fresult;
 	FIL			fil;
 	uint8_t 	log[LOG_SIZE];
 	uint8_t		logStr[256];
 	uint16_t	readByte, writtenlog;
-	uint16_t	j,c,s,i,f,cnt,beforeTime=0;
+	uint16_t	j,c,s,i,f,cnt,beforeTime=0,time;
 	static union {float f; uint32_t i;} ftoi;
 
-	uint8_t		logval8[10];
+	uint8_t		logval8[10],speed;
 	uint16_t 	logval16[10];
 	uint32_t 	logval32[10];
-	float		logvalf[10],dt;
+	float		logvalf[10],dt,zg;
 
-	initIMU = false;  // IMUの使用を停止(SPIが競合するため)
-	modeLOG = false;  // ログ取得停止
-
-#ifdef LOG_RUNNING_WRITE
 	logBuffSendIndex = logBuffIndex;		// バッファのバイト数を記録
 	memcpy(logBufferSend, logBuffer, logBuffSendIndex);		// 送信用配列にコピー
 	f_write(&fil_W,logBufferSend,logBuffSendIndex,writtenlog);	// 残りのログをSDカードに送信
@@ -306,7 +309,7 @@ void endLog(void) {
 	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ);  // ログファイルを開く
 
 	c=2;
-	s=3;
+	s=5;
 	i=1;
 	f=1;
 	clearXYcie();	// xy座標クリア
@@ -323,21 +326,29 @@ void endLog(void) {
 			logvalf[cnt] = ftoi.f;
 		}
 
-		cnt=f;
-		logvalf[cnt++] = calcROC(logval16[1],logvalf[0]);
+		time = logval16[0];
+		speed = logval16[1];
+		zg = logvalf[0];
 
-		dt = (float)(logval16[0]-beforeTime) / 1000;
-		calcXYcie(logval16[1],logvalf[0], dt);
+		cnt=f;
+		logvalf[cnt++] = calcROC(speed,zg);	// 曲率半径を計算
+
+
+		dt = (float)(time-beforeTime) / 1000;	// 経過時間
+		calcXYcie(speed,zg, dt);	// xy座標を計算
 		logvalf[cnt++] = xycie.x;
 		logvalf[cnt++] = xycie.y;
-		beforeTime = logval16[0];
+		beforeTime = time;			// 時間を更新
 
+		// 文字列に変換
 		sprintf(logStr, formatLog
 			,logval8[0]
 			,logval8[1]
 			,logval16[0]
 			,logval16[1]
 			,logval16[2]
+			,(float)(logval16[3]-HALFSCAL)/4095*3.3 / RREF * 10000.0
+			,(float)(logval16[4]-HALFSCAL)/4095*3.3 / RREF * 10000.0
 			,logval32[0]
 			,logvalf[0]
 			,logvalf[1]
@@ -345,6 +356,7 @@ void endLog(void) {
 			,logvalf[3]
 		);
 
+		// 文字列をSDカードに送信
 		f_puts(logStr, &fil_W);
 	}
 
@@ -352,8 +364,6 @@ void endLog(void) {
 	f_close(&fil);		// 一時ファイル
 	
 #else
-	// SPIバスが空くまで待つ
-	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );
 	createLog();    // ログファイル作成
 	writeLogPrint();  // ログ書き込み
 	f_close(&fil_W);
@@ -491,18 +501,21 @@ void send32bit(uint32_t data) {
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logPut8bit
 // 処理概要     8bit変数を16bitに変換する
-// 引数         data:変換する8bit変数	offsetaddress: MicroSD内の順番
-// 戻り値       変換したshort型
+// 引数         なし
+// 戻り値       変換したuint8_t型
 /////////////////////////////////////////////////////////////////////
+#ifdef LOG_RUNNING_WRITE
 uint8_t logPut8bit(void) {
 	return *logaddress++;				
 }
+#endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logPut16bit
 // 処理概要     8bit変数を16bitに変換する
-// 引数         data:変換する8bit変数	offsetaddress: MicroSD内の順番
-// 戻り値       変換したshort型
+// 引数         なし
+// 戻り値       変換したuint16_t型
 /////////////////////////////////////////////////////////////////////
+#ifdef LOG_RUNNING_WRITE
 uint16_t logPut16bit(void) {
 	uint16_t s;
 	
@@ -511,12 +524,14 @@ uint16_t logPut16bit(void) {
 	
 	return s;				
 }
+#endif
 /////////////////////////////////////////////////////////////////////
-// モジュール名 CharTouInt
-// 処理概要     unsigned char型変数をunsigned int型に変換する
-// 引数         data:変換するsigned char型変数	offsetaddress: MicroSD内の順番
-// 戻り値       変換したunsigned int型
+// モジュール名 logPut32bit
+// 処理概要     8bit変数を32bitに変換する
+// 引数         なし
+// 戻り値       変換したuint32_t型
 /////////////////////////////////////////////////////////////////////
+#ifdef LOG_RUNNING_WRITE
 uint32_t logPut32bit(void) {
 	uint32_t i;
 	
@@ -527,3 +542,4 @@ uint32_t logPut32bit(void) {
 					
 	return i;				
 }
+#endif

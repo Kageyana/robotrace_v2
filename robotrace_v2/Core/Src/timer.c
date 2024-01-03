@@ -136,7 +136,7 @@ void Interrupt1ms(void) {
             // CALCDISTANCEごとにログを保存
             // writeLogBufferPrint(); // バッファにログを保存
             writeLogBufferPuts(
-                2,3,1,1
+                2,5,1,1
                 // 8bit
                 ,courseMarkerLog
                 ,targetSpeed
@@ -144,6 +144,8 @@ void Interrupt1ms(void) {
                 ,cntLog
                 ,encCurrentN
                 ,optimalIndex
+                ,motorCurrentValL
+                ,motorCurrentValR
                 // 32bit
                 ,encTotalOptimal
                 // float型

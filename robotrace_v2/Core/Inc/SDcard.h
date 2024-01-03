@@ -14,7 +14,7 @@
 #ifdef LOG_RUNNING_WRITE
 
 #define BUFFER_SIZE_LOG         512
-#define LOG_SIZE                16
+#define LOG_SIZE                20
 
 #else
 
