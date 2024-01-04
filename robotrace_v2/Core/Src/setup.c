@@ -84,6 +84,7 @@ void setup( void )
 
 	if (patternDisplay != beforeHEX) 	{
 		// ロータリスイッチ切替時に実行
+		showBattery();	// バッテリ残量表示
 
 		// ロータリスイッチ値を表示
 		ssd1306_SetCursor(0,3);
@@ -92,9 +93,7 @@ void setup( void )
 		
 		ssd1306_FillRectangle(0,15,127,63, Black);	// メイン表示空白埋め
 		ssd1306_FillRectangle(24,0,94,13, Black);	// ヘッダ表示空白埋め
-		ssd1306_SetCursor(30,3); // ヘッダタイトル位置
-
-		showBattery();	// バッテリ残量表示
+		ssd1306_SetCursor(28,3); // ヘッダタイトル位置
 	}
 
 	// ディップスイッチで項目選択

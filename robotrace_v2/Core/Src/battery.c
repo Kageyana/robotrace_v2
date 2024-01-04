@@ -58,6 +58,8 @@ void SchmittBatery (void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void showBattery (void) {
+
+    showBatMark();
     switch(batteryLevel){
         case BAT_LV_0:
             ssd1306_FillRectangle(96,2,123,11, Black);
