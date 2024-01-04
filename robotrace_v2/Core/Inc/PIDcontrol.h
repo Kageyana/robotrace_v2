@@ -15,7 +15,7 @@
 #define KD1		170
 
 #define KP2		10
-#define KI2		90
+#define KI2		10
 #define KD2		0
 
 #define KP3		38

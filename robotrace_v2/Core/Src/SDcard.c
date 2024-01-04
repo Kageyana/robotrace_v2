@@ -138,6 +138,8 @@ void createLog(void) {
 	setLogStr("optimalIndex",  "%d");
 	setLogStr("CurrentL",  "%f");
 	setLogStr("CurrentR",  "%f");
+	setLogStr("lineTraceCtrl",  "%d");
+	setLogStr("veloCtrl",  "%d");
 	
 	setLogStr("encTotalN",    "%d");
 	setLogStr("gyroVal_Z",   "%f");
@@ -291,11 +293,11 @@ void endLog(void) {
 	uint8_t 	log[LOG_SIZE];
 	uint8_t		logStr[256];
 	uint16_t	readByte, writtenlog;
-	uint16_t	j,c,s,i,f,cnt,beforeTime=0,time;
+	uint16_t	j,cnt,beforeTime=0,time;
 	static union {float f; uint32_t i;} ftoi;
 
-	uint8_t		logval8[10],speed;
-	uint16_t 	logval16[10];
+	uint8_t		logval8[10];
+	uint16_t 	logval16[10],speed, beforeSpeed=0;
 	uint32_t 	logval32[10];
 	float		logvalf[10],dt,zg;
 
@@ -308,29 +310,30 @@ void endLog(void) {
 
 	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ);  // ログファイルを開く
 
-	c=2;
-	s=5;
-	i=1;
-	f=1;
 	clearXYcie();	// xy座標クリア
 	for (j=0; j<cntSend; j++) {
 		f_read(&fil, log, sizeof(log), readByte);
 		logaddress = log;	// 読み込んだ配列の先頭アドレスを取得
 
 		// 型ごとに変数を復元
-		for ( cnt=0; cnt<c; cnt++ ) logval8[cnt] = logPut8bit();
-		for ( cnt=0; cnt<s; cnt++ ) logval16[cnt] = logPut16bit();
-		for ( cnt=0; cnt<i; cnt++ ) logval32[cnt] = logPut32bit();
-		for ( cnt=0; cnt<f; cnt++ ) {
+		for ( cnt=0; cnt<LOG_NUM_8BIT; cnt++ ) logval8[cnt] = logPut8bit();
+		for ( cnt=0; cnt<LOG_NUM_16BIT; cnt++ ) logval16[cnt] = logPut16bit();
+		for ( cnt=0; cnt<LOG_NUM_32BIT; cnt++ ) logval32[cnt] = logPut32bit();
+		for ( cnt=0; cnt<LOG_NUM_FLOAT; cnt++ ) {
 			ftoi.i = logPut32bit();	// 共用体を使用してfloat型のビット操作をできるようにする
 			logvalf[cnt] = ftoi.f;
 		}
 
 		time = logval16[0];
 		speed = logval16[1];
+		if(abs(speed - beforeSpeed) > 500) {
+			speed = beforeSpeed;
+			logval16[1] = beforeSpeed;
+		}
+		beforeSpeed = speed;
 		zg = logvalf[0];
 
-		cnt=f;
+		cnt=LOG_NUM_FLOAT;	// float型のログの続きを使用する
 		logvalf[cnt++] = calcROC(speed,zg);	// 曲率半径を計算
 
 
@@ -349,6 +352,8 @@ void endLog(void) {
 			,logval16[2]
 			,(float)(logval16[3]-HALFSCAL)/4095*3.3 / RREF * 10000.0
 			,(float)(logval16[4]-HALFSCAL)/4095*3.3 / RREF * 10000.0
+			,(int16_t)logval16[5]
+			,(int16_t)logval16[6]
 			,logval32[0]
 			,logvalf[0]
 			,logvalf[1]

@@ -66,8 +66,8 @@ void motorControlTrace( void ) {
 	
 	//サーボモータ用PWM値計算
 	if (lSensorOffset[0] > 0)	{
-		senL = (lSensorCari[4]) + (lSensorCari[3]*0.6) + (lSensorCari[2]*0.4) + (lSensorCari[1]*0.2) + (lSensorCari[0]*0.1);
-		senR = (lSensorCari[5]) + (lSensorCari[6]*0.6) + (lSensorCari[7]*0.4) + (lSensorCari[8]*0.2) + (lSensorCari[9]*0.1);
+		senL = (lSensorCari[4]) + (lSensorCari[3]*0.7) + (lSensorCari[2]*0.5) + (lSensorCari[1]*0.3) + (lSensorCari[0]*0.2);
+		senR = (lSensorCari[5]) + (lSensorCari[6]*0.7) + (lSensorCari[7]*0.5) + (lSensorCari[8]*0.3) + (lSensorCari[9]*0.2);
 	} else {
 		// senL = (lSensor[4]) + (lSensor[3]*0.8) + (lSensor[2]*0.7) + (lSensor[1]*0.5) + (lSensor[0]*0.3);
 		// senR = (lSensor[5]) + (lSensor[6]*0.8) + (lSensor[7]*0.7) + (lSensor[8]*0.5) + (lSensor[9]*0.3);
@@ -91,11 +91,6 @@ void motorControlTrace( void ) {
 	// PWMの上限の設定
 	if ( iRet >  900 ) iRet = 900;
 	if ( iRet <  -900 ) iRet = -900;
-
-	// if ((lSensorCari[3]) + (lSensorCari[2]) + (lSensorCari[6]) + (lSensorCari[7]) < 2500) {
-	// 	if ( iRet >  100 ) iRet = 100;
-	// 	if ( iRet <  -100 ) iRet = -100;
-	// }
 	
 	lineTraceCtrl.pwm = iRet;
 	traceBefore = Dev;				// 次回はこの値が1ms前の値となる
