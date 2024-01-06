@@ -40,7 +40,7 @@ int16_t patternClick=1;
 // フラグ関連
 uint8_t motor_test = 0;
 uint8_t trace_test = 0;
-uint8_t clickStart=0;
+int8_t 	clickStart=0;
 
 // パラメータ関連
 int16_t motorTestPwm = 200;
@@ -67,13 +67,17 @@ void setup( void )
 	// 右ホイールをロータリスイッチ代わりに使用する
 	if (!trace_test && !motor_test ) {
 		if(abs(encClick) > 400) {
-			if(encClick > 400) patternDisplay++;
-			else if(encClick < -400) patternDisplay--;
+			if(encClick > 400) {
+				patternDisplay++;
+				clickStart = 1;
+			} else if(encClick < -400) {
+				patternDisplay--;
+				clickStart = -1;
+			}
 
 			if(patternDisplay > 0x9) patternDisplay = 0;
 			else if(patternDisplay < 0) patternDisplay = 0x9;
 
-			clickStart = 1;
 			encClick = 0;
 		}
 	}
@@ -1273,16 +1277,17 @@ void caribrateSensors(void) {
 ///////////////////////////////////////////////////////////////////////////////////////
 void wheelClick(void) {
 	static uint8_t cnt=0;
+	uint16_t pwm = 200;
 
 	switch(patternClick) {
 		case 1:
-			if(clickStart == 1) {
+			if(clickStart != 0) {
 				patternClick = 2;
 			}
 			break;
 
 		case 2:
-			motorPwmOut(200,0);
+			motorPwmOut(-pwm*clickStart,0);
 			cnt++;
 			if(cnt >= 3) {
 				cnt = 0;
@@ -1291,7 +1296,7 @@ void wheelClick(void) {
 			break;
 
 		case 3:
-			motorPwmOut(-200,0);
+			motorPwmOut(pwm*clickStart,0);
 			cnt++;
 			if(cnt >= 3) {
 				cnt = 0;
