@@ -25,24 +25,26 @@ uint16_t	cntSend=0;
 uint8_t		*logaddress;
 #else
 typedef struct {
-    uint16_t 	time;
-    uint8_t 	marker;
+    uint8_t 	time;
     uint8_t 	speed;
     float 		zg;
-    int32_t 	distance;
-    uint8_t 	target;
-    uint16_t 	optimalIndex;
 } logData;
 logData logVal[BUFFER_SIZW_LOG];
-uint32_t	logValIndex=0;
+uint16_t	logValIndex=0;
 #endif
 
+typedef struct {
+    int32_t distance;
+    uint8_t marker;
+} markerData;
+markerData markerVal[200];
+uint16_t	markerValIndex=0;
 
 // ログファイルナンバー
 int16_t 	fileNumbers[1000], fileIndexLog = 0, endFileIndex = 0;
 
 // カウンタ
-uint16_t    cntLog = 0;
+uint8_t    cntLog = 0;
 int32_t     encLog = 0;
 
 /////////////////////////////////////////////////////////////////////
@@ -129,7 +131,7 @@ void createLog(void) {
 
 	strcpy(columnTitle, "");
 	strcpy(formatLog, "");
-
+#ifdef	LOG_RUNNING_WRITE
 	setLogStr("courseMarker",  "%d");
 	setLogStr("targetSpeed",    "%d");
 
@@ -147,10 +149,30 @@ void createLog(void) {
 	setLogStr("ROC",  "%f");
 	setLogStr("x",  "%f");
 	setLogStr("y",  "%f");
-
+#else
+	setLogStr("cntlog",       "%d");
+	setLogStr("encCurrentN",  "%d");
+	setLogStr("gyroVal_Z",   "%d");
+	setLogStr("ROC",  "%d");
+	setLogStr("x",  "%d");
+	setLogStr("y",  "%d");
+	// setLogStr("courseMarker",  "%d");
+	// setLogStr("encTotalN",    "%d");
+#endif
 	strcat(columnTitle,"\n");
 	strcat(formatLog,"\n");
 	f_printf(&fil_W, columnTitle);
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 initLog
+// 処理概要     バイナリ保存用のファイルを作成
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void writeMarkerPos(uint32_t distance, uint8_t marker) {
+	markerVal[markerValIndex].distance = distance;
+	markerVal[markerValIndex].marker = marker;
+	markerValIndex++;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 initLog
@@ -230,15 +252,9 @@ void writeLogPuts(void) {
 #ifndef	LOG_RUNNING_WRITE
 void writeLogBufferPrint(void) {
   if (modeLOG) {
-    logVal[logValIndex].time = cntLog;
-    logVal[logValIndex].marker = courseMarkerLog;
+	logVal[logValIndex].time = cntLog;
     logVal[logValIndex].speed = encCurrentN;
     logVal[logValIndex].zg = BMI088val.gyro.z;
-    logVal[logValIndex].distance = encTotalOptimal;
-	// logVal[logValIndex].distance = distCtrl.pwm;
-    logVal[logValIndex].target = targetSpeed;
-    logVal[logValIndex].optimalIndex = optimalIndex;
-	// logVal[logValIndex].optimalIndex = targetDist;
     logValIndex++;
   }
 }
@@ -251,28 +267,24 @@ void writeLogBufferPrint(void) {
 /////////////////////////////////////////////////////////////////////
 #ifndef	LOG_RUNNING_WRITE
 void writeLogPrint(void) {
-	uint32_t 	i,length = 0, beforeTime=0;
-	float 		dt;
+	uint32_t 	i, totalTime = 0;
 
 	clearXYcie();	// xy座標クリア
 	for(i = 0;i<logValIndex;i++) {
-		dt = (float)(logVal[i].time - beforeTime) / 1000;
-		calcXYcie(logVal[i].speed,logVal[i].zg, dt);
+		totalTime += logVal[i].time;
+		calcXYcie(logVal[i].speed,logVal[i].zg, (float)logVal[i].time/1000);
 
 		f_printf(&fil_W, formatLog
-			,logVal[i].time
-			,logVal[i].marker
+			,totalTime
 			,logVal[i].speed
 			,(int32_t)(logVal[i].zg*10000)
-			,logVal[i].distance
-			,logVal[i].target
-			,logVal[i].optimalIndex
+			// ,logVal[i].distance
+			// ,logVal[i].target
+			// ,logVal[i].optimalIndex
 			,(int32_t)(calcROC(logVal[i].speed,logVal[i].zg))
 			,(int32_t)(xycie.x*10000)
 			,(int32_t)(xycie.y*10000)
 		);
-
-		beforeTime = logVal[i].time;
 	}
 }
 #endif
@@ -292,14 +304,16 @@ void endLog(void) {
 	FIL			fil;
 	uint8_t 	log[LOG_SIZE];
 	uint8_t		logStr[256];
-	uint16_t	readByte, writtenlog;
-	uint16_t	j,cnt,beforeTime=0,time;
+	uint16_t	readByte, writtenlog, j,cnt;
+	uint16_t	marker, time, beforeTime=0, speed, beforeSpeed=0;
+	uint32_t	distance;
+	float		dt,zg;
 	static union {float f; uint32_t i;} ftoi;
 
 	uint8_t		logval8[10];
-	uint16_t 	logval16[10],speed, beforeSpeed=0;
+	uint16_t 	logval16[10];
 	uint32_t 	logval32[10];
-	float		logvalf[10],dt,zg;
+	float		logvalf[10];
 
 	logBuffSendIndex = logBuffIndex;		// バッファのバイト数を記録
 	memcpy(logBufferSend, logBuffer, logBuffSendIndex);		// 送信用配列にコピー
@@ -324,15 +338,18 @@ void endLog(void) {
 			logvalf[cnt] = ftoi.f;
 		}
 
+		marker = logval8[0];
 		time = logval16[0];
 		speed = logval16[1];
+		distance = logval32[0];
+		zg = logvalf[0];
+
 		if(abs(speed - beforeSpeed) > 500) {
 			speed = beforeSpeed;
 			logval16[1] = beforeSpeed;
 		}
 		beforeSpeed = speed;
-		zg = logvalf[0];
-
+		
 		cnt=LOG_NUM_FLOAT;	// float型のログの続きを使用する
 		logvalf[cnt++] = calcROC(speed,zg);	// 曲率半径を計算
 
@@ -345,17 +362,17 @@ void endLog(void) {
 
 		// 文字列に変換
 		sprintf(logStr, formatLog
-			,logval8[0]
+			,time
+			,marker
+			,speed
+			,zg
+			,distance
 			,logval8[1]
-			,logval16[0]
-			,logval16[1]
 			,logval16[2]
 			,(float)(logval16[3]-HALFSCAL)/4095*3.3 / RREF * 10000.0
 			,(float)(logval16[4]-HALFSCAL)/4095*3.3 / RREF * 10000.0
 			,(int16_t)logval16[5]
 			,(int16_t)logval16[6]
-			,logval32[0]
-			,logvalf[0]
 			,logvalf[1]
 			,logvalf[2]
 			,logvalf[3]

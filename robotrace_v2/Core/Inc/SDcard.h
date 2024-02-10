@@ -8,13 +8,13 @@
 //====================================//
 // シンボル定義
 //====================================//
-#define LOG_RUNNING_WRITE
+// #define LOG_RUNNING_WRITE
 
 
 #ifdef LOG_RUNNING_WRITE
 
 #define BUFFER_SIZE_LOG     512
-#define LOG_NUM_8BIT        2
+#define LOG_NUM_8BIT        1
 #define LOG_NUM_16BIT       7
 #define LOG_NUM_32BIT       1
 #define LOG_NUM_FLOAT       1
@@ -22,7 +22,7 @@
 
 #else
 
-#define BUFFER_SIZW_LOG     3000
+#define BUFFER_SIZW_LOG     5000
 
 #endif
 
@@ -32,7 +32,7 @@
 // グローバル変数の宣言
 //====================================//
 extern int16_t  fileNumbers[1000], fileIndexLog, endFileIndex;
-extern uint16_t cntLog;
+extern uint8_t  cntLog;
 extern int32_t  encLog;
 //====================================//
 // プロトタイプ宣言
@@ -41,6 +41,7 @@ extern int32_t  encLog;
 bool initMicroSD(void);
 void createLog(void);
 void endLog(void);
+void writeMarkerPos(uint32_t distance, uint8_t marker);
 #ifdef	LOG_RUNNING_WRITE
 void initLog(void);
 void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...);

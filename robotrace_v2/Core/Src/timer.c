@@ -41,10 +41,6 @@ void Interrupt1ms(void) {
         courseMarker = checkMarker();   // マーカー検知
         checkGoalMarker();              // ゴールマーカー処理
 
-        if( courseMarker > 0) {
-            courseMarkerLog = courseMarker;
-        }
-
         // カーブマーカーを通過した時
         if (courseMarker == 2 && beforeCourseMarker == 0) {
             cntMarker++;    // マーカーカウント
@@ -66,6 +62,12 @@ void Interrupt1ms(void) {
                 }
             }
         }
+
+        if( courseMarker > 0) {
+            // マーカーの位置を記録
+            writeMarkerPos(encTotalOptimal, courseMarker);
+        }
+        
         beforeCourseMarker = courseMarker;
 
     }
@@ -134,11 +136,10 @@ void Interrupt1ms(void) {
     if (modeLOG) {
         if( encLog >= encMM(CALCDISTANCE_SHORTCUT) ) {
             // CALCDISTANCEごとにログを保存
-            // writeLogBufferPrint(); // バッファにログを保存
+#ifdef	LOG_RUNNING_WRITE
             writeLogBufferPuts(
                 LOG_NUM_8BIT,LOG_NUM_16BIT,LOG_NUM_32BIT,LOG_NUM_FLOAT
                 // 8bit
-                ,courseMarkerLog
                 ,targetSpeed
                 // 16bit
                 ,cntLog
@@ -153,7 +154,10 @@ void Interrupt1ms(void) {
                 // float型
                 ,BMI088val.gyro.z
             );
-            courseMarkerLog = 0;
+#else
+            writeLogBufferPrint(); // バッファにログを保存
+#endif
+            cntLog = 0;
             encLog = 0;
         }
     }
@@ -183,7 +187,9 @@ void Interrupt1ms(void) {
 /////////////////////////////////////////////////////////////////////
 void Interrupt100us(void) {
     if (IMUstate == IMU_STOP ) {
+#ifdef	LOG_RUNNING_WRITE
         writeLogPuts();
+#endif
     }
 }   
 /////////////////////////////////////////////////////////////////////
