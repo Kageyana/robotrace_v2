@@ -49,38 +49,22 @@ void motorPwmOut(int16_t pwmL, int16_t pwmR) {
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
 void motorPwmOutSynth(int16_t tPwm, int16_t sPwm, int16_t yrPwm, int16_t dPwm) {
-	int16_t overpwm;
+	int16_t overpwm, tracePwm = tPwm;
 
-    // if (abs(sPwm + tPwm) > 1000 || abs(sPwm - tPwm) > 1000) {
-    //     // ライントレースと速度制御の合計制御量が1000を超えたとき
-    //     overpwm = abs(sPwm) + abs(tPwm) - 1000; // 1000を超えた分の制御量を計算
+    if (abs(sPwm + tPwm) > 1000 || abs(sPwm - tPwm) > 1000) {
+        // ライントレースと速度制御の合計制御量が1000を超えたとき
+        overpwm = abs(sPwm) + abs(tPwm) - 1000; // 1000を超えた分の制御量を計算
 
-    //     // トレースの内輪側から越えた分の制御量を引く 正負はtPwmと同じ
-    //     if (tPwm > 0) {
-    //         if (sPwm > 0) {
-    //             motorpwmR = sPwm - tPwm - (overpwm * (tPwm/abs(tPwm))) - yrPwm - yPwm;
-    //             motorpwmL = 1000;
-    //         } else {
-    //             motorpwmR = -1000;
-    //             motorpwmL = sPwm + tPwm + (overpwm * (tPwm/abs(tPwm))) + yrPwm + yPwm;
-    //         }
-    //     } else {
-    //         if (sPwm > 0) {
-    //             motorpwmR = 1000;
-    //             motorpwmL = sPwm + tPwm + (overpwm * (tPwm/abs(tPwm))) + yrPwm + yPwm;
-    //         } else {
-    //             motorpwmR = sPwm - tPwm - (overpwm * (tPwm/abs(tPwm))) - yrPwm - yPwm;
-    //             motorpwmL = -1000;
-    //         }
-            
-    //     }
-    // } else {
-    //     motorpwmR = sPwm - tPwm - yrPwm - yPwm;
-	//     motorpwmL = sPwm + tPwm + yrPwm + yPwm;
-    // }
+        // トレースの内輪側から越えた分の制御量を引く 正負はtPwmと同じ
+        if (tPwm > 0) {
+            tracePwm = tPwm - (overpwm * (tPwm/abs(tPwm)));
+        } else {
+            tracePwm = tPwm + (overpwm * (tPwm/abs(tPwm)));
+        }
+    }
 
-    motorpwmR = sPwm - tPwm - yrPwm + dPwm;
-    motorpwmL = sPwm + tPwm + yrPwm + dPwm;
+    motorpwmR = sPwm - tracePwm - yrPwm + dPwm;
+    motorpwmL = sPwm + tracePwm + yrPwm + dPwm;
     
 	motorPwmOut(motorpwmL, motorpwmR);
 }
