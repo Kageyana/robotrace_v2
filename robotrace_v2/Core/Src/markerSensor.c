@@ -77,15 +77,15 @@ uint8_t checkMarker( void ) {
 	distR = nowEncTotalN - encMarkerR;
 
 	// ゴールマーカーを検出してから40~50mm走行後かつカーブマーカーを140mm検出していないとき
-	if (distR > encMM(40) && distR <= encMM(50) && distL > encMM(140)) {
+	if (distR > encMM(50) && distR <= encMM(60) && distL > encMM(140)) {
 		ret = RIGHTMARKER;
 	}
 	// カーブマーカーを検出してから20~30mm走行後かつゴールマーカーを40mm検出していないとき
-	if (distL > encMM(20) && distL <= encMM(30) && distR > encMM(40)) {
+	if (distL > encMM(10) && distL <= encMM(20) && distR > encMM(40)) {
 		ret = LEFTMARKER;
 	}
 
-	if (distL > encMM(20) && distL <= encMM(30) && distR == distL) {
+	if (distL > encMM(10) && distL <= encMM(20) && distR == distL) {
 		ret = CROSSLINE;
 	}
 	

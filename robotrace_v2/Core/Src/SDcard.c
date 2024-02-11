@@ -28,6 +28,7 @@ typedef struct {
     uint8_t 	time;
     uint8_t 	speed;
     float 		zg;
+	uint16_t	opIndex;
 } logData;
 logData logVal[BUFFER_SIZW_LOG];
 uint16_t	logValIndex=0;
@@ -38,7 +39,7 @@ typedef struct {
     int32_t distance;
     uint8_t marker;
 } markerData;
-markerData markerVal[200];
+markerData markerVal[500];
 uint16_t	markerValIndex=0;
 
 // ログファイルナンバー
@@ -159,6 +160,7 @@ void createLog(void) {
 	setLogStr("ROC",  "%d");
 	setLogStr("x",  "%d");
 	setLogStr("y",  "%d");
+	setLogStr("optimalIndex",  "%d");
 	// setLogStr("courseMarker",  "%d");
 	// setLogStr("encTotalN",    "%d");
 #endif
@@ -259,6 +261,7 @@ void writeLogBufferPrint(void) {
 	logVal[logValIndex].time = cntLog;
     logVal[logValIndex].speed = encCurrentN;
     logVal[logValIndex].zg = BMI088val.gyro.z;
+	logVal[logValIndex].opIndex = optimalIndex;
     logValIndex++;
   }
 }
@@ -299,6 +302,7 @@ void writeLogPrint(void) {
 			,(int32_t)(calcROC(logVal[i].speed,logVal[i].zg))
 			,(int32_t)(xycie.x*10000)
 			,(int32_t)(xycie.y*10000)
+			,logVal[i].opIndex
 		);
 	}
 }

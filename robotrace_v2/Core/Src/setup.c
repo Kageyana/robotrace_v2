@@ -549,8 +549,8 @@ void setup( void )
 									initIMU = false;
 									// 距離基準解析
 									// numPPADarry = k;
-									numPPADarry = calcXYcies(fileNumbers[k]);
-									// numPPADarry = readLogDistance(fileNumbers[k]);
+									// numPPADarry = calcXYcies(fileNumbers[k]);
+									numPPADarry = readLogDistance(fileNumbers[k]);
 									// numPPADarry = readLogTest(fileNumbers[k]);
 
 									if (numPPADarry > 0) {

@@ -9,8 +9,8 @@
 //====================================//
 // シンボル定義
 //====================================//
-#define OPT_BUFF_SIZE           700
-#define OPT_SHORT_BUFF_SIZE     2000
+#define OPT_BUFF_SIZE           800
+#define OPT_SHORT_BUFF_SIZE     100
 #define DELTATIME               0.01F   // ログ保存周期[s]
 #define CALCDISTANCE            50      // 距離解析ステップ[mm]
 #define CALCDISTANCE_SHORTCUT   10      // 距離解析ステップ(ショートカット走行)[mm]
@@ -28,7 +28,7 @@
 #define FILENAME_ANALIZENUMBER "analize"
 
 typedef struct {
-    float   ROC;
+    int16_t ROC;
     float   boostSpeed;
 } AnalysisData;
 
@@ -69,8 +69,9 @@ float		calcROC(float velo, float angvelo);
 void		saveLogNumber(int16_t fileNumber);
 void		getLogNumber(void);
 int16_t		readLogDistance(int logNumber);
-float		asignVelocity(float ROC);
+float		asignVelocity(int16_t ROC);
 int			cmpfloat(const void * n1, const void * n2);
+int			cmpint16_t(const void * n1, const void * n2);
 int16_t		readLogTest(int logNumber);
 int16_t		calcXYcies(int logNumber);
 void		calcXYcie(float encpulse, float angVelo, float dt);

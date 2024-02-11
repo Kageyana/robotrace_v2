@@ -42,7 +42,7 @@ void Interrupt1ms(void) {
         checkGoalMarker();              // ゴールマーカー処理
 
         // カーブマーカーを通過した時
-        if (courseMarker == 2 && beforeCourseMarker == 0) {
+        if (courseMarker >= 2 && beforeCourseMarker == 0) {
             cntMarker++;    // マーカーカウント
             if (optimalTrace == BOOST_DISTANCE) {
                 // 距離基準2次走行のとき

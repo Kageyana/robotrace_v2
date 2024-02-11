@@ -124,11 +124,11 @@ int16_t readLogDistance(int logNumber) {
 
         // ログデータの取得
         TCHAR     log[512];
-        int32_t   time=0, marker=0,velo=0,angVelo=0,distance=0;
-        int32_t   startEnc=0, numD=0, numM=0, cntCurR=0,beforeMarker=0;
+        int32_t   time=0, marker=0,velo=0,angVelo=0,distance=0, roc, i=0;
+        int32_t   numD=0, numM=0, cntCurR=0,beforeMarker=0;
         bool      analysis=false;
-        static float     ROCbuff[600] = {0};
-        static float*    sortROC;
+        static int16_t   ROCbuff[600] = {0};
+        static int16_t*    sortROC;
 
         // 前処理
         // 構造体配列の初期化
@@ -137,20 +137,21 @@ int16_t readLogDistance(int logNumber) {
 
         // ログデータ取得開始
         while (f_gets(log,sizeof(log),&fil_Read)) {
-            sscanf(log,"%d,%d,%d,%d,%d",&time,&marker,&velo,&angVelo,&distance);
+            sscanf(log,"%d,%d,%d,%d,%d,%d,",&time,&velo,&angVelo,&marker,&distance,&roc);
             // 解析処理
-            if (marker == 0 && beforeMarker == 2) {
+            if (marker >= 2) {
                 // カーブマーカーを通過したときにマーカー位置を記録
                 markerPos[numM].distance = distance;
                 markerPos[numM].indexPPAD = numD;
+
                 numM++;     // マーカー解析インデックス更新
             }
             
             // 一定距離ごとに処理
-            if ( distance-startEnc >= encMM(CALCDISTANCE)) {
-                sortROC = (float*)malloc(sizeof(float) * cntCurR);  // 計算した曲率半径カウント分の配列を作成
-                memcpy(sortROC,ROCbuff,sizeof(float) * cntCurR);    // 作成した配列に曲率半径をコピーする
-                qsort(sortROC, cntCurR, sizeof(float), cmpfloat);   // ソート
+            if ( i % (CALCDISTANCE/10) == 0 ) {
+                sortROC = (int16_t*)malloc(sizeof(int16_t) * cntCurR);  // 計算した曲率半径カウント分の配列を作成
+                memcpy(sortROC,ROCbuff,sizeof(int16_t) * cntCurR);    // 作成した配列に曲率半径をコピーする
+                qsort(sortROC, cntCurR, sizeof(int16_t), cmpint16_t);   // ソート
 
                 // 曲率半径を記録する
                 if (cntCurR % 2 == 0) {
@@ -160,18 +161,20 @@ int16_t readLogDistance(int logNumber) {
                     // 中央値を記録(配列要素数が奇数のとき)
                     PPAD[numD].ROC = sortROC[cntCurR/2];
                 }
+                free(sortROC);
                 
                 PPAD[numD].boostSpeed = asignVelocity(PPAD[numD].ROC);   // 曲率半径ごとの速度を計算する
 
                 cntCurR = 0;            // 曲率半径用配列のカウントクリア
-                startEnc = distance;    // 距離計測開始位置を更新
                 numD++;                 // 距離解析インデックス更新
                 if(numD >= OPT_BUFF_SIZE) return -1;
             }
             // 曲率半径の計算
-            ROCbuff[cntCurR] = calcROC((float)velo, (float)angVelo/10000);
+            ROCbuff[cntCurR] = roc;
+            
             cntCurR++;  // 曲率半径用配列のカウント
             beforeMarker = marker;  // 前回マーカーを記録
+            i++;
         }
 
         // インデックスが1多くなるので調整
@@ -233,21 +236,21 @@ int16_t readLogDistance(int logNumber) {
 // 引数         
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-float asignVelocity(float ROC) {
-    float absROC;
+float asignVelocity(int16_t ROC) {
+    int16_t absROC;
     float ret; 
 
-    absROC = fabs(ROC);
-    if ( absROC > 1500.0F ) ret = tgtParam.bstStraight;
-    if ( absROC <= 1500.0F ) ret = tgtParam.bst1500;
-    if ( absROC <= 800.0F )  ret = tgtParam.bst800;
-    if ( absROC <= 700.0F )  ret = tgtParam.bst700;
-    if ( absROC <= 600.0F )  ret = tgtParam.bst600;
-    if ( absROC <= 500.0F )  ret = tgtParam.bst500;
-    if ( absROC <= 400.0F )  ret = tgtParam.bst400;
-    if ( absROC <= 300.0F )  ret = tgtParam.bst300;
-    if ( absROC <= 200.0F )  ret = tgtParam.bst200;
-    if ( absROC <= 100.0F )  ret = tgtParam.bst100;
+    absROC = abs(ROC);
+    if ( absROC > 1500 ) ret = tgtParam.bstStraight;
+    if ( absROC <= 1500 ) ret = tgtParam.bst1500;
+    if ( absROC <= 800 )  ret = tgtParam.bst800;
+    if ( absROC <= 700 )  ret = tgtParam.bst700;
+    if ( absROC <= 600 )  ret = tgtParam.bst600;
+    if ( absROC <= 500 )  ret = tgtParam.bst500;
+    if ( absROC <= 400 )  ret = tgtParam.bst400;
+    if ( absROC <= 300 )  ret = tgtParam.bst300;
+    if ( absROC <= 200 )  ret = tgtParam.bst200;
+    if ( absROC <= 100 )  ret = tgtParam.bst100;
 
     return ret;
 }
@@ -260,6 +263,17 @@ float asignVelocity(float ROC) {
 int cmpfloat(const void * n1, const void * n2) {
 	if (*(float *)n1 > *(float *)n2) return 1;
 	else if (*(float *)n1 < *(float *)n2) return -1;
+	else return 0;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 cmpint16_t
+// 処理概要     int16_t型の比較
+// 引数         
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+int cmpint16_t(const void * n1, const void * n2) {
+	if (*(int16_t *)n1 > *(int16_t *)n2) return 1;
+	else if (*(int16_t *)n1 < *(int16_t *)n2) return -1;
 	else return 0;
 }
 /////////////////////////////////////////////////////////////////////
@@ -294,7 +308,7 @@ int16_t readLogTest(int logNumber) {
 
         // ログデータ取得開始
         while (f_gets(log,sizeof(log),&fil_Read)) {
-            sscanf(log,"%d,%d,%d,%d,%d",&time,&marker,&velo,&angVelo,&distance);
+            sscanf(log,"%d,%d,%d,%d,%d",&time,&velo,&angVelo,&marker,&distance);
 
             // 解析処理
             if (marker == 1 && beforeMarker == 0) {
