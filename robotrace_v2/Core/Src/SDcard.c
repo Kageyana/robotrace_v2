@@ -34,6 +34,7 @@ uint16_t	logValIndex=0;
 #endif
 
 typedef struct {
+	uint16_t index;
     int32_t distance;
     uint8_t marker;
 } markerData;
@@ -153,6 +154,8 @@ void createLog(void) {
 	setLogStr("cntlog",       "%d");
 	setLogStr("encCurrentN",  "%d");
 	setLogStr("gyroVal_Z",   "%d");
+	setLogStr("courseMarker",  "%d");
+	setLogStr("encTotalN",    "%d");
 	setLogStr("ROC",  "%d");
 	setLogStr("x",  "%d");
 	setLogStr("y",  "%d");
@@ -170,6 +173,7 @@ void createLog(void) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void writeMarkerPos(uint32_t distance, uint8_t marker) {
+	markerVal[markerValIndex].index = logValIndex;
 	markerVal[markerValIndex].distance = distance;
 	markerVal[markerValIndex].marker = marker;
 	markerValIndex++;
@@ -267,18 +271,29 @@ void writeLogBufferPrint(void) {
 /////////////////////////////////////////////////////////////////////
 #ifndef	LOG_RUNNING_WRITE
 void writeLogPrint(void) {
-	uint32_t 	i, totalTime = 0;
+	uint32_t 	i, totalTime = 0, distance;
+	uint16_t 	indexM = 0, marker;
 
 	clearXYcie();	// xy座標クリア
 	for(i = 0;i<logValIndex;i++) {
 		totalTime += logVal[i].time;
 		calcXYcie(logVal[i].speed,logVal[i].zg, (float)logVal[i].time/1000);
 
+		if(i == markerVal[indexM].index) {
+			marker = markerVal[indexM].marker;
+			distance = markerVal[indexM].distance;
+			indexM++;
+		} else {
+			marker = 0;
+			distance = 0;
+		}
+
 		f_printf(&fil_W, formatLog
 			,totalTime
 			,logVal[i].speed
 			,(int32_t)(logVal[i].zg*10000)
-			// ,logVal[i].distance
+			,marker
+			,distance
 			// ,logVal[i].target
 			// ,logVal[i].optimalIndex
 			,(int32_t)(calcROC(logVal[i].speed,logVal[i].zg))

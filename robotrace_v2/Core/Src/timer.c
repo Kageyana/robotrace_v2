@@ -62,8 +62,7 @@ void Interrupt1ms(void) {
                 }
             }
         }
-
-        if( courseMarker > 0) {
+        if (courseMarker > 0 && beforeCourseMarker == 0) {
             // マーカーの位置を記録
             writeMarkerPos(encTotalOptimal, courseMarker);
         }
