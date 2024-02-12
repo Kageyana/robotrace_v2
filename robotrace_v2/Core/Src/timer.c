@@ -42,29 +42,40 @@ void Interrupt1ms(void) {
         checkGoalMarker();              // ゴールマーカー処理
 
         // カーブマーカーを通過した時
-        if (courseMarker >= 3 && beforeCourseMarker == 0) {
+        if (courseMarker == 0 && beforeCourseMarker >= 3) {
             cntMarker++;    // マーカーカウント
             if (optimalTrace == BOOST_DISTANCE) {
                 // 距離基準2次走行のとき
-                int32_t i, j, errorDistance, upperLimit, lowerLimit;
+                int32_t i, j, errorDistance;
+
+                // errorDistance = encTotalOptimal - DistanceOptimal;  // 現在の差を計算
+                // encTotalOptimal = markerPos[pathedMarker].distance;               // 距離を補正
+                // DistanceOptimal = encTotalOptimal - errorDistance;  // 補正後の現在距離からの差分
+                // optimalIndex = markerPos[pathedMarker].indexPPAD;      // インデックス更新
+
+                // pathedMarker++;
 
                 for(i=pathedMarker;i<=numPPAMarry;i++) {
                     // 現在地から一番近いマーカーを探す
-                    if (abs(encTotalOptimal - markerPos[i].distance) < encMM(50)) {
+                    if (abs(encTotalOptimal - markerPos[i].distance) < encMM(100)) {
                         errorDistance = encTotalOptimal - DistanceOptimal;  // 現在の差を計算
                         encTotalOptimal = markerPos[i].distance;               // 距離を補正
                         DistanceOptimal = encTotalOptimal - errorDistance;  // 補正後の現在距離からの差分
                         optimalIndex = markerPos[i].indexPPAD;      // インデックス更新
 
-                        pathedMarker = i;
+                        if(i-5 < 0) {
+                            pathedMarker = i-5;
+                        } else {
+                            pathedMarker = 0;
+                        }
                         break;
                     }
                 }
             }
         }
-        if (courseMarker > 0 && beforeCourseMarker == 0) {
+        if (courseMarker == 0 && beforeCourseMarker > 0) {
             // マーカーの位置を記録
-            writeMarkerPos(encTotalOptimal, courseMarker);
+            writeMarkerPos(encTotalOptimal, beforeCourseMarker);
         }
         
         beforeCourseMarker = courseMarker;

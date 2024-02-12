@@ -123,12 +123,12 @@ int16_t readLogDistance(int logNumber) {
         // }
 
         // ログデータの取得
-        TCHAR     log[512];
-        int32_t   time=0, marker=0,velo=0,angVelo=0,distance=0, roc, i=0;
-        int32_t   numD=0, numM=0, cntCurR=0,beforeMarker=0;
-        bool      analysis=false;
-        static int16_t   ROCbuff[600] = {0};
-        static int16_t*    sortROC;
+        TCHAR   log[512];
+        int32_t time=0, marker=0,velo=0,angVelo=0,distance=0, roc, i=0;
+        int32_t numD=0, numM=0, cntCurR=0, numStraight=0;
+        bool    analysis=false;
+        static  int16_t   ROCbuff[600] = {0};
+        static  int16_t*  sortROC;
 
         // 前処理
         // 構造体配列の初期化
@@ -161,19 +161,24 @@ int16_t readLogDistance(int logNumber) {
                     // 中央値を記録(配列要素数が奇数のとき)
                     PPAD[numD].ROC = sortROC[cntCurR/2];
                 }
-                free(sortROC);
+                free(sortROC); // mallocで確保したメモリを開放
                 
                 PPAD[numD].boostSpeed = asignVelocity(PPAD[numD].ROC);   // 曲率半径ごとの速度を計算する
 
+                if(PPAD[i].ROC == PPAD[i-1].ROC) {
+                    numStraight++;
+                } else {
+                    numStraight = 0;
+                }
+                
                 cntCurR = 0;            // 曲率半径用配列のカウントクリア
                 numD++;                 // 距離解析インデックス更新
-                if(numD >= OPT_BUFF_SIZE) return -1;
+                if(numD >= OPT_BUFF_SIZE) return -1; // 解析用配列のサイズを超えたら強制終了
             }
             // 曲率半径の計算
             ROCbuff[cntCurR] = roc;
             
             cntCurR++;  // 曲率半径用配列のカウント
-            beforeMarker = marker;  // 前回マーカーを記録
             i++;
         }
 
