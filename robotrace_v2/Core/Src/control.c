@@ -146,7 +146,6 @@ void loopSystem (void) {
 			if (start) {
 				motorPwmOut(0,0);
 				countdown = 5000;		// カウントダウンスタート
-				calibratIMU = true;		// IMUキャリブレーションを開始
 				patternTrace = 1;
 			}
 			break;
@@ -170,6 +169,7 @@ void loopSystem (void) {
 					ssd1306_SetCursor(56,28);
 					ssd1306_printf(Font_16x26,"2");
 					ssd1306_UpdateScreen();  // グラフィック液晶更新
+					calibratIMU = true;		// IMUキャリブレーションを開始
 				}
 				if ( countdown == 1000 ) {
 					ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
@@ -180,7 +180,7 @@ void loopSystem (void) {
 			}
 
 			// IMUのキャリブレーションが終了したら走行開始
-			if ( !calibratIMU ) {
+			if ( !calibratIMU && countdown == 0) {
 				powerLinesensors(1);	// ラインセンサ点灯
 
 				// SDカードに変数保存
