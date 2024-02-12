@@ -207,9 +207,9 @@ int16_t readLogDistance(int logNumber) {
             }
         }
 
-        //  for (i=0;i<=numD;i++) {
-        //      printf("%f\n",PPAD[i].boostSpeed);
-        //  }
+         for (i=0;i<=numD;i++) {
+             printf("%f\n",PPAD[i].boostSpeed);
+         }
         
         numPPAMarry = numM;
         numPPADarry = numD;

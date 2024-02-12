@@ -28,7 +28,7 @@ typedef struct {
     uint8_t 	time;
     uint8_t 	speed;
     float 		zg;
-	uint16_t	opIndex;
+	int16_t		opIndex;
 } logData;
 logData logVal[BUFFER_SIZW_LOG];
 uint16_t	logValIndex=0;
@@ -261,7 +261,7 @@ void writeLogBufferPrint(void) {
 	logVal[logValIndex].time = cntLog;
     logVal[logValIndex].speed = encCurrentN;
     logVal[logValIndex].zg = BMI088val.gyro.z;
-	logVal[logValIndex].opIndex = optimalIndex;
+	logVal[logValIndex].opIndex = targetSpeed;
     logValIndex++;
   }
 }

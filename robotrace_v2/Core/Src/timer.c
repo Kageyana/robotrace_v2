@@ -42,7 +42,7 @@ void Interrupt1ms(void) {
         checkGoalMarker();              // ゴールマーカー処理
 
         // カーブマーカーを通過した時
-        if (courseMarker >= 2 && beforeCourseMarker == 0) {
+        if (courseMarker >= 3 && beforeCourseMarker == 0) {
             cntMarker++;    // マーカーカウント
             if (optimalTrace == BOOST_DISTANCE) {
                 // 距離基準2次走行のとき
@@ -133,31 +133,33 @@ void Interrupt1ms(void) {
     }
         
     if (modeLOG) {
-        if( encLog >= encMM(CALCDISTANCE_SHORTCUT) ) {
-            // CALCDISTANCEごとにログを保存
+        if (patternTrace > 11 && patternTrace < 100) {
+            if( encLog >= encMM(CALCDISTANCE_SHORTCUT) ) {
+                // CALCDISTANCEごとにログを保存
 #ifdef	LOG_RUNNING_WRITE
-            writeLogBufferPuts(
-                LOG_NUM_8BIT,LOG_NUM_16BIT,LOG_NUM_32BIT,LOG_NUM_FLOAT
-                // 8bit
-                ,targetSpeed
-                // 16bit
-                ,cntLog
-                ,encCurrentN
-                ,optimalIndex
-                ,motorCurrentValL
-                ,motorCurrentValR
-                ,lineTraceCtrl.pwm
-                ,veloCtrl.pwm
-                // 32bit
-                ,encTotalOptimal
-                // float型
-                ,BMI088val.gyro.z
-            );
+                writeLogBufferPuts(
+                    LOG_NUM_8BIT,LOG_NUM_16BIT,LOG_NUM_32BIT,LOG_NUM_FLOAT
+                    // 8bit
+                    ,targetSpeed
+                    // 16bit
+                    ,cntLog
+                    ,encCurrentN
+                    ,optimalIndex
+                    ,motorCurrentValL
+                    ,motorCurrentValR
+                    ,lineTraceCtrl.pwm
+                    ,veloCtrl.pwm
+                    // 32bit
+                    ,encTotalOptimal
+                    // float型
+                    ,BMI088val.gyro.z
+                );
 #else
-            writeLogBufferPrint(); // バッファにログを保存
+                writeLogBufferPrint(); // バッファにログを保存
 #endif
-            cntLog = 0;
-            encLog = 0;
+                cntLog = 0;
+                encLog = 0;
+            }
         }
     }
    
