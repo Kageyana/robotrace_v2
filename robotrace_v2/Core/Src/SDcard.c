@@ -40,7 +40,7 @@ typedef struct {
     int32_t distance;
     uint8_t marker;
 } markerData;
-markerData markerVal[500];
+markerData markerVal[BUFFER_SIZW_MARKER];
 uint16_t	markerValIndex=0;
 
 // ログファイルナンバー
@@ -188,13 +188,18 @@ void writeMarkerPos(uint32_t distance, uint8_t marker) {
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-#ifdef	LOG_RUNNING_WRITE
 void initLog(void) {
 	FRESULT   fresult;
-	
+#ifdef	LOG_RUNNING_WRITE
 	fresult = f_open(&fil_W, "temp", FA_OPEN_ALWAYS | FA_WRITE);  // create file
-}
+#else
+	// 構造体配列の初期化
+    memset(&logVal, 0, sizeof(logData) * BUFFER_SIZW_LOG);
+	memset(&markerVal, 0, sizeof(markerData) * BUFFER_SIZW_MARKER);
+	logValIndex = 0;
+	markerValIndex = 0;
 #endif
+}
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogBufferPuts
 // 処理概要     保存する変数をバッファに転送する
@@ -440,7 +445,8 @@ void getFileNumbers(void) {
 				endFileIndex++;
 			}
 		} while(fno.fname[0] != 0); // ファイルの有無を確認
-
+		
+		endFileIndex--;
 		fileIndexLog = endFileIndex;
 	}
 

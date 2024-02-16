@@ -237,7 +237,7 @@ void calibrationIMU (void) {
 	int16_t gyroVal[3];
 
 	
-	if(i<(uint32_t)(2.0/DEFF_TIME)) {
+	if(i<(uint32_t)(1.0/DEFF_TIME)) {
 		// 角速度の生データを取得
 		BMI088ReadAxisDataG(REG_RATE_X_LSB,rawData,6);
 		// LSBとMSBを結合
@@ -250,13 +250,13 @@ void calibrationIMU (void) {
 		angleInt[2] += gyroVal[2];
 		i++;
 	} else {
-		i = 0;
-		angleOffset[0] = angleInt[0] / 1000;
-		angleOffset[1] = angleInt[1] / 1000;
-		angleOffset[2] = angleInt[2] / 1000;
+		angleOffset[0] = angleInt[0] / i;
+		angleOffset[1] = angleInt[1] / i;
+		angleOffset[2] = angleInt[2] / i;
 		angleInt[0] = 0;
 		angleInt[1] = 0;
 		angleInt[2] = 0;
+		i = 0;
 		calibratIMU = false;
 	}
 	

@@ -65,6 +65,7 @@ extern bool     initLCD;        // LCD初期化状況
 extern bool     initIMU;        // IMU初期化状況
 extern bool     initCurrent;    // 電流センサ初期化状況
 extern uint8_t  modeCurve;	    // カーブ判断 0:直線 1:カーブ進入
+extern uint8_t  autoStart;       // 5走を自動で開始する
 
 extern uint16_t analogVal1[10];         // ADC結果格納配列
 extern uint16_t analogVal2[3];         // ADC結果格納配列

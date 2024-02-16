@@ -117,31 +117,44 @@ void setup( void )
 			switch (patternCalibration) {
 				case 1:
 					setTargetSpeed(0);
-					data_select( &trace_test, SW_PUSH );
 					// スイッチ入力待ち
-					if (trace_test) {
-						veloCtrl.Int = 0;	// I成分リセット
+					if (swValTact == SW_PUSH) {
 						if(lSensorOffset[0] > 0) {
 							// キャリブレーション実施済み
 							start = 1;
 						} else {
-							// キャリブレーション未実施
-							ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
-							ssd1306_SetCursor(22,28);
-							ssd1306_printf(Font_7x10,"Calibration");
-							ssd1306_SetCursor(53,42);
-							ssd1306_printf(Font_7x10,"Now");
-							ssd1306_UpdateScreen();  // グラフィック液晶更新
-
-							cntSetup1 = 0;
-							enc1 = 0;
-							powerLinesensors(1);	// 先に点灯させて安定させる
+							patternCalibration = 2;
+						}
+					} else if(swValTact == SW_RIGHT) {
+						// オートスタート
+						if(lSensorOffset[0] > 0) {
+							// キャリブレーション実施済み
+							autoStart = 1;
+						} else {
 							patternCalibration = 2;
 						}
 					}
 					break;
 
 				case 2:
+					// キャリブレーション未実施
+					veloCtrl.Int = 0;	// I成分リセット
+					ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+					ssd1306_SetCursor(22,28);
+					ssd1306_printf(Font_7x10,"Calibration");
+					ssd1306_SetCursor(53,42);
+					ssd1306_printf(Font_7x10,"Now");
+					ssd1306_UpdateScreen();  // グラフィック液晶更新
+
+					trace_test = true;
+					cntSetup1 = 0;
+					enc1 = 0;
+					powerLinesensors(1);	// 先に点灯させて安定させる
+
+					patternCalibration = 3;
+					break;
+
+				case 3:
 					// 開始準備
 					if (cntSetup1 > 1000) {
 						veloCtrl.Int = 0;			// I成分リセット
@@ -150,35 +163,35 @@ void setup( void )
 						setTargetSpeed(0);			// 目標速度0[m/s]
 						enc1 = 0;
 						modeCalLinesensors = 1; 	// キャリブレーション開始
-						patternCalibration = 3;
-					}
-					break;
-
-				case 3:
-					// 左旋回
-					setTargetAngularVelocity(CALIBRATIONSPEED);
-					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-					if (BMI088val.angle.z < -320.0) {
 						patternCalibration = 4;
 					}
 					break;
 
 				case 4:
-					// 初期位置に戻る
-					setTargetAngularVelocity(-400.0F);
+					// 左旋回
+					setTargetAngularVelocity(CALIBRATIONSPEED);
 					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-					if (lSensor[5] < 1000) {
-						modeCalLinesensors = 0;
-						powerLinesensors(0);	// ラインセンサ消灯
-						countdown = 500;
+					if (BMI088val.angle.z < -320.0) {
 						patternCalibration = 5;
 					}
 					break;
 
 				case 5:
+					// 初期位置に戻る
+					setTargetAngularVelocity(-400.0F);
+					motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+					if (lSensor[5] < 1000) {
+						modeCalLinesensors = 0;
+						countdown = 500;
+						patternCalibration = 6;
+					}
+					break;
+
+				case 6:
 					// 停止
 					motorPwmOutSynth( lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 					if (countdown <= 0) {
+						powerLinesensors(0);	// ラインセンサ消灯
 						start = 1;
 					}
 					break;
@@ -507,7 +520,7 @@ void setup( void )
 				ssd1306_printf(Font_6x8,"microSD  ");
 
 				// 前回解析したログ番号を探す
-				k = endFileIndex-1;
+				k = endFileIndex;
 				for(i=0;i<5;i++) {
 					if(0+(20*i) < 128 || k >= 0) {
 						for(j=0;j<5;j++) {
@@ -538,7 +551,7 @@ void setup( void )
 			dataTuningLR( &x, 1, 0, 4);
 			
 			// i-jとx-yが一致したとき文字色反転
-			k = endFileIndex-1;
+			k = endFileIndex;
 			for(i=0;i<5;i++) {
 				if(0+(20*i) < 128 || k >= 0) {
 					for(j=0;j<5;j++) {

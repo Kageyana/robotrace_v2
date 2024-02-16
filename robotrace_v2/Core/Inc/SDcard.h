@@ -23,6 +23,7 @@
 #else
 
 #define BUFFER_SIZW_LOG     5000
+#define BUFFER_SIZW_MARKER  500
 
 #endif
 
@@ -42,8 +43,8 @@ bool initMicroSD(void);
 void createLog(void);
 void endLog(void);
 void writeMarkerPos(uint32_t distance, uint8_t marker);
-#ifdef	LOG_RUNNING_WRITE
 void initLog(void);
+#ifdef	LOG_RUNNING_WRITE
 void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...);
 void writeLogPuts(void);
 void send8bit(uint8_t data);

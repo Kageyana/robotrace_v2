@@ -15,6 +15,7 @@ bool    initLCD = false;    // LCD初期化状況		false:初期化失敗	true:�
 bool    initIMU = false;    // IMU初期化状況		false:初期化失敗	true:初期化成功
 bool    initCurrent = false;    // 電流センサ初期化状況		false:初期化失敗	true:初期化成功
 uint8_t modeCurve = 0;		// カーブ判断			0:直線			1:カーブ進入
+uint8_t autoStart = 0;  	// 5走を自動で開始する
 
 uint16_t 	analogVal1[NUM_SENSORS];		// ADC結果格納配列
 uint16_t 	analogVal2[3];		// ADC結果格納配列
@@ -137,18 +138,52 @@ void loopSystem (void) {
 	
 	switch (patternTrace) {
       	case 0:
-			if(modeDSP) {
-				setup();
-			} else {
-				caribrateSensors();
-			}
-				
-			if (start) {
+			if(autoStart > 1) {
+				// 2次走行
 				motorPwmOut(0,0);
-				countdown = 5000;		// カウントダウンスタート
+				// 初期化
+				if (autoStart == 2) {
+					getFileNumbers();	// 1次走行のログ番号取得
+				}
+				SGmarker = 0;
+				// 目標速度調整
+
+				// コース解析
+				ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+				ssd1306_SetCursor(0,25);
+				ssd1306_printf(Font_11x18,"Analizing");
+				ssd1306_UpdateScreen();  // グラフィック液晶更新
+				initIMU = false;
+				numPPADarry = readLogDistance(fileNumbers[fileIndexLog]);
+				optimalIndex = 0;
+				initIMU = true;
+
+				countdown = 2000;		// カウントダウンスタート
+				ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+				ssd1306_SetCursor(56,28);
+				ssd1306_printf(Font_16x26,"2");
+				ssd1306_UpdateScreen();  // グラフィック液晶更新
 				patternTrace = 1;
+			} else {
+				if(modeDSP) {
+					setup();
+				} else {
+					// ディスプレイモジュールが接続されていない時
+					caribrateSensors();
+				}
+
+				if (start || autoStart) {
+					motorPwmOut(0,0);
+					countdown = 5000;		// カウントダウンスタート
+					ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+					ssd1306_SetCursor(56,28);
+					ssd1306_printf(Font_16x26,"5");
+					ssd1306_UpdateScreen();  // グラフィック液晶更新
+					patternTrace = 1;
+				}
 			}
 			break;
+
 		case 1:	
 			// カウントダウンスタート
 			if(modeDSP) {
@@ -169,13 +204,13 @@ void loopSystem (void) {
 					ssd1306_SetCursor(56,28);
 					ssd1306_printf(Font_16x26,"2");
 					ssd1306_UpdateScreen();  // グラフィック液晶更新
-					calibratIMU = true;		// IMUキャリブレーションを開始
 				}
 				if ( countdown == 1000 ) {
 					ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
 					ssd1306_SetCursor(56,28);
 					ssd1306_printf(Font_16x26,"1");
 					ssd1306_UpdateScreen();  // グラフィック液晶更新
+					calibratIMU = true;		// IMUキャリブレーションを開始
 				}
 			}
 
@@ -187,25 +222,24 @@ void loopSystem (void) {
 				initIMU = false;
 
 				// PIDゲインを記録
-				writePIDparameters(&lineTraceCtrl);
-				writePIDparameters(&veloCtrl);
-				writePIDparameters(&yawRateCtrl);
-				writePIDparameters(&yawCtrl);
-				writePIDparameters(&distCtrl);
+				if (autoStart == 0) {
+					writePIDparameters(&lineTraceCtrl);
+					writePIDparameters(&veloCtrl);
+					writePIDparameters(&yawRateCtrl);
+					writePIDparameters(&yawCtrl);
+					writePIDparameters(&distCtrl);
+				}
 
 				writeTgtspeeds();	// 目標速度を記録
 
-#ifdef LOG_RUNNING_WRITE
 				if(initMSD) initLog();    // ログ一時ファイル作成
-#endif
+
 				initIMU = true;
 
 				// 変数初期化
 				encRightMarker = encMM(600);
 				veloCtrl.Int = 0.0;
 				yawRateCtrl.Int = 0.0;
-
-
 
 				patternTrace = 11;
 			}
@@ -309,26 +343,56 @@ void loopSystem (void) {
 
       	case 101:
 			// 停止速度まで減速
-			if (enc1 >= encMM(500)) {
+			if (enc1 >= encMM(200)) {
 				setTargetSpeed(0);
 			} else {
 				setTargetSpeed(tgtParam.stop);
 			}
 			motorPwmOutSynth( lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 			
-			if (encCurrentN == 0 && enc1 >= encMM(500)) {
+			if (encCurrentN == 0 ) {
 				motorPwmOutSynth( 0, 0, 0, 0);
+
+				ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+				ssd1306_SetCursor(0,25);
+				ssd1306_printf(Font_11x18,"log");
+				ssd1306_SetCursor(0,45);
+				ssd1306_printf(Font_11x18,"Writing");
+				ssd1306_UpdateScreen();  // グラフィック液晶更新
+
 				if (modeLOG) endLog();	// ログ保存終了
 
-				if(modeDSP) {
-					ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
-					ssd1306_SetCursor(0,25);
-					ssd1306_printf(Font_11x18,"Time %d",optimalTrace);
-					ssd1306_SetCursor(0,45);
-					ssd1306_printf(Font_11x18,"%6.3f[s]",(float)goalTime/1000);
-					ssd1306_UpdateScreen();  // グラフィック液晶更新
+				ssd1306_SetCursor(0,45);
+				ssd1306_printf(Font_11x18,"Written");
+				ssd1306_UpdateScreen();  // グラフィック液晶更新
+
+				if (autoStart > 0) {
+					autoStart++;
+					if (autoStart > 5) {
+						ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+						ssd1306_SetCursor(0,25);
+						ssd1306_printf(Font_11x18,"Auto run");
+						ssd1306_SetCursor(0,45);
+						ssd1306_printf(Font_11x18,"Finish!");
+						ssd1306_UpdateScreen();  // グラフィック液晶更新
+						patternTrace = 102;
+						break;
+					} else {
+						powerLinesensors(0);
+						patternTrace = 0;
+						break;
+					}
+				} else {
+					if(modeDSP) {
+						ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
+						ssd1306_SetCursor(0,25);
+						ssd1306_printf(Font_11x18,"Time %d",optimalTrace);
+						ssd1306_SetCursor(0,45);
+						ssd1306_printf(Font_11x18,"%6.3f[s]",(float)goalTime/1000);
+						ssd1306_UpdateScreen();  // グラフィック液晶更新
+					}
 				}
-	
+
 				goalTime = cntRun;
 				patternTrace = 102;
 				break;
@@ -340,11 +404,6 @@ void loopSystem (void) {
 			motorPwmOutSynth( 0, 0, 0, 0);
 			powerLinesensors(0);
 
-			// if (swValTact == SW_PUSH) {
-			// 	initSystem();
-			// 	start = 0;
-			// 	patternTrace = 0;
-			// }
 			break;
     
       	default:
