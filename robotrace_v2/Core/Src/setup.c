@@ -209,7 +209,7 @@ void setup( void )
 				ssd1306_printf(Font_6x8,"Parameter");
 			}
 
-			dataTuningLR( &patternParameter1, 1, 1, 13);
+			dataTuningLR( &patternParameter1, 1, 1, 16);
 
 			if (beforePparam != patternParameter1) {
 				ssd1306_FillRectangle(0,16,127,63, Black);
@@ -253,42 +253,60 @@ void setup( void )
 					ssd1306_printf(Font_6x8,"BST 800:%3gm/s", tgtParam.bst800);
 					break;
 				case 7:
-					// 2次走行_R1600
+					// 2次走行_R700
+					dataTuningUDF( &tgtParam.bst700, 0.1, 0.0, 10.0 );
+					ssd1306_SetCursor(0,24);
+					ssd1306_printf(Font_6x8,"BST 700:%3gm/s", tgtParam.bst700);
+					break;
+				case 8:
+					// 2次走行_R600
 					dataTuningUDF( &tgtParam.bst600, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
 					ssd1306_printf(Font_6x8,"BST 600:%3gm/s", tgtParam.bst600);
 					break;
-				case 8:
+				case 9:
+					// 2次走行_R500
+					dataTuningUDF( &tgtParam.bst500, 0.1, 0.0, 10.0 );
+					ssd1306_SetCursor(0,24);
+					ssd1306_printf(Font_6x8,"BST 500:%3gm/s", tgtParam.bst500);
+					break;
+				case 10:
 					// 2次走行_R400
 					dataTuningUDF( &tgtParam.bst400, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
 					ssd1306_printf(Font_6x8,"BST 400:%3gm/s", tgtParam.bst400);
 					break;
-				case 9:
+				case 11:
+					// 2次走行_R300
+					dataTuningUDF( &tgtParam.bst300, 0.1, 0.0, 10.0 );
+					ssd1306_SetCursor(0,24);
+					ssd1306_printf(Font_6x8,"BST 300:%3gm/s", tgtParam.bst300);
+					break;
+				case 12:
 					// 2次走行_R200
 					dataTuningUDF( &tgtParam.bst200, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
 					ssd1306_printf(Font_6x8,"BST 200:%3gm/s", tgtParam.bst200);
 					break;
-				case 10:
+				case 13:
 					// 2次走行_R100
 					dataTuningUDF( &tgtParam.bst100, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
 					ssd1306_printf(Font_6x8,"BST 100:%3gm/s", tgtParam.bst100);
 					break;
-				case 11:
+				case 14:
 					// 2次走行_加速度
 					dataTuningUDF( &tgtParam.acceleF, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
 					ssd1306_printf(Font_6x8,"BST acceleF:%3gm/ss", tgtParam.acceleF);
 					break;
-				case 12:
+				case 15:
 					// 2次走行_減速度
 					dataTuningUDF( &tgtParam.acceleD, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);
 					ssd1306_printf(Font_6x8,"BST acceleD:%3gm/ss", tgtParam.acceleD);
 					break;
-				case 13:
+				case 16:
 					// 2次走行_減速度
 					dataTuningUDF( &tgtParam.shortCut, 0.1, 0.0, 10.0 );
 					ssd1306_SetCursor(0,24);

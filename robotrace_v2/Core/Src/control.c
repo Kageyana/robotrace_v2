@@ -375,16 +375,18 @@ void loopSystem (void) {
 
 				if (autoStart > 0) {
 					autoStart++;
-					tgtParam.bstStraight	*= PARAM_UP_STEP;
-					tgtParam.bst1500		*= PARAM_UP_STEP;
-					tgtParam.bst800			*= PARAM_UP_STEP;
-					tgtParam.bst700			*= PARAM_UP_STEP;
-					tgtParam.bst600			*= PARAM_UP_STEP;
-					tgtParam.bst500			*= PARAM_UP_STEP;
-					tgtParam.bst400			*= PARAM_UP_STEP;
-					// tgtParam.bst300			*= PARAM_UP_STEP;
-					// tgtParam.bst200			*= PARAM_UP_STEP;
-					// tgtParam.bst100			*= PARAM_UP_STEP;
+					if (autoStart >= 3) {
+						tgtParam.bstStraight	*= PARAM_UP_STEP;
+						tgtParam.bst1500		*= PARAM_UP_STEP;
+						tgtParam.bst800			*= PARAM_UP_STEP;
+						tgtParam.bst700			*= PARAM_UP_STEP;
+						// tgtParam.bst600			*= PARAM_UP_STEP;
+						// tgtParam.bst500			*= PARAM_UP_STEP;
+						// tgtParam.bst400			*= PARAM_UP_STEP;
+						// tgtParam.bst300			*= PARAM_UP_STEP;
+						// tgtParam.bst200			*= PARAM_UP_STEP;
+						// tgtParam.bst100			*= PARAM_UP_STEP;
+					}
 
 					if (autoStart > 5) {
 						ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め

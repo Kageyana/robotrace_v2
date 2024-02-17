@@ -35,7 +35,7 @@ void Interrupt1ms(void) {
         // if (cntEmcStopAngleX()) emcStop = STOP_ANGLE_X;
         // if (cntEmcStopAngleY()) emcStop = STOP_ANGLE_Y;
         if (cntEmcStopEncStop()) emcStop = STOP_ENCODER_STOP;
-        // if (cntEmcStopLineSensor()) emcStop = STOP_LINESENSOR;
+        if (cntEmcStopLineSensor()) emcStop = STOP_LINESENSOR;
         if (judgeOverSpeed()) emcStop = STOP_OVERSPEED;
         
         courseMarker = checkMarker();   // マーカー検知
@@ -47,25 +47,49 @@ void Interrupt1ms(void) {
             if (optimalTrace == BOOST_DISTANCE) {
                 if(straightState) {
                     // 距離基準2次走行のとき
-                    int32_t i, j, errorDistance;
+                    int32_t i, j, errorDistance = 0;
 
+                    // for(i=pathedMarker;i<=numPPAMarry;i++) {
+                    //     // 現在地から一番近いマーカーを探す
+                    //     if (abs(encTotalOptimal - markerPos[i].distance) < encMM(100)) {
+                    //         errorDistance = encTotalOptimal - DistanceOptimal;  // 現在の差を計算
+                    //         encTotalOptimal = markerPos[i].distance;               // 距離を補正
+                    //         DistanceOptimal = encTotalOptimal - errorDistance;  // 補正後の現在距離からの差分
+                    //         optimalIndex = markerPos[i].indexPPAD;      // インデックス更新
+
+                    //         if(i-5 < 0) {
+                    //             pathedMarker = i-5;
+                    //         } else {
+                    //             pathedMarker = 0;
+                    //         }
+                    //         break;
+                    //     }
+                    // }
+                    
                     for(i=pathedMarker;i<=numPPAMarry;i++) {
                         // 現在地から一番近いマーカーを探す
-                        if (abs(encTotalOptimal - markerPos[i].distance) < encMM(100)) {
-                            errorDistance = encTotalOptimal - DistanceOptimal;  // 現在の差を計算
-                            encTotalOptimal = markerPos[i].distance;               // 距離を補正
-                            DistanceOptimal = encTotalOptimal - errorDistance;  // 補正後の現在距離からの差分
-                            optimalIndex = markerPos[i].indexPPAD;      // インデックス更新
+                        if (encTotalOptimal - markerPos[i].distance < 0) {
+                            for (j=i;j>0;j--) {
+                                if (abs(encTotalOptimal - markerPos[j].distance) < encMM(100)) {
+                                    errorDistance = encTotalOptimal - DistanceOptimal;  // 現在の差を計算
+                                    encTotalOptimal = markerPos[j].distance;               // 距離を補正
+                                    DistanceOptimal = encTotalOptimal - errorDistance;  // 補正後の現在距離からの差分
+                                    optimalIndex = markerPos[j].indexPPAD;      // インデックス更新
 
-                            if(i-5 < 0) {
-                                pathedMarker = i-5;
-                            } else {
-                                pathedMarker = 0;
+                                    if(j-5 < 0) {
+                                        pathedMarker = j-5;
+                                    } else {
+                                        pathedMarker = 0;
+                                    }
+                                    straightState = false;
+                                    straightMeter = 0;
+                                    break;
+                                }
                             }
-                            break;
+                            if(errorDistance != 0) break;
                         }
                     }
-                    straightState = false;
+                    
                 }
             }
         }
@@ -142,7 +166,9 @@ void Interrupt1ms(void) {
         
     if (patternTrace > 11 && patternTrace < 100) {
         if( encLog >= encMM(CALCDISTANCE_SHORTCUT) ) {
-            if( calcROC(encCurrentN,BMI088val.gyro.z) >= 2000 ) {
+            static float rocCorrection = 0;
+            rocCorrection = calcROC(encCurrentN,BMI088val.gyro.z);
+            if( fabs(rocCorrection) >= 700.0F) {
                 straightMeter += CALCDISTANCE_SHORTCUT;
             } else {
                 straightMeter = 0;

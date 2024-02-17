@@ -18,7 +18,7 @@
 #define STOP_COUNT_ANGLE_X	    100		// X方向の角速度変化
 #define STOP_COUNT_ANGLE_Y	    100		// Y方向の角速度変化
 #define STOP_COUNT_TIME		    1000	// 時間停止
-#define STOP_COUNT_LINESENSOR	200	    // ラインセンサが外れる
+#define STOP_COUNT_LINESENSOR	300	    // ラインセンサが外れる
 #define STOP_COUNT_OVERSPEED	200	    // 目標速度を大きく超えている
 //====================================//
 // グローバル変数の宣言
