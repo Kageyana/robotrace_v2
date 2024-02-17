@@ -49,6 +49,9 @@ uint8_t 	courseMarker;
 uint8_t 	beforeCourseMarker;
 uint32_t 	cntMarker = 0;
 uint8_t 	courseMarkerLog;
+int32_t  	straightMeter = 0;
+bool     	straightState = false;
+
 
 // ログ関連
 uint32_t 	goalTime = 0;
@@ -230,14 +233,16 @@ void loopSystem (void) {
 					writePIDparameters(&distCtrl);
 				}
 
-				writeTgtspeeds();	// 目標速度を記録
+				if(autoStart <= 1) {
+					writeTgtspeeds();	// 目標速度を記録
+				}
 
 				if(initMSD) initLog();    // ログ一時ファイル作成
 
 				initIMU = true;
 
 				// 変数初期化
-				encRightMarker = encMM(600);
+				encRightMarker = encMM(1000);
 				veloCtrl.Int = 0.0;
 				yawRateCtrl.Int = 0.0;
 
@@ -265,6 +270,8 @@ void loopSystem (void) {
 				BMI088val.angle.z = 0.0F;
 				yawCtrl.Int = 0.0;
 				distCtrl.Int = 0.0;
+				straightMeter = 0;
+				straightState = false;
 
 				clearXYcie();	// 座標計算変数初期化
 
@@ -368,6 +375,17 @@ void loopSystem (void) {
 
 				if (autoStart > 0) {
 					autoStart++;
+					tgtParam.bstStraight	*= PARAM_UP_STEP;
+					tgtParam.bst1500		*= PARAM_UP_STEP;
+					tgtParam.bst800			*= PARAM_UP_STEP;
+					tgtParam.bst700			*= PARAM_UP_STEP;
+					tgtParam.bst600			*= PARAM_UP_STEP;
+					tgtParam.bst500			*= PARAM_UP_STEP;
+					tgtParam.bst400			*= PARAM_UP_STEP;
+					// tgtParam.bst300			*= PARAM_UP_STEP;
+					// tgtParam.bst200			*= PARAM_UP_STEP;
+					// tgtParam.bst100			*= PARAM_UP_STEP;
+
 					if (autoStart > 5) {
 						ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
 						ssd1306_SetCursor(0,25);

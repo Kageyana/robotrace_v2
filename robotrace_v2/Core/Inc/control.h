@@ -25,6 +25,8 @@
 #define PARAM_BOOST_200             1.6F
 #define PARAM_BOOST_100             1.4F
 
+#define PARAM_UP_STEP               1.04F
+
 // ゴール
 #define COUNT_GOAL              2       // ゴールマーカーを読む回数
 
@@ -78,6 +80,8 @@ extern uint8_t  courseMarker;
 extern uint8_t  beforeCourseMarker;
 extern uint32_t cntMarker;
 extern uint8_t  courseMarkerLog;
+extern int32_t  straightMeter;
+extern bool     straightState;
 
 // タイマ関連
 extern uint32_t cntRun;

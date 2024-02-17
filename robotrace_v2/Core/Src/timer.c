@@ -41,38 +41,35 @@ void Interrupt1ms(void) {
         courseMarker = checkMarker();   // マーカー検知
         checkGoalMarker();              // ゴールマーカー処理
 
-        // カーブマーカーを通過した時
-        if (courseMarker == 0 && beforeCourseMarker >= 3) {
+        // カーブマーカー,クロスラインを通過した時
+        if (courseMarker == 0 && beforeCourseMarker > 0) {
             cntMarker++;    // マーカーカウント
             if (optimalTrace == BOOST_DISTANCE) {
-                // 距離基準2次走行のとき
-                int32_t i, j, errorDistance;
+                if(straightState) {
+                    // 距離基準2次走行のとき
+                    int32_t i, j, errorDistance;
 
-                // errorDistance = encTotalOptimal - DistanceOptimal;  // 現在の差を計算
-                // encTotalOptimal = markerPos[pathedMarker].distance;               // 距離を補正
-                // DistanceOptimal = encTotalOptimal - errorDistance;  // 補正後の現在距離からの差分
-                // optimalIndex = markerPos[pathedMarker].indexPPAD;      // インデックス更新
+                    for(i=pathedMarker;i<=numPPAMarry;i++) {
+                        // 現在地から一番近いマーカーを探す
+                        if (abs(encTotalOptimal - markerPos[i].distance) < encMM(100)) {
+                            errorDistance = encTotalOptimal - DistanceOptimal;  // 現在の差を計算
+                            encTotalOptimal = markerPos[i].distance;               // 距離を補正
+                            DistanceOptimal = encTotalOptimal - errorDistance;  // 補正後の現在距離からの差分
+                            optimalIndex = markerPos[i].indexPPAD;      // インデックス更新
 
-                // pathedMarker++;
-
-                for(i=pathedMarker;i<=numPPAMarry;i++) {
-                    // 現在地から一番近いマーカーを探す
-                    if (abs(encTotalOptimal - markerPos[i].distance) < encMM(100)) {
-                        errorDistance = encTotalOptimal - DistanceOptimal;  // 現在の差を計算
-                        encTotalOptimal = markerPos[i].distance;               // 距離を補正
-                        DistanceOptimal = encTotalOptimal - errorDistance;  // 補正後の現在距離からの差分
-                        optimalIndex = markerPos[i].indexPPAD;      // インデックス更新
-
-                        if(i-5 < 0) {
-                            pathedMarker = i-5;
-                        } else {
-                            pathedMarker = 0;
+                            if(i-5 < 0) {
+                                pathedMarker = i-5;
+                            } else {
+                                pathedMarker = 0;
+                            }
+                            break;
                         }
-                        break;
                     }
+                    straightState = false;
                 }
             }
         }
+            
         if (courseMarker == 0 && beforeCourseMarker > 0) {
             // マーカーの位置を記録
             writeMarkerPos(encTotalOptimal, beforeCourseMarker);
@@ -143,9 +140,19 @@ void Interrupt1ms(void) {
             break;
     }
         
-    if (modeLOG) {
-        if (patternTrace > 11 && patternTrace < 100) {
-            if( encLog >= encMM(CALCDISTANCE_SHORTCUT) ) {
+    if (patternTrace > 11 && patternTrace < 100) {
+        if( encLog >= encMM(CALCDISTANCE_SHORTCUT) ) {
+            if( calcROC(encCurrentN,BMI088val.gyro.z) >= 2000 ) {
+                straightMeter += CALCDISTANCE_SHORTCUT;
+            } else {
+                straightMeter = 0;
+            }
+
+            if (straightMeter >= 100 ) {
+                straightState = true;
+            }
+
+            if (modeLOG) {
                 // CALCDISTANCEごとにログを保存
 #ifdef	LOG_RUNNING_WRITE
                 writeLogBufferPuts(

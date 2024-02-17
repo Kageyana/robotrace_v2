@@ -117,7 +117,7 @@ bool checkCrossLine(void) {
 /////////////////////////////////////////////////////////////
 void checkGoalMarker (void) {
 	if ( courseMarker == RIGHTMARKER ) {
-		if (encRightMarker > encMM(600) ) {	// 2回目以降
+		if (encRightMarker > encMM(1000) ) {	// 2回目以降
 			SGmarker++;
 			encRightMarker = 0;
 		}
