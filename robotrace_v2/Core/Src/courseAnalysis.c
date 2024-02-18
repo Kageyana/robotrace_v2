@@ -129,6 +129,8 @@ int16_t readLogDistance(int logNumber) {
         bool    analysis=false;
         static  int16_t   ROCbuff[600] = {0};
         static  int16_t*  sortROC;
+        int32_t  	straightMeter = 0;
+        bool     	straightState = false;
 
         // 前処理
         // 構造体配列の初期化
@@ -139,10 +141,23 @@ int16_t readLogDistance(int logNumber) {
         while (f_gets(log,sizeof(log),&fil_Read)) {
             sscanf(log,"%d,%d,%d,%d,%d,%d,",&time,&velo,&angVelo,&marker,&distance,&roc);
             // 解析処理
-            if (marker >= 2) {
+            // if (marker >= 2) {
+            //     // カーブマーカーを通過したときにマーカー位置を記録
+            //     markerPos[numM].distance = distance;
+            //     markerPos[numM].indexPPAD = numD;
+
+            //     numM++;     // マーカー解析インデックス更新
+            // }
+
+            if (marker == 3 || (marker == 2 && straightState) ) {
                 // カーブマーカーを通過したときにマーカー位置を記録
                 markerPos[numM].distance = distance;
                 markerPos[numM].indexPPAD = numD;
+
+                if(marker == 2 && straightState) {
+                    straightState = false;
+                    straightMeter = 0;
+                }
 
                 numM++;     // マーカー解析インデックス更新
             }
@@ -177,6 +192,16 @@ int16_t readLogDistance(int logNumber) {
             }
             // 曲率半径の計算
             ROCbuff[cntCurR] = roc;
+
+            if( abs(ROCbuff[cntCurR]) >= 700) {
+                straightMeter += CALCDISTANCE_SHORTCUT;
+            } else {
+                straightMeter = 0;
+            }
+
+            if (straightMeter >= 100 ) {
+                straightState = true;
+            }
             
             cntCurR++;  // 曲率半径用配列のカウント
             i++;

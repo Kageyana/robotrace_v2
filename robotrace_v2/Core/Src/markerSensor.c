@@ -62,6 +62,9 @@ uint8_t checkMarker( void ) {
 			// マーカー位置を記録
 			if(existMarker == 0x1) {
 				encMarkerR = nowEncTotalN;
+				if(SGmarker == 0) {
+					SGmarker++;
+				}
 			} else if(existMarker == 0x2) {
 				encMarkerL = nowEncTotalN;
 			} else if (existMarker == 0x3) {
@@ -116,7 +119,7 @@ bool checkCrossLine(void) {
 // 戻り値       0:マーカなし 0x1:右 0x2:左 0x3:クロスライン
 /////////////////////////////////////////////////////////////
 void checkGoalMarker (void) {
-	if ( courseMarker == RIGHTMARKER ) {
+	if ( courseMarker == RIGHTMARKER && SGmarker > 0) {
 		if (encRightMarker > encMM(1000) ) {	// 2回目以降
 			SGmarker++;
 			encRightMarker = 0;
