@@ -273,6 +273,8 @@ float asignVelocity(int16_t ROC) {
     absROC = abs(ROC);
     if ( absROC > 1500 ) ret = tgtParam.bstStraight;
     if ( absROC <= 1500 ) ret = tgtParam.bst1500;
+    if ( absROC <= 1300 ) ret = tgtParam.bst1300;
+    if ( absROC <= 1000 ) ret = tgtParam.bst1000;
     if ( absROC <= 800 )  ret = tgtParam.bst800;
     if ( absROC <= 700 )  ret = tgtParam.bst700;
     if ( absROC <= 600 )  ret = tgtParam.bst600;

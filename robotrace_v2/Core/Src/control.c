@@ -27,6 +27,8 @@ speedParam tgtParam = {
 	PARAM_STOP,
 	PARAM_BOOST_STRAIGHT,
 	PARAM_BOOST_1500,
+	PARAM_BOOST_1300,
+	PARAM_BOOST_1000,
 	PARAM_BOOST_800,
 	PARAM_BOOST_700,
 	PARAM_BOOST_600,
@@ -378,10 +380,12 @@ void loopSystem (void) {
 					if (autoStart >= 3) {
 						tgtParam.bstStraight	*= PARAM_UP_STEP;
 						tgtParam.bst1500		*= PARAM_UP_STEP;
+						tgtParam.bst1300		*= PARAM_UP_STEP;
+						tgtParam.bst1000		*= PARAM_UP_STEP;
 						tgtParam.bst800			*= PARAM_UP_STEP;
 						tgtParam.bst700			*= PARAM_UP_STEP;
-						// tgtParam.bst600			*= PARAM_UP_STEP;
-						// tgtParam.bst500			*= PARAM_UP_STEP;
+						tgtParam.bst600			*= PARAM_UP_STEP;
+						tgtParam.bst500			*= PARAM_UP_STEP;
 						// tgtParam.bst400			*= PARAM_UP_STEP;
 						// tgtParam.bst300			*= PARAM_UP_STEP;
 						// tgtParam.bst200			*= PARAM_UP_STEP;
@@ -567,6 +571,8 @@ void writeTgtspeeds(void) {
 			,(int32_t)(round(tgtParam.stop*100))
 			,(int32_t)(round(tgtParam.bstStraight*100))
 			,(int32_t)(round(tgtParam.bst1500*100))
+			,(int32_t)(round(tgtParam.bst1300*100))
+			,(int32_t)(round(tgtParam.bst1000*100))
 			,(int32_t)(round(tgtParam.bst800*100))
 			,(int32_t)(round(tgtParam.bst700*100))
 			,(int32_t)(round(tgtParam.bst600*100))
@@ -613,17 +619,19 @@ void readTgtspeeds(void) {
 		tgtParam.stop			= (float)param[2]/100;
 		tgtParam.bstStraight	= (float)param[3]/100;
 		tgtParam.bst1500		= (float)param[4]/100;
-		tgtParam.bst800			= (float)param[5]/100;
-		tgtParam.bst700			= (float)param[6]/100;
-		tgtParam.bst600			= (float)param[7]/100;
-		tgtParam.bst500			= (float)param[8]/100;
-		tgtParam.bst400			= (float)param[9]/100;
-		tgtParam.bst300			= (float)param[10]/100;
-		tgtParam.bst200			= (float)param[11]/100;
-		tgtParam.bst100			= (float)param[12]/100;
-		tgtParam.acceleF		= (float)param[13]/100;
-		tgtParam.acceleD		= (float)param[14]/100;
-		tgtParam.shortCut		= (float)param[15]/100;
+		tgtParam.bst1300		= (float)param[5]/100;
+		tgtParam.bst1000		= (float)param[6]/100;
+		tgtParam.bst800			= (float)param[7]/100;
+		tgtParam.bst700			= (float)param[8]/100;
+		tgtParam.bst600			= (float)param[9]/100;
+		tgtParam.bst500			= (float)param[10]/100;
+		tgtParam.bst400			= (float)param[11]/100;
+		tgtParam.bst300			= (float)param[12]/100;
+		tgtParam.bst200			= (float)param[13]/100;
+		tgtParam.bst100			= (float)param[14]/100;
+		tgtParam.acceleF		= (float)param[15]/100;
+		tgtParam.acceleD		= (float)param[16]/100;
+		tgtParam.shortCut		= (float)param[17]/100;
 	}
 
 	f_close(&fil);

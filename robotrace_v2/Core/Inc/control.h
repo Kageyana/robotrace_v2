@@ -11,11 +11,13 @@
 
 // 速度パラメータ関連
 #define PARAM_STRAIGHT              1.3F
-#define PARAM_CURVE                 1.0F
+#define PARAM_CURVE                 1.1F
 #define PARAM_STOP                  0.8F
 #define PARAM_SHORTCUT              0.5F
 #define PARAM_BOOST_STRAIGHT        2.4F
-#define PARAM_BOOST_1500            2.2F
+#define PARAM_BOOST_1500            2.3F
+#define PARAM_BOOST_1300            2.2F
+#define PARAM_BOOST_1000            2.1F
 #define PARAM_BOOST_800             2.0F
 #define PARAM_BOOST_700             1.8F
 #define PARAM_BOOST_600             1.7F
@@ -43,6 +45,8 @@ typedef struct {
     float stop;
     float bstStraight;
     float bst1500;
+    float bst1300;
+    float bst1000;
     float bst800;
     float bst700;
     float bst600;
