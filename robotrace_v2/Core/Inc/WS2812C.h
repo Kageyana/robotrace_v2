@@ -8,18 +8,26 @@
 //====================================//
 // シンボル定義
 //====================================//
-#define BUFFER_SIZW_LED 32
+#define MAX_LED 4
+#define PERIOD_LED_TIM htim1.Init.Period  // counter period
+
+typedef struct {
+    uint8_t pattern;
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+} RGBLED;
 //====================================//
 // グローバル変数の宣言
 //====================================//
-// extern int32_t ledBuff;     // 送信バッファ
-// extern bool    ledsend = false;    // 送信フラグ
-// extern uint8_t ledCntBit;     // 送信bitのカウント
-
+extern volatile bool datasentflag;
+extern bool lineflag;
 //====================================//
 // プロトタイプ宣言
 //====================================//
-void ledset(uint8_t r, uint8_t g, uint8_t b);
-void sendColorData(void);
-
+void setLED (int LEDnum, int Red, int Green, int Blue);
+void sendLED (void);
+void lineLED (void);
+void r2b(RGBLED *led, uint8_t brightness);
+void b2r(RGBLED *led, uint8_t brightness);
 #endif // WS2812C_H_

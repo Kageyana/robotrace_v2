@@ -87,30 +87,32 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define SIDEMARKER_L_Pin GPIO_PIN_13
 #define SIDEMARKER_L_GPIO_Port GPIOC
-#define RGBLED_Pin GPIO_PIN_14
-#define RGBLED_GPIO_Port GPIOC
+#define SidemarkerPWR_Pin GPIO_PIN_14
+#define SidemarkerPWR_GPIO_Port GPIOC
 #define MOTOR_DIR_L_Pin GPIO_PIN_15
 #define MOTOR_DIR_L_GPIO_Port GPIOC
 #define MOTOR_CM1_Pin GPIO_PIN_0
 #define MOTOR_CM1_GPIO_Port GPIOC
-#define BATTM_Pin GPIO_PIN_4
-#define BATTM_GPIO_Port GPIOC
-#define MOTOR_CM2_Pin GPIO_PIN_5
+#define BATTM_Pin GPIO_PIN_7
+#define BATTM_GPIO_Port GPIOA
+#define MOTOR_CM2_Pin GPIO_PIN_4
 #define MOTOR_CM2_GPIO_Port GPIOC
-#define MOTOR_DIR_R_Pin GPIO_PIN_2
+#define MOTOR_DIR_R_Pin GPIO_PIN_12
 #define MOTOR_DIR_R_GPIO_Port GPIOB
-#define SIDEMARKER_R_Pin GPIO_PIN_12
+#define SIDEMARKER_R_Pin GPIO_PIN_13
 #define SIDEMARKER_R_GPIO_Port GPIOB
 #define ButtonR_Pin GPIO_PIN_10
 #define ButtonR_GPIO_Port GPIOA
-#define ButtonL_Pin GPIO_PIN_11
-#define ButtonL_GPIO_Port GPIOA
-#define IMU_CSB2_Pin GPIO_PIN_12
-#define IMU_CSB2_GPIO_Port GPIOA
-#define IMU_CSB1_Pin GPIO_PIN_15
-#define IMU_CSB1_GPIO_Port GPIOA
+#define SD_SW_Pin GPIO_PIN_15
+#define SD_SW_GPIO_Port GPIOA
 #define CS_MSD_Pin GPIO_PIN_2
 #define CS_MSD_GPIO_Port GPIOD
+#define IMU_CSB2_Pin GPIO_PIN_4
+#define IMU_CSB2_GPIO_Port GPIOB
+#define IMU_CSB1_Pin GPIO_PIN_5
+#define IMU_CSB1_GPIO_Port GPIOB
+#define ButtonL_Pin GPIO_PIN_8
+#define ButtonL_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 extern ADC_HandleTypeDef hadc1;
@@ -121,6 +123,7 @@ extern I2C_HandleTypeDef hi2c1;
 
 extern SPI_HandleTypeDef hspi3;
 
+extern TIM_HandleTypeDef htim1;
 extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim3;
 extern TIM_HandleTypeDef htim6;
