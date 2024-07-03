@@ -28,10 +28,10 @@ Courseplot   shortCutxycie[OPT_SHORT_BUFF_SIZE];   // xy座標値(走行中計�
 // 引数         velo: エンコーダカウント angvelo: 角速度[rad/s]
 // 戻り値       曲率半径[mm]
 /////////////////////////////////////////////////////////////////////
-float calcROC(float velo, float angvelo) {
+float calcROC(int16_t velo, float angvelo, float dt) {
     float dl, drad, ret;
     
-    dl = velo / PALSE_MILLIMETER * 10.0F; // [palse] → [mm/s] → [mm] 
+    dl = (float)velo / PALSE_MILLIMETER * 10.0F; // [palse] → [mm/ms] → [mm] 
     drad = angvelo * DEG2RAD * DELTATIME;            // [deg/s] → [rad]
     ret = dl / drad;
     // 曲率半径が大きい＝直線の場合は極大にする

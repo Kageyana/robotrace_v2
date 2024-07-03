@@ -12,7 +12,7 @@
 
 #define CALIBRATIONSPEED -1500.0F   // ラインセンサのキャリブレーション時の角速度[rad/s]
 
-#define USE_WHEEL       // ホイールをロータリスイッチの代わりに使用する(使用しないときはコメントアウトする)
+//#define USE_WHEEL       // ホイールをロータリスイッチの代わりに使用する(使用しないときはコメントアウトする)
 
 #define HEX_START       0x0
 #define HEX_SPEED_PARAM 0x1

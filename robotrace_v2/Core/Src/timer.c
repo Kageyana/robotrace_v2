@@ -48,24 +48,7 @@ void Interrupt1ms(void) {
                 if(straightState) {
                     // 距離基準2次走行のとき
                     int32_t i, j, errorDistance = 0;
-
-                    // for(i=pathedMarker;i<=numPPAMarry;i++) {
-                    //     // 現在地から一番近いマーカーを探す
-                    //     if (abs(encTotalOptimal - markerPos[i].distance) < encMM(100)) {
-                    //         errorDistance = encTotalOptimal - DistanceOptimal;  // 現在の差を計算
-                    //         encTotalOptimal = markerPos[i].distance;               // 距離を補正
-                    //         DistanceOptimal = encTotalOptimal - errorDistance;  // 補正後の現在距離からの差分
-                    //         optimalIndex = markerPos[i].indexPPAD;      // インデックス更新
-
-                    //         if(i-5 < 0) {
-                    //             pathedMarker = i-5;
-                    //         } else {
-                    //             pathedMarker = 0;
-                    //         }
-                    //         break;
-                    //     }
-                    // }
-                    
+                   
                     for(i=pathedMarker;i<=numPPAMarry;i++) {
                         // 現在地から一番近いマーカーを探す
                         if (encTotalOptimal - markerPos[i].distance < 0) {
@@ -93,10 +76,14 @@ void Interrupt1ms(void) {
                 }
             }
         }
-            
+        
+        // マーカーの位置を記録
         if (courseMarker == 0 && beforeCourseMarker > 0) {
-            // マーカーの位置を記録
             writeMarkerPos(encTotalOptimal, beforeCourseMarker);
+        }
+
+        if(initIMU) {
+            BMI088getGyro();    // 角速度取得
         }
         
         beforeCourseMarker = courseMarker;
@@ -113,7 +100,7 @@ void Interrupt1ms(void) {
         cntSwitchLR++;
 
         wheelClick();
-    }  
+    } 
     
     switch(cnt5) {
         case 1:
@@ -141,7 +128,10 @@ void Interrupt1ms(void) {
                 IMUstate = IMU_TRANSMIT;
 
                 if(!calibratIMU) {
-                    BMI088getGyro();    // 角速度取得
+                    // BMI088getGyro();    // 角速度取得
+                    BMI088val.gyro.z = BMI088val.gyroTotal.z / 5;
+                    BMI088val.gyroTotal.z = 0;
+
                     calcDegrees();      // 角度計算
                     if(optimalTrace == 0) checkCurve(); // 1次走行 カーブ検出
 
@@ -167,7 +157,7 @@ void Interrupt1ms(void) {
     if (patternTrace > 11 && patternTrace < 100) {
         if( encLog >= encMM(CALCDISTANCE_SHORTCUT) ) {
             static float rocCorrection = 0;
-            rocCorrection = calcROC(encCurrentN,BMI088val.gyro.z);
+            rocCorrection = calcROC(encCurrentN,BMI088val.gyro.z, (float)cntLog/1000);
             if( fabs(rocCorrection) >= 700.0F) {
                 straightMeter += CALCDISTANCE_SHORTCUT;
             } else {

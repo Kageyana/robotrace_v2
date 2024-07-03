@@ -55,6 +55,7 @@ typedef struct {
 typedef struct {
     axis accele;
     axis gyro;
+    axis gyroTotal;
     axis angle;
     float temp;
     uint16_t id;

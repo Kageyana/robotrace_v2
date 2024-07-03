@@ -28,7 +28,7 @@ typedef struct {
     uint8_t 	time;
     uint8_t 	speed;
     float 		zg;
-	uint8_t		targetSpeed;
+	int16_t		targetSpeed;
 	int16_t		opIndex;
 } logData;
 logData logVal[BUFFER_SIZW_LOG];
@@ -161,8 +161,8 @@ void createLog(void) {
 	setLogStr("ROC",  "%d");
 	setLogStr("x",  "%d");
 	setLogStr("y",  "%d");
-	setLogStr("optimalIndex",  "%d");
-	setLogStr("targetSpeed",    "%d");
+	setLogStr("encCurrentL",  "%d");
+	setLogStr("encCurrentR",    "%d");
 	// setLogStr("courseMarker",  "%d");
 	// setLogStr("encTotalN",    "%d");
 #endif
@@ -268,8 +268,10 @@ void writeLogBufferPrint(void) {
 	logVal[logValIndex].time = cntLog;
     logVal[logValIndex].speed = encCurrentN;
     logVal[logValIndex].zg = BMI088val.gyro.z;
-	logVal[logValIndex].opIndex = optimalIndex;
-	logVal[logValIndex].targetSpeed = targetSpeed;
+	// logVal[logValIndex].opIndex = optimalIndex;
+	// logVal[logValIndex].targetSpeed = targetSpeed;
+	logVal[logValIndex].opIndex = encCurrentL;
+	logVal[logValIndex].targetSpeed = encCurrentR;
     logValIndex++;
   }
 }
@@ -307,7 +309,7 @@ void writeLogPrint(void) {
 			,distance
 			// ,logVal[i].target
 			// ,logVal[i].optimalIndex
-			,(int32_t)(calcROC(logVal[i].speed,logVal[i].zg))
+			,(int32_t)(calcROC(logVal[i].speed,logVal[i].zg, (float)logVal[i].time/1000))
 			,(int32_t)(xycie.x*10000)
 			,(int32_t)(xycie.y*10000)
 			,logVal[i].opIndex

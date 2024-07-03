@@ -7,6 +7,7 @@
 //====================================//
 axis accele = { 0.0F, 0.0F, 0.0F};
 axis gyro = { 0.0F, 0.0F, 0.0F};
+axis gyroTotal = { 0.0F, 0.0F, 0.0F};
 axis angle = { 0.0F, 0.0F, 0.0F};
 IMUval 	BMI088val;
 
@@ -166,7 +167,7 @@ void BMI088getGyro(void) {
 
 	// BMI088val.gyro.x = (float)gyroVal[0] / GYROLSB * COEFF_DPD;
 	// BMI088val.gyro.y = (float)gyroVal[1] / GYROLSB * COEFF_DPD;
-	BMI088val.gyro.z = (float)gyroVal[2] / GYROLSB * COEFF_DPD;
+	BMI088val.gyroTotal.z += (float)gyroVal[2] / GYROLSB * COEFF_DPD;
 	
 }
 /////////////////////////////////////////////////////////////////////
