@@ -67,61 +67,61 @@ uint32_t 	goalTime = 0;
 void initSystem (void) {
 
 	// ADC
-	if (HAL_ADC_Start_DMA(&hadc1, analogVal1, 10) != HAL_OK)	Error_Handler();
-	if (HAL_ADC_Start_DMA(&hadc2, analogVal2, 3) != HAL_OK)		Error_Handler();
+	// if (HAL_ADC_Start_DMA(&hadc1, analogVal1, 10) != HAL_OK)	Error_Handler();
+	// if (HAL_ADC_Start_DMA(&hadc2, analogVal2, 3) != HAL_OK)		Error_Handler();
 
 	// Encoder count
-	HAL_TIM_Encoder_Start(&htim3,TIM_CHANNEL_ALL);
-	HAL_TIM_Encoder_Start(&htim8,TIM_CHANNEL_ALL);
+	// HAL_TIM_Encoder_Start(&htim3,TIM_CHANNEL_ALL);
+	// HAL_TIM_Encoder_Start(&htim8,TIM_CHANNEL_ALL);
 
 	// Motor driver
-	if (HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2) != HAL_OK) Error_Handler();
-	if (HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3) != HAL_OK) Error_Handler();
-	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 0);
-	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
-	motorPwmOut(0,0);
+	// if (HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2) != HAL_OK) Error_Handler();
+	// if (HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3) != HAL_OK) Error_Handler();
+	// __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 0);
+	// __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
+	// motorPwmOut(0,0);
 
 	// line sensor PWM
-	if (HAL_TIM_PWM_Start_IT(&htim13, TIM_CHANNEL_1) != HAL_OK) Error_Handler();
-	powerLinesensors(0);
+	// if (HAL_TIM_PWM_Start_IT(&htim13, TIM_CHANNEL_1) != HAL_OK) Error_Handler();
+	// powerLinesensors(0);
 
 	// microSD
-	initMSD = initMicroSD();
-	if(initMSD) {
-		getLogNumber(); // 前回の解析ログナンバーを取得
+	// initMSD = initMicroSD();
+	// if(initMSD) {
+	// 	getLogNumber(); // 前回の解析ログナンバーを取得
 
-		// 前回のPIDゲインを取得
-		readPIDparameters(&lineTraceCtrl);
-		readPIDparameters(&veloCtrl);
-		readPIDparameters(&yawRateCtrl);
-		readPIDparameters(&yawCtrl);
-		readPIDparameters(&distCtrl);
+	// 	// 前回のPIDゲインを取得
+	// 	readPIDparameters(&lineTraceCtrl);
+	// 	readPIDparameters(&veloCtrl);
+	// 	readPIDparameters(&yawRateCtrl);
+	// 	readPIDparameters(&yawCtrl);
+	// 	readPIDparameters(&distCtrl);
 
-		readLinesenval();	// ラインセンサオフセット値を取得
-		readTgtspeeds();	// 目標速度を取得
-	}
-	// IMU
-	initIMU = initBMI088();
+	// 	readLinesenval();	// ラインセンサオフセット値を取得
+	// 	readTgtspeeds();	// 目標速度を取得
+	// }
+	// // IMU
+	// initIMU = initBMI088();
 	
 	// Display
-	if(TACTSW1 == 1) {
-		modeDSP = true;
-		ssd1306_Init();
-		ssd1306_Fill(Black);
+	// if(TACTSW1 == 1) {
+	// 	modeDSP = true;
+	// 	ssd1306_Init();
+	// 	ssd1306_Fill(Black);
 		
-		// トップバー表示
-		// 電池マーク
-		showBatMark();
+	// 	// トップバー表示
+	// 	// 電池マーク
+	// 	showBatMark();
 		
-		ssd1306_UpdateScreen();
-	} else {
-		modeDSP = false;
-	}
+	// 	ssd1306_UpdateScreen();
+	// } else {
+	// 	modeDSP = false;
+	// }
 	
 
 	// Timer interrupt
 	HAL_TIM_Base_Start_IT(&htim6);
-	HAL_TIM_Base_Start_IT(&htim7);
+	// HAL_TIM_Base_Start_IT(&htim7);
 
 	// ledset(100,0,0);
 

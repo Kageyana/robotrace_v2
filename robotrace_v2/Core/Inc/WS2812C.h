@@ -13,9 +13,9 @@
 
 typedef struct {
     uint8_t pattern;
-    uint8_t r;
-    uint8_t g;
-    uint8_t b;
+    int8_t r;
+    int8_t g;
+    int8_t b;
 } RGBLED;
 //====================================//
 // グローバル変数の宣言
@@ -25,9 +25,8 @@ extern bool lineflag;
 //====================================//
 // プロトタイプ宣言
 //====================================//
-void setLED (int LEDnum, int Red, int Green, int Blue);
-void sendLED (void);
-void lineLED (void);
-void r2b(RGBLED *led, uint8_t brightness);
-void b2r(RGBLED *led, uint8_t brightness);
+void setLED(int LEDnum, int Red, int Green, int Blue);
+void sendLED(void);
+void fullColorLED (uint8_t brightness, uint8_t add);
+void r2b(RGBLED *led, uint8_t brightness, uint8_t add);
 #endif // WS2812C_H_

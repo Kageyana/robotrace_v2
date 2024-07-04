@@ -13,7 +13,7 @@ bool lineflag = false;
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 setLED
 // 処理概要     色ごとの輝度を設定する
-// 引数         LEDnum:設定するLEDの番号(0から) rgb:色ごとの輝度(0～256)
+// 引数         LEDnum:設定するLEDの番号(0から) rgb:色ごとの輝度(0～255)
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
 void setLED (int LEDnum, int Red, int Green, int Blue) {
@@ -58,14 +58,13 @@ void sendLED (void) {
 	}
 }
 ///////////////////////////////////////////////////////////////////////////
-// モジュール名 lineLED
-// 処理概要     左(右)から一方向に色が変わる
-// 引数         なし
+// モジュール名 fullColorLED
+// 処理概要     4つのLEDの色を順番に変える
+// 引数         brightness:最大輝度(0～127) add 輝度の変化量
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
-void lineLED (void)
+void fullColorLED (uint8_t brightness, uint8_t add)
 {
-	uint8_t r[MAX_LED],g[MAX_LED],b[MAX_LED],patternLED[MAX_LED];
 	static RGBLED led[MAX_LED] = { 1,0,0,0};
 
 	if(!lineflag) {
@@ -77,7 +76,7 @@ void lineLED (void)
 
 	if(lineflag) {
 		for (int i= 0; i<MAX_LED; i++) {
-			r2b(&led[i],10);
+			r2b(&led[i],brightness, add);
 			setLED(i, led[i].r, led[i].g, led[i].b);
 		}
 		sendLED();
@@ -86,110 +85,76 @@ void lineLED (void)
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 r2b
 // 処理概要     赤から青へ色をフルカラーに変える
-// 引数         *led:RGB構造体のポインタ brightness:最大輝度(0～256)
+// 引数         *led:RGB構造体のポインタ brightness:最大輝度(0～127) add 輝度の変化量
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
-void r2b(RGBLED *led, uint8_t brightness){
+void r2b(RGBLED *led, uint8_t brightness, uint8_t add) {
 	switch(led->pattern) {
 		case 1:
 			// 赤スタート
 			// 緑増
 			led->r = brightness;
-			led->g++;
+			led->g += add;
 			led->b = 0;
-			if(led->g == brightness) led->pattern=2;
+			if(led->g >= brightness) {
+				led->g = brightness;
+				led->pattern=2;
+			}
 			break;
 		case 2:
 			// 赤減
-			led->r--;
+			if(led->r == 0) led->r = brightness; // 初期値
+			led->r -= add;
 			led->g = brightness;
 			led->b = 0;
-			if(led->r == 0) led->pattern=3;
+			if(led->r <= 0) {
+				led->r = 0;
+				led->pattern=3;
+			}
 			break;
 		case 3:
 			// 緑スタート
 			// 青増
 			led->r = 0;
 			led->g = brightness;
-			led->b++;
-			if(led->b == brightness) led->pattern=4;
+			led->b += add;
+			if(led->b >= brightness) {
+				led->b = brightness;
+				led->pattern=4;
+			}
 			break;
 		case 4:
 			// 緑減
+			if(led->g == 0) led->g = brightness; // 初期値
 			led->r = 0;
-			led->g--;
+			led->g -= add;
 			led->b = brightness;
-			if(led->g == 0) led->pattern=5;
+			if(led->g <= 0) {
+				led->g = 0;
+				led->pattern=5;
+			}
 			break;
 		case 5:
 			// 青スタート
 			// 赤増
-			led->r++;
+			led->r += add;
 			led->g = 0;
 			led->b = brightness;
-			if(led->r == brightness) led->pattern=6;
+			if(led->r >= brightness) {
+				led->r = brightness;
+				led->pattern=6;
+			}
 			break;
 		case 6:
 			// 青減
+			if(led->b == 0) led->b = brightness; // 初期値
 			led->r = brightness;
 			led->g = 0;
-			led->b--;
-			if(led->b == 0) led->pattern=1;
-			break;
-	}
-}
-///////////////////////////////////////////////////////////////////////////
-// モジュール名 r2b
-// 処理概要     赤から青へ色をフルカラーに変える
-// 引数         *led:RGB構造体のポインタ brightness:最大輝度(0～256)
-// 戻り値       なし
-///////////////////////////////////////////////////////////////////////////
-void b2r(RGBLED *led, uint8_t brightness){
-	switch(led->pattern) {
-		case 1:
-			// 赤スタート
-			// 緑増
-			led->r = brightness;
-			led->g++;
-			led->b = 0;
-			if(led->g == brightness) led->pattern=2;
-			break;
-		case 2:
-			// 赤減
-			led->r--;
-			led->g = brightness;
-			led->b = 0;
-			if(led->r == 0) led->pattern=3;
-			break;
-		case 3:
-			// 緑スタート
-			// 青増
-			led->r = 0;
-			led->g = brightness;
-			led->b++;
-			if(led->b == brightness) led->pattern=4;
-			break;
-		case 4:
-			// 緑減
-			led->r = 0;
-			led->g--;
-			led->b = brightness;
-			if(led->g == 0) led->pattern=5;
-			break;
-		case 5:
-			// 青スタート
-			// 赤増
-			led->r++;
-			led->g = 0;
-			led->b = brightness;
-			if(led->r == brightness) led->pattern=6;
-			break;
-		case 6:
-			// 青減
-			led->r = brightness;
-			led->g = 0;
-			led->b--;
-			if(led->b == 0) led->pattern=1;
+			led->b -= add;
+			if(led->b <= 0) {
+				led->b = 0;
+				led->pattern=1;
+			}
 			break;
 	}
 }

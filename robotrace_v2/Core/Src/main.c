@@ -143,112 +143,12 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-      // if(cntSetup1 >= 200) {
-      //   cntSetup1 = 0;
-
-      //   lineLED();
-      // }
-
-    switch(cntSetup1) {
-      case 200:
-        cntSetup1++;
-        setLED(0, 10, 0, 0);
-        setLED(1, 10, 5, 0);
-        setLED(2, 10, 10, 0);
-        setLED(3, 5, 10, 0);
-        sendLED();
-        break;
-      case 400:
-        cntSetup1++;
-        setLED(0, 10, 5, 0);
-        setLED(1, 10, 10, 0);
-        setLED(2, 5, 10, 0);
-        setLED(3, 0, 10, 0);
-        sendLED();
-        break;
-      case 600:
-        cntSetup1++;
-        setLED(0, 10, 10, 0);
-        setLED(1, 5, 10, 0);
-        setLED(2, 0, 10, 0);
-        setLED(3, 0, 10, 5);
-        sendLED();
-        break;
-      case 800:
-        cntSetup1++;
-        setLED(0, 5, 10, 0);
-        setLED(1, 0, 10, 0);
-        setLED(2, 0, 10, 5);
-        setLED(3, 0, 10, 10);
-        sendLED();
-        break;
-      case 1000:
-        cntSetup1++;
-        setLED(0, 0, 10, 0);
-        setLED(1, 0, 10, 5);
-        setLED(2, 0, 10, 10);
-        setLED(3, 0, 5, 10);
-        sendLED();
-        break;
-      case 1200:
-        cntSetup1++;
-        setLED(0, 0, 10, 5);
-        setLED(1, 0, 10, 10);
-        setLED(2, 0, 5, 10);
-        setLED(3, 0, 0, 10);
-        sendLED();
-        break;
-      case 1400:
-        cntSetup1++;
-        setLED(0, 0, 10, 10);
-        setLED(1, 0, 5, 10);
-        setLED(2, 0, 0, 10);
-        setLED(3, 5, 0, 10);
-        sendLED();
-        break;
-      case 1600:
-        cntSetup1++;
-        setLED(0, 0, 5, 10);
-        setLED(1, 0, 0, 10);
-        setLED(2, 5, 0, 10);
-        setLED(3, 10, 0, 10);
-        sendLED();
-        break;
-      case 1800:
-        cntSetup1++;
-        setLED(0, 0, 0, 10);
-        setLED(1, 5, 0, 10);
-        setLED(2, 10, 0, 10);
-        setLED(3, 10, 0, 5);
-        sendLED();
-        break;
-      case 2000:
-        cntSetup1++;
-        setLED(0, 5, 0, 10);
-        setLED(1, 10, 0, 10);
-        setLED(2, 10, 0, 5);
-        setLED(3, 10, 0, 0);
-        sendLED();
-        break;
-      case 2200:
-        cntSetup1++;
-        setLED(0, 10, 0, 10);
-        setLED(1, 10, 0, 5);
-        setLED(2, 10, 0, 0);
-        setLED(3, 10, 5, 0);
-        sendLED();
-        break;
-      case 2400:
-      cntSetup1++;
-        setLED(0, 10, 0, 5);
-        setLED(1, 10, 0, 0);
-        setLED(2, 10, 5, 0);
-        setLED(3, 10, 10, 0);
-        sendLED();
+      if(cntSetup1 >= 50) {
         cntSetup1 = 0;
-        break;
-    }
-    
+
+        fullColorLED(15, 3);
+      }
+
     // loopSystem();
     /* USER CODE END WHILE */
 
