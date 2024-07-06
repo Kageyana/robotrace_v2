@@ -20,7 +20,7 @@ extern uint8_t batteryLevel;
 //====================================//
 // プロトタイプ宣言
 //====================================//
-void SchmittBatery (void);
-void showBattery (void);
-void showBatMark (void);
+void SchmittBatery(void);
+void showBattery(void);
+void showBatMark(void);
 #endif // BATTERY_H_

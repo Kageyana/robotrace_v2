@@ -143,11 +143,11 @@ int main(void)
 	/* USER CODE BEGIN WHILE */
 	while (1)
 	{
-		if (cntSetup1 >= 50)
+		if (cntSetup1 >= 20)
 		{
 			cntSetup1 = 0;
 
-			fullColorLED(15, 3);
+			fullColorLED(15, 2);
 		}
 
 		// loopSystem();
