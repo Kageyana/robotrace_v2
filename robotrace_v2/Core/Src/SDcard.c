@@ -7,48 +7,50 @@
 // グローバル変数の宣
 //====================================//
 // MicroSD
-FATFS     fs;
-FIL       fil_W;
-FIL       fil_R;
+FATFS fs;
+FIL fil_W;
+FIL fil_R;
 
 // ログヘッダー
-uint8_t   columnTitle[512] = "", formatLog[256] = "";
+uint8_t columnTitle[512] = "", formatLog[256] = "";
 
 // ログバッファ
-#ifdef	LOG_RUNNING_WRITE
-uint8_t		logBuffer[BUFFER_SIZE_LOG], logBufferSend[BUFFER_SIZE_LOG];
-uint8_t		*logBufferPointa;		// RAM保存バッファ用ポインタ
-int16_t		logBuffIndex=0;			// 一時記録バッファ書込アドレス
-uint32_t	logBuffSendIndex=0;
-bool		sendSD = false;
-uint16_t	cntSend=0;
-uint8_t		*logaddress;
+#ifdef LOG_RUNNING_WRITE
+uint8_t logBuffer[BUFFER_SIZE_LOG], logBufferSend[BUFFER_SIZE_LOG];
+uint8_t *logBufferPointa; // RAM保存バッファ用ポインタ
+int16_t logBuffIndex = 0; // 一時記録バッファ書込アドレス
+uint32_t logBuffSendIndex = 0;
+bool sendSD = false;
+uint16_t cntSend = 0;
+uint8_t *logaddress;
 #else
-typedef struct {
-    uint8_t 	time;
-    uint8_t 	speed;
-    float 		zg;
-	int16_t		targetSpeed;
-	int16_t		opIndex;
+typedef struct
+{
+	uint8_t time;
+	uint8_t speed;
+	float zg;
+	int16_t targetSpeed;
+	int16_t opIndex;
 } logData;
 logData logVal[BUFFER_SIZW_LOG];
-uint16_t	logValIndex=0;
+uint16_t logValIndex = 0;
 #endif
 
-typedef struct {
+typedef struct
+{
 	uint16_t index;
-    int32_t distance;
-    uint8_t marker;
+	int32_t distance;
+	uint8_t marker;
 } markerData;
 markerData markerVal[BUFFER_SIZW_MARKER];
-uint16_t	markerValIndex=0;
+uint16_t markerValIndex = 0;
 
 // ログファイルナンバー
-int16_t 	fileNumbers[1000], fileIndexLog = 0, endFileIndex = 0;
+int16_t fileNumbers[1000], fileIndexLog = 0, endFileIndex = 0;
 
 // カウンタ
-uint8_t    cntLog = 0;
-int32_t     encLog = 0;
+uint8_t cntLog = 0;
+int32_t encLog = 0;
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 initMicroSD
@@ -56,28 +58,30 @@ int32_t     encLog = 0;
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-bool initMicroSD(void) {
-	FATFS		*pfs;
-	FRESULT		fresult;
-	DIR			dir;			// Directory
-	FILINFO		fno;			// File Info
-	DWORD		fre_clust;
-	uint32_t	total, free_space;
-	uint8_t		dirSetting = 0;
-	FIL			fil_T;
+bool initMicroSD(void)
+{
+	FATFS *pfs;
+	FRESULT fresult;
+	DIR dir;	 // Directory
+	FILINFO fno; // File Info
+	DWORD fre_clust;
+	uint32_t total, free_space;
+	uint8_t dirSetting = 0;
+	FIL fil_T;
 
 	// SDcardをマウント
 	fresult = f_mount(&fs, "", 0);
-	if (fresult == FR_OK) {
+	if (fresult == FR_OK)
+	{
 		// マウント成功
 		initMSD = true;
 		printf("SD CARD mounted successfully...\r\n");
 
 		// 空き容量を計算
-		f_getfree("", &fre_clust, &pfs); // cluster size
-		total = (uint32_t)((pfs -> n_fatent - 2) * pfs -> csize * 0.5); // total capacity
+		f_getfree("", &fre_clust, &pfs);							// cluster size
+		total = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5); // total capacity
 		printf("SD_SIZE: \t%lu\r\n", total);
-		free_space = (uint32_t)(fre_clust * pfs->csize*0.5);  // empty capacity
+		free_space = (uint32_t)(fre_clust * pfs->csize * 0.5); // empty capacity
 		printf("SD free space: \t%lu\r\n", free_space);
 
 		getFileNumbers();
@@ -87,10 +91,12 @@ bool initMicroSD(void) {
 		createDir("plot");
 
 		return true;
-	} else {
+	}
+	else
+	{
 		// マウント失敗
 		initMSD = false;
-		printf ("error in mounting SD CARD...\r\n");
+		printf("error in mounting SD CARD...\r\n");
 		return false;
 	}
 }
@@ -100,74 +106,80 @@ bool initMicroSD(void) {
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void createLog(void) {
-	FRESULT   fresult;
-	DIR dir;                    // Directory
-	FILINFO fno;                // File Info
+void createLog(void)
+{
+	FRESULT fresult;
+	DIR dir;	 // Directory
+	FILINFO fno; // File Info
 	uint8_t *tp, fileName[10];
 	uint16_t fileNumber = 0;
 
-	f_opendir(&dir,"/");  // directory open
-	
-	do {
-		f_readdir(&dir,&fno);  
-		tp = strtok(fno.fname,".");		// 拡張子削除
-		if ( atoi(tp) > fileNumber ) {	// 番号比較
-			fileNumber = atoi(tp);		// 文字列を数値に変換
-		}
-	} while(fno.fname[0] != 0); // ファイルの有無を確認
+	f_opendir(&dir, "/"); // directory open
 
-	f_closedir(&dir);     // directory close
+	do
+	{
+		f_readdir(&dir, &fno);
+		tp = strtok(fno.fname, "."); // 拡張子削除
+		if (atoi(tp) > fileNumber)
+		{						   // 番号比較
+			fileNumber = atoi(tp); // 文字列を数値に変換
+		}
+	} while (fno.fname[0] != 0); // ファイルの有無を確認
+
+	f_closedir(&dir); // directory close
 
 	// ファイルナンバー作成
-	if (fileNumber == 0) {
+	if (fileNumber == 0)
+	{
 		// ファイルが無いとき
 		fileNumber = 1;
-	} else {
+	}
+	else
+	{
 		// ファイルが有るとき
-		fileNumber++;         // index pulus
+		fileNumber++; // index pulus
 	}
 
-	sprintf(fileName,"%d",fileNumber);  // 数値を文字列に変換
-	strcat(fileName, ".csv");           // 拡張子を追加
-	fresult = f_open(&fil_W, fileName, FA_OPEN_ALWAYS | FA_WRITE);  // create file 
+	sprintf(fileName, "%d", fileNumber);						   // 数値を文字列に変換
+	strcat(fileName, ".csv");									   // 拡張子を追加
+	fresult = f_open(&fil_W, fileName, FA_OPEN_ALWAYS | FA_WRITE); // create file
 
 	strcpy(columnTitle, "");
 	strcpy(formatLog, "");
-#ifdef	LOG_RUNNING_WRITE
-	setLogStr("courseMarker",  "%d");
-	setLogStr("targetSpeed",    "%d");
+#ifdef LOG_RUNNING_WRITE
+	setLogStr("courseMarker", "%d");
+	setLogStr("targetSpeed", "%d");
 
-	setLogStr("cntlog",       "%d");
-	setLogStr("encCurrentN",  "%d");
-	setLogStr("optimalIndex",  "%d");
-	setLogStr("CurrentL",  "%f");
-	setLogStr("CurrentR",  "%f");
-	setLogStr("lineTraceCtrl",  "%d");
-	setLogStr("veloCtrl",  "%d");
-	
-	setLogStr("encTotalN",    "%d");
-	setLogStr("gyroVal_Z",   "%f");
-	
-	setLogStr("ROC",  "%f");
-	setLogStr("x",  "%f");
-	setLogStr("y",  "%f");
+	setLogStr("cntlog", "%d");
+	setLogStr("encCurrentN", "%d");
+	setLogStr("optimalIndex", "%d");
+	setLogStr("CurrentL", "%f");
+	setLogStr("CurrentR", "%f");
+	setLogStr("lineTraceCtrl", "%d");
+	setLogStr("veloCtrl", "%d");
+
+	setLogStr("encTotalN", "%d");
+	setLogStr("gyroVal_Z", "%f");
+
+	setLogStr("ROC", "%f");
+	setLogStr("x", "%f");
+	setLogStr("y", "%f");
 #else
-	setLogStr("cntlog",       "%d");
-	setLogStr("encCurrentN",  "%d");
-	setLogStr("gyroVal_Z",   "%d");
-	setLogStr("courseMarker",  "%d");
-	setLogStr("encTotalN",    "%d");
-	setLogStr("ROC",  "%d");
-	setLogStr("x",  "%d");
-	setLogStr("y",  "%d");
-	setLogStr("encCurrentL",  "%d");
-	setLogStr("encCurrentR",    "%d");
+	setLogStr("cntlog", "%d");
+	setLogStr("encCurrentN", "%d");
+	setLogStr("gyroVal_Z", "%d");
+	setLogStr("courseMarker", "%d");
+	setLogStr("encTotalN", "%d");
+	setLogStr("ROC", "%d");
+	setLogStr("x", "%d");
+	setLogStr("y", "%d");
+	setLogStr("encCurrentL", "%d");
+	setLogStr("encCurrentR", "%d");
 	// setLogStr("courseMarker",  "%d");
 	// setLogStr("encTotalN",    "%d");
 #endif
-	strcat(columnTitle,"\n");
-	strcat(formatLog,"\n");
+	strcat(columnTitle, "\n");
+	strcat(formatLog, "\n");
 	f_printf(&fil_W, columnTitle);
 }
 /////////////////////////////////////////////////////////////////////
@@ -176,7 +188,8 @@ void createLog(void) {
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void writeMarkerPos(uint32_t distance, uint8_t marker) {
+void writeMarkerPos(uint32_t distance, uint8_t marker)
+{
 	markerVal[markerValIndex].index = logValIndex;
 	markerVal[markerValIndex].distance = distance;
 	markerVal[markerValIndex].marker = marker;
@@ -188,13 +201,14 @@ void writeMarkerPos(uint32_t distance, uint8_t marker) {
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void initLog(void) {
-	FRESULT   fresult;
-#ifdef	LOG_RUNNING_WRITE
-	fresult = f_open(&fil_W, "temp", FA_OPEN_ALWAYS | FA_WRITE);  // create file
+void initLog(void)
+{
+	FRESULT fresult;
+#ifdef LOG_RUNNING_WRITE
+	fresult = f_open(&fil_W, "temp", FA_OPEN_ALWAYS | FA_WRITE); // create file
 #else
 	// 構造体配列の初期化
-    memset(&logVal, 0, sizeof(logData) * BUFFER_SIZW_LOG);
+	memset(&logVal, 0, sizeof(logData) * BUFFER_SIZW_LOG);
 	memset(&markerVal, 0, sizeof(markerData) * BUFFER_SIZW_MARKER);
 	logValIndex = 0;
 	markerValIndex = 0;
@@ -206,34 +220,45 @@ void initLog(void) {
 // 引数         c:8bit変数の数s:16bit変数の数i:32bit変数の数f:float変数の数
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-#ifdef	LOG_RUNNING_WRITE
-void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...) {
+#ifdef LOG_RUNNING_WRITE
+void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
+{
 	va_list args;
-	uint8_t cnt=0;
-	static union {float f; uint32_t i;} ftoi;
+	uint8_t cnt = 0;
+	static union
+	{
+		float f;
+		uint32_t i;
+	} ftoi;
 
-	if (modeLOG) {
+	if (modeLOG)
+	{
 		// 	バッファ配列に保存
-		va_start( args, f );
+		va_start(args, f);
 		// logBuffer[0] = va_arg( args, uint8_t* );
-		for ( cnt=0; cnt<c; cnt++ ) send8bit( va_arg( args, uint32_t ) );
-		for ( cnt=0; cnt<s; cnt++ ) send16bit( va_arg( args, uint32_t ) );
-		for ( cnt=0; cnt<i; cnt++ ) send32bit( va_arg( args, uint32_t ) );
-		for ( cnt=0; cnt<f; cnt++ ) {
-			ftoi.f = va_arg( args, double );	// 共用体を使用してfloat型のビット操作をできるようにする
-			send32bit( ftoi.i );
+		for (cnt = 0; cnt < c; cnt++)
+			send8bit(va_arg(args, uint32_t));
+		for (cnt = 0; cnt < s; cnt++)
+			send16bit(va_arg(args, uint32_t));
+		for (cnt = 0; cnt < i; cnt++)
+			send32bit(va_arg(args, uint32_t));
+		for (cnt = 0; cnt < f; cnt++)
+		{
+			ftoi.f = va_arg(args, double); // 共用体を使用してfloat型のビット操作をできるようにする
+			send32bit(ftoi.i);
 		}
 		va_end(args);
 		cntSend++;
 
 		// バッファが512バイト付近まで溜まったら確認
-		if( logBuffIndex + LOG_SIZE > 32) {
-			logBuffSendIndex = logBuffIndex;		// バッファのバイト数を記録
-			memcpy(logBufferSend, logBuffer, logBuffSendIndex);		// 送信用配列にコピー
-			
-			logBuffIndex = 0;	// バイト数リセット
-			logBufferPointa = logBuffer;	// バッファ配列の先頭アドレスを設定
-			sendSD = true;		// 送信開始
+		if (logBuffIndex + LOG_SIZE > 32)
+		{
+			logBuffSendIndex = logBuffIndex;					// バッファのバイト数を記録
+			memcpy(logBufferSend, logBuffer, logBuffSendIndex); // 送信用配列にコピー
+
+			logBuffIndex = 0;			 // バイト数リセット
+			logBufferPointa = logBuffer; // バッファ配列の先頭アドレスを設定
+			sendSD = true;				 // 送信開始
 		}
 	}
 }
@@ -244,14 +269,17 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...) {
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-#ifdef	LOG_RUNNING_WRITE
-void writeLogPuts(void) {
-	uint32_t	writtenlog = 0;
+#ifdef LOG_RUNNING_WRITE
+void writeLogPuts(void)
+{
+	uint32_t writtenlog = 0;
 
-	if (modeLOG) {
-		if (sendSD) {
+	if (modeLOG)
+	{
+		if (sendSD)
+		{
 			sendSD = false;
-			f_write(&fil_W,logBufferSend,logBuffSendIndex,writtenlog);
+			f_write(&fil_W, logBufferSend, logBuffSendIndex, writtenlog);
 		}
 	}
 }
@@ -262,18 +290,20 @@ void writeLogPuts(void) {
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-#ifndef	LOG_RUNNING_WRITE
-void writeLogBufferPrint(void) {
-  if (modeLOG) {
-	logVal[logValIndex].time = cntLog;
-    logVal[logValIndex].speed = encCurrentN;
-    logVal[logValIndex].zg = BMI088val.gyro.z;
-	// logVal[logValIndex].opIndex = optimalIndex;
-	// logVal[logValIndex].targetSpeed = targetSpeed;
-	logVal[logValIndex].opIndex = encCurrentL;
-	logVal[logValIndex].targetSpeed = encCurrentR;
-    logValIndex++;
-  }
+#ifndef LOG_RUNNING_WRITE
+void writeLogBufferPrint(void)
+{
+	if (modeLOG)
+	{
+		logVal[logValIndex].time = cntLog;
+		logVal[logValIndex].speed = encCurrentN;
+		logVal[logValIndex].zg = BMI088val.gyro.z;
+		// logVal[logValIndex].opIndex = optimalIndex;
+		// logVal[logValIndex].targetSpeed = targetSpeed;
+		logVal[logValIndex].opIndex = encCurrentL;
+		logVal[logValIndex].targetSpeed = encCurrentR;
+		logValIndex++;
+	}
 }
 #endif
 /////////////////////////////////////////////////////////////////////
@@ -282,39 +312,35 @@ void writeLogBufferPrint(void) {
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-#ifndef	LOG_RUNNING_WRITE
-void writeLogPrint(void) {
-	uint32_t 	i, totalTime = 0, distance;
-	uint16_t 	indexM = 0, marker;
+#ifndef LOG_RUNNING_WRITE
+void writeLogPrint(void)
+{
+	uint32_t i, totalTime = 0, distance;
+	uint16_t indexM = 0, marker;
 
-	clearXYcie();	// xy座標クリア
-	for(i = 0;i<logValIndex;i++) {
+	clearXYcie(); // xy座標クリア
+	for (i = 0; i < logValIndex; i++)
+	{
 		totalTime += logVal[i].time;
-		calcXYcie(logVal[i].speed,logVal[i].zg, (float)logVal[i].time/1000);
+		calcXYcie(logVal[i].speed, logVal[i].zg, (float)logVal[i].time / 1000);
 
-		if(i == markerVal[indexM].index) {
+		if (i == markerVal[indexM].index)
+		{
 			marker = markerVal[indexM].marker;
 			distance = markerVal[indexM].distance;
 			indexM++;
-		} else {
+		}
+		else
+		{
 			marker = 0;
 			distance = 0;
 		}
 
-		f_printf(&fil_W, formatLog
-			,totalTime
-			,logVal[i].speed
-			,(int32_t)(logVal[i].zg*10000)
-			,marker
-			,distance
-			// ,logVal[i].target
-			// ,logVal[i].optimalIndex
-			,(int32_t)(calcROC(logVal[i].speed,logVal[i].zg, (float)logVal[i].time/1000))
-			,(int32_t)(xycie.x*10000)
-			,(int32_t)(xycie.y*10000)
-			,logVal[i].opIndex
-			,logVal[i].targetSpeed
-		);
+		f_printf(&fil_W, formatLog, totalTime, logVal[i].speed, (int32_t)(logVal[i].zg * 10000), marker, distance
+				 // ,logVal[i].target
+				 // ,logVal[i].optimalIndex
+				 ,
+				 (int32_t)(calcROC(logVal[i].speed, logVal[i].zg, (float)logVal[i].time / 1000)), (int32_t)(xycie.x * 10000), (int32_t)(xycie.y * 10000), logVal[i].opIndex, logVal[i].targetSpeed);
 	}
 }
 #endif
@@ -324,47 +350,58 @@ void writeLogPrint(void) {
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void endLog(void) {
-	initIMU = false;  // IMUの使用を停止(SPIが競合するため)
-	modeLOG = false;  // ログ取得停止
-	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );	// SPIバスが空くまで待つ
+void endLog(void)
+{
+	initIMU = false; // IMUの使用を停止(SPIが競合するため)
+	modeLOG = false; // ログ取得停止
+	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY)
+		; // SPIバスが空くまで待つ
 
 #ifdef LOG_RUNNING_WRITE
-	FRESULT		fresult;
-	FIL			fil;
-	uint8_t 	log[LOG_SIZE];
-	uint8_t		logStr[256];
-	uint16_t	readByte, writtenlog, j,cnt;
-	uint16_t	marker, time, beforeTime=0, speed, beforeSpeed=0;
-	uint32_t	distance;
-	float		dt,zg;
-	static union {float f; uint32_t i;} ftoi;
+	FRESULT fresult;
+	FIL fil;
+	uint8_t log[LOG_SIZE];
+	uint8_t logStr[256];
+	uint16_t readByte, writtenlog, j, cnt;
+	uint16_t marker, time, beforeTime = 0, speed, beforeSpeed = 0;
+	uint32_t distance;
+	float dt, zg;
+	static union
+	{
+		float f;
+		uint32_t i;
+	} ftoi;
 
-	uint8_t		logval8[10];
-	uint16_t 	logval16[10];
-	uint32_t 	logval32[10];
-	float		logvalf[10];
+	uint8_t logval8[10];
+	uint16_t logval16[10];
+	uint32_t logval32[10];
+	float logvalf[10];
 
-	logBuffSendIndex = logBuffIndex;		// バッファのバイト数を記録
-	memcpy(logBufferSend, logBuffer, logBuffSendIndex);		// 送信用配列にコピー
-	f_write(&fil_W,logBufferSend,logBuffSendIndex,writtenlog);	// 残りのログをSDカードに送信
-	f_close(&fil_W);	// 一時ファイルを閉じる
+	logBuffSendIndex = logBuffIndex;							  // バッファのバイト数を記録
+	memcpy(logBufferSend, logBuffer, logBuffSendIndex);			  // 送信用配列にコピー
+	f_write(&fil_W, logBufferSend, logBuffSendIndex, writtenlog); // 残りのログをSDカードに送信
+	f_close(&fil_W);											  // 一時ファイルを閉じる
 
-	createLog();		// ログファイル(csv)を作成
+	createLog(); // ログファイル(csv)を作成
 
-	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ);  // ログファイルを開く
+	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ); // ログファイルを開く
 
-	clearXYcie();	// xy座標クリア
-	for (j=0; j<cntSend; j++) {
+	clearXYcie(); // xy座標クリア
+	for (j = 0; j < cntSend; j++)
+	{
 		f_read(&fil, log, sizeof(log), readByte);
-		logaddress = log;	// 読み込んだ配列の先頭アドレスを取得
+		logaddress = log; // 読み込んだ配列の先頭アドレスを取得
 
 		// 型ごとに変数を復元
-		for ( cnt=0; cnt<LOG_NUM_8BIT; cnt++ ) logval8[cnt] = logPut8bit();
-		for ( cnt=0; cnt<LOG_NUM_16BIT; cnt++ ) logval16[cnt] = logPut16bit();
-		for ( cnt=0; cnt<LOG_NUM_32BIT; cnt++ ) logval32[cnt] = logPut32bit();
-		for ( cnt=0; cnt<LOG_NUM_FLOAT; cnt++ ) {
-			ftoi.i = logPut32bit();	// 共用体を使用してfloat型のビット操作をできるようにする
+		for (cnt = 0; cnt < LOG_NUM_8BIT; cnt++)
+			logval8[cnt] = logPut8bit();
+		for (cnt = 0; cnt < LOG_NUM_16BIT; cnt++)
+			logval16[cnt] = logPut16bit();
+		for (cnt = 0; cnt < LOG_NUM_32BIT; cnt++)
+			logval32[cnt] = logPut32bit();
+		for (cnt = 0; cnt < LOG_NUM_FLOAT; cnt++)
+		{
+			ftoi.i = logPut32bit(); // 共用体を使用してfloat型のビット操作をできるようにする
 			logvalf[cnt] = ftoi.f;
 		}
 
@@ -374,50 +411,35 @@ void endLog(void) {
 		distance = logval32[0];
 		zg = logvalf[0];
 
-		if(abs(speed - beforeSpeed) > 500) {
+		if (abs(speed - beforeSpeed) > 500)
+		{
 			speed = beforeSpeed;
 			logval16[1] = beforeSpeed;
 		}
 		beforeSpeed = speed;
-		
-		cnt=LOG_NUM_FLOAT;	// float型のログの続きを使用する
-		logvalf[cnt++] = calcROC(speed,zg);	// 曲率半径を計算
 
+		cnt = LOG_NUM_FLOAT;				 // float型のログの続きを使用する
+		logvalf[cnt++] = calcROC(speed, zg); // 曲率半径を計算
 
-		dt = (float)(time-beforeTime) / 1000;	// 経過時間
-		calcXYcie(speed,zg, dt);	// xy座標を計算
+		dt = (float)(time - beforeTime) / 1000; // 経過時間
+		calcXYcie(speed, zg, dt);				// xy座標を計算
 		logvalf[cnt++] = xycie.x;
 		logvalf[cnt++] = xycie.y;
-		beforeTime = time;			// 時間を更新
+		beforeTime = time; // 時間を更新
 
 		// 文字列に変換
-		sprintf(logStr, formatLog
-			,time
-			,marker
-			,speed
-			,zg
-			,distance
-			,logval8[1]
-			,logval16[2]
-			,(float)(logval16[3]-HALFSCAL)/4095*3.3 / RREF * 10000.0
-			,(float)(logval16[4]-HALFSCAL)/4095*3.3 / RREF * 10000.0
-			,(int16_t)logval16[5]
-			,(int16_t)logval16[6]
-			,logvalf[1]
-			,logvalf[2]
-			,logvalf[3]
-		);
+		sprintf(logStr, formatLog, time, marker, speed, zg, distance, logval8[1], logval16[2], (float)(logval16[3] - HALFSCAL) / 4095 * 3.3 / RREF * 10000.0, (float)(logval16[4] - HALFSCAL) / 4095 * 3.3 / RREF * 10000.0, (int16_t)logval16[5], (int16_t)logval16[6], logvalf[1], logvalf[2], logvalf[3]);
 
 		// 文字列をSDカードに送信
 		f_puts(logStr, &fil_W);
 	}
 
-	f_close(&fil_W);	// ログファイル(csv)
-	f_close(&fil);		// 一時ファイル
-	
+	f_close(&fil_W); // ログファイル(csv)
+	f_close(&fil);	 // 一時ファイル
+
 #else
-	createLog();    // ログファイル作成
-	writeLogPrint();  // ログ書き込み
+	createLog();	 // ログファイル作成
+	writeLogPrint(); // ログ書き込み
 	f_close(&fil_W);
 #endif
 
@@ -429,30 +451,34 @@ void endLog(void) {
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void getFileNumbers(void) {
-	DIR 	dir;			// Directory
-	FILINFO fno;			// File Info
-	FRESULT	fresult;
+void getFileNumbers(void)
+{
+	DIR dir;	 // Directory
+	FILINFO fno; // File Info
+	FRESULT fresult;
 	uint8_t fileName[10];
 	uint8_t *tp, i;
 
-	fresult = f_opendir(&dir,"/");  // directory open
-	if (fresult == FR_OK) {
-		do {
-			f_readdir(&dir,&fno);     
-			if (strstr(fno.fname,".csv") != NULL) {
+	fresult = f_opendir(&dir, "/"); // directory open
+	if (fresult == FR_OK)
+	{
+		do
+		{
+			f_readdir(&dir, &fno);
+			if (strstr(fno.fname, ".csv") != NULL)
+			{
 				// csvファイルのとき
-				tp = strtok(fno.fname,".");     // 拡張子削除
-				fileNumbers[endFileIndex] = atoi(tp);        // 文字列を数値に変換
+				tp = strtok(fno.fname, ".");		  // 拡張子削除
+				fileNumbers[endFileIndex] = atoi(tp); // 文字列を数値に変換
 				endFileIndex++;
 			}
-		} while(fno.fname[0] != 0); // ファイルの有無を確認
-		
+		} while (fno.fname[0] != 0); // ファイルの有無を確認
+
 		endFileIndex--;
 		fileIndexLog = endFileIndex;
 	}
 
-	f_closedir(&dir);     // directory close
+	f_closedir(&dir); // directory close
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setLogStr
@@ -460,17 +486,18 @@ void getFileNumbers(void) {
 // 引数         column: ヘッダー文字列 format: フォーマット文字列
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void setLogStr(uint8_t* column, uint8_t* format) {
-	uint8_t* columnStr[30], formatStr[30];
+void setLogStr(uint8_t *column, uint8_t *format)
+{
+	uint8_t *columnStr[30], formatStr[30];
 
 	// copy str to local variable
-	strcpy(columnStr,column);
-	strcpy(formatStr,format);
+	strcpy(columnStr, column);
+	strcpy(formatStr, format);
 
-	strcat(columnStr,",");
-	strcat(formatStr,",");
-	strcat(columnTitle,columnStr);
-	strcat(formatLog,formatStr);
+	strcat(columnStr, ",");
+	strcat(formatStr, ",");
+	strcat(columnTitle, columnStr);
+	strcat(formatLog, formatStr);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SDtest
@@ -478,12 +505,14 @@ void setLogStr(uint8_t* column, uint8_t* format) {
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void SDtest(void) {
-	FIL       fil_T;
-	FRESULT   fresult;
+void SDtest(void)
+{
+	FIL fil_T;
+	FRESULT fresult;
 
-	fresult = f_open(&fil_T, "test.csv", FA_OPEN_ALWAYS | FA_WRITE);  // create file
-	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY );
+	fresult = f_open(&fil_T, "test.csv", FA_OPEN_ALWAYS | FA_WRITE); // create file
+	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY)
+		;
 	f_close(&fil_T);
 }
 /////////////////////////////////////////////////////////////////////
@@ -492,25 +521,30 @@ void SDtest(void) {
 // 引数         ディレクトリ名
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void createDir(uint8_t *dirName) {
-	FRESULT		fresult;
-	DIR			dir;			// Directory
-	FILINFO		fno;			// File Info
-	uint8_t		exist = 0;
+void createDir(uint8_t *dirName)
+{
+	FRESULT fresult;
+	DIR dir;	 // Directory
+	FILINFO fno; // File Info
+	uint8_t exist = 0;
 
-	fresult = f_opendir(&dir,"/");  // directory open
-	if (fresult == FR_OK) {
-		do {
-			f_readdir(&dir,&fno);     
-			if (strcmp(fno.fname,dirName) == 0) {
-				exist = 1;	// dirNameディレクトリが存在する
+	fresult = f_opendir(&dir, "/"); // directory open
+	if (fresult == FR_OK)
+	{
+		do
+		{
+			f_readdir(&dir, &fno);
+			if (strcmp(fno.fname, dirName) == 0)
+			{
+				exist = 1; // dirNameディレクトリが存在する
 				break;
 			}
-		} while(fno.fname[0] != 0); // ファイルの有無を確認
+		} while (fno.fname[0] != 0); // ファイルの有無を確認
 
-		if (!exist) {
+		if (!exist)
+		{
 			// dirNameディレクトリが存在しない場合は作成する
-			f_mkdir(dirName);	
+			f_mkdir(dirName);
 		}
 	}
 }
@@ -521,7 +555,8 @@ void createDir(uint8_t *dirName) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 #ifdef LOG_RUNNING_WRITE
-void send8bit(uint8_t data) {
+void send8bit(uint8_t data)
+{
 	logBuffer[logBuffIndex++] = data;
 }
 #endif
@@ -532,7 +567,8 @@ void send8bit(uint8_t data) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 #ifdef LOG_RUNNING_WRITE
-void send16bit(uint16_t data) {
+void send16bit(uint16_t data)
+{
 	logBuffer[logBuffIndex++] = data >> 8;
 	logBuffer[logBuffIndex++] = data & 0xff;
 }
@@ -544,10 +580,11 @@ void send16bit(uint16_t data) {
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 #ifdef LOG_RUNNING_WRITE
-void send32bit(uint32_t data) {
+void send32bit(uint32_t data)
+{
 	logBuffer[logBuffIndex++] = data >> 24;
-	logBuffer[logBuffIndex++] = ( data & 0x00ff0000 ) >> 16;
-	logBuffer[logBuffIndex++] = ( data & 0x0000ff00 ) >> 8;
+	logBuffer[logBuffIndex++] = (data & 0x00ff0000) >> 16;
+	logBuffer[logBuffIndex++] = (data & 0x0000ff00) >> 8;
 	logBuffer[logBuffIndex++] = data & 0x000000ff;
 }
 #endif
@@ -558,8 +595,9 @@ void send32bit(uint32_t data) {
 // 戻り値       変換したuint8_t型
 /////////////////////////////////////////////////////////////////////
 #ifdef LOG_RUNNING_WRITE
-uint8_t logPut8bit(void) {
-	return *logaddress++;				
+uint8_t logPut8bit(void)
+{
+	return *logaddress++;
 }
 #endif
 /////////////////////////////////////////////////////////////////////
@@ -569,13 +607,14 @@ uint8_t logPut8bit(void) {
 // 戻り値       変換したuint16_t型
 /////////////////////////////////////////////////////////////////////
 #ifdef LOG_RUNNING_WRITE
-uint16_t logPut16bit(void) {
+uint16_t logPut16bit(void)
+{
 	uint16_t s;
-	
-	s = (uint16_t)((uint8_t)*logaddress++ * 0x100 + 
-					(uint8_t)*logaddress++ );
-	
-	return s;				
+
+	s = (uint16_t)((uint8_t)*logaddress++ * 0x100 +
+				   (uint8_t)*logaddress++);
+
+	return s;
 }
 #endif
 /////////////////////////////////////////////////////////////////////
@@ -585,14 +624,15 @@ uint16_t logPut16bit(void) {
 // 戻り値       変換したuint32_t型
 /////////////////////////////////////////////////////////////////////
 #ifdef LOG_RUNNING_WRITE
-uint32_t logPut32bit(void) {
+uint32_t logPut32bit(void)
+{
 	uint32_t i;
-	
+
 	i = (uint32_t)(uint8_t)*logaddress++ * 0x1000000;
 	i += (uint32_t)(uint8_t)*logaddress++ * 0x10000;
 	i += (uint32_t)(uint8_t)*logaddress++ * 0x100;
 	i += (uint32_t)(uint8_t)*logaddress++;
-					
-	return i;				
+
+	return i;
 }
 #endif

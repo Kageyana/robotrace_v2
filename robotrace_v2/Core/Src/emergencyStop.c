@@ -13,15 +13,29 @@ uint8_t emcStop = 0;
 // 引数         なし
 // 戻り値       true:緊急停止 false:異常なし
 /////////////////////////////////////////////////////////////////////
-bool cntEmcStopAngleX(void) {
-    static uint16_t cntAngleX;
+bool cntEmcStopAngleX(void)
+{
+	static uint16_t cntAngleX;
 
-    // 緊急停止条件
-    if (fabs(BMI088val.gyro.x) > 2.0f) cntAngleX++;
-    else    cntAngleX = 0;
+	// 緊急停止条件
+	if (fabs(BMI088val.gyro.x) > 2.0f)
+	{
+		cntAngleX++;
+	}
+	else
+	{
+		cntAngleX = 0;
+	}
 
-    if (cntAngleX > STOP_COUNT_ANGLE_X) return true;
-    else return false;
+	// 停止条件継続タイマ
+	if (cntAngleX > STOP_COUNT_ANGLE_X)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 cntEmcStopAngleY
@@ -29,15 +43,29 @@ bool cntEmcStopAngleX(void) {
 // 引数         なし
 // 戻り値       true:緊急停止 false:異常なし
 /////////////////////////////////////////////////////////////////////
-bool cntEmcStopAngleY(void) {
-    static uint16_t cntAngleY;
+bool cntEmcStopAngleY(void)
+{
+	static uint16_t cntAngleY;
 
-    // 緊急停止条件
-    if (fabs(BMI088val.gyro.y) > 2.0f) cntAngleY++;
-    else    cntAngleY = 0;
+	// 緊急停止条件
+	if (fabs(BMI088val.gyro.y) > 2.0f)
+	{
+		cntAngleY++;
+	}
+	else
+	{
+		cntAngleY = 0;
+	}
 
-    if (cntAngleY > STOP_COUNT_ANGLE_Y) return true;
-    else return false;
+	// 停止条件継続タイマ
+	if (cntAngleY > STOP_COUNT_ANGLE_Y)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 cntEmcStopEncStop
@@ -45,15 +73,29 @@ bool cntEmcStopAngleY(void) {
 // 引数         なし
 // 戻り値       true:緊急停止 false:異常なし
 /////////////////////////////////////////////////////////////////////
-bool cntEmcStopEncStop(void) {
-    static uint16_t cntEncStop;
+bool cntEmcStopEncStop(void)
+{
+	static uint16_t cntEncStop;
 
-    // 緊急停止条件
-    if (abs(encCurrentN) < 10) cntEncStop++;
-    else    cntEncStop = 0;
+	// 緊急停止条件
+	if (abs(encCurrentN) < 10)
+	{
+		cntEncStop++;
+	}
+	else
+	{
+		cntEncStop = 0;
+	}
 
-    if (cntEncStop > STOP_COUNT_ENCODER_STOP) return true;
-    else return false;
+	// 停止条件継続タイマ
+	if (cntEncStop > STOP_COUNT_ENCODER_STOP)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 cntEmcStopLinesensor
@@ -61,15 +103,29 @@ bool cntEmcStopEncStop(void) {
 // 引数         なし
 // 戻り値       true:緊急停止 false:異常なし
 /////////////////////////////////////////////////////////////////////
-bool cntEmcStopLineSensor(void) {
-    static uint16_t cntLineSensor = 0;
+bool cntEmcStopLineSensor(void)
+{
+	static uint16_t cntLineSensor = 0;
 
-    // 緊急停止条件
-    if (lSensor[3]+lSensor[4]+lSensor[5]+lSensor[6] > 12000) cntLineSensor++;
-    else    cntLineSensor = 0;
+	// 緊急停止条件
+	if (lSensor[3] + lSensor[4] + lSensor[5] + lSensor[6] > 12000)
+	{
+		cntLineSensor++;
+	}
+	else
+	{
+		cntLineSensor = 0;
+	}
 
-    if (cntLineSensor > STOP_COUNT_LINESENSOR) return true;
-    else return false;
+	// 停止条件継続タイマ
+	if (cntLineSensor > STOP_COUNT_LINESENSOR)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 judgeOverSpeed
@@ -77,13 +133,27 @@ bool cntEmcStopLineSensor(void) {
 // 引数         なし
 // 戻り値       true:緊急停止 false:異常なし
 /////////////////////////////////////////////////////////////////////
-bool judgeOverSpeed(void) {
-    static uint16_t cntOverSpeed = 0;
+bool judgeOverSpeed(void)
+{
+	static uint16_t cntOverSpeed = 0;
 
-    // 緊急停止条件
-    if (encCurrentN > (uint32_t)(targetSpeed * 2)) cntOverSpeed++;
-    else    cntOverSpeed = 0;
+	// 緊急停止条件
+	if (encCurrentN > (uint32_t)(targetSpeed * 2))
+	{
+		cntOverSpeed++;
+	}
+	else
+	{
+		cntOverSpeed = 0;
+	}
 
-    if (cntOverSpeed > STOP_COUNT_OVERSPEED) return true;
-    else return false;
+	// 停止条件継続タイマ
+	if (cntOverSpeed > STOP_COUNT_OVERSPEED)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
 }

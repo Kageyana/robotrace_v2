@@ -6,40 +6,42 @@
 //====================================//
 // グローバル変数の宣
 //====================================//
-uint8_t     optimalTrace = 0;
-uint16_t    optimalIndex;
-int16_t     numPPADarry;                    // path palanning analysis distance (PPAD)
-int16_t     numPPAMarry;                    // path palanning analysis marker (PPAM1)
-int16_t     pathedMarker = 0;
-float       boostSpeed;
-int32_t     DistanceOptimal = 0;            // 2次走行用走行距離変数
-int16_t     analizedNumber = 0;             // 前回解析したログ番号
-int32_t     encTotalOptimal = 0;            // 2次走行用の距離変数(距離補正をする)
-int32_t     encPID = 0;                     // 距離制御用の距離変数
-float       xydegz = 0;
+uint8_t optimalTrace = 0;
+uint16_t optimalIndex;
+int16_t numPPADarry; // path palanning analysis distance (PPAD)
+int16_t numPPAMarry; // path palanning analysis marker (PPAM1)
+int16_t pathedMarker = 0;
+float boostSpeed;
+int32_t DistanceOptimal = 0; // 2次走行用走行距離変数
+int16_t analizedNumber = 0;	 // 前回解析したログ番号
+int32_t encTotalOptimal = 0; // 2次走行用の距離変数(距離補正をする)
+int32_t encPID = 0;			 // 距離制御用の距離変数
+float xydegz = 0;
 
 AnalysisData PPAD[OPT_BUFF_SIZE];
-EventPos     markerPos[OPT_BUFF_SIZE];
-Courseplot   xycie;                         // xy座標値(走行中計算、ログ保存用)
-Courseplot   shortCutxycie[OPT_SHORT_BUFF_SIZE];   // xy座標値(走行中計算、ログ保存用)
+EventPos markerPos[OPT_BUFF_SIZE];
+Courseplot xycie;							   // xy座標値(走行中計算、ログ保存用)
+Courseplot shortCutxycie[OPT_SHORT_BUFF_SIZE]; // xy座標値(走行中計算、ログ保存用)
 /////////////////////////////////////////////////////////////////////
 // モジュール名 calcROC
 // 処理概要     曲率半径の計算
 // 引数         velo: エンコーダカウント angvelo: 角速度[rad/s]
 // 戻り値       曲率半径[mm]
 /////////////////////////////////////////////////////////////////////
-float calcROC(int16_t velo, float angvelo, float dt) {
-    float dl, drad, ret;
-    
-    dl = (float)velo / PALSE_MILLIMETER * 10.0F; // [palse] → [mm/ms] → [mm] 
-    drad = angvelo * DEG2RAD * DELTATIME;            // [deg/s] → [rad]
-    ret = dl / drad;
-    // 曲率半径が大きい＝直線の場合は極大にする
-    if (fabs(ret) > 1500.0F) {
-        ret = 2000.0;
-    }
+float calcROC(int16_t velo, float angvelo, float dt)
+{
+	float dl, drad, ret;
 
-    return ret;
+	dl = (float)velo / PALSE_MILLIMETER * 10.0F; // [palse] → [mm/ms] → [mm]
+	drad = angvelo * DEG2RAD * DELTATIME;		 // [deg/s] → [rad]
+	ret = dl / drad;
+	// 曲率半径が大きい＝直線の場合は極大にする
+	if (fabs(ret) > 1500.0F)
+	{
+		ret = 2000.0;
+	}
+
+	return ret;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 saveLogNumber
@@ -47,18 +49,20 @@ float calcROC(int16_t velo, float angvelo, float dt) {
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void saveLogNumber(int16_t fileNumber) {
-    FRESULT     fresult;
-    FIL         fil;
-    uint8_t     fileName[20] = PATH_SETTING;
+void saveLogNumber(int16_t fileNumber)
+{
+	FRESULT fresult;
+	FIL fil;
+	uint8_t fileName[20] = PATH_SETTING;
 
-    strcat(fileName,FILENAME_ANALIZENUMBER); // ファイル名追加
-	strcat(fileName,".txt");   // 拡張子追加
-    fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_WRITE);  // create file
-    if(fresult == FR_OK) {
-        f_printf(&fil, "%04d",fileNumber);
-    }
-    f_close(&fil);
+	strcat(fileName, FILENAME_ANALIZENUMBER);					 // ファイル名追加
+	strcat(fileName, ".txt");									 // 拡張子追加
+	fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_WRITE); // create file
+	if (fresult == FR_OK)
+	{
+		f_printf(&fil, "%04d", fileNumber);
+	}
+	f_close(&fil);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getLogNumber
@@ -66,27 +70,31 @@ void saveLogNumber(int16_t fileNumber) {
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void getLogNumber(void) {
-    FRESULT     fresult;
-    FIL         fil;
-    TCHAR       log[20];
-    uint8_t     fileName[20] = PATH_SETTING;
+void getLogNumber(void)
+{
+	FRESULT fresult;
+	FIL fil;
+	TCHAR log[20];
+	uint8_t fileName[20] = PATH_SETTING;
 
-    strcat(fileName,FILENAME_ANALIZENUMBER); // ファイル名追加
-	strcat(fileName,".txt");   // 拡張子追加
-    fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_READ);  // csvファイルを開く
-    if (fresult == FR_OK) {
-        f_gets(log,sizeof(log),&fil);
-        sscanf(log,"%d",&analizedNumber);
-        f_close(&fil);
-    }
+	strcat(fileName, FILENAME_ANALIZENUMBER);					// ファイル名追加
+	strcat(fileName, ".txt");									// 拡張子追加
+	fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_READ); // csvファイルを開く
+	if (fresult == FR_OK)
+	{
+		f_gets(log, sizeof(log), &fil);
+		sscanf(log, "%d", &analizedNumber);
+		f_close(&fil);
+	}
 
-    for (int16_t i = 0; i <= endFileIndex; i++) {
-        if (analizedNumber == fileNumbers[i]) {
-            fileIndexLog = i;
-            break;
-        }
-    }
+	for (int16_t i = 0; i <= endFileIndex; i++)
+	{
+		if (analizedNumber == fileNumbers[i])
+		{
+			fileIndexLog = i;
+			break;
+		}
+	}
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 readLogDistance
@@ -94,219 +102,264 @@ void getLogNumber(void) {
 // 引数         ログ番号(ファイル名)
 // 戻り値       最適速度配列の最大要素数
 /////////////////////////////////////////////////////////////////////
-int16_t readLogDistance(int logNumber) {
-    // ファイル読み込み
-    FIL         fil_Read;
-    FRESULT     fresult;
-    uint8_t     fileName[10];
-    int16_t     ret = 0;
-    uint32_t    i;
+int16_t readLogDistance(int logNumber)
+{
+	// ファイル読み込み
+	FIL fil_Read;
+	FRESULT fresult;
+	uint8_t fileName[10];
+	int16_t ret = 0;
+	uint32_t i;
 
-    snprintf(fileName,sizeof(fileName),"%d",logNumber);   // 数値を文字列に変換
-    strcat(fileName,".csv");                              // 拡張子を追加
-    fresult = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ);  // csvファイルを開く
+	snprintf(fileName, sizeof(fileName), "%d", logNumber);			   // 数値を文字列に変換
+	strcat(fileName, ".csv");										   // 拡張子を追加
+	fresult = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // csvファイルを開く
 
-    if (fresult == FR_OK) {
-        // printf("Analysis distance start\n");
+	if (fresult == FR_OK)
+	{
+		// printf("Analysis distance start\n");
 
-        // // ヘッダーの取得
-        // TCHAR     header[256];
-        // uint8_t   formatLogRead[256] = "", *tmpStr;
+		// // ヘッダーの取得
+		// TCHAR     header[256];
+		// uint8_t   formatLogRead[256] = "", *tmpStr;
 
-        // f_gets(header,256,&fil_Read);
-        // tmpStr = header;
-        // while(*tmpStr != '\0') {
-        //     if (*tmpStr == (uint8_t)',') {
-        //         strcat(formatLogRead,"%d,");
-        //     }
-        //     tmpStr++;
-        // }
+		// f_gets(header,256,&fil_Read);
+		// tmpStr = header;
+		// while(*tmpStr != '\0') {
+		//     if (*tmpStr == (uint8_t)',') {
+		//         strcat(formatLogRead,"%d,");
+		//     }
+		//     tmpStr++;
+		// }
 
-        // ログデータの取得
-        TCHAR   log[512];
-        int32_t time=0, marker=0,velo=0,angVelo=0,distance=0, roc, i=0;
-        int32_t numD=0, numM=0, cntCurR=0, numStraight=0;
-        bool    analysis=false;
-        static  int16_t   ROCbuff[600] = {0};
-        static  int16_t*  sortROC;
-        int32_t  	straightMeter = 0;
-        bool     	straightState = false;
+		// ログデータの取得
+		TCHAR log[512];
+		int32_t time = 0, marker = 0, velo = 0, angVelo = 0, distance = 0, roc, i = 0;
+		int32_t numD = 0, numM = 0, cntCurR = 0, numStraight = 0;
+		bool analysis = false;
+		static int16_t ROCbuff[600] = {0};
+		static int16_t *sortROC;
+		int32_t straightMeter = 0;
+		bool straightState = false;
 
-        // 前処理
-        // 構造体配列の初期化
-        memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
-        // memset(&ROCbuff, 0, sizeof(float) * 500);
+		// 前処理
+		// 構造体配列の初期化
+		memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
+		// memset(&ROCbuff, 0, sizeof(float) * 500);
 
-        // ログデータ取得開始
-        while (f_gets(log,sizeof(log),&fil_Read)) {
-            sscanf(log,"%d,%d,%d,%d,%d,%d,",&time,&velo,&angVelo,&marker,&distance,&roc);
-            // 解析処理
-            // if (marker >= 2) {
-            //     // カーブマーカーを通過したときにマーカー位置を記録
-            //     markerPos[numM].distance = distance;
-            //     markerPos[numM].indexPPAD = numD;
+		// ログデータ取得開始
+		while (f_gets(log, sizeof(log), &fil_Read))
+		{
+			sscanf(log, "%d,%d,%d,%d,%d,%d,", &time, &velo, &angVelo, &marker, &distance, &roc);
+			// 解析処理
+			// if (marker >= 2) {
+			//     // カーブマーカーを通過したときにマーカー位置を記録
+			//     markerPos[numM].distance = distance;
+			//     markerPos[numM].indexPPAD = numD;
 
-            //     numM++;     // マーカー解析インデックス更新
-            // }
+			//     numM++;     // マーカー解析インデックス更新
+			// }
 
-            if (marker == 3 || (marker == 2 && straightState) ) {
-                // カーブマーカーを通過したときにマーカー位置を記録
-                markerPos[numM].distance = distance;
-                markerPos[numM].indexPPAD = numD;
+			if (marker == 3 || (marker == 2 && straightState))
+			{
+				// カーブマーカーを通過したときにマーカー位置を記録
+				markerPos[numM].distance = distance;
+				markerPos[numM].indexPPAD = numD;
 
-                if(marker == 2 && straightState) {
-                    straightState = false;
-                    straightMeter = 0;
-                }
+				if (marker == 2 && straightState)
+				{
+					straightState = false;
+					straightMeter = 0;
+				}
 
-                numM++;     // マーカー解析インデックス更新
-            }
-            
-            // 一定距離ごとに処理
-            if ( i % (CALCDISTANCE/10) == 0 ) {
-                sortROC = (int16_t*)malloc(sizeof(int16_t) * cntCurR);  // 計算した曲率半径カウント分の配列を作成
-                memcpy(sortROC,ROCbuff,sizeof(int16_t) * cntCurR);    // 作成した配列に曲率半径をコピーする
-                qsort(sortROC, cntCurR, sizeof(int16_t), cmpint16_t);   // ソート
+				numM++; // マーカー解析インデックス更新
+			}
 
-                // 曲率半径を記録する
-                if (cntCurR % 2 == 0) {
-                    // 中央値を記録(配列要素数が偶数のとき) 中央2つの平均値
-                    PPAD[numD].ROC = (sortROC[cntCurR/2]+sortROC[cntCurR/2-1])/2;
-                } else {
-                    // 中央値を記録(配列要素数が奇数のとき)
-                    PPAD[numD].ROC = sortROC[cntCurR/2];
-                }
-                free(sortROC); // mallocで確保したメモリを開放
-                
-                PPAD[numD].boostSpeed = asignVelocity(PPAD[numD].ROC);   // 曲率半径ごとの速度を計算する
+			// 一定距離ごとに処理
+			if (i % (CALCDISTANCE / 10) == 0)
+			{
+				sortROC = (int16_t *)malloc(sizeof(int16_t) * cntCurR); // 計算した曲率半径カウント分の配列を作成
+				memcpy(sortROC, ROCbuff, sizeof(int16_t) * cntCurR);	// 作成した配列に曲率半径をコピーする
+				qsort(sortROC, cntCurR, sizeof(int16_t), cmpint16_t);	// ソート
 
-                if(PPAD[i].ROC == PPAD[i-1].ROC) {
-                    numStraight++;
-                } else {
-                    numStraight = 0;
-                }
-                
-                cntCurR = 0;            // 曲率半径用配列のカウントクリア
-                numD++;                 // 距離解析インデックス更新
-                if(numD >= OPT_BUFF_SIZE) return -1; // 解析用配列のサイズを超えたら強制終了
-            }
-            // 曲率半径の計算
-            ROCbuff[cntCurR] = roc;
+				// 曲率半径を記録する
+				if (cntCurR % 2 == 0)
+				{
+					// 中央値を記録(配列要素数が偶数のとき) 中央2つの平均値
+					PPAD[numD].ROC = (sortROC[cntCurR / 2] + sortROC[cntCurR / 2 - 1]) / 2;
+				}
+				else
+				{
+					// 中央値を記録(配列要素数が奇数のとき)
+					PPAD[numD].ROC = sortROC[cntCurR / 2];
+				}
+				free(sortROC); // mallocで確保したメモリを開放
 
-            if( abs(ROCbuff[cntCurR]) >= 700) {
-                straightMeter += CALCDISTANCE_SHORTCUT;
-            } else {
-                straightMeter = 0;
-            }
+				PPAD[numD].boostSpeed = asignVelocity(PPAD[numD].ROC); // 曲率半径ごとの速度を計算する
 
-            if (straightMeter >= 100 ) {
-                straightState = true;
-            }
-            
-            cntCurR++;  // 曲率半径用配列のカウント
-            i++;
-        }
+				if (PPAD[i].ROC == PPAD[i - 1].ROC)
+				{
+					numStraight++;
+				}
+				else
+				{
+					numStraight = 0;
+				}
 
-        // インデックスが1多くなるので調整
-        numM--;
-        numD--; 
+				cntCurR = 0; // 曲率半径用配列のカウントクリア
+				numD++;		 // 距離解析インデックス更新
+				if (numD >= OPT_BUFF_SIZE)
+					return -1; // 解析用配列のサイズを超えたら強制終了
+			}
+			// 曲率半径の計算
+			ROCbuff[cntCurR] = roc;
 
-        // 目標速度配列の整形 加減速が間に合うように距離を調整する
-        float acceleration, elapsedTime, dv, dl;
+			if (abs(ROCbuff[cntCurR]) >= 700)
+			{
+				straightMeter += CALCDISTANCE_SHORTCUT;
+			}
+			else
+			{
+				straightMeter = 0;
+			}
 
-        // 最初の要素は調整しない
-        dl = (float)CALCDISTANCE / 1000;
+			if (straightMeter >= 100)
+			{
+				straightState = true;
+			}
 
-        // 加速 インデックス2から開始
-        for (i=2;i<=numD;i++) {
-            dv = (PPAD[i].boostSpeed - PPAD[i-1].boostSpeed);
-            elapsedTime = fabs(dl /dv);
-            acceleration = dv / elapsedTime;
-            if (acceleration > MACHINEACCELE) {
-                PPAD[i].boostSpeed = PPAD[i-1].boostSpeed + (MACHINEACCELE*dl);
-            }
-        }
+			cntCurR++; // 曲率半径用配列のカウント
+			i++;
+		}
 
-        // 減速 インデックス末尾から開始
-        for (i=numD-1;i>=1;i--) { 
-            dv = (PPAD[i].boostSpeed - PPAD[i+1].boostSpeed);
-            elapsedTime = fabs(dl /dv);
-            acceleration = dv / elapsedTime;
-            if (acceleration > MACHINEDECREACE) {
-                PPAD[i].boostSpeed = PPAD[i+1].boostSpeed + (MACHINEDECREACE*dl);
-            }
-        }
+		// インデックスが1多くなるので調整
+		numM--;
+		numD--;
 
-         for (i=0;i<=numD;i++) {
-             printf("%f\n",PPAD[i].boostSpeed);
-         }
-        
-        numPPAMarry = numM;
-        numPPADarry = numD;
-        ret = numD;
-    } else {
-        ret = -4;
-    }
-    f_close(&fil_Read);
+		// 目標速度配列の整形 加減速が間に合うように距離を調整する
+		float acceleration, elapsedTime, dv, dl;
 
-    // printf("Analysis distance end\n");
+		// 最初の要素は調整しない
+		dl = (float)CALCDISTANCE / 1000;
 
-    // 解析済みのログ番号を保存
-    saveLogNumber(logNumber);
-    analizedNumber = logNumber;
+		// 加速 インデックス2から開始
+		for (i = 2; i <= numD; i++)
+		{
+			dv = (PPAD[i].boostSpeed - PPAD[i - 1].boostSpeed);
+			elapsedTime = fabs(dl / dv);
+			acceleration = dv / elapsedTime;
+			if (acceleration > MACHINEACCELE)
+			{
+				PPAD[i].boostSpeed = PPAD[i - 1].boostSpeed + (MACHINEACCELE * dl);
+			}
+		}
 
-    // 2次走行フラグ 距離基準2次走行
-    optimalTrace = BOOST_DISTANCE;
+		// 減速 インデックス末尾から開始
+		for (i = numD - 1; i >= 1; i--)
+		{
+			dv = (PPAD[i].boostSpeed - PPAD[i + 1].boostSpeed);
+			elapsedTime = fabs(dl / dv);
+			acceleration = dv / elapsedTime;
+			if (acceleration > MACHINEDECREACE)
+			{
+				PPAD[i].boostSpeed = PPAD[i + 1].boostSpeed + (MACHINEDECREACE * dl);
+			}
+		}
 
-    return ret;
+		for (i = 0; i <= numD; i++)
+		{
+			printf("%f\n", PPAD[i].boostSpeed);
+		}
+
+		numPPAMarry = numM;
+		numPPADarry = numD;
+		ret = numD;
+	}
+	else
+	{
+		ret = -4;
+	}
+	f_close(&fil_Read);
+
+	// printf("Analysis distance end\n");
+
+	// 解析済みのログ番号を保存
+	saveLogNumber(logNumber);
+	analizedNumber = logNumber;
+
+	// 2次走行フラグ 距離基準2次走行
+	optimalTrace = BOOST_DISTANCE;
+
+	return ret;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 asignVelocity
 // 処理概要     曲率半径ごとの最適速度を割り当てる
-// 引数         
+// 引数
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-float asignVelocity(int16_t ROC) {
-    int16_t absROC;
-    float ret; 
+float asignVelocity(int16_t ROC)
+{
+	int16_t absROC;
+	float ret;
 
-    absROC = abs(ROC);
-    if ( absROC > 1500 ) ret = tgtParam.bstStraight;
-    if ( absROC <= 1500 ) ret = tgtParam.bst1500;
-    if ( absROC <= 1300 ) ret = tgtParam.bst1300;
-    if ( absROC <= 1000 ) ret = tgtParam.bst1000;
-    if ( absROC <= 800 )  ret = tgtParam.bst800;
-    if ( absROC <= 700 )  ret = tgtParam.bst700;
-    if ( absROC <= 600 )  ret = tgtParam.bst600;
-    if ( absROC <= 500 )  ret = tgtParam.bst500;
-    if ( absROC <= 400 )  ret = tgtParam.bst400;
-    if ( absROC <= 300 )  ret = tgtParam.bst300;
-    if ( absROC <= 200 )  ret = tgtParam.bst200;
-    if ( absROC <= 100 )  ret = tgtParam.bst100;
+	absROC = abs(ROC);
+	if (absROC > 1500)
+		ret = tgtParam.bstStraight;
+	if (absROC <= 1500)
+		ret = tgtParam.bst1500;
+	if (absROC <= 1300)
+		ret = tgtParam.bst1300;
+	if (absROC <= 1000)
+		ret = tgtParam.bst1000;
+	if (absROC <= 800)
+		ret = tgtParam.bst800;
+	if (absROC <= 700)
+		ret = tgtParam.bst700;
+	if (absROC <= 600)
+		ret = tgtParam.bst600;
+	if (absROC <= 500)
+		ret = tgtParam.bst500;
+	if (absROC <= 400)
+		ret = tgtParam.bst400;
+	if (absROC <= 300)
+		ret = tgtParam.bst300;
+	if (absROC <= 200)
+		ret = tgtParam.bst200;
+	if (absROC <= 100)
+		ret = tgtParam.bst100;
 
-    return ret;
+	return ret;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 cmpfloat
 // 処理概要     float型の比較
-// 引数         
+// 引数
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-int cmpfloat(const void * n1, const void * n2) {
-	if (*(float *)n1 > *(float *)n2) return 1;
-	else if (*(float *)n1 < *(float *)n2) return -1;
-	else return 0;
+int cmpfloat(const void *n1, const void *n2)
+{
+	if (*(float *)n1 > *(float *)n2)
+		return 1;
+	else if (*(float *)n1 < *(float *)n2)
+		return -1;
+	else
+		return 0;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 cmpint16_t
 // 処理概要     int16_t型の比較
-// 引数         
+// 引数
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-int cmpint16_t(const void * n1, const void * n2) {
-	if (*(int16_t *)n1 > *(int16_t *)n2) return 1;
-	else if (*(int16_t *)n1 < *(int16_t *)n2) return -1;
-	else return 0;
+int cmpint16_t(const void *n1, const void *n2)
+{
+	if (*(int16_t *)n1 > *(int16_t *)n2)
+		return 1;
+	else if (*(int16_t *)n1 < *(int16_t *)n2)
+		return -1;
+	else
+		return 0;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 readLogDistance
@@ -314,59 +367,68 @@ int cmpint16_t(const void * n1, const void * n2) {
 // 引数         ログ番号(ファイル名)
 // 戻り値       最適速度配列の最大要素数
 /////////////////////////////////////////////////////////////////////
-int16_t readLogTest(int logNumber) {
-    // ファイル読み込み
-    FIL         fil_Read;
-    FRESULT     fresult;
-    uint8_t     fileName[10];
-    int16_t     ret = 0;
-    uint32_t    i;
+int16_t readLogTest(int logNumber)
+{
+	// ファイル読み込み
+	FIL fil_Read;
+	FRESULT fresult;
+	uint8_t fileName[10];
+	int16_t ret = 0;
+	uint32_t i;
 
-    snprintf(fileName,sizeof(fileName),"%d",logNumber);   // 数値を文字列に変換
-    strcat(fileName,".csv");                              // 拡張子を追加
-    fresult = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ);  // csvファイルを開く
+	snprintf(fileName, sizeof(fileName), "%d", logNumber);			   // 数値を文字列に変換
+	strcat(fileName, ".csv");										   // 拡張子を追加
+	fresult = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // csvファイルを開く
 
-    if (fresult == FR_OK) {
-        TCHAR     log[512];
-        int32_t   time, marker,velo,angVelo,distance;
-        int32_t   startEnc=0, numD=0, numM=0, cntCurR=0,beforeMarker=0;
-        bool      analysis=false;
-        float     ROCbuff[600] = {0};
-        float*    sortROC;
+	if (fresult == FR_OK)
+	{
+		TCHAR log[512];
+		int32_t time, marker, velo, angVelo, distance;
+		int32_t startEnc = 0, numD = 0, numM = 0, cntCurR = 0, beforeMarker = 0;
+		bool analysis = false;
+		float ROCbuff[600] = {0};
+		float *sortROC;
 
-        // 前処理
-        // 構造体配列の初期化
-        memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
+		// 前処理
+		// 構造体配列の初期化
+		memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
 
-        // ログデータ取得開始
-        while (f_gets(log,sizeof(log),&fil_Read)) {
-            sscanf(log,"%d,%d,%d,%d,%d",&time,&velo,&angVelo,&marker,&distance);
+		// ログデータ取得開始
+		while (f_gets(log, sizeof(log), &fil_Read))
+		{
+			sscanf(log, "%d,%d,%d,%d,%d", &time, &velo, &angVelo, &marker, &distance);
 
-            // 解析処理
-            if (marker == 1 && beforeMarker == 0) {
-                // ゴールマーカーを通過したときにフラグ反転
-                analysis = !analysis;
-                startEnc = distance;
-            } else if (marker == 0 && beforeMarker == 2) {
-                // カーブマーカーを通過したときにマーカー位置を記録
-                markerPos[numM].distance = distance;
-                markerPos[numM].indexPPAD = numD;
-                numM++;     // マーカー解析インデックス更新
-            }
-            if(!analysis && startEnc > 0) break;
-            numD++;
-        } 
-        ret = numD;
-    } else {
-        ret = -1;
-    }
-    f_close(&fil_Read);
+			// 解析処理
+			if (marker == 1 && beforeMarker == 0)
+			{
+				// ゴールマーカーを通過したときにフラグ反転
+				analysis = !analysis;
+				startEnc = distance;
+			}
+			else if (marker == 0 && beforeMarker == 2)
+			{
+				// カーブマーカーを通過したときにマーカー位置を記録
+				markerPos[numM].distance = distance;
+				markerPos[numM].indexPPAD = numD;
+				numM++; // マーカー解析インデックス更新
+			}
+			if (!analysis && startEnc > 0)
+				break;
+			numD++;
+		}
+		ret = numD;
+	}
+	else
+	{
+		ret = -1;
+	}
+	f_close(&fil_Read);
 
-    // 解析済みのログ番号を保存
-    // saveLogNumber(logNumber);
-    analizedNumber = logNumber;
+	// 解析済みのログ番号を保存
+	// saveLogNumber(logNumber);
+	analizedNumber = logNumber;
 
-    return ret;
+	return ret;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 calcXYcies (cie=Coordinate)
@@ -374,133 +436,143 @@ int16_t readLogTest(int logNumber) {
 // 引数         ログ番号(ファイル名)
 // 戻り値       解析した配列の要素数
 /////////////////////////////////////////////////////////////////////
-int16_t calcXYcies(int logNumber) {
-    FIL         fil_Read,fil_Plot;
-    FRESULT     fresult1,fresult2;
-    uint8_t     fileName[10];
-    int16_t     ret=0;
-    
+int16_t calcXYcies(int logNumber)
+{
+	FIL fil_Read, fil_Plot;
+	FRESULT fresult1, fresult2;
+	uint8_t fileName[10];
+	int16_t ret = 0;
 
-    // ファイル読み込み
-    snprintf(fileName,sizeof(fileName),"%d",logNumber);   // 数値を文字列に変換
-    strcat(fileName,".csv");                              // 拡張子を追加
-    fresult1 = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ);  // ログファイルを開く
-    fresult1 = f_unlink("./plot/plot.csv");
-    fresult2 = f_open(&fil_Plot, "./plot/plot.csv", FA_OPEN_ALWAYS | FA_WRITE);  // csvファイルを開く
+	// ファイル読み込み
+	snprintf(fileName, sizeof(fileName), "%d", logNumber);				// 数値を文字列に変換
+	strcat(fileName, ".csv");											// 拡張子を追加
+	fresult1 = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // ログファイルを開く
+	fresult1 = f_unlink("./plot/plot.csv");
+	fresult2 = f_open(&fil_Plot, "./plot/plot.csv", FA_OPEN_ALWAYS | FA_WRITE); // csvファイルを開く
 
-    if (fresult2 == FR_OK) {
-        // ログデータの取得
-        TCHAR     log[512];
-        int32_t time=0, marker=0,velo=0,angVelo=0,distance=0;
-        int32_t beforeTime=0, startEnc=0;
-        float   degz=0, degzR, velocity=0, dt;
-        float   x=0, y=0, xm=0, ym=0, degzm=0;
-        float   xValues[SHORTCUTWINDOW], yValues[SHORTCUTWINDOW], degzValues[SHORTCUTWINDOW];
-        int16_t i=0, j=0, indexSC=0;
+	if (fresult2 == FR_OK)
+	{
+		// ログデータの取得
+		TCHAR log[512];
+		int32_t time = 0, marker = 0, velo = 0, angVelo = 0, distance = 0;
+		int32_t beforeTime = 0, startEnc = 0;
+		float degz = 0, degzR, velocity = 0, dt;
+		float x = 0, y = 0, xm = 0, ym = 0, degzm = 0;
+		float xValues[SHORTCUTWINDOW], yValues[SHORTCUTWINDOW], degzValues[SHORTCUTWINDOW];
+		int16_t i = 0, j = 0, indexSC = 0;
 
-        // 配列の初期化
-        memset(&xValues, 0, sizeof(float) * SHORTCUTWINDOW);
-        memset(&yValues, 0, sizeof(float) * SHORTCUTWINDOW);
-        memset(&degzValues, 0, sizeof(float) * SHORTCUTWINDOW);
+		// 配列の初期化
+		memset(&xValues, 0, sizeof(float) * SHORTCUTWINDOW);
+		memset(&yValues, 0, sizeof(float) * SHORTCUTWINDOW);
+		memset(&degzValues, 0, sizeof(float) * SHORTCUTWINDOW);
 
-        // ショートカット軌跡初期値の設定
-        shortCutxycie[indexSC].x = 0;
-        shortCutxycie[indexSC].y = 0;
-        shortCutxycie[indexSC].w = 0;
-        indexSC++;
+		// ショートカット軌跡初期値の設定
+		shortCutxycie[indexSC].x = 0;
+		shortCutxycie[indexSC].y = 0;
+		shortCutxycie[indexSC].w = 0;
+		indexSC++;
 
-        f_printf(&fil_Plot, "xm,ym,degzm\n");
+		f_printf(&fil_Plot, "xm,ym,degzm\n");
 
-        // ログデータ取得開始
-        while (f_gets(log,sizeof(log),&fil_Read) != NULL) {
-            sscanf(log,"%d,%d,%d,%d,%d",&time,&marker,&velo,&angVelo,&distance);
+		// ログデータ取得開始
+		while (f_gets(log, sizeof(log), &fil_Read) != NULL)
+		{
+			sscanf(log, "%d,%d,%d,%d,%d", &time, &marker, &velo, &angVelo, &distance);
 
-            dt = (float)(time - beforeTime)/1000;
+			dt = (float)(time - beforeTime) / 1000;
 
-            degz = degz + ((float)angVelo/10000 * dt);   // 角度
-            degzR = degz * DEG2RAD;                             // [rad]に変換
-            velocity = (float)velo/PALSE_MILLIMETER;            // 速度
+			degz = degz + ((float)angVelo / 10000 * dt); // 角度
+			degzR = degz * DEG2RAD;						 // [rad]に変換
+			velocity = (float)velo / PALSE_MILLIMETER;	 // 速度
 
-            // 座標計算
-            x = x + (velocity * sin(degzR));
-            y = y + (velocity * cos(degzR));
+			// 座標計算
+			x = x + (velocity * sin(degzR));
+			y = y + (velocity * cos(degzR));
 
-            // リングバッファに座標を保存
-            xValues[i & (SHORTCUTWINDOW-1)] = x;
-            yValues[i & (SHORTCUTWINDOW-1)] = y;
-            degzValues[i & (SHORTCUTWINDOW-1)] = degz;
+			// リングバッファに座標を保存
+			xValues[i & (SHORTCUTWINDOW - 1)] = x;
+			yValues[i & (SHORTCUTWINDOW - 1)] = y;
+			degzValues[i & (SHORTCUTWINDOW - 1)] = degz;
 
-            // リングバッファの総和を計算
-            for(j=0;j<SHORTCUTWINDOW;j++) {
-                xm += xValues[j];
-                ym += yValues[j];
-                degzm += degzValues[j];
-            }
+			// リングバッファの総和を計算
+			for (j = 0; j < SHORTCUTWINDOW; j++)
+			{
+				xm += xValues[j];
+				ym += yValues[j];
+				degzm += degzValues[j];
+			}
 
-            // 移動平均を計算(ショートカット座標)
-            xm /= SHORTCUTWINDOW;
-            ym /= SHORTCUTWINDOW;
-            degzm /= SHORTCUTWINDOW;
+			// 移動平均を計算(ショートカット座標)
+			xm /= SHORTCUTWINDOW;
+			ym /= SHORTCUTWINDOW;
+			degzm /= SHORTCUTWINDOW;
 
-            if ( distance-startEnc >= encMM(CALCDISTANCE_SHORTCUT)) {
-                shortCutxycie[indexSC].x = xm;
-                shortCutxycie[indexSC].y = ym;
-                startEnc = distance;    // 距離計測開始位置を更新
-                indexSC++;
-            }
+			if (distance - startEnc >= encMM(CALCDISTANCE_SHORTCUT))
+			{
+				shortCutxycie[indexSC].x = xm;
+				shortCutxycie[indexSC].y = ym;
+				startEnc = distance; // 距離計測開始位置を更新
+				indexSC++;
+			}
 
-            i++;
-            beforeTime = time;
-        }
+			i++;
+			beforeTime = time;
+		}
 
-        // ショートカット座標からyaw軸角度を計算
-        float   xe=0, ye=0;
-        float   theta=0, thetaBefore=90, thetae, tanc;
+		// ショートカット座標からyaw軸角度を計算
+		float xe = 0, ye = 0;
+		float theta = 0, thetaBefore = 90, thetae, tanc;
 
-        degz = 0;
-        // 初期値記録
-        f_printf(&fil_Plot, "%d,%d,%d\n",(int32_t)(shortCutxycie[0].x*10000),(int32_t)(shortCutxycie[0].y*10000),(int32_t)(shortCutxycie[0].w*10000));
+		degz = 0;
+		// 初期値記録
+		f_printf(&fil_Plot, "%d,%d,%d\n", (int32_t)(shortCutxycie[0].x * 10000), (int32_t)(shortCutxycie[0].y * 10000), (int32_t)(shortCutxycie[0].w * 10000));
 
-        for(i=1;i<=indexSC;i++) {
-            xe = shortCutxycie[i].x - shortCutxycie[i-1].x; // x座標の移動量
-            ye = shortCutxycie[i].y - shortCutxycie[i-1].y; // y座標の移動量
+		for (i = 1; i <= indexSC; i++)
+		{
+			xe = shortCutxycie[i].x - shortCutxycie[i - 1].x; // x座標の移動量
+			ye = shortCutxycie[i].y - shortCutxycie[i - 1].y; // y座標の移動量
 
-            theta = atan2(ye,xe) * RAD2DEG;     // [deg]に変換
+			theta = atan2(ye, xe) * RAD2DEG; // [deg]に変換
 
-            // 2直線のなす角を計算
-            thetae = thetaBefore - theta;
-            if(thetae > 180) {
-                thetae -= 360;        
-            } else if(thetae < -180) {
-                thetae += 360;
-            }
-            degz += thetae;
+			// 2直線のなす角を計算
+			thetae = thetaBefore - theta;
+			if (thetae > 180)
+			{
+				thetae -= 360;
+			}
+			else if (thetae < -180)
+			{
+				thetae += 360;
+			}
+			degz += thetae;
 
-            shortCutxycie[i].w = degz;    // yaw軸角度
+			shortCutxycie[i].w = degz; // yaw軸角度
 
-            f_printf(&fil_Plot, "%d,%d,%d\n",(int32_t)(shortCutxycie[i].x*10000),(int32_t)(shortCutxycie[i].y*10000),(int32_t)(shortCutxycie[i].w*10000));
-            // f_printf(&fil_Plot, "%d,%d\n",(int32_t)(thetaBefore*10000),(int32_t)(theta*10000));
+			f_printf(&fil_Plot, "%d,%d,%d\n", (int32_t)(shortCutxycie[i].x * 10000), (int32_t)(shortCutxycie[i].y * 10000), (int32_t)(shortCutxycie[i].w * 10000));
+			// f_printf(&fil_Plot, "%d,%d\n",(int32_t)(thetaBefore*10000),(int32_t)(theta*10000));
 
-            thetaBefore = theta;        // 前回のyaw軸角度を更新
-        }
-      
-        ret = indexSC;
-    } else {
-        ret = -1;
-    }
+			thetaBefore = theta; // 前回のyaw軸角度を更新
+		}
 
-    // ファイルクローズ
-    f_close(&fil_Read);
-    f_close(&fil_Plot);
+		ret = indexSC;
+	}
+	else
+	{
+		ret = -1;
+	}
 
-    // 解析済みのログ番号を保存
-    saveLogNumber(logNumber);
-    analizedNumber = logNumber;
+	// ファイルクローズ
+	f_close(&fil_Read);
+	f_close(&fil_Plot);
 
-    // 2次走行フラグ 距離基準2次走行
-    optimalTrace = BOOST_SHORTCUT;
+	// 解析済みのログ番号を保存
+	saveLogNumber(logNumber);
+	analizedNumber = logNumber;
 
-    return ret;
+	// 2次走行フラグ 距離基準2次走行
+	optimalTrace = BOOST_SHORTCUT;
+
+	return ret;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 calcXYcie (cie=Coordinate)
@@ -508,15 +580,16 @@ int16_t calcXYcies(int logNumber) {
 // 引数         encpulse:エンコーダパルス angVelo:角速度[deg/s]
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void calcXYcie(float encpulse, float angVelo, float dt) {
-    static float velocity, degzR;
+void calcXYcie(float encpulse, float angVelo, float dt)
+{
+	static float velocity, degzR;
 
-    xydegz = xydegz + (angVelo * dt);           // 角度
-    degzR = xydegz * (M_PI/180.0F);             // [rad]に変換
-    velocity = encpulse/PALSE_MILLIMETER;       // 速度
+	xydegz = xydegz + (angVelo * dt);		// 角度
+	degzR = xydegz * (M_PI / 180.0F);		// [rad]に変換
+	velocity = encpulse / PALSE_MILLIMETER; // 速度
 
-    xycie.x = xycie.x + (velocity * sin(degzR));
-    xycie.y = xycie.y + (velocity * cos(degzR));
+	xycie.x = xycie.x + (velocity * sin(degzR));
+	xycie.y = xycie.y + (velocity * cos(degzR));
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 clearXYcie (cie=Coordinate)
@@ -524,10 +597,11 @@ void calcXYcie(float encpulse, float angVelo, float dt) {
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void clearXYcie(void) {
-    xycie.x = 0;
-    xycie.y = 0;
-    xydegz = 0;
+void clearXYcie(void)
+{
+	xycie.x = 0;
+	xycie.y = 0;
+	xydegz = 0;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setShortCutTarget
@@ -535,14 +609,15 @@ void clearXYcie(void) {
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void setShortCutTarget(void) {
-    float xe,ye,dist;
-    setTargetAngle(shortCutxycie[optimalIndex].w);
+void setShortCutTarget(void)
+{
+	float xe, ye, dist;
+	setTargetAngle(shortCutxycie[optimalIndex].w);
 
-    xe = shortCutxycie[optimalIndex].x - xycie.x;
-    ye = shortCutxycie[optimalIndex].y - xycie.y;
+	xe = shortCutxycie[optimalIndex].x - xycie.x;
+	ye = shortCutxycie[optimalIndex].y - xycie.y;
 
-    dist = sqrt(pow(xe,2) + pow(ye,2));
+	dist = sqrt(pow(xe, 2) + pow(ye, 2));
 
-    setTargetDist(dist);
+	setTargetDist(dist);
 }
