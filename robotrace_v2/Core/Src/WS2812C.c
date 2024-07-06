@@ -5,9 +5,9 @@
 //====================================//
 // グローバル変数の宣言
 //====================================//
-volatile uint8_t LED_Data[MAX_LED][4];
-volatile uint16_t pwmData[(24*MAX_LED)+230] = {0};
-volatile bool datasentflag = false;
+uint8_t LED_Data[MAX_LED][4];
+uint16_t pwmData[(24 * MAX_LED) + 230] = {0};
+bool datasentflag = false;
 
 bool lineflag = false;
 ///////////////////////////////////////////////////////////////////////////
@@ -16,8 +16,10 @@ bool lineflag = false;
 // 引数         LEDnum:設定するLEDの番号(0から) rgb:色ごとの輝度(0～255)
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
-void setLED (int LEDnum, int Red, int Green, int Blue) {
-	if (!datasentflag) {
+void setLED(int LEDnum, int Red, int Green, int Blue)
+{
+	if (!datasentflag)
+	{
 		LED_Data[LEDnum][0] = LEDnum;
 		LED_Data[LEDnum][1] = Green;
 		LED_Data[LEDnum][2] = Red;
@@ -30,25 +32,33 @@ void setLED (int LEDnum, int Red, int Green, int Blue) {
 // 引数         なし
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
-void sendLED (void) {
-	volatile uint32_t indx=0;
+void sendLED(void)
+{
+	volatile uint32_t indx = 0;
 	volatile uint32_t color;
 
-	if (!datasentflag) {
-		for (int i= 0; i<MAX_LED; i++) {
-			color = ((LED_Data[i][1]<<16) | (LED_Data[i][2]<<8) | (LED_Data[i][3]));
+	if (!datasentflag)
+	{
+		for (int i = 0; i < MAX_LED; i++)
+		{
+			color = ((LED_Data[i][1] << 16) | (LED_Data[i][2] << 8) | (LED_Data[i][3]));
 
-			for (int i=23; i>=0; i--) {
-				if (color&(1<<i)) {
-					pwmData[indx] = 156;  // 25/7 of 224
-				} else {
-					pwmData[indx] = 56;  //2/7 of 224
+			for (int i = 23; i >= 0; i--)
+			{
+				if (color & (1 << i))
+				{
+					pwmData[indx] = 156; // 5/7 of 224
+				}
+				else
+				{
+					pwmData[indx] = 56; // 2/7 of 224
 				}
 				indx++;
 			}
 		}
 
-		for (int i=0; i<230; i++) {
+		for (int i = 0; i < 230; i++)
+		{
 			pwmData[indx] = 0;
 			indx++;
 		}
@@ -63,20 +73,24 @@ void sendLED (void) {
 // 引数         brightness:最大輝度(0～127) add 輝度の変化量
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
-void fullColorLED (uint8_t brightness, uint8_t add)
+void fullColorLED(uint8_t brightness, uint8_t add)
 {
-	static RGBLED led[MAX_LED] = { 1,0,0,0};
+	static RGBLED led[MAX_LED] = {1, 0, 0, 0};
 
-	if(!lineflag) {
-		for (int i= 0; i<MAX_LED; i++) {
-			led[i].pattern = i+1;
+	if (!lineflag)
+	{
+		for (int i = 0; i < MAX_LED; i++)
+		{
+			led[i].pattern = i + 1;
 		}
 		lineflag = true;
 	}
 
-	if(lineflag) {
-		for (int i= 0; i<MAX_LED; i++) {
-			r2b(&led[i],brightness, add);
+	if (lineflag)
+	{
+		for (int i = 0; i < MAX_LED; i++)
+		{
+			r2b(&led[i], brightness, add);
 			setLED(i, led[i].r, led[i].g, led[i].b);
 		}
 		sendLED();
@@ -88,73 +102,105 @@ void fullColorLED (uint8_t brightness, uint8_t add)
 // 引数         *led:RGB構造体のポインタ brightness:最大輝度(0～127) add 輝度の変化量
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
-void r2b(RGBLED *led, uint8_t brightness, uint8_t add) {
-	switch(led->pattern) {
-		case 1:
-			// 赤スタート
-			// 緑増
-			led->r = brightness;
-			led->g += add;
-			led->b = 0;
-			if(led->g >= brightness) {
-				led->g = brightness;
-				led->pattern=2;
-			}
-			break;
-		case 2:
-			// 赤減
-			if(led->r == 0) led->r = brightness; // 初期値
-			led->r -= add;
+void r2b(RGBLED *led, uint8_t brightness, uint8_t add)
+{
+	switch (led->pattern)
+	{
+	case 1:
+		// 赤スタート
+		// 緑増
+		led->r = brightness;
+		led->g += add;
+		led->b = 0;
+		if (led->g >= brightness)
+		{
 			led->g = brightness;
-			led->b = 0;
-			if(led->r <= 0) {
-				led->r = 0;
-				led->pattern=3;
-			}
-			break;
-		case 3:
-			// 緑スタート
-			// 青増
+			led->pattern = 2;
+		}
+		break;
+	case 2:
+		// 赤減
+		if (led->r == 0)
+			led->r = brightness; // 初期値
+		led->r -= add;
+		led->g = brightness;
+		led->b = 0;
+		if (led->r <= 0)
+		{
 			led->r = 0;
-			led->g = brightness;
-			led->b += add;
-			if(led->b >= brightness) {
-				led->b = brightness;
-				led->pattern=4;
-			}
-			break;
-		case 4:
-			// 緑減
-			if(led->g == 0) led->g = brightness; // 初期値
-			led->r = 0;
-			led->g -= add;
+			led->pattern = 3;
+		}
+		break;
+	case 3:
+		// 緑スタート
+		// 青増
+		led->r = 0;
+		led->g = brightness;
+		led->b += add;
+		if (led->b >= brightness)
+		{
 			led->b = brightness;
-			if(led->g <= 0) {
-				led->g = 0;
-				led->pattern=5;
-			}
-			break;
-		case 5:
-			// 青スタート
-			// 赤増
-			led->r += add;
+			led->pattern = 4;
+		}
+		break;
+	case 4:
+		// 緑減
+		if (led->g == 0)
+			led->g = brightness; // 初期値
+		led->r = 0;
+		led->g -= add;
+		led->b = brightness;
+		if (led->g <= 0)
+		{
 			led->g = 0;
-			led->b = brightness;
-			if(led->r >= brightness) {
-				led->r = brightness;
-				led->pattern=6;
-			}
-			break;
-		case 6:
-			// 青減
-			if(led->b == 0) led->b = brightness; // 初期値
+			led->pattern = 5;
+		}
+		break;
+	case 5:
+		// 青スタート
+		// 赤増
+		led->r += add;
+		led->g = 0;
+		led->b = brightness;
+		if (led->r >= brightness)
+		{
 			led->r = brightness;
-			led->g = 0;
-			led->b -= add;
-			if(led->b <= 0) {
-				led->b = 0;
-				led->pattern=1;
-			}
-			break;
+			led->pattern = 6;
+		}
+		break;
+	case 6:
+		// 青減
+		if (led->b == 0)
+			led->b = brightness; // 初期値
+		led->r = brightness;
+		led->g = 0;
+		led->b -= add;
+		if (led->b <= 0)
+		{
+			led->b = 0;
+			led->pattern = 1;
+		}
+		break;
 	}
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 led_out
+// 処理概要     赤色で2進数表示
+// 引数         表示したい2進数4bit
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void led_out(uint8_t data)
+{
+	for (int i = 0; i < MAX_LED; i++)
+	{
+		if (data & (1 << i))
+		{
+			setLED(i, 10, 0, 0);
+		}
+		else
+		{
+			setLED(i, 0, 0, 0);
+		}
+	}
+	sendLED();
 }
