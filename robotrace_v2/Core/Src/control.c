@@ -75,8 +75,8 @@ void initSystem(void)
 		Error_Handler();
 	}
 	// Encoder count
-	// HAL_TIM_Encoder_Start(&htim3,TIM_CHANNEL_ALL);
-	// HAL_TIM_Encoder_Start(&htim8,TIM_CHANNEL_ALL);
+	HAL_TIM_Encoder_Start(&ENC_TIM_HANDLER_R, TIM_CHANNEL_ALL);
+	HAL_TIM_Encoder_Start(&ENC_TIM_HANDLER_L, TIM_CHANNEL_ALL);
 
 	// Motor driver
 	// if (HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2) != HAL_OK) Error_Handler();

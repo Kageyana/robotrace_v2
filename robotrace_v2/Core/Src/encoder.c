@@ -28,8 +28,8 @@ void getEncoder(void)
 	static encBufR = 0, encBufL = 0;
 
 	// エンコーダカウントを取得
-	encRawR = TIM8->CNT;
-	encRawL = TIM3->CNT;
+	encRawR = ENC_TIM_R->CNT;
+	encRawL = ENC_TIM_L->CNT;
 
 	// 1msあたりのカウント
 	encCurrentR = encRawR - encBufR;
