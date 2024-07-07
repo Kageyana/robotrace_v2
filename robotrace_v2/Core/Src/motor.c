@@ -17,39 +17,38 @@ float motorCurrentL, motorCurrentR;
 /////////////////////////////////////////////////////////////////////
 void motorPwmOut(int16_t pwmL, int16_t pwmR)
 {
-
 	// 0除算回避
 	if (pwmL == 0)
-		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CHANNEL_L, 0);
+		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_L, 0);
 	if (pwmR == 0)
-		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CHANNEL_R, 0);
+		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_R, 0);
 
 	if (pwmL != 0)
 	{
 		if (pwmL > 0)
 		{
-			FOWARD_L;
+			HAL_GPIO_WritePin(MOTOR_DIR_L_GPIO_Port, MOTOR_DIR_L_Pin, GPIO_PIN_SET);
 		}
 		else
 		{
-			REVERSE_L;
+			HAL_GPIO_WritePin(MOTOR_DIR_L_GPIO_Port, MOTOR_DIR_L_Pin, GPIO_PIN_RESET);
 		}
 		pwmL = abs(pwmL);
-		PWMOUT_L;
+		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_L, (int16_t)((float)pwmL / 1000 * MOTOR_PERIOD));
 	}
 
 	if (pwmR != 0)
 	{
 		if (pwmR > 0)
 		{
-			FOWARD_R;
+			HAL_GPIO_WritePin(MOTOR_DIR_R_GPIO_Port, MOTOR_DIR_R_Pin, GPIO_PIN_RESET);
 		}
 		else
 		{
-			REVERSE_R;
+			HAL_GPIO_WritePin(MOTOR_DIR_R_GPIO_Port, MOTOR_DIR_R_Pin, GPIO_PIN_SET);
 		}
 		pwmR = abs(pwmR);
-		PWMOUT_R;
+		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_R, (int16_t)((float)pwmR / 1000 * MOTOR_PERIOD));
 	}
 }
 ///////////////////////////////////////////////////////////////////////////
@@ -99,4 +98,22 @@ void getMotorCurrent(void)
 
 	motorCurrentL = vL / RREF * 10000.0;
 	motorCurrentR = vR / RREF * 10000.0;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 MotorSuctionPwmOut
+// 処理概要     吸引モータにPWMを出力する
+// 引数         pwm: モータへの出力(1~1000)
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void MotorSuctionPwmOut(int16_t pwm)
+{
+	// 0除算回避
+	if (pwm == 0)
+		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_SUCTION_TIM_CH, 0);
+
+	if (pwm != 0)
+	{
+		pwm = abs(pwm);
+		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_SUCTION_TIM_CH, (int16_t)((float)pwm / 1000 * MOTOR_PERIOD));
+	}
 }

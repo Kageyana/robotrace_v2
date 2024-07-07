@@ -9,18 +9,10 @@
 // シンボル定義
 //====================================//
 #define MOTOR_TIM_HANDLER htim2
-#define MOTOR_TIM_CHANNEL_R TIM_CHANNEL_3
-#define MOTOR_TIM_CHANNEL_L TIM_CHANNEL_2
-#define MOTOR_COUNTERPERIOD MOTOR_TIM_HANDLER.Init.Period
-
-#define PWMOUT_L __HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, TIM_CHANNEL_2, (int16_t)((float)pwmL / 1000 * MOTOR_COUNTERPERIOD))
-#define PWMOUT_R __HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, TIM_CHANNEL_3, (int16_t)((float)pwmR / 1000 * MOTOR_COUNTERPERIOD))
-
-#define FOWARD_L HAL_GPIO_WritePin(MOTOR_DIR_L_GPIO_Port, MOTOR_DIR_L_Pin, GPIO_PIN_SET)
-#define REVERSE_L HAL_GPIO_WritePin(MOTOR_DIR_L_GPIO_Port, MOTOR_DIR_L_Pin, GPIO_PIN_RESET)
-
-#define FOWARD_R HAL_GPIO_WritePin(MOTOR_DIR_R_GPIO_Port, MOTOR_DIR_R_Pin, GPIO_PIN_RESET)
-#define REVERSE_R HAL_GPIO_WritePin(MOTOR_DIR_R_GPIO_Port, MOTOR_DIR_R_Pin, GPIO_PIN_SET)
+#define MOTOR_PERIOD MOTOR_TIM_HANDLER.Init.Period
+#define MOTOR_TIM_CH_L TIM_CHANNEL_2
+#define MOTOR_TIM_CH_R TIM_CHANNEL_3
+#define MOTOR_SUCTION_TIM_CH TIM_CHANNEL_4
 
 #define HALFSCAL 2070
 #define RREF 2700.0F
@@ -36,5 +28,6 @@ extern float motorCurrentL, motorCurrentR;
 void motorPwmOut(int16_t pwmL, int16_t pwmR);
 void motorPwmOutSynth(int16_t tPwm, int16_t sPwm, int16_t yrPwm, int16_t dPwm);
 void getMotorCurrent(void);
+void MotorSuctionPwmOut(int16_t pwm);
 
 #endif // MOTOR_H_
