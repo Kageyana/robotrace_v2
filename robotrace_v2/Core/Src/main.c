@@ -143,7 +143,7 @@ int main(void)
 	/* USER CODE BEGIN WHILE */
 	while (1)
 	{
-		if (getSWMainTact())
+		if (swValMainTact)
 		{
 			if (cntSetup1 >= 20)
 			{
@@ -151,6 +151,7 @@ int main(void)
 
 				fullColorLED(15, 2);
 			}
+			powerMarkerSensors(1);
 			lighting = true;
 		}
 		else
@@ -162,6 +163,7 @@ int main(void)
 					setLED(i, 0, 0, 0);
 				}
 				sendLED();
+				powerMarkerSensors(0);
 				lighting = false;
 			}
 		}

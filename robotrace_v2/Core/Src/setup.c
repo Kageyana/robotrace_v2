@@ -169,7 +169,7 @@ void setup(void)
 			trace_test = true;
 			cntSetup1 = 0;
 			enc1 = 0;
-			powerLinesensors(1); // 先に点灯させて安定させる
+			powerLineSensors(1); // 先に点灯させて安定させる
 
 			patternCalibration = 3;
 			break;
@@ -215,7 +215,7 @@ void setup(void)
 			motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 			if (countdown <= 0)
 			{
-				powerLinesensors(0); // ラインセンサ消灯
+				powerLineSensors(0); // ラインセンサ消灯
 				start = 1;
 			}
 			break;
@@ -577,11 +577,11 @@ void setup(void)
 			data_select(&motor_test, SW_PUSH);
 			if (motor_test == 1)
 			{
-				powerLinesensors(1);
+				powerLineSensors(1);
 			}
 			else
 			{
-				powerLinesensors(0);
+				powerLineSensors(0);
 			}
 
 			break;
@@ -729,7 +729,7 @@ void setup(void)
 				// 配列初期化
 				memset(&lSensorOffset, 0, sizeof(uint16_t) * NUM_SENSORS);
 
-				powerLinesensors(1);	// ラインセンサ点灯
+				powerLineSensors(1);	// ラインセンサ点灯
 				modeCalLinesensors = 1; // キャリブレーション開始
 
 				// 手動で機体を動かしキャリブレーションする
@@ -744,7 +744,7 @@ void setup(void)
 			if (!trace_test)
 			{
 				modeCalLinesensors = 0;						  // キャリブレーション終了
-				powerLinesensors(0);						  // ラインセンサ消灯
+				powerLineSensors(0);						  // ラインセンサ消灯
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_UpdateScreen();						  // グラフィック液晶更新
 
@@ -786,12 +786,12 @@ void setup(void)
 		if (trace_test == 1)
 		{
 			motorPwmOutSynth(lineTraceCtrl.pwm, 0, 0, 0);
-			powerLinesensors(1);
+			powerLineSensors(1);
 		}
 		else
 		{
 			motorPwmOutSynth(0, 0, 0, 0);
-			powerLinesensors(0);
+			powerLineSensors(0);
 		}
 
 		// ゲイン表示
@@ -859,14 +859,14 @@ void setup(void)
 		// PUSHでトレースON/OFF
 		if (trace_test == 1)
 		{
-			powerLinesensors(1);
+			powerLineSensors(1);
 			setTargetSpeed(0.0);
 			motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.kp, 0, 0);
 		}
 		else
 		{
 			motorPwmOutSynth(0, 0, 0, 0);
-			powerLinesensors(0);
+			powerLineSensors(0);
 		}
 
 		// ゲイン表示
@@ -1448,7 +1448,7 @@ void caribrateSensors(void)
 				// キャリブレーション未実施
 				cntSetup1 = 0;
 				enc1 = 0;
-				powerLinesensors(1); // 先に点灯させて安定させる
+				powerLineSensors(1); // 先に点灯させて安定させる
 				patternCalibration = 2;
 			}
 		}
@@ -1524,7 +1524,7 @@ void caribrateSensors(void)
 		motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
 		if (abs(encCurrentN) == 0)
 		{
-			powerLinesensors(0); // ラインセンサ消灯
+			powerLineSensors(0); // ラインセンサ消灯
 			if (mode == START_OPTIMAL)
 			{
 				// 距離基準解析

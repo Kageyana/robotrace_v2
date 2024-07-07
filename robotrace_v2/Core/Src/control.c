@@ -102,7 +102,7 @@ void initSystem(void)
 	{
 		Error_Handler();
 	}
-	powerLinesensors(0);
+	powerLineSensors(0);
 
 	// microSD
 	initMSD = initMicroSD();
@@ -257,7 +257,7 @@ void loopSystem(void)
 		// IMUのキャリブレーションが終了したら走行開始
 		if (!calibratIMU && countdown == 0)
 		{
-			powerLinesensors(1); // ラインセンサ点灯
+			powerLineSensors(1); // ラインセンサ点灯
 
 			// SDカードに変数保存
 			initIMU = false;
@@ -473,7 +473,7 @@ void loopSystem(void)
 				}
 				else
 				{
-					powerLinesensors(0);
+					powerLineSensors(0);
 					patternTrace = 0;
 					break;
 				}
@@ -500,7 +500,7 @@ void loopSystem(void)
 
 	case 102:
 		motorPwmOutSynth(0, 0, 0, 0);
-		powerLinesensors(0);
+		powerLineSensors(0);
 
 		break;
 

@@ -150,3 +150,20 @@ void checkGoalMarker(void)
 		}
 	}
 }
+/////////////////////////////////////////////////////////////////////
+// モジュール名 powerMarkerSensors
+// 処理概要  	マーカーセンサのON/OFF処理
+// 引数     	0:OFF 1:ON
+// 戻り値    	なし
+/////////////////////////////////////////////////////////////////////
+void powerMarkerSensors(uint8_t onoff)
+{
+	if (onoff == 0)
+	{
+		HAL_GPIO_WritePin(SidemarkerPWR_GPIO_Port, SidemarkerPWR_Pin, GPIO_PIN_RESET);
+	}
+	else if (onoff == 1)
+	{
+		HAL_GPIO_WritePin(SidemarkerPWR_GPIO_Port, SidemarkerPWR_Pin, GPIO_PIN_SET);
+	}
+}

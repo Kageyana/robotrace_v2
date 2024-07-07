@@ -116,6 +116,8 @@ void Interrupt1ms(void)
 		cntSwitchUD++;
 		cntSwitchLR++;
 
+		SGmarker = getMarkerSensor();
+
 		wheelClick();
 	}
 

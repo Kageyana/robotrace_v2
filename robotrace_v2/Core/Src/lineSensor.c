@@ -19,12 +19,12 @@ float angleSensor;
 uint16_t lSensorOffset[NUM_SENSORS] = {0};
 uint8_t modeCalLinesensors = 0;
 /////////////////////////////////////////////////////////////////////
-// モジュール名 powerLinesensors
+// モジュール名 powerLineSensors
 // 処理概要  	ラインセンサのON/OFF処理
 // 引数     	0:OFF 1:ON
 // 戻り値    	なし
 /////////////////////////////////////////////////////////////////////
-void powerLinesensors(uint8_t onoff)
+void powerLineSensors(uint8_t onoff)
 {
 	if (onoff == 0)
 	{
