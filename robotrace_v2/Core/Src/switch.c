@@ -6,12 +6,12 @@
 // グローバル変数の宣言
 //====================================//
 // スイッチ関連
-uint8_t			swValTact;
-uint8_t			swValRotary;
-uint8_t			swValMainTact;
+uint8_t swValTact;
+uint8_t swValRotary;
+uint8_t swValMainTact;
 
 // タイマ関連
-uint16_t		cntSW = 0;		// 5方向タクトスイッチのチャタリング防止用
+uint16_t cntSW = 0; // 5方向タクトスイッチのチャタリング防止用
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getSwitches
 // 処理概要  	スイッチの読み込み(10msごとに実行)
@@ -24,7 +24,7 @@ void getSwitches(void)
 	swValTact = getSWtact();
 	// ディップスイッチ読み込み
 	swValRotary = getSWrotary();
-	//メインボード上のタクトスイッチ読み込み
+	// メインボード上のタクトスイッチ読み込み
 	swValMainTact = getSWMainTact();
 }
 ////////////////////////////////////////////////////////////////////
@@ -33,16 +33,20 @@ void getSwitches(void)
 // 引数         なし
 // 戻り値       スイッチ値 0～15
 /////////////////////////////////////////////////////////////////////
-uint8_t getSWrotary(void) 
+uint8_t getSWrotary(void)
 {
-	uint8_t	dpsw[4] = {0};
-	
-	if ( DIPSW1 == 1 )	dpsw[0] = 0x1;
-	if ( DIPSW2 == 1 )	dpsw[1] = 0x2;
-	if ( DIPSW3 == 1 )	dpsw[2] = 0x4;
-	if ( DIPSW4 == 1 )	dpsw[3] = 0x8;
+	uint8_t dpsw[4] = {0};
 
-	return ( dpsw[0] + dpsw[1] + dpsw[2] + dpsw[3] );
+	if (DIPSW1 == 1)
+		dpsw[0] = 0x1;
+	if (DIPSW2 == 1)
+		dpsw[1] = 0x2;
+	if (DIPSW3 == 1)
+		dpsw[2] = 0x4;
+	if (DIPSW4 == 1)
+		dpsw[3] = 0x8;
+
+	return (dpsw[0] + dpsw[1] + dpsw[2] + dpsw[3]);
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 getSWtact
@@ -50,15 +54,20 @@ uint8_t getSWrotary(void)
 // 引数         なし
 // 戻り値       スイッチ値 0～7
 ///////////////////////////////////////////////////////////////////////////
-uint8_t getSWtact(void) 
+uint8_t getSWtact(void)
 {
-	uint8_t	ret = SW_NONE;
-	
-	if ( TACTSW1 == 0 )	ret = SW_UP;
-	if ( TACTSW2 == 0 )	ret = SW_LEFT;
-	if ( TACTSW3 == 0 )	ret = SW_RIGHT;
-	if ( TACTSW4 == 0 )	ret = SW_DOWN;
-	if ( TACTSW5 == 0 )	ret = SW_PUSH;
+	uint8_t ret = SW_NONE;
+
+	if (TACTSW1 == 0)
+		ret = SW_UP;
+	if (TACTSW2 == 0)
+		ret = SW_LEFT;
+	if (TACTSW3 == 0)
+		ret = SW_RIGHT;
+	if (TACTSW4 == 0)
+		ret = SW_DOWN;
+	if (TACTSW5 == 0)
+		ret = SW_PUSH;
 
 	return ret;
 }
@@ -68,12 +77,14 @@ uint8_t getSWtact(void)
 // 引数         なし
 // 戻り値       スイッチ値 0～7
 ///////////////////////////////////////////////////////////////////////////
-uint8_t getSWMainTact(void) 
+uint8_t getSWMainTact(void)
 {
-	uint8_t	ret = SW_NONE;
-	
-	if ( ButtonR == 0 )	ret = SW_TACT_R;
-	if ( ButtonL == 0 )	ret = SW_TACT_L;
+	uint8_t ret = SW_NONE;
+
+	if (BTN_R == 0)
+		ret = SW_TACT_R;
+	if (BTN_L == 0)
+		ret = SW_TACT_L;
 
 	return ret;
 }

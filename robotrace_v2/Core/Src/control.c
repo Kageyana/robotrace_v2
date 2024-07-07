@@ -105,22 +105,23 @@ void initSystem(void)
 	powerLinesensors(0);
 
 	// microSD
-	// initMSD = initMicroSD();
-	// if(initMSD) {
-	// 	getLogNumber(); // 前回の解析ログナンバーを取得
+	initMSD = initMicroSD();
+	if (initMSD)
+	{
+		getLogNumber(); // 前回の解析ログナンバーを取得
 
-	// 	// 前回のPIDゲインを取得
-	// 	readPIDparameters(&lineTraceCtrl);
-	// 	readPIDparameters(&veloCtrl);
-	// 	readPIDparameters(&yawRateCtrl);
-	// 	readPIDparameters(&yawCtrl);
-	// 	readPIDparameters(&distCtrl);
+		// 前回のPIDゲインを取得
+		readPIDparameters(&lineTraceCtrl);
+		readPIDparameters(&veloCtrl);
+		readPIDparameters(&yawRateCtrl);
+		readPIDparameters(&yawCtrl);
+		readPIDparameters(&distCtrl);
 
-	// 	readLinesenval();	// ラインセンサオフセット値を取得
-	// 	readTgtspeeds();	// 目標速度を取得
-	// }
-	// // IMU
-	// initIMU = initBMI088();
+		readLinesenval(); // ラインセンサオフセット値を取得
+		readTgtspeeds();  // 目標速度を取得
+	}
+	// IMU
+	initIMU = initBMI088();
 
 	// Display
 	// if(TACTSW1 == 1) {
