@@ -29,12 +29,12 @@ void powerLinesensors(uint8_t onoff)
 	if (onoff == 0)
 	{
 		lineSensorState = false;
-		__HAL_TIM_SET_COMPARE(&LS_TIMER, TIM_CHANNEL_1, 0);
+		__HAL_TIM_SET_COMPARE(&LS_TIMER, LS_CHANNEL, 0);
 	}
 	else if (onoff == 1)
 	{
 		lineSensorState = true;
-		__HAL_TIM_SET_COMPARE(&LS_TIMER, TIM_CHANNEL_1, LS_COUNTERPERIOD);
+		__HAL_TIM_SET_COMPARE(&LS_TIMER, LS_CHANNEL, LS_COUNTERPERIOD);
 	}
 }
 /////////////////////////////////////////////////////////////////////

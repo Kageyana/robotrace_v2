@@ -66,9 +66,14 @@ void initSystem(void)
 {
 
 	// ADC
-	// if (HAL_ADC_Start_DMA(&hadc1, analogVal1, 10) != HAL_OK)	Error_Handler();
-	// if (HAL_ADC_Start_DMA(&hadc2, analogVal2, 3) != HAL_OK)		Error_Handler();
-
+	if (HAL_ADC_Start_DMA(&hadc1, analogVal1, 10) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	if (HAL_ADC_Start_DMA(&hadc2, analogVal2, 3) != HAL_OK)
+	{
+		Error_Handler();
+	}
 	// Encoder count
 	// HAL_TIM_Encoder_Start(&htim3,TIM_CHANNEL_ALL);
 	// HAL_TIM_Encoder_Start(&htim8,TIM_CHANNEL_ALL);
@@ -81,8 +86,11 @@ void initSystem(void)
 	// motorPwmOut(0,0);
 
 	// line sensor PWM
-	// if (HAL_TIM_PWM_Start_IT(&htim13, TIM_CHANNEL_1) != HAL_OK) Error_Handler();
-	// powerLinesensors(0);
+	if (HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_3) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	powerLinesensors(1);
 
 	// microSD
 	// initMSD = initMicroSD();
