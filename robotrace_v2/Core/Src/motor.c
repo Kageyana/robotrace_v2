@@ -20,9 +20,9 @@ void motorPwmOut(int16_t pwmL, int16_t pwmR)
 
 	// 0除算回避
 	if (pwmL == 0)
-		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 0);
+		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CHANNEL_L, 0);
 	if (pwmR == 0)
-		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
+		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CHANNEL_R, 0);
 
 	if (pwmL != 0)
 	{

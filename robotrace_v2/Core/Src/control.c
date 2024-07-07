@@ -79,18 +79,24 @@ void initSystem(void)
 	HAL_TIM_Encoder_Start(&ENC_TIM_HANDLER_L, TIM_CHANNEL_ALL);
 
 	// Motor driver
-	// if (HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2) != HAL_OK) Error_Handler();
-	// if (HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3) != HAL_OK) Error_Handler();
-	// __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 0);
-	// __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
-	// motorPwmOut(0,0);
+	if (HAL_TIM_PWM_Start(&MOTOR_TIM_HANDLER, MOTOR_TIM_CHANNEL_L) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	if (HAL_TIM_PWM_Start(&MOTOR_TIM_HANDLER, MOTOR_TIM_CHANNEL_R) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CHANNEL_L, 0);
+	__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CHANNEL_R, 0);
+	motorPwmOut(0, 0);
 
 	// line sensor PWM
 	if (HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_3) != HAL_OK)
 	{
 		Error_Handler();
 	}
-	powerLinesensors(1);
+	powerLinesensors(0);
 
 	// microSD
 	// initMSD = initMicroSD();
