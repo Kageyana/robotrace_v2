@@ -64,8 +64,7 @@ void setup(void)
 		showBattery(); // バッテリ残量表示
 	}
 
-#ifdef USE_WHEEL
-	// 右ホイールをロータリスイッチ代わりに使用する
+	// 左ホイールをロータリスイッチ代わりに使用する
 	if (!trace_test && !motor_test)
 	{
 		if (abs(encClick) > 400)
@@ -89,10 +88,6 @@ void setup(void)
 			encClick = 0;
 		}
 	}
-#else
-	// ロータリスイッチ値を使用する
-	patternDisplay = swValRotary;
-#endif
 
 	if (patternDisplay != beforeHEX)
 	{
@@ -129,31 +124,31 @@ void setup(void)
 		case 1:
 			setTargetSpeed(0);
 			// スイッチ入力待ち
-			if (swValTact == SW_PUSH)
-			{
-				if (lSensorOffset[0] > 0)
-				{
-					// キャリブレーション実施済み
-					start = 1;
-				}
-				else
-				{
-					patternCalibration = 2;
-				}
-			}
-			else if (swValTact == SW_RIGHT)
-			{
-				// オートスタート
-				if (lSensorOffset[0] > 0)
-				{
-					// キャリブレーション実施済み
-					autoStart = 1;
-				}
-				else
-				{
-					patternCalibration = 2;
-				}
-			}
+			// if (swValTact == SW_PUSH)
+			// {
+			// 	if (lSensorOffset[0] > 0)
+			// 	{
+			// 		// キャリブレーション実施済み
+			// 		start = 1;
+			// 	}
+			// 	else
+			// 	{
+			// 		patternCalibration = 2;
+			// 	}
+			// }
+			// else if (swValTact == SW_RIGHT)
+			// {
+			// 	// オートスタート
+			// 	if (lSensorOffset[0] > 0)
+			// 	{
+			// 		// キャリブレーション実施済み
+			// 		autoStart = 1;
+			// 	}
+			// 	else
+			// 	{
+			// 		patternCalibration = 2;
+			// 	}
+			// }
 			break;
 
 		case 2:
@@ -506,7 +501,7 @@ void setup(void)
 				ssd1306_printf(Font_7x10, "Battery");
 			}
 			ssd1306_SetCursor(0, 30);
-			ssd1306_printf(Font_7x10, "BatteryValAD:%d", batteryVal);
+			ssd1306_printf(Font_7x10, "batteryADAD:%d", batteryAD);
 
 			ssd1306_SetCursor(0, 42);
 			ssd1306_printf(Font_7x10, "BatteryLv:%d", batteryLevel);

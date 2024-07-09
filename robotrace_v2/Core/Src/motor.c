@@ -7,7 +7,7 @@
 //====================================//
 int16_t motorpwmL = 0;
 int16_t motorpwmR = 0;
-uint16_t motorCurrentValL, motorCurrentValR;
+uint16_t motorCurrentADL, motorCurrentADR;
 float motorCurrentL, motorCurrentR;
 /////////////////////////////////////////////////////////////////////
 // モジュール名 motorPwmOut
@@ -93,8 +93,8 @@ void getMotorCurrent(void)
 	float vL, vR;
 
 	// AD値を電圧[V]に変換
-	vL = (float)(motorCurrentValL - HALFSCAL) / 4095 * 3.3;
-	vR = (float)(motorCurrentValR - HALFSCAL) / 4095 * 3.3;
+	vL = (float)(motorCurrentADL - HALFSCAL) / 4095 * 3.3;
+	vR = (float)(motorCurrentADR - HALFSCAL) / 4095 * 3.3;
 
 	motorCurrentL = vL / RREF * 10000.0;
 	motorCurrentR = vR / RREF * 10000.0;

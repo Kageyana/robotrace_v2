@@ -7,8 +7,9 @@
 //====================================//
 // スイッチ関連
 uint8_t swValTact;
-uint8_t swValRotary;
 uint8_t swValMainTact;
+
+uint16_t swValTactAD; // 5方向タクトスイッチのAD値
 
 // タイマ関連
 uint16_t cntSW = 0; // 5方向タクトスイッチのチャタリング防止用
@@ -21,52 +22,29 @@ uint16_t cntSW = 0; // 5方向タクトスイッチのチャタリング防止�
 void getSwitches(void)
 {
 	// 5方向タクトスイッチ読み込み
-	swValTact = getSWtact();
-	// ディップスイッチ読み込み
-	swValRotary = getSWrotary();
+	swValTact = getSW5aAxisTact();
 	// メインボード上のタクトスイッチ読み込み
 	swValMainTact = getSWMainTact();
 }
-////////////////////////////////////////////////////////////////////
-// モジュール名 dipswGet
-// 処理概要     ディップスイッチ値を16進数で取得
-// 引数         なし
-// 戻り値       スイッチ値 0～15
-/////////////////////////////////////////////////////////////////////
-uint8_t getSWrotary(void)
-{
-	uint8_t dpsw[4] = {0};
-
-	if (DIPSW1 == 1)
-		dpsw[0] = 0x1;
-	if (DIPSW2 == 1)
-		dpsw[1] = 0x2;
-	if (DIPSW3 == 1)
-		dpsw[2] = 0x4;
-	if (DIPSW4 == 1)
-		dpsw[3] = 0x8;
-
-	return (dpsw[0] + dpsw[1] + dpsw[2] + dpsw[3]);
-}
 ///////////////////////////////////////////////////////////////////////////
-// モジュール名 getSWtact
+// モジュール名 getSW5aAxisTact
 // 処理概要     タクトスイッチ値を16進数で取得
 // 引数         なし
 // 戻り値       スイッチ値 0～7
 ///////////////////////////////////////////////////////////////////////////
-uint8_t getSWtact(void)
+uint8_t getSW5aAxisTact(void)
 {
 	uint8_t ret = SW_NONE;
 
-	if (TACTSW1 == 0)
+	if (swValTactAD >= 2150 && swValTactAD <= 2190)
 		ret = SW_UP;
-	if (TACTSW2 == 0)
+	if (swValTactAD >= 1200 && swValTactAD <= 1240)
 		ret = SW_LEFT;
-	if (TACTSW3 == 0)
+	if (swValTactAD >= 2800 && swValTactAD <= 2840)
 		ret = SW_RIGHT;
-	if (TACTSW4 == 0)
+	if (swValTactAD >= 3310 && swValTactAD <= 3350)
 		ret = SW_DOWN;
-	if (TACTSW5 == 0)
+	if (swValTactAD <= 100)
 		ret = SW_PUSH;
 
 	return ret;

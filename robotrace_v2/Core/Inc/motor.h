@@ -20,7 +20,7 @@
 // グローバル変数の宣言
 //====================================//
 extern int16_t motorpwmL, motorpwmR;
-extern uint16_t motorCurrentValL, motorCurrentValR;
+extern uint16_t motorCurrentADL, motorCurrentADR;
 extern float motorCurrentL, motorCurrentR;
 //====================================//
 // プロトタイプ宣言

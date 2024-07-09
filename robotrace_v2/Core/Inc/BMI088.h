@@ -43,9 +43,9 @@
 #define CSB1_SET HAL_GPIO_WritePin(IMU_CSB1_GPIO_Port, IMU_CSB1_Pin, GPIO_PIN_SET)
 #define CSB2_RESET HAL_GPIO_WritePin(IMU_CSB2_GPIO_Port, IMU_CSB2_Pin, GPIO_PIN_RESET)
 #define CSB2_SET HAL_GPIO_WritePin(IMU_CSB2_GPIO_Port, IMU_CSB2_Pin, GPIO_PIN_SET)
-#define BMI088TRANSFER HAL_SPI_Transmit(&hspi3, &txData, txNum, 1000)
-#define BMI088RECEIVE HAL_SPI_Receive(&hspi3, &rxData, rxNum, 1000)
-#define BMI088RECEIVES HAL_SPI_Receive(&hspi3, rxData, rxNum, 1000)
+#define BMI088TRANSFER HAL_SPI_Transmit(&hspi2, &txData, txNum, 1000)
+#define BMI088RECEIVE HAL_SPI_Receive(&hspi2, &rxData, rxNum, 1000)
+#define BMI088RECEIVES HAL_SPI_Receive(&hspi2, rxData, rxNum, 1000)
 /***************************************************************************************/
 typedef struct
 {

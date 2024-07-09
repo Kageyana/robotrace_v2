@@ -18,7 +18,7 @@ uint8_t modeCurve = 0;	  // カーブ判断			0:直線			1:カーブ進入
 uint8_t autoStart = 0;	  // 5走を自動で開始する
 
 uint16_t analogVal1[NUM_SENSORS]; // ADC結果格納配列
-uint16_t analogVal2[3];			  // ADC結果格納配列
+uint16_t analogVal2[4];			  // ADC結果格納配列
 
 // 速度パラメータ関連
 speedParam tgtParam = {
@@ -66,11 +66,11 @@ void initSystem(void)
 {
 
 	// ADC
-	if (HAL_ADC_Start_DMA(&hadc1, analogVal1, 10) != HAL_OK)
+	if (HAL_ADC_Start_DMA(&hadc1, analogVal1, NUM_SENSORS) != HAL_OK)
 	{
 		Error_Handler();
 	}
-	if (HAL_ADC_Start_DMA(&hadc2, analogVal2, 3) != HAL_OK)
+	if (HAL_ADC_Start_DMA(&hadc2, analogVal2, 4) != HAL_OK)
 	{
 		Error_Handler();
 	}
@@ -103,6 +103,7 @@ void initSystem(void)
 		Error_Handler();
 	}
 	powerLineSensors(0);
+	powerMarkerSensors(0);
 
 	// microSD
 	initMSD = initMicroSD();
@@ -122,19 +123,30 @@ void initSystem(void)
 	}
 	// IMU
 	initIMU = initBMI088();
+	if (initIMU)
+	{
+		led_out(0x1);
+	}
+	else
+	{
+		led_out(0x4);
+	}
 
 	// Display
-	// if(TACTSW1 == 1) {
-	// 	modeDSP = true;
-	// 	ssd1306_Init();
-	// 	ssd1306_Fill(Black);
+	// if (TACTSW1 == 1)
+	{
+		modeDSP = true;
+		ssd1306_Init();
+		ssd1306_Fill(Black);
 
-	// 	// トップバー表示
-	// 	// 電池マーク
-	// 	showBatMark();
+		// トップバー表示
+		// 電池マーク
+		showBatMark();
 
-	// 	ssd1306_UpdateScreen();
-	// } else {
+		ssd1306_UpdateScreen();
+	}
+	// else
+	// {
 	// 	modeDSP = false;
 	// }
 
@@ -632,9 +644,10 @@ void checkCurve(void)
 /////////////////////////////////////////////////////////////////////
 void getADC2(void)
 {
-	motorCurrentValL = analogVal2[0];
-	motorCurrentValR = analogVal2[1];
-	batteryVal = analogVal2[2];
+	motorCurrentADL = analogVal2[0];
+	motorCurrentADR = analogVal2[1];
+	batteryAD = analogVal2[2];
+	swValTactAD = analogVal2[3];
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 writePIDparameters

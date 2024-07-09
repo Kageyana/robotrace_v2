@@ -75,7 +75,7 @@ extern uint8_t modeCurve;	 // カーブ判断 0:直線 1:カーブ進入
 extern uint8_t autoStart;	 // 5走を自動で開始する
 
 extern uint16_t analogVal1[10]; // ADC結果格納配列
-extern uint16_t analogVal2[3];	// ADC結果格納配列
+extern uint16_t analogVal2[4];	// ADC結果格納配列
 
 // パラメータ関連
 extern speedParam tgtParam;

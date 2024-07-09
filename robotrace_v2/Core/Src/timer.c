@@ -116,9 +116,12 @@ void Interrupt1ms(void)
 		cntSwitchUD++;
 		cntSwitchLR++;
 
-		SGmarker = getMarkerSensor();
-
 		wheelClick();
+
+		if (initIMU)
+		{
+			BMI088getGyro(); // 角速度取得
+		}
 	}
 
 	switch (cnt5)
@@ -210,7 +213,7 @@ void Interrupt1ms(void)
 					targetSpeed
 					// 16bit
 					,
-					cntLog, encCurrentN, optimalIndex, motorCurrentValL, motorCurrentValR, lineTraceCtrl.pwm, veloCtrl.pwm
+					cntLog, encCurrentN, optimalIndex, motorCurrentADL, motorCurrentADR, lineTraceCtrl.pwm, veloCtrl.pwm
 					// 32bit
 					,
 					encTotalOptimal
@@ -229,7 +232,6 @@ void Interrupt1ms(void)
 	switch (cnt10)
 	{
 	case 1:
-		getADC2();
 		// getMotorCurrent();
 		break;
 	case 2:

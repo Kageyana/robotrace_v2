@@ -40,8 +40,9 @@
 // グローバル変数の宣言
 //====================================//
 extern uint8_t swValTact;
-extern uint8_t swValRotary;
 extern uint8_t swValMainTact;
+
+extern uint16_t swValTactAD;
 
 // タイマ関連
 extern uint16_t cntSW; // アナログ入力スイッチのチャタリング防止用
@@ -49,7 +50,7 @@ extern uint16_t cntSW; // アナログ入力スイッチのチャタリング防
 // プロトタイプ宣言
 //====================================//
 uint8_t getSWrotary(void);
-uint8_t getSWtact(void);
+uint8_t getSW5aAxisTact(void);
 uint8_t getSWMainTact(void);
 void getSwitches(void);
 #endif // SWITCH_H_

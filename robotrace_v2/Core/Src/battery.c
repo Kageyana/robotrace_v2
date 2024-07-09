@@ -5,7 +5,7 @@
 //====================================//
 // グローバル変数の宣言
 //====================================//
-uint16_t batteryVal;
+uint16_t batteryAD;
 uint8_t batteryLevel;
 
 /////////////////////////////////////////////////////////////////////
@@ -18,44 +18,44 @@ void SchmittBatery(void)
 {
 	static bool batteryThreshold[4] = {false, false, false, false};
 
-	if (batteryVal < 500)
+	if (batteryAD < 500)
 	{
 		batteryLevel = BAT_LV_NONE;
 	}
 
-	if (batteryVal > 1881 && !batteryThreshold[1])
+	if (batteryAD > 1881 && !batteryThreshold[1])
 	{
 		// 7.45V以上のとき
 		batteryLevel = BAT_LV_1;
 		batteryThreshold[1] = true;
 	}
-	else if (batteryVal < 1869 && batteryThreshold[1])
+	else if (batteryAD < 1869 && batteryThreshold[1])
 	{
 		// 7.40V以上のとき
 		batteryLevel = BAT_LV_0;
 		batteryThreshold[1] = false;
 	}
 
-	if (batteryVal > 1933 && !batteryThreshold[2])
+	if (batteryAD > 1933 && !batteryThreshold[2])
 	{
 		// 7.65V以上のとき
 		batteryLevel = BAT_LV_2;
 		batteryThreshold[2] = true;
 	}
-	else if (batteryVal < 1919 && batteryThreshold[2])
+	else if (batteryAD < 1919 && batteryThreshold[2])
 	{
 		// 7.60V以上のとき
 		batteryLevel = BAT_LV_1;
 		batteryThreshold[2] = false;
 	}
 
-	if (batteryVal > 2035 && !batteryThreshold[3])
+	if (batteryAD > 2035 && !batteryThreshold[3])
 	{
 		// 8.05V以上のとき
 		batteryLevel = BAT_LV_3;
 		batteryThreshold[3] = true;
 	}
-	else if (batteryVal < 2023 && batteryThreshold[3])
+	else if (batteryAD < 2023 && batteryThreshold[3])
 	{
 		// 8.00V以下のとき
 		batteryLevel = BAT_LV_2;

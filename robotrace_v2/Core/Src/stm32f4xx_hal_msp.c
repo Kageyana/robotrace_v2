@@ -164,8 +164,9 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* hadc)
     PC0     ------> ADC2_IN10
     PA7     ------> ADC2_IN7
     PC4     ------> ADC2_IN14
+    PC5     ------> ADC2_IN15
     */
-    GPIO_InitStruct.Pin = MOTOR_CM1_Pin|MOTOR_CM2_Pin;
+    GPIO_InitStruct.Pin = MOTOR_CM1_Pin|MOTOR_CM2_Pin|GPIO_PIN_5;
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
@@ -252,8 +253,9 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* hadc)
     PC0     ------> ADC2_IN10
     PA7     ------> ADC2_IN7
     PC4     ------> ADC2_IN14
+    PC5     ------> ADC2_IN15
     */
-    HAL_GPIO_DeInit(GPIOC, MOTOR_CM1_Pin|MOTOR_CM2_Pin);
+    HAL_GPIO_DeInit(GPIOC, MOTOR_CM1_Pin|MOTOR_CM2_Pin|GPIO_PIN_5);
 
     HAL_GPIO_DeInit(BATTM_GPIO_Port, BATTM_Pin);
 
