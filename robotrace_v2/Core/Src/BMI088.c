@@ -13,7 +13,6 @@ IMUval BMI088val;
 
 int16_t angleOffset[3] = {0, 0, 0};
 bool calibratIMU = false;
-bool IMUstate = IMU_STOP;
 /////////////////////////////////////////////////////////////////////
 // モジュール名 BMI088ReadByteG
 // 処理概要     指定レジスタの値を読み出す(ジャイロセンサ部)
@@ -177,7 +176,7 @@ void BMI088getGyro(void)
 
 	// BMI088val.gyro.x = (float)gyroVal[0] / GYROLSB * COEFF_DPD;
 	// BMI088val.gyro.y = (float)gyroVal[1] / GYROLSB * COEFF_DPD;
-	BMI088val.gyroTotal.z += (float)gyroVal[2] / GYROLSB * COEFF_DPD;
+	BMI088val.gyro.z = (float)gyroVal[2] / GYROLSB * COEFF_DPD;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 BMI088getAccele

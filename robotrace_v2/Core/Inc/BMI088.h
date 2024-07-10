@@ -13,7 +13,7 @@
 #define GYROLSB 16.384F
 #define MAGPLSB 16.0F
 
-#define DEFF_TIME 0.005F
+#define DEFF_TIME 0.001F
 #define COEFF_DPD -1.00F
 #define IMU_TRANSMIT true
 #define IMU_STOP false
@@ -67,7 +67,6 @@ typedef struct
 //====================================//
 extern IMUval BMI088val;
 extern bool calibratIMU;
-extern bool IMUstate;
 //====================================//
 // プロトタイプ宣言
 //====================================//

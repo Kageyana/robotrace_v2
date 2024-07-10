@@ -30,6 +30,23 @@ void Interrupt1ms(void)
 	motorControlSpeed();
 	motorControldist();
 
+	if (initIMU)
+	{
+		if (!calibratIMU)
+		{
+			BMI088getGyro(); // 角速度取得
+			calcDegrees();	 // 角度計算
+			if (optimalTrace == 0)
+				checkCurve();	   // 1次走行 カーブ検出
+			motorControlYawRate(); // 角速度制御
+			motorControlYaw();	   // 角度制御
+		}
+		else
+		{
+			calibrationIMU();
+		}
+	}
+
 	// 走行中に処理
 	if (patternTrace > 10 && patternTrace < 100)
 	{
@@ -98,11 +115,6 @@ void Interrupt1ms(void)
 			writeMarkerPos(encTotalOptimal, beforeCourseMarker);
 		}
 
-		if (initIMU)
-		{
-			BMI088getGyro(); // 角速度取得
-		}
-
 		beforeCourseMarker = courseMarker;
 	}
 
@@ -117,11 +129,6 @@ void Interrupt1ms(void)
 		cntSwitchLR++;
 
 		wheelClick();
-
-		if (initIMU)
-		{
-			BMI088getGyro(); // 角速度取得
-		}
 	}
 
 	switch (cnt5)
@@ -147,36 +154,13 @@ void Interrupt1ms(void)
 		// }
 		break;
 	case 2:
-		if (initIMU)
-		{
-			IMUstate = IMU_TRANSMIT;
-
-			if (!calibratIMU)
-			{
-				// BMI088getGyro();    // 角速度取得
-				BMI088val.gyro.z = BMI088val.gyroTotal.z / 5;
-				BMI088val.gyroTotal.z = 0;
-
-				calcDegrees(); // 角度計算
-				if (optimalTrace == 0)
-					checkCurve(); // 1次走行 カーブ検出
-
-				motorControlYawRate(); // 角速度制御
-				motorControlYaw();	   // 角度制御
-			}
-			else
-			{
-				calibrationIMU();
-			}
-
-			IMUstate = IMU_STOP;
-		}
 		break;
 	case 3:
 		break;
 	case 5:
-		// if(initIMU) {
-		//     BMI088getAccele();
+		// if (initIMU)
+		// {
+		// 	BMI088getAccele();
 		// }
 		cnt5 = 0;
 		break;
@@ -254,12 +238,9 @@ void Interrupt1ms(void)
 /////////////////////////////////////////////////////////////////////
 void Interrupt100us(void)
 {
-	if (IMUstate == IMU_STOP)
-	{
 #ifdef LOG_RUNNING_WRITE
-		writeLogPuts();
+	writeLogPuts();
 #endif
-	}
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 Interrupt300ns
