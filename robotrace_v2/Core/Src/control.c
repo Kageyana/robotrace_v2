@@ -64,33 +64,22 @@ uint32_t goalTime = 0;
 ///////////////////////////////////////////////////////////////////////////
 void initSystem(void)
 {
+	HAL_StatusTypeDef resultHAL[10];
+	bool statusGPIO = false;
 
 	// ADC
-	if (HAL_ADC_Start_DMA(&hadc1, analogVal1, NUM_SENSORS) != HAL_OK)
-	{
-		Error_Handler();
-	}
-	if (HAL_ADC_Start_DMA(&hadc2, analogVal2, 4) != HAL_OK)
-	{
-		Error_Handler();
-	}
+	resultHAL[0] = HAL_ADC_Start_DMA(&hadc1, analogVal1, NUM_SENSORS);
+	resultHAL[1] = HAL_ADC_Start_DMA(&hadc2, analogVal2, 4);
+
 	// Encoder count
-	HAL_TIM_Encoder_Start(&ENC_TIM_HANDLER_R, TIM_CHANNEL_ALL);
-	HAL_TIM_Encoder_Start(&ENC_TIM_HANDLER_L, TIM_CHANNEL_ALL);
+	resultHAL[2] = HAL_TIM_Encoder_Start(&ENC_TIM_HANDLER_R, TIM_CHANNEL_ALL);
+	resultHAL[3] = HAL_TIM_Encoder_Start(&ENC_TIM_HANDLER_L, TIM_CHANNEL_ALL);
 
 	// Motor driver
-	if (HAL_TIM_PWM_Start(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_L) != HAL_OK)
-	{
-		Error_Handler();
-	}
-	if (HAL_TIM_PWM_Start(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_R) != HAL_OK)
-	{
-		Error_Handler();
-	}
-	if (HAL_TIM_PWM_Start(&MOTOR_TIM_HANDLER, MOTOR_SUCTION_TIM_CH) != HAL_OK)
-	{
-		Error_Handler();
-	}
+	resultHAL[4] = HAL_TIM_PWM_Start(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_L);
+	resultHAL[5] = HAL_TIM_PWM_Start(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_R);
+	resultHAL[6] = HAL_TIM_PWM_Start(&MOTOR_TIM_HANDLER, MOTOR_SUCTION_TIM_CH);
+
 	__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_L, 0);
 	__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_R, 0);
 	__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_SUCTION_TIM_CH, 0);
@@ -98,10 +87,8 @@ void initSystem(void)
 	MotorSuctionPwmOut(0);
 
 	// line sensor PWM
-	if (HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_3) != HAL_OK)
-	{
-		Error_Handler();
-	}
+	resultHAL[7] = HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_3);
+
 	powerLineSensors(0);
 	powerMarkerSensors(0);
 
@@ -135,36 +122,98 @@ void initSystem(void)
 	initIMU = initBMI088();
 	if (initIMU)
 	{
-		setLED(3, 0, 10, 0); // 初期化 成功 緑点灯
+		setLED(1, 0, 10, 0); // 初期化 成功 緑点灯
 	}
 	else
 	{
-		setLED(3, 10, 0, 0); // 初期化 失敗 赤点灯
+		setLED(1, 10, 0, 0); // 初期化 失敗 赤点灯
 	}
 
-	// Display
-	// if (TACTSW1 == 1)
+	// Extended board
+	// 5方向タクトスイッチのプルアップを検出したら拡張ボードを接続している
+	if (swValTactAD > 1000)
 	{
+		// Display
 		modeDSP = true;
 		ssd1306_Init();
 		ssd1306_Fill(Black);
-
 		// トップバー表示
 		// 電池マーク
 		showBatMark();
-
 		ssd1306_UpdateScreen();
+
+		setLED(2, 0, 10, 0); // 初期化 成功 緑点灯
 	}
-	// else
-	// {
-	// 	modeDSP = false;
-	// }
+	else
+	{
+		modeDSP = false;
+		setLED(2, 10, 0, 0); // 初期化 失敗 赤点灯
+	}
 
 	// Timer interrupt
-	HAL_TIM_Base_Start_IT(&htim6);
-	// HAL_TIM_Base_Start_IT(&htim7);
+	resultHAL[8] = HAL_TIM_Base_Start_IT(&htim6);
+	resultHAL[9] = HAL_TIM_Base_Start_IT(&htim7);
 
+	// 各機能スタート時ののエラーチェック
+	uint8_t j = 0;
+	for (uint8_t i = 0; i < 10; i++)
+	{
+		j += resultHAL[i];
+		if (j > 0)
+		{
+			setLED(3, 10, 0, 0); // 初期化 失敗 赤点灯
+			Error_Handler();
+		}
+	}
+	statusGPIO = true;
+	setLED(3, 0, 10, 0); // 初期化 成功 緑点灯
+
+	// 初期化状況の表示
 	sendLED();
+	if (modeDSP)
+	{
+		// Extended board
+		ssd1306_SetCursor(0, 16);
+		ssd1306_printf(Font_6x8, "Exboard connect");
+
+		// MicroSD
+		ssd1306_SetCursor(0, 28);
+		if (initMSD)
+		{
+			ssd1306_printf(Font_6x8, "MicroSD success");
+		}
+		else
+		{
+			ssd1306_printf(Font_6x8, "MicroSD failed");
+		}
+
+		// IMU
+		ssd1306_SetCursor(0, 40);
+		if (initIMU)
+		{
+			ssd1306_printf(Font_6x8, "IMU     success");
+		}
+		else
+		{
+			ssd1306_printf(Font_6x8, "IMU     failed");
+		}
+
+		// GPIO
+		ssd1306_SetCursor(0, 52);
+		if (statusGPIO)
+		{
+			ssd1306_printf(Font_6x8, "GPIO    success");
+		}
+		else
+		{
+			ssd1306_printf(Font_6x8, "GPIO    failed");
+		}
+		ssd1306_UpdateScreen(); // グラフィック液晶更新
+
+		HAL_Delay(2000);
+	}
+
+	clearLED();
 
 	printf("hello \n");
 }

@@ -54,7 +54,7 @@ int32_t encClick = 0;
 void setup(void)
 {
 	uint8_t cntLed, i, j, k;
-	static uint8_t beforePparam, beforeBATLV, beforeHEX = 255;
+	static uint8_t beforePparam, beforeBATLV, beforeHEX = 255, beforeMotorTest;
 	static int16_t x = 0, y = 0;
 
 	SchmittBatery(); // バッテリレベルを取得
@@ -84,11 +84,15 @@ void setup(void)
 				patternDisplay = 0;
 			else if (patternDisplay < 0)
 				patternDisplay = 0x9;
-
 			encClick = 0;
 		}
 	}
+	else
+	{
+		encClick = 0;
+	}
 
+	// ページ番号表示
 	if (patternDisplay != beforeHEX)
 	{
 		// ロータリスイッチ切替時に実行
@@ -110,6 +114,7 @@ void setup(void)
 	// スタート待ち
 	//------------------------------------------------------------------
 	case HEX_START:
+	{
 		if (patternDisplay != beforeHEX)
 		{
 			// 切替時に実行
@@ -121,38 +126,39 @@ void setup(void)
 
 		switch (patternCalibration)
 		{
-		case 1:
+		case 1: // スイッチ入力待ち
+		{
 			setTargetSpeed(0);
-			// スイッチ入力待ち
-			// if (swValTact == SW_PUSH)
-			// {
-			// 	if (lSensorOffset[0] > 0)
-			// 	{
-			// 		// キャリブレーション実施済み
-			// 		start = 1;
-			// 	}
-			// 	else
-			// 	{
-			// 		patternCalibration = 2;
-			// 	}
-			// }
-			// else if (swValTact == SW_RIGHT)
-			// {
-			// 	// オートスタート
-			// 	if (lSensorOffset[0] > 0)
-			// 	{
-			// 		// キャリブレーション実施済み
-			// 		autoStart = 1;
-			// 	}
-			// 	else
-			// 	{
-			// 		patternCalibration = 2;
-			// 	}
-			// }
-			break;
 
-		case 2:
-			// キャリブレーション未実施
+			if (swValTact == SW_PUSH)
+			{
+				if (lSensorOffset[0] > 0)
+				{
+					// キャリブレーション実施済み
+					start = 1;
+				}
+				else
+				{
+					patternCalibration = 2;
+				}
+			}
+			else if (swValTact == SW_RIGHT)
+			{
+				// オートスタート
+				if (lSensorOffset[0] > 0)
+				{
+					// キャリブレーション実施済み
+					autoStart = 1;
+				}
+				else
+				{
+					patternCalibration = 2;
+				}
+			}
+			break;
+		}
+		case 2: // キャリブレーション未実施
+		{
 			veloCtrl.Int = 0;							  // I成分リセット
 			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 			ssd1306_SetCursor(22, 28);
@@ -168,9 +174,9 @@ void setup(void)
 
 			patternCalibration = 3;
 			break;
-
-		case 3:
-			// 開始準備
+		}
+		case 3: // 開始準備
+		{
 			if (cntSetup1 > 1000)
 			{
 				veloCtrl.Int = 0;		 // I成分リセット
@@ -182,9 +188,9 @@ void setup(void)
 				patternCalibration = 4;
 			}
 			break;
-
-		case 4:
-			// 左旋回
+		}
+		case 4: // 左旋回
+		{
 			setTargetAngularVelocity(CALIBRATIONSPEED);
 			motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 			if (BMI088val.angle.z < -320.0)
@@ -192,9 +198,9 @@ void setup(void)
 				patternCalibration = 5;
 			}
 			break;
-
-		case 5:
-			// 初期位置に戻る
+		}
+		case 5: // 初期位置に戻る
+		{
 			setTargetAngularVelocity(-400.0F);
 			motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 			if (lSensor[5] < 1000)
@@ -204,9 +210,9 @@ void setup(void)
 				patternCalibration = 6;
 			}
 			break;
-
-		case 6:
-			// 停止
+		}
+		case 6: // 停止
+		{
 			motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 			if (countdown <= 0)
 			{
@@ -214,15 +220,17 @@ void setup(void)
 				start = 1;
 			}
 			break;
-
+		}
 		default:
 			break;
 		}
 		break;
+	}
 	//------------------------------------------------------------------
 	// パラメータ調整(通常トレース)
 	//------------------------------------------------------------------
 	case HEX_SPEED_PARAM:
+	{
 		if (patternDisplay != beforeHEX)
 		{
 			// 切替時に実行
@@ -238,121 +246,141 @@ void setup(void)
 
 		switch (patternParameter1)
 		{
-		case 1:
-			// 通常走行速度
+		case 1: // 通常走行速度
+		{
 			dataTuningUDF(&tgtParam.straight, 0.1, 0.0, 10.0);
 			ssd1306_SetCursor(0, 24);
 			ssd1306_printf(Font_6x8, "STRAIGHT:%3gm/s", tgtParam.straight);
 			break;
-		case 2:
-			// 停止速度
+		}
+		case 2: // 停止速度
+		{
 			dataTuningUDF(&tgtParam.curve, 0.1, 0.0, 10.0);
 			ssd1306_SetCursor(0, 24);
 			ssd1306_printf(Font_6x8, "CURVE:%3gm/s", tgtParam.curve);
 			break;
-		case 3:
-			// 停止速度
+		}
+		case 3: // 停止速度
+		{
 			dataTuningUDF(&tgtParam.stop, 0.1, 0.0, 10.0);
 			ssd1306_SetCursor(0, 24);
 			ssd1306_printf(Font_6x8, "STOP:%3gm/s", tgtParam.stop);
 			break;
-		case 4:
-			// 2次走行_直線
+		}
+		case 4: // 2次走行_直線
+		{
 			dataTuningUDF(&tgtParam.bstStraight, 0.1, 0.0, 10.0);
 			ssd1306_SetCursor(0, 24);
 			ssd1306_printf(Font_6x8, "BST STRT:%3gm/s", tgtParam.bstStraight);
 			break;
-		case 5:
-			// 2次走行_R1500
+		}
+		case 5: // 2次走行_R1500
+		{
 			dataTuningUDF(&tgtParam.bst1500, 0.1, 0.0, 10.0);
 			ssd1306_SetCursor(0, 24);
 			ssd1306_printf(Font_6x8, "BST 1500:%3gm/s", tgtParam.bst1500);
 			break;
-		case 6:
-			// 2次走行_R1300
+		}
+		case 6: // 2次走行_R1300
+		{
 			dataTuningUDF(&tgtParam.bst1300, 0.1, 0.0, 10.0);
 			ssd1306_SetCursor(0, 24);
 			ssd1306_printf(Font_6x8, "BST 1300:%3gm/s", tgtParam.bst1300);
 			break;
-		case 7:
-			// 2次走行_R1000
+		}
+		case 7: // 2次走行_R1000
+		{
 			dataTuningUDF(&tgtParam.bst1000, 0.1, 0.0, 10.0);
 			ssd1306_SetCursor(0, 24);
 			ssd1306_printf(Font_6x8, "BST 1000:%3gm/s", tgtParam.bst1000);
 			break;
-		case 8:
-			// 2次走行_R800
+		}
+		case 8: // 2次走行_R800
+		{
 			dataTuningUDF(&tgtParam.bst800, 0.1, 0.0, 10.0);
 			ssd1306_SetCursor(0, 24);
 			ssd1306_printf(Font_6x8, "BST 800:%3gm/s", tgtParam.bst800);
 			break;
-		case 9:
-			// 2次走行_R700
+		}
+		case 9: // 2次走行_R700
+		{
 			dataTuningUDF(&tgtParam.bst700, 0.1, 0.0, 10.0);
 			ssd1306_SetCursor(0, 24);
 			ssd1306_printf(Font_6x8, "BST 700:%3gm/s", tgtParam.bst700);
 			break;
-		case 10:
-			// 2次走行_R600
+		}
+		case 10: // 2次走行_R600
+		{
 			dataTuningUDF(&tgtParam.bst600, 0.1, 0.0, 10.0);
 			ssd1306_SetCursor(0, 24);
 			ssd1306_printf(Font_6x8, "BST 600:%3gm/s", tgtParam.bst600);
 			break;
-		case 11:
-			// 2次走行_R500
+		}
+		case 11: // 2次走行_R500
+		{
 			dataTuningUDF(&tgtParam.bst500, 0.1, 0.0, 10.0);
 			ssd1306_SetCursor(0, 24);
 			ssd1306_printf(Font_6x8, "BST 500:%3gm/s", tgtParam.bst500);
 			break;
-		case 12:
-			// 2次走行_R400
+		}
+		case 12: // 2次走行_R400
+		{
 			dataTuningUDF(&tgtParam.bst400, 0.1, 0.0, 10.0);
 			ssd1306_SetCursor(0, 24);
 			ssd1306_printf(Font_6x8, "BST 400:%3gm/s", tgtParam.bst400);
 			break;
-		case 13:
-			// 2次走行_R300
+		}
+		case 13: // 2次走行_R300
+		{
 			dataTuningUDF(&tgtParam.bst300, 0.1, 0.0, 10.0);
 			ssd1306_SetCursor(0, 24);
 			ssd1306_printf(Font_6x8, "BST 300:%3gm/s", tgtParam.bst300);
 			break;
-		case 14:
-			// 2次走行_R200
+		}
+		case 14: // 2次走行_R200
+		{
 			dataTuningUDF(&tgtParam.bst200, 0.1, 0.0, 10.0);
 			ssd1306_SetCursor(0, 24);
 			ssd1306_printf(Font_6x8, "BST 200:%3gm/s", tgtParam.bst200);
 			break;
-		case 15:
-			// 2次走行_R100
+		}
+		case 15: // 2次走行_R100
+		{
 			dataTuningUDF(&tgtParam.bst100, 0.1, 0.0, 10.0);
 			ssd1306_SetCursor(0, 24);
 			ssd1306_printf(Font_6x8, "BST 100:%3gm/s", tgtParam.bst100);
 			break;
-		case 16:
-			// 2次走行_加速度
+		}
+		case 16: // 2次走行_加速度
+		{
 			dataTuningUDF(&tgtParam.acceleF, 0.1, 0.0, 10.0);
 			ssd1306_SetCursor(0, 24);
 			ssd1306_printf(Font_6x8, "BST acceleF:%3gm/ss", tgtParam.acceleF);
 			break;
-		case 17:
-			// 2次走行_減速度
+		}
+		case 17: // 2次走行_減速度
+		{
 			dataTuningUDF(&tgtParam.acceleD, 0.1, 0.0, 10.0);
 			ssd1306_SetCursor(0, 24);
 			ssd1306_printf(Font_6x8, "BST acceleD:%3gm/ss", tgtParam.acceleD);
 			break;
-		case 18:
-			// 2次走行_減速度
+		}
+		case 18: // 2次走行_減速度
+		{
 			dataTuningUDF(&tgtParam.shortCut, 0.1, 0.0, 10.0);
 			ssd1306_SetCursor(0, 24);
 			ssd1306_printf(Font_6x8, "BST shortCut:%3gm/s", tgtParam.shortCut);
 			break;
 		}
+		}
 		beforePparam = patternParameter1;
 		break;
+	}
 	//------------------------------------------------------------------
 	// Sensors test
 	//------------------------------------------------------------------
 	case HEX_SENSORS:
+	{
 		if (patternDisplay != beforeHEX)
 		{
 			// 切替時に実行
@@ -363,7 +391,8 @@ void setup(void)
 		dataTuningLR(&patternSensors, 1, 1, 7);
 		switch (patternSensors)
 		{
-		case 1:
+		case 1: // モータテスト
+		{
 			if (patternSensors != beforeSensors)
 			{
 				// 切替時に実行
@@ -398,9 +427,20 @@ void setup(void)
 			{
 				motorPwmOut(0, 0);
 			}
-			break;
 
-		case 2:
+			if (motor_test != beforeMotorTest && motor_test == 0)
+			{
+				motor_test = 2;
+			}
+			if (motor_test == 2 && encCurrentL == 0)
+			{
+				motor_test = 0;
+			}
+			beforeMotorTest = motor_test;
+			break;
+		}
+		case 2: // IMU角度表示
+		{
 			if (patternSensors != beforeSensors)
 			{
 				// 切替時に実行
@@ -446,7 +486,9 @@ void setup(void)
 				HAL_Delay(800);
 			}
 			break;
-		case 3:
+		}
+		case 3: // IMU加速度表示
+		{
 			if (patternSensors != beforeSensors)
 			{
 				// 切替時に実行
@@ -465,7 +507,9 @@ void setup(void)
 			ssd1306_SetCursor(64, 30);
 			ssd1306_printf(Font_7x10, "T:%4.1f", BMI088val.temp);
 			break;
-		case 4:
+		}
+		case 4: // マーカーセンサ
+		{
 			if (patternSensors != beforeSensors)
 			{
 				// 切替時に実行
@@ -477,7 +521,9 @@ void setup(void)
 			ssd1306_printf(Font_7x10, "Marker sensors:%d", getMarkerSensor());
 
 			break;
-		case 5:
+		}
+		case 5: // タクトスイッチ
+		{
 			if (patternSensors != beforeSensors)
 			{
 				// 切替時に実行
@@ -492,7 +538,9 @@ void setup(void)
 			ssd1306_printf(Font_7x10, "5axis SW:%d", swValTact);
 
 			break;
-		case 6:
+		}
+		case 6: // バッテリ電圧
+		{
 			if (patternSensors != beforeSensors)
 			{
 				// 切替時に実行
@@ -507,7 +555,9 @@ void setup(void)
 			ssd1306_printf(Font_7x10, "BatteryLv:%d", batteryLevel);
 
 			break;
-		case 7:
+		}
+		case 7: // ラインセンサ
+		{
 			if (patternSensors != beforeSensors)
 			{
 				// 切替時に実行
@@ -581,12 +631,15 @@ void setup(void)
 
 			break;
 		}
+		}
 		beforeSensors = patternSensors;
 		break;
+	}
 	//------------------------------------------------------------------
 	// Log analysis
 	//------------------------------------------------------------------
 	case HEX_LOG:
+	{
 		if (patternDisplay != beforeHEX)
 		{
 			// 切替時に実行
@@ -683,10 +736,12 @@ void setup(void)
 		}
 
 		break;
+	}
 	//------------------------------------------------------------------
 	// キャリブレーション(ラインセンサ)
 	//------------------------------------------------------------------
 	case HEX_CALIBRATION:
+	{
 		if (patternDisplay != beforeHEX)
 		{
 			// 切替時に実行
@@ -696,8 +751,8 @@ void setup(void)
 
 		switch (patternCalibration)
 		{
-		case 1:
-			// スイッチ入力待ち
+		case 1: // スイッチ入力待ち
+		{
 			setTargetSpeed(0);
 			ssd1306_SetCursor(65, 22);
 			ssd1306_printf(Font_6x8, "%4d", lSensorOffset[0]);
@@ -709,9 +764,9 @@ void setup(void)
 				patternCalibration = 2;
 			}
 			break;
-
-		case 2:
-			// 開始準備
+		}
+		case 2: // 開始準備
+		{
 			if (cntSetup1 > 1000)
 			{
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
@@ -732,9 +787,9 @@ void setup(void)
 				patternCalibration = 3;
 			}
 			break;
-
-		case 3:
-			// スイッチ押下で終了
+		}
+		case 3: // スイッチ押下で終了
+		{
 			data_select(&trace_test, SW_PUSH);
 			if (!trace_test)
 			{
@@ -752,15 +807,18 @@ void setup(void)
 				patternCalibration = 1;
 			}
 			break;
+		}
 
 		default:
 			break;
 		}
 		break;
+	}
 	//------------------------------------------------------------------
 	// ゲイン調整(直線トレース)
 	//------------------------------------------------------------------
 	case HEX_PID_TRACE:
+	{
 		if (patternDisplay != beforeHEX)
 		{
 			// 切替時に実行
@@ -788,6 +846,15 @@ void setup(void)
 			motorPwmOutSynth(0, 0, 0, 0);
 			powerLineSensors(0);
 		}
+		if (trace_test != beforeMotorTest && trace_test == 0)
+		{
+			trace_test = 2;
+		}
+		if (trace_test == 2 && encCurrentL == 0)
+		{
+			trace_test = 0;
+		}
+		beforeMotorTest = trace_test;
 
 		// ゲイン表示
 		dataTuningUD(&patternGain, 1, 3, 1);
@@ -831,10 +898,12 @@ void setup(void)
 		}
 
 		break;
+	}
 	//------------------------------------------------------------------
 	// ゲイン調整(速度)
 	//------------------------------------------------------------------
 	case HEX_PID_SPEED:
+	{
 		if (patternDisplay != beforeHEX)
 		{
 			// 切替時に実行
@@ -905,10 +974,12 @@ void setup(void)
 			}
 		}
 		break;
+	}
 	//------------------------------------------------------------------
 	// ゲイン調整(角速度)
 	//------------------------------------------------------------------
 	case HEX_PID_ANGULAR:
+	{
 		if (patternDisplay != beforeHEX)
 		{
 			// 切替時に実行
@@ -937,6 +1008,15 @@ void setup(void)
 		{
 			motorPwmOutSynth(0, 0, 0, 0);
 		}
+		if (trace_test != beforeMotorTest && trace_test == 0)
+		{
+			trace_test = 2;
+		}
+		if (trace_test == 2 && encCurrentL == 0)
+		{
+			trace_test = 0;
+		}
+		beforeMotorTest = trace_test;
 
 		// ゲイン表示
 		dataTuningUD(&patternGain, 1, 3, 1);
@@ -979,11 +1059,12 @@ void setup(void)
 			}
 		}
 		break;
-
+	}
 	//------------------------------------------------------------------
 	// ゲイン調整(角度)
 	//------------------------------------------------------------------
 	case HEX_PID_ANGLE:
+	{
 		if (patternDisplay != beforeHEX)
 		{
 			// 切替時に実行
@@ -1051,10 +1132,12 @@ void setup(void)
 			}
 		}
 		break;
+	}
 	//------------------------------------------------------------------
 	// ゲイン調整(距離)
 	//------------------------------------------------------------------
 	case HEX_PID_DIST:
+	{
 		if (patternDisplay != beforeHEX)
 		{
 			// 切替時に実行
@@ -1114,13 +1197,16 @@ void setup(void)
 			}
 		}
 		break;
+	}
 
 	default:
+	{
 		ssd1306_SetCursor(30, 5);
 		ssd1306_printf(Font_6x8, "None      ");
 		ssd1306_FillRectangle(0, 16, 127, 63, Black);
 
 		break;
+	}
 	} // switch
 
 	// 前回値更新
