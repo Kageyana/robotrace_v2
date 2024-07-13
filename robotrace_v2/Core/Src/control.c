@@ -106,30 +106,40 @@ void initSystem(void)
 	powerMarkerSensors(0);
 
 	// microSD
-	initMSD = initMicroSD();
-	if (initMSD)
+	if (insertSD())
 	{
-		getLogNumber(); // 前回の解析ログナンバーを取得
+		initMSD = initMicroSD();
+		if (initMSD)
+		{
+			getLogNumber(); // 前回の解析ログナンバーを取得
 
-		// 前回のPIDゲインを取得
-		readPIDparameters(&lineTraceCtrl);
-		readPIDparameters(&veloCtrl);
-		readPIDparameters(&yawRateCtrl);
-		readPIDparameters(&yawCtrl);
-		readPIDparameters(&distCtrl);
+			// 前回のPIDゲインを取得
+			readPIDparameters(&lineTraceCtrl);
+			readPIDparameters(&veloCtrl);
+			readPIDparameters(&yawRateCtrl);
+			readPIDparameters(&yawCtrl);
+			readPIDparameters(&distCtrl);
 
-		readLinesenval(); // ラインセンサオフセット値を取得
-		readTgtspeeds();  // 目標速度を取得
+			readLinesenval(); // ラインセンサオフセット値を取得
+			readTgtspeeds();  // 目標速度を取得
+		}
+
+		setLED(0, 0, 10, 0); // 初期化 成功 緑点灯
 	}
+	else
+	{
+		setLED(0, 10, 0, 0); // 初期化 失敗 赤点灯
+	}
+
 	// IMU
 	initIMU = initBMI088();
 	if (initIMU)
 	{
-		led_out(0x1);
+		setLED(3, 0, 10, 0); // 初期化 成功 緑点灯
 	}
 	else
 	{
-		led_out(0x4);
+		setLED(3, 10, 0, 0); // 初期化 失敗 赤点灯
 	}
 
 	// Display
@@ -154,7 +164,7 @@ void initSystem(void)
 	HAL_TIM_Base_Start_IT(&htim6);
 	// HAL_TIM_Base_Start_IT(&htim7);
 
-	// ledset(100,0,0);
+	sendLED();
 
 	printf("hello \n");
 }

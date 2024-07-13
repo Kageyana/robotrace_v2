@@ -99,7 +99,6 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-	bool lighting = true;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -166,7 +165,7 @@ int main(void)
 		// 	}
 		// }
 
-		loopSystem();
+		// loopSystem();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
