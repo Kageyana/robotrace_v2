@@ -216,7 +216,7 @@ void Interrupt1ms(void)
 	switch (cnt10)
 	{
 	case 1:
-		// getMotorCurrent();
+		getMotorCurrent();
 		break;
 	case 2:
 		// if(initIMU) {

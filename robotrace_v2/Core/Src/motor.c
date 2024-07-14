@@ -8,6 +8,8 @@
 int16_t motorpwmL = 0;
 int16_t motorpwmR = 0;
 uint16_t motorCurrentADL, motorCurrentADR;
+uint16_t motorCurrentADLInt[MOTOR_AD_WINDOW], motorCurrentADRInt[MOTOR_AD_WINDOW];
+uint32_t cntMotorAD = 0;
 float motorCurrentL, motorCurrentR;
 /////////////////////////////////////////////////////////////////////
 // モジュール名 motorPwmOut
@@ -83,6 +85,18 @@ void motorPwmOutSynth(int16_t tPwm, int16_t sPwm, int16_t yrPwm, int16_t dPwm)
 	motorPwmOut(motorpwmL, motorpwmR);
 }
 ///////////////////////////////////////////////////////////////////////////
+// モジュール名 getMotorAD
+// 処理概要     MP6551のCMピン出力[AD]を取得する
+// 引数         LAD:左モータのAD値 RAD:右モータのAD値
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void getMotorAD(uint16_t LAD, uint16_t RAD)
+{
+	motorCurrentADLInt[cntMotorAD & (MOTOR_AD_WINDOW - 1)] = LAD;
+	motorCurrentADRInt[cntMotorAD & (MOTOR_AD_WINDOW - 1)] = RAD;
+	cntMotorAD++;
+}
+///////////////////////////////////////////////////////////////////////////
 // モジュール名 getMotorCurrent
 // 処理概要     MP6551のCMピン出力[V]を電流値[A]に変換する
 // 引数         なし
@@ -91,21 +105,33 @@ void motorPwmOutSynth(int16_t tPwm, int16_t sPwm, int16_t yrPwm, int16_t dPwm)
 void getMotorCurrent(void)
 {
 	float vL, vR;
+	uint32_t Lint = 0, Rint = 0;
+
+	// リングバッファの総和を計算
+	for (uint16_t i = 0; i < MOTOR_AD_WINDOW; i++)
+	{
+		Lint += motorCurrentADLInt[i];
+		Rint += motorCurrentADRInt[i];
+	}
+
+	// 移動平均を計算
+	motorCurrentADL = Lint / MOTOR_AD_WINDOW;
+	motorCurrentADR = Rint / MOTOR_AD_WINDOW;
 
 	// AD値を電圧[V]に変換
-	vL = (float)(motorCurrentADL - HALFSCAL) / 4095 * 3.3;
-	vR = (float)(motorCurrentADR - HALFSCAL) / 4095 * 3.3;
+	vL = (float)(motorCurrentADL) / 4095 * 3.3;
+	vR = (float)(motorCurrentADR) / 4095 * 3.3;
 
-	motorCurrentL = vL / RREF * 10000.0;
-	motorCurrentR = vR / RREF * 10000.0;
+	motorCurrentL = 10000.0 * (vL - VREF_L) / RREF_L;
+	motorCurrentR = 10000.0 * (vR - VREF_R) / RREF_R;
 }
 /////////////////////////////////////////////////////////////////////
-// モジュール名 MotorSuctionPwmOut
+// モジュール名 MotorFanPwmOut
 // 処理概要     吸引モータにPWMを出力する
 // 引数         pwm: モータへの出力(1~1000)
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void MotorSuctionPwmOut(int16_t pwm)
+void MotorFanPwmOut(int16_t pwm)
 {
 	// 0除算回避
 	if (pwm == 0)

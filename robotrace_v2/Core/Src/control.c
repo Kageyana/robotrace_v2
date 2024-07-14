@@ -84,7 +84,7 @@ void initSystem(void)
 	__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_R, 0);
 	__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_SUCTION_TIM_CH, 0);
 	motorPwmOut(0, 0);
-	MotorSuctionPwmOut(0);
+	MotorFanPwmOut(0);
 
 	// line sensor PWM
 	resultHAL[7] = HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_3);
@@ -703,8 +703,7 @@ void checkCurve(void)
 /////////////////////////////////////////////////////////////////////
 void getADC2(void)
 {
-	motorCurrentADL = analogVal2[0];
-	motorCurrentADR = analogVal2[1];
+	getMotorAD(analogVal2[0], analogVal2[1]);
 	batteryAD = analogVal2[2];
 	swValTactAD = analogVal2[3];
 }
