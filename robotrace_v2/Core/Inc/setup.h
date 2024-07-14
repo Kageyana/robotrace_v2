@@ -52,7 +52,7 @@ void data_select(uint8_t *data, uint8_t button);
 void dataTuningUD(int16_t *data, int16_t add, int16_t min, int16_t max);
 void dataTuningLR(int16_t *data, int16_t add, int16_t min, int16_t max);
 void dataTuningUDF(float *data, float add, float min, float max);
-void caribrateSensors(void);
+void setupNonDisp(void);
 void wheelClick(void);
 
 #endif /* SETUP_H_ */

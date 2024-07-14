@@ -97,7 +97,7 @@ void initSystem(void)
 	HAL_Delay(100);
 
 	// Extended board
-	if (swValTactAD > 1000) // 5方向タクトスイッチのプルアップを検出したら拡張ボードを接続している
+	if (swValTactAD > 2000) // 5方向タクトスイッチのプルアップを検出したら拡張ボードを接続している
 	{
 		// Display
 		modeDSP = true;
@@ -119,7 +119,6 @@ void initSystem(void)
 		modeDSP = false;
 		setLED(0, 50, 0, 0); // 初期化 失敗 赤点灯
 	}
-	ssd1306_UpdateScreen(); // グラフィック液晶更新
 	sendLED();
 
 	// microSD
@@ -156,7 +155,10 @@ void initSystem(void)
 		}
 		setLED(1, 50, 0, 0); // 初期化 失敗 赤点灯
 	}
-	ssd1306_UpdateScreen(); // グラフィック液晶更新
+	if (modeDSP)
+	{
+		ssd1306_UpdateScreen(); // グラフィック液晶更新
+	}
 	sendLED();
 
 	// IMU
@@ -178,8 +180,17 @@ void initSystem(void)
 		}
 		setLED(2, 50, 0, 0); // 初期化 失敗 赤点灯
 	}
-	ssd1306_UpdateScreen(); // グラフィック液晶更新
+	if (modeDSP)
+	{
+		ssd1306_UpdateScreen(); // グラフィック液晶更新
+	}
 	sendLED();
+
+	// Timer interrupt
+	resultHAL[8] = HAL_TIM_Base_Start_IT(&htim6);
+	resultHAL[9] = HAL_TIM_Base_Start_IT(&htim7);
+
+	HAL_Delay(100);
 
 	// 各機能スタート時ののエラーチェック
 	ssd1306_SetCursor(0, 52);
@@ -195,20 +206,25 @@ void initSystem(void)
 	if (statusGPIO)
 	{
 		setLED(3, 0, 50, 0); // 初期化 成功 緑点灯
-		ssd1306_printf(Font_6x8, "GPIO    success");
+		if (modeDSP)
+		{
+			ssd1306_printf(Font_6x8, "GPIO    success");
+		}
 	}
 	else
 	{
-		ssd1306_printf(Font_6x8, "GPIO    failed");
 		setLED(3, 50, 0, 0); // 初期化 失敗 赤点灯
+		if (modeDSP)
+		{
+			ssd1306_printf(Font_6x8, "GPIO    failed");
+		}
 		Error_Handler();
 	}
-	ssd1306_UpdateScreen(); // グラフィック液晶更新
+	if (modeDSP)
+	{
+		ssd1306_UpdateScreen(); // グラフィック液晶更新
+	}
 	sendLED();
-
-	// Timer interrupt
-	resultHAL[8] = HAL_TIM_Base_Start_IT(&htim6);
-	resultHAL[9] = HAL_TIM_Base_Start_IT(&htim7);
 
 	HAL_Delay(2000);
 	clearLED();
@@ -272,7 +288,7 @@ void loopSystem(void)
 			else
 			{
 				// ディスプレイモジュールが接続されていない時
-				caribrateSensors();
+				setupNonDisp();
 			}
 
 			if (start || autoStart)

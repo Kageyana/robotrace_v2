@@ -45,12 +45,12 @@ int8_t clickStart = 0;
 // パラメータ関連
 int16_t motorTestPwm = 200;
 int32_t encClick = 0;
-///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup
 // 処理概要     走行前設定
 // 引数         なし
 // 戻り値       なし
-///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
 void setup(void)
 {
 	uint8_t cntLed, i, j, k;
@@ -95,6 +95,11 @@ void setup(void)
 	// ページ番号表示
 	if (patternDisplay != beforeHEX)
 	{
+		if (!modeDSP) // ディスプレイが無いとき番号をLEDで表示
+		{
+			led_out(patternDisplay);
+		}
+
 		// ロータリスイッチ切替時に実行
 		showBattery(); // バッテリ残量表示
 
@@ -388,7 +393,7 @@ void setup(void)
 			beforeSensors = 100;
 		}
 
-		dataTuningLR(&patternSensors, 1, 1, 7);
+		dataTuningLR(&patternSensors, 1, 1, 8);
 		switch (patternSensors)
 		{
 		case 1: // モータテスト
@@ -631,6 +636,34 @@ void setup(void)
 
 			break;
 		}
+		case 8: // RGBLED
+		{
+			if (patternSensors != beforeSensors)
+			{
+				// 切替時に実行
+				ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
+				ssd1306_SetCursor(24, 16);
+				ssd1306_printf(Font_7x10, "RGBLED");
+			}
+
+			data_select(&motor_test, SW_PUSH);
+			if (motor_test == 1)
+			{
+				if (cntSetup2 > 50)
+				{
+					fullColorLED(10, 4);
+					cntSetup2 = 0;
+				}
+			}
+
+			if (motor_test != beforeMotorTest)
+			{
+				clearLED();
+			}
+
+			beforeMotorTest = motor_test;
+			break;
+		}
 		}
 		beforeSensors = patternSensors;
 		break;
@@ -850,7 +883,7 @@ void setup(void)
 		{
 			trace_test = 2;
 		}
-		if (trace_test == 2 && encCurrentL == 0)
+		if (trace_test == 2 && encCurrentL == 0) // ホイールの回転が停止したら0
 		{
 			trace_test = 0;
 		}
@@ -1012,7 +1045,7 @@ void setup(void)
 		{
 			trace_test = 2;
 		}
-		if (trace_test == 2 && encCurrentL == 0)
+		if (trace_test == 2 && encCurrentL == 0) // ホイールの回転が停止したら0
 		{
 			trace_test = 0;
 		}
@@ -1212,6 +1245,11 @@ void setup(void)
 	// 前回値更新
 	beforeHEX = patternDisplay;
 	beforeBATLV = batteryLevel;
+
+	if (!modeDSP)
+	{
+		sendLED();
+	}
 
 	if (!trace_test && !calibratIMU)
 	{
@@ -1493,12 +1531,12 @@ void dataTuningUDF(float *data, float add, float min, float max)
 	}
 }
 ///////////////////////////////////////////////////////////////////////////////////////
-// モジュール名 caribrateSensors
-// 処理概要     機体を超信地旋回させてラインセンサをキャリブレーションする
+// モジュール名 setupNonDisp
+// 処理概要     拡張ボードを接続していないときのセットアップ
 // 引数         なし
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////////////////
-void caribrateSensors(void)
+void setupNonDisp(void)
 {
 	static uint8_t mode = 0;
 
@@ -1507,6 +1545,7 @@ void caribrateSensors(void)
 	case 1:
 		setTargetSpeed(0);
 
+		led_out(0x9);
 		// スイッチ入力待ち
 		if (swValMainTact == SW_TACT_L || swValMainTact == SW_TACT_R)
 		{
