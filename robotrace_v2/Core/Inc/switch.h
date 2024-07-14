@@ -49,6 +49,7 @@ extern uint16_t cntSW; // アナログ入力スイッチのチャタリング防
 //====================================//
 // プロトタイプ宣言
 //====================================//
+void getSwitchAD(uint16_t ad);
 uint8_t getSWrotary(void);
 uint8_t getSW5aAxisTact(void);
 uint8_t getSWMainTact(void);

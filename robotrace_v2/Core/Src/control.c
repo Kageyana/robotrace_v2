@@ -704,8 +704,25 @@ void checkCurve(void)
 void getADC2(void)
 {
 	getMotorAD(analogVal2[0], analogVal2[1]);
-	batteryAD = analogVal2[2];
-	swValTactAD = analogVal2[3];
+	getBatteryAD(analogVal2[2]);
+	getSwitchAD(analogVal2[3]);
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 setEncoderVal
+// 処理概要     エンコーダ値を変数に加算する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void setEncoderVal(void)
+{
+	// 外部変数
+	enc1 += encCurrentN;			// 通常トレース用
+	encRightMarker += encCurrentN;	// ゴールマーカ判定用
+	encCurve += encCurrentN;		// カーブ処理用
+	encTotalOptimal += encCurrentN; // 2次走行用
+	encLog += encCurrentN;			// 一定距離ごとにログを保存する用
+	encPID += encCurrentN;			// 距離制御用
+	encClick += encCurrentL;		// ホイールクリック用
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 writePIDparameters

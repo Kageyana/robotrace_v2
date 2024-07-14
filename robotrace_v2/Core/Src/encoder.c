@@ -41,15 +41,6 @@ void getEncoder(void)
 	encTotalL += encCurrentL;
 	encTotalN += encCurrentN;
 
-	// 外部変数
-	enc1 += encCurrentN;			// 通常トレース用
-	encRightMarker += encCurrentN;	// ゴールマーカ判定用
-	encCurve += encCurrentN;		// カーブ処理用
-	encTotalOptimal += encCurrentN; // 2次走行用
-	encLog += encCurrentN;			// 一定距離ごとにログを保存する用
-	encPID += encCurrentN;			// 距離制御用
-	encClick += encCurrentL;		// ホイールクリック用
-
 	// 前回値を更新
 	encBufR = encRawR;
 	encBufL = encRawL;
