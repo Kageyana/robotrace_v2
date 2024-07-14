@@ -64,8 +64,8 @@ uint32_t goalTime = 0;
 ///////////////////////////////////////////////////////////////////////////
 void initSystem(void)
 {
-	HAL_StatusTypeDef resultHAL[10];
-	bool statusGPIO = false;
+	HAL_StatusTypeDef resultHAL[10] = {};
+	bool statusGPIO = true;
 
 	// ADC
 	resultHAL[0] = HAL_ADC_Start_DMA(&hadc1, analogVal1, NUM_SENSORS);
@@ -92,7 +92,38 @@ void initSystem(void)
 	powerLineSensors(0);
 	powerMarkerSensors(0);
 
+	// AD値取得
+	getADC2();
+	HAL_Delay(100);
+
+	// Extended board
+	if (swValTactAD > 1000) // 5方向タクトスイッチのプルアップを検出したら拡張ボードを接続している
+	{
+		// Display
+		modeDSP = true;
+		ssd1306_Init();
+		ssd1306_Fill(Black);
+		// トップバー表示
+
+		SchmittBatery(); // バッテリレベルを取得
+		showBatMark();	 // 電池マーク
+		showBattery();	 // 充電Lv表示
+		ssd1306_SetCursor(0, 16);
+		ssd1306_printf(Font_6x8, "Exboard connect");
+		ssd1306_UpdateScreen();
+
+		setLED(0, 0, 50, 0); // 初期化 成功 緑点灯
+	}
+	else
+	{
+		modeDSP = false;
+		setLED(0, 50, 0, 0); // 初期化 失敗 赤点灯
+	}
+	ssd1306_UpdateScreen(); // グラフィック液晶更新
+	sendLED();
+
 	// microSD
+	ssd1306_SetCursor(0, 28);
 	if (insertSD())
 	{
 		initMSD = initMicroSD();
@@ -109,110 +140,77 @@ void initSystem(void)
 
 			readLinesenval(); // ラインセンサオフセット値を取得
 			readTgtspeeds();  // 目標速度を取得
-		}
 
-		setLED(0, 0, 10, 0); // 初期化 成功 緑点灯
+			if (modeDSP)
+			{
+				ssd1306_printf(Font_6x8, "MicroSD success");
+			}
+			setLED(1, 0, 50, 0); // 初期化 成功 緑点灯
+		}
 	}
 	else
 	{
-		setLED(0, 10, 0, 0); // 初期化 失敗 赤点灯
+		if (modeDSP)
+		{
+			ssd1306_printf(Font_6x8, "MicroSD failed");
+		}
+		setLED(1, 50, 0, 0); // 初期化 失敗 赤点灯
 	}
+	ssd1306_UpdateScreen(); // グラフィック液晶更新
+	sendLED();
 
 	// IMU
 	initIMU = initBMI088();
+	ssd1306_SetCursor(0, 40);
 	if (initIMU)
 	{
-		setLED(1, 0, 10, 0); // 初期化 成功 緑点灯
+		if (modeDSP)
+		{
+			ssd1306_printf(Font_6x8, "IMU     success");
+		}
+		setLED(2, 0, 50, 0); // 初期化 成功 緑点灯
 	}
 	else
 	{
-		setLED(1, 10, 0, 0); // 初期化 失敗 赤点灯
+		if (modeDSP)
+		{
+			ssd1306_printf(Font_6x8, "IMU     failed");
+		}
+		setLED(2, 50, 0, 0); // 初期化 失敗 赤点灯
 	}
-
-	// Extended board
-	// 5方向タクトスイッチのプルアップを検出したら拡張ボードを接続している
-	if (swValTactAD > 1000)
-	{
-		// Display
-		modeDSP = true;
-		ssd1306_Init();
-		ssd1306_Fill(Black);
-		// トップバー表示
-		// 電池マーク
-		showBatMark();
-		ssd1306_UpdateScreen();
-
-		setLED(2, 0, 10, 0); // 初期化 成功 緑点灯
-	}
-	else
-	{
-		modeDSP = false;
-		setLED(2, 10, 0, 0); // 初期化 失敗 赤点灯
-	}
-
-	// Timer interrupt
-	resultHAL[8] = HAL_TIM_Base_Start_IT(&htim6);
-	resultHAL[9] = HAL_TIM_Base_Start_IT(&htim7);
+	ssd1306_UpdateScreen(); // グラフィック液晶更新
+	sendLED();
 
 	// 各機能スタート時ののエラーチェック
+	ssd1306_SetCursor(0, 52);
 	uint8_t j = 0;
 	for (uint8_t i = 0; i < 10; i++)
 	{
 		j += resultHAL[i];
 		if (j > 0)
 		{
-			setLED(3, 10, 0, 0); // 初期化 失敗 赤点灯
-			Error_Handler();
+			statusGPIO = false;
 		}
 	}
-	statusGPIO = true;
-	setLED(3, 0, 10, 0); // 初期化 成功 緑点灯
-
-	// 初期化状況の表示
-	sendLED();
-	if (modeDSP)
+	if (statusGPIO)
 	{
-		// Extended board
-		ssd1306_SetCursor(0, 16);
-		ssd1306_printf(Font_6x8, "Exboard connect");
-
-		// MicroSD
-		ssd1306_SetCursor(0, 28);
-		if (initMSD)
-		{
-			ssd1306_printf(Font_6x8, "MicroSD success");
-		}
-		else
-		{
-			ssd1306_printf(Font_6x8, "MicroSD failed");
-		}
-
-		// IMU
-		ssd1306_SetCursor(0, 40);
-		if (initIMU)
-		{
-			ssd1306_printf(Font_6x8, "IMU     success");
-		}
-		else
-		{
-			ssd1306_printf(Font_6x8, "IMU     failed");
-		}
-
-		// GPIO
-		ssd1306_SetCursor(0, 52);
-		if (statusGPIO)
-		{
-			ssd1306_printf(Font_6x8, "GPIO    success");
-		}
-		else
-		{
-			ssd1306_printf(Font_6x8, "GPIO    failed");
-		}
-		ssd1306_UpdateScreen(); // グラフィック液晶更新
-
-		HAL_Delay(2000);
+		setLED(3, 0, 50, 0); // 初期化 成功 緑点灯
+		ssd1306_printf(Font_6x8, "GPIO    success");
 	}
+	else
+	{
+		ssd1306_printf(Font_6x8, "GPIO    failed");
+		setLED(3, 50, 0, 0); // 初期化 失敗 赤点灯
+		Error_Handler();
+	}
+	ssd1306_UpdateScreen(); // グラフィック液晶更新
+	sendLED();
 
+	// Timer interrupt
+	resultHAL[8] = HAL_TIM_Base_Start_IT(&htim6);
+	resultHAL[9] = HAL_TIM_Base_Start_IT(&htim7);
+
+	HAL_Delay(2000);
 	clearLED();
 
 	printf("hello \n");
