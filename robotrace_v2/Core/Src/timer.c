@@ -24,6 +24,7 @@ void Interrupt1ms(void)
 
 	// Encoder
 	getEncoder();
+	setEncoderVal();
 
 	// PID制御処理
 	motorControlTrace();

@@ -100,6 +100,7 @@ void emargencyStop(void);
 void countDown(void);
 void checkCurve(void);
 void getADC2(void);
+void setEncoderVal(void);
 void writeTgtspeeds(void);
 void readTgtspeeds(void);
 
