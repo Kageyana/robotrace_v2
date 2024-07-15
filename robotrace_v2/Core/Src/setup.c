@@ -519,11 +519,23 @@ void setup(void)
 			{
 				// 切替時に実行
 				ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
-				ssd1306_SetCursor(32, 16);
-				ssd1306_printf(Font_7x10, "Side sensors");
+				ssd1306_SetCursor(15, 16);
+				ssd1306_printf(Font_7x10, "Marker sensors");
 			}
 			ssd1306_SetCursor(0, 30);
-			ssd1306_printf(Font_7x10, "Marker sensors:%d", getMarkerSensor());
+			ssd1306_printf(Font_7x10, "sensors:%d", getMarkerSensor());
+			ssd1306_SetCursor(0, 45);
+			ssd1306_printf(Font_7x10, "britght:%d", motor_test);
+
+			data_select(&motor_test, SW_PUSH);
+			if (motor_test == 1)
+			{
+				powerMarkerSensors(1);
+			}
+			else
+			{
+				powerMarkerSensors(0);
+			}
 
 			break;
 		}
@@ -642,7 +654,7 @@ void setup(void)
 			{
 				// 切替時に実行
 				ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
-				ssd1306_SetCursor(24, 16);
+				ssd1306_SetCursor(43, 16);
 				ssd1306_printf(Font_7x10, "RGBLED");
 			}
 

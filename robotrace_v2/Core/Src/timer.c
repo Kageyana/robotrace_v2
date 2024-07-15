@@ -167,22 +167,23 @@ void Interrupt1ms(void)
 		break;
 	}
 
-	if (patternTrace > 11 && patternTrace < 100)
+	if (patternTrace > 11 && patternTrace < 100) // 走行中に処理
 	{
-		if (encLog >= encMM(CALCDISTANCE_SHORTCUT))
+		if (encLog >= encMM(CALCDISTANCE_SHORTCUT)) // 一定距離ごとに処理
 		{
 			static float rocCorrection = 0;
+			// ROC計算
 			rocCorrection = calcROC(encCurrentN, BMI088val.gyro.z, (float)cntLog / 1000);
-			if (fabs(rocCorrection) >= 700.0F)
+			if (fabs(rocCorrection) >= 700.0F) // 直線判断
 			{
-				straightMeter += CALCDISTANCE_SHORTCUT;
+				straightMeter += CALCDISTANCE_SHORTCUT; // 距離積算
 			}
 			else
 			{
 				straightMeter = 0;
 			}
 
-			if (straightMeter >= 100)
+			if (straightMeter >= 100) // 直線が100mm以上のとき
 			{
 				straightState = true;
 			}
