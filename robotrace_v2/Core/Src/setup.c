@@ -433,10 +433,12 @@ void setup(void)
 				motorPwmOut(0, 0);
 			}
 
+			// motor_test 1→0のとき 2にする
 			if (motor_test != beforeMotorTest && motor_test == 0)
 			{
 				motor_test = 2;
 			}
+			// 2のときホイールの回転が止まったらmotor_test=0にする
 			if (motor_test == 2 && encCurrentL == 0)
 			{
 				motor_test = 0;
@@ -452,17 +454,11 @@ void setup(void)
 				ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
 				ssd1306_SetCursor(36, 16);
 				ssd1306_printf(Font_7x10, "IMU[deg]");
+				motor_test = 1;
 			}
 
 			if (!calibratIMU)
 			{
-				// ssd1306_SetCursor(0,30);
-				// ssd1306_printf(Font_7x10,"xg:%6.1f",BMI088val.gyro.x);
-				// ssd1306_SetCursor(0,42);
-				// ssd1306_printf(Font_7x10,"yg:%6.1f",BMI088val.gyro.y);
-				// ssd1306_SetCursor(0,54);
-				// ssd1306_printf(Font_7x10,"zg:%6.1f",BMI088val.gyro.z);
-
 				ssd1306_SetCursor(64, 30);
 				ssd1306_printf(Font_7x10, "xd:%6.1f", BMI088val.angle.x);
 				ssd1306_SetCursor(64, 42);
@@ -488,7 +484,7 @@ void setup(void)
 				ssd1306_UpdateScreen();
 
 				calibratIMU = true;
-				HAL_Delay(800);
+				HAL_Delay(1000);
 			}
 			break;
 		}
