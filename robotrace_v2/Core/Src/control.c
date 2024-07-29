@@ -226,8 +226,13 @@ void initSystem(void)
 	}
 	sendLED();
 
-	HAL_Delay(2000);
+	HAL_Delay(1000);
 	clearLED();
+
+	// DWT初期化
+	initCycleCounter();
+	resetCycleCounter();
+	enableCycleCounter(); // カウント開始
 
 	printf("hello \n");
 }

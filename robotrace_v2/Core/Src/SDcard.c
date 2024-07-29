@@ -267,7 +267,7 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 		cntSend++;
 
 		// バッファが512バイト付近まで溜まったら確認
-		if (logBuffIndex + LOG_SIZE > 512)
+		if (logBuffIndex + LOG_SIZE > 512 && !sendSD)
 		{
 			logBuffSendIndex = logBuffIndex;					// バッファのバイト数を記録
 			memcpy(logBufferSend, logBuffer, logBuffSendIndex); // 送信用配列にコピー
@@ -464,8 +464,8 @@ void endLog(void)
 				logval16[2],
 				(float)logval16[3] / 10000,
 				(float)logval16[4] / 10000,
-				logval16[5],
-				logval16[6],
+				(int16_t)logval16[5],
+				(int16_t)logval16[6],
 				logvalf[1],
 				logvalf[2],
 				logvalf[3]);

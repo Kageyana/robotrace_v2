@@ -7,6 +7,7 @@
 //====================================//
 int32_t cnt5 = 0;
 int32_t cnt10 = 0;
+float bootTime;
 /////////////////////////////////////////////////////////////////////
 // モジュール名 Interrupt1ms
 // 処理概要     タイマー割り込み(1ms)
@@ -21,6 +22,11 @@ void Interrupt1ms(void)
 	cnt5++;
 	cnt10++;
 	cntLog++;
+
+	// 割り込み時間計測
+	uint32_t freqCount = getCycleCounter();
+	resetCycleCounter();
+	bootTime = getTimeMs(freqCount);
 
 	// Encoder
 	getEncoder();
@@ -167,31 +173,6 @@ void Interrupt1ms(void)
 		break;
 	}
 
-#ifdef LOG_RUNNING_WRITE
-	writeLogBufferPuts(
-		LOG_NUM_8BIT,
-		LOG_NUM_16BIT,
-		LOG_NUM_32BIT,
-		LOG_NUM_FLOAT,
-		// 8bit
-		targetSpeed,
-		courseMarker,
-		// 16bit
-		cntLog,
-		encCurrentN,
-		optimalIndex,
-		(int16_t)(motorCurrentL * 10000),
-		(int16_t)(motorCurrentR * 10000),
-		lineTraceCtrl.pwm,
-		veloCtrl.pwm,
-		// 32bit
-		encTotalOptimal,
-		// float型
-		BMI088val.gyro.z);
-#else
-	writeLogBufferPrint(); // バッファにログを保存
-#endif
-
 	if (patternTrace > 11 && patternTrace < 100) // 走行中に処理
 	{
 		if (encLog >= encMM(CALCDISTANCE_SHORTCUT)) // 一定距離ごとに処理
@@ -216,7 +197,30 @@ void Interrupt1ms(void)
 			if (modeLOG)
 			{
 				// CALCDISTANCEごとにログを保存
-
+#ifdef LOG_RUNNING_WRITE
+				writeLogBufferPuts(
+					LOG_NUM_8BIT,
+					LOG_NUM_16BIT,
+					LOG_NUM_32BIT,
+					LOG_NUM_FLOAT,
+					// 8bit
+					targetSpeed,
+					courseMarker,
+					// 16bit
+					cntRun,
+					encCurrentN,
+					optimalIndex,
+					(int16_t)(motorCurrentL * 10000),
+					(int16_t)(motorCurrentR * 10000),
+					lineTraceCtrl.pwm,
+					veloCtrl.pwm,
+					// 32bit
+					encTotalOptimal,
+					// float型
+					BMI088val.gyro.z);
+#else
+				writeLogBufferPrint(); // バッファにログを保存
+#endif
 				cntLog = 0;
 				encLog = 0;
 			}

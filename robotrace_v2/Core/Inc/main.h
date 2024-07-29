@@ -57,7 +57,7 @@ extern "C" {
 #include "emergencyStop.h"
 #include "courseAnalysis.h"
 #include "control.h"
-
+#include "DWT.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
