@@ -165,10 +165,11 @@ void createLog(void)
 	strcpy(formatLog, "");
 #ifdef LOG_RUNNING_WRITE
 	setLogStr("cntlog", "%d");
-	setLogStr("courseMarker", "%d");
 	setLogStr("encCurrentN", "%d");
 	setLogStr("gyroVal_Z", "%f");
+	setLogStr("courseMarker", "%d");
 	setLogStr("encTotalN", "%d");
+	setLogStr("ROC", "%f");
 
 	setLogStr("targetSpeed", "%d");
 	setLogStr("optimalIndex", "%d");
@@ -177,18 +178,17 @@ void createLog(void)
 	setLogStr("lineTraceCtrl", "%d");
 	setLogStr("veloCtrl", "%d");
 
-	setLogStr("ROC", "%f");
 	setLogStr("x", "%f");
 	setLogStr("y", "%f");
 #else
 	setLogStr("cntlog", "%d");
 	setLogStr("encCurrentN", "%d");
-	setLogStr("gyroVal_Z", "%d");
+	setLogStr("gyroVal_Z", "%f");
 	setLogStr("courseMarker", "%d");
 	setLogStr("encTotalN", "%d");
-	setLogStr("ROC", "%d");
-	setLogStr("x", "%d");
-	setLogStr("y", "%d");
+	setLogStr("ROC", "%f");
+	setLogStr("x", "%f");
+	setLogStr("y", "%f");
 	setLogStr("CurrentL", "%d");
 	setLogStr("CurrentR", "%d");
 	// setLogStr("courseMarker",  "%d");
@@ -331,6 +331,7 @@ void writeLogBufferPrint(void)
 #ifndef LOG_RUNNING_WRITE
 void writeLogPrint(void)
 {
+	uint8_t logStr[256];
 	uint32_t i, totalTime = 0, distance;
 	uint16_t indexM = 0, marker;
 
@@ -352,19 +353,22 @@ void writeLogPrint(void)
 			distance = 0;
 		}
 
-		f_printf(&fil_W, "%d,", totalTime);
-		f_printf(&fil_W, "%d,", logVal[i].speed);
-		f_printf(&fil_W, "%d,", (int32_t)(logVal[i].zg * 10000));
-		f_printf(&fil_W, "%d,", marker);
-		f_printf(&fil_W, "%d,", distance);
-		// f_printf(&fil_W, "%d,", logVal[i].target);
-		// f_printf(&fil_W, "%d,", logVal[i].optimalIndex);
-		f_printf(&fil_W, "%d,", (int32_t)(calcROC(logVal[i].speed, logVal[i].zg, (float)logVal[i].time / 1000)));
-		f_printf(&fil_W, "%d,", (int32_t)(xycie.x * 10000));
-		f_printf(&fil_W, "%d,", (int32_t)(xycie.y * 10000));
-		f_printf(&fil_W, "%d,", logVal[i].opIndex);
-		f_printf(&fil_W, "%d,", logVal[i].targetSpeed);
-		f_printf(&fil_W, "\n");
+		// 文字列に変換
+		sprintf(logStr, formatLog,
+				totalTime,
+				logVal[i].speed,
+				logVal[i].zg,
+				marker,
+				distance,
+				calcROC(logVal[i].speed, logVal[i].zg, (float)logVal[i].time / 1000),
+
+				xycie.x,
+				xycie.y,
+				logVal[i].opIndex,
+				logVal[i].targetSpeed);
+
+		// 文字列をSDカードに送信
+		f_puts(logStr, &fil_W);
 	}
 }
 #endif
@@ -453,20 +457,20 @@ void endLog(void)
 		beforeTime = time; // 時間を更新
 
 		// 文字列に変換
-		sprintf(logStr,
-				formatLog,
+		sprintf(logStr, formatLog,
 				time,
-				marker,
 				speed,
 				zg,
+				marker,
 				distance,
+				logvalf[1],
+
 				logval8[0],
 				logval16[2],
 				(float)logval16[3] / 10000,
 				(float)logval16[4] / 10000,
 				(int16_t)logval16[5],
 				(int16_t)logval16[6],
-				logvalf[1],
 				logvalf[2],
 				logvalf[3]);
 
