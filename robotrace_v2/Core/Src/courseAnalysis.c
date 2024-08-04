@@ -134,7 +134,8 @@ int16_t readLogDistance(int logNumber)
 
 		// ログデータの取得
 		TCHAR log[512];
-		int32_t time = 0, marker = 0, velo = 0, angVelo = 0, distance = 0, roc, i = 0;
+		int32_t time, marker, velo, distance, roc, i = 0;
+		float angVelo;
 		int32_t numD = 0, numM = 0, cntCurR = 0, numStraight = 0;
 		bool analysis = false;
 		static int16_t ROCbuff[600] = {0};
@@ -150,7 +151,7 @@ int16_t readLogDistance(int logNumber)
 		// ログデータ取得開始
 		while (f_gets(log, sizeof(log), &fil_Read))
 		{
-			sscanf(log, "%d,%d,%d,%d,%d,%d,", &time, &velo, &angVelo, &marker, &distance, &roc);
+			sscanf(log, "%d,%d,%f,%d,%d,%d,", &time, &velo, &angVelo, &marker, &distance, &roc);
 			// 解析処理
 			// if (marker >= 2) {
 			//     // カーブマーカーを通過したときにマーカー位置を記録
@@ -383,7 +384,8 @@ int16_t readLogTest(int logNumber)
 	if (fresult == FR_OK)
 	{
 		TCHAR log[512];
-		int32_t time, marker, velo, angVelo, distance;
+		int32_t time, marker, velo, distance;
+		float angVelo;
 		int32_t startEnc = 0, numD = 0, numM = 0, cntCurR = 0, beforeMarker = 0;
 		bool analysis = false;
 		float ROCbuff[600] = {0};
@@ -396,7 +398,7 @@ int16_t readLogTest(int logNumber)
 		// ログデータ取得開始
 		while (f_gets(log, sizeof(log), &fil_Read))
 		{
-			sscanf(log, "%d,%d,%d,%d,%d", &time, &velo, &angVelo, &marker, &distance);
+			sscanf(log, "%d,%d,%f,%d,%d", &time, &velo, &angVelo, &marker, &distance);
 
 			// 解析処理
 			if (marker == 1 && beforeMarker == 0)
@@ -454,7 +456,8 @@ int16_t calcXYcies(int logNumber)
 	{
 		// ログデータの取得
 		TCHAR log[512];
-		int32_t time = 0, marker = 0, velo = 0, angVelo = 0, distance = 0;
+		int32_t time, marker, velo, distance;
+		float angVelo;
 		int32_t beforeTime = 0, startEnc = 0;
 		float degz = 0, degzR, velocity = 0, dt;
 		float x = 0, y = 0, xm = 0, ym = 0, degzm = 0;
@@ -477,13 +480,13 @@ int16_t calcXYcies(int logNumber)
 		// ログデータ取得開始
 		while (f_gets(log, sizeof(log), &fil_Read) != NULL)
 		{
-			sscanf(log, "%d,%d,%d,%d,%d", &time, &marker, &velo, &angVelo, &distance);
+			sscanf(log, "%d,%d,%f,%d,%d", &time, &marker, &velo, &angVelo, &distance);
 
 			dt = (float)(time - beforeTime) / 1000;
 
-			degz = degz + ((float)angVelo / 10000 * dt); // 角度
-			degzR = degz * DEG2RAD;						 // [rad]に変換
-			velocity = (float)velo / PALSE_MILLIMETER;	 // 速度
+			degz = degz + (angVelo * dt);			   // 角度
+			degzR = degz * DEG2RAD;					   // [rad]に変換
+			velocity = (float)velo / PALSE_MILLIMETER; // 速度
 
 			// 座標計算
 			x = x + (velocity * sin(degzR));
