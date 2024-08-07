@@ -46,7 +46,9 @@ markerData markerVal[BUFFER_SIZW_MARKER];
 uint16_t markerValIndex = 0;
 
 // ログファイルナンバー
-int16_t fileNumbers[1000], fileIndexLog = 0, endFileIndex = 0;
+int16_t fileNumbers[1000];
+int16_t fileIndexLog = 0; // 現在使用しているログ番号
+int16_t endFileIndex = 0; // ログの最終番号
 
 // カウンタ
 uint8_t cntLog = 0;

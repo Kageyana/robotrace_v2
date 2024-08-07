@@ -227,12 +227,28 @@ void initSystem(void)
 	sendLED();
 
 	HAL_Delay(1000);
-	clearLED();
 
+	// Sd card未挿入の警告
+	if (!insertSD())
+	{
+		if (modeDSP)
+		{
+			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+			ssd1306_SetCursor(15, 30);
+			ssd1306_printf(Font_11x18, "No SDcard");
+			ssd1306_UpdateScreen(); // グラフィック液晶更新
+
+			HAL_Delay(1000);
+		}
+	}
+
+	clearLED();
+#ifdef LOG_RUNNING_WRITE
 	// DWT初期化
 	initCycleCounter();
 	resetCycleCounter();
 	enableCycleCounter(); // カウント開始
+#endif
 
 	printf("hello \n");
 }
