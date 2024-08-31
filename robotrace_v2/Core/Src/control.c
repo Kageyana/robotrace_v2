@@ -243,12 +243,10 @@ void initSystem(void)
 	}
 
 	clearLED();
-#ifdef LOG_RUNNING_WRITE
 	// DWT初期化
 	initCycleCounter();
 	resetCycleCounter();
 	enableCycleCounter(); // カウント開始
-#endif
 
 	printf("hello \n");
 }
