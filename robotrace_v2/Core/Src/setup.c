@@ -686,132 +686,41 @@ void setup(void)
 			// 切替時に実行
 			ssd1306_printf(Font_6x8, "microSD  ");
 			y = endFileIndex + 1;
-
-			// // 前回解析したログ番号を探す
-			// k = endFileIndex;
-			// for (i = 0; i < 5; i++)
-			// {
-			// 	if (0 + (20 * i) < 128 || k >= 0)
-			// 	{
-			// 		for (j = 0; j < 5; j++)
-			// 		{
-			// 			if (24 + (8 * j) < 64 || k >= 0)
-			// 			{
-			// 				if (k == fileIndexLog)
-			// 				{
-			// 					x = i;
-			// 					y = j;
-			// 					break;
-			// 				}
-			// 				k--;
-			// 			}
-			// 			else
-			// 			{
-			// 				break;
-			// 			}
-			// 		}
-			// 		if (k == fileIndexLog)
-			// 		{
-			// 			break;
-			// 		}
-			// 	}
-			// 	else
-			// 	{
-			// 		break;
-			// 	}
-			// }
 		}
 
 		ssd1306_SetCursor(52, 16);
 		ssd1306_printf(Font_6x8, "%4d", fileNumbers[fileIndexLog]);
 
 		dataTuningUD(&y, 1, 0, endFileIndex + 1);
-		// dataTuningLR(&x, 1, 0, 4);
 
 		for (i = 0; i < 5; i++)
 		{
+			// 前回解析ログNoを選択しているとき
 			if (y == endFileIndex + 1)
 			{
 				ssd1306_SetCursor(52, 16);
 				ssd1306_printfB(Font_6x8, "%4d", fileNumbers[fileIndexLog]);
 			}
 
-			offset = endFileIndex - y - 4;
+			// ログNoを選択するとき
+			offset = endFileIndex - y - 4; // 前回解析Noと一番下のNoを除く表示中の4つ中一番上のインデックスを計算
 			ssd1306_SetCursor(52, 24 + (8 * i));
+
+			// 最新4つのデータを表示するとき
 			if (offset < 0)
 			{
 				offset = 0;
+			}
 
-				if (endFileIndex - y == i)
-				{
-					ssd1306_printfB(Font_6x8, "%4d", fileNumbers[endFileIndex - offset - i]);
-				}
-				else
-				{
-					ssd1306_printf(Font_6x8, "%4d", fileNumbers[endFileIndex - offset - i]);
-				}
+			if (endFileIndex - y == i || (i == 4 && offset > 0))
+			{
+				ssd1306_printfB(Font_6x8, "%4d", fileNumbers[endFileIndex - offset - i]);
 			}
 			else
 			{
-				if (i != 4)
-				{
-					ssd1306_printf(Font_6x8, "%4d", fileNumbers[endFileIndex - i - offset]);
-				}
-				else
-				{
-					ssd1306_printfB(Font_6x8, "%4d", fileNumbers[endFileIndex - i - offset]);
-				}
+				ssd1306_printf(Font_6x8, "%4d", fileNumbers[endFileIndex - offset - i]);
 			}
 		}
-
-		// // i-jとx-yが一致したとき文字色反転
-		// k = endFileIndex;
-		// for (i = 0; i < 5; i++)
-		// {
-		// 	if (0 + (20 * i) < 128 || k >= 0)
-		// 	{
-		// 		for (j = 0; j < 5; j++)
-		// 		{
-		// 			if (24 + (8 * j) < 64 || k >= 0)
-		// 			{
-		// 				ssd1306_SetCursor(0 + (20 * i), 24 + (8 * j)); // 原点 0,24
-		// 				if (i == x && j == y)
-		// 				{
-		// 					if (swValTact == SW_PUSH)
-		// 					{
-		// 						initIMU = false;
-		// 						// 距離基準解析
-		// 						// numPPADarry = k;
-		// 						// numPPADarry = calcXYcies(fileNumbers[k]);
-		// 						numPPADarry = readLogDistance(fileNumbers[k]);
-		// 						// numPPADarry = readLogTest(fileNumbers[k]);
-
-		// 						if (numPPADarry > 0)
-		// 						{
-		// 							optimalIndex = 0;
-		// 							HAL_Delay(100);
-		// 						}
-		// 						initIMU = true;
-		// 					}
-		// 					ssd1306_printfB(Font_6x8, "%d", fileNumbers[k]);
-		// 				}
-		// 				else
-		// 				{
-		// 					ssd1306_printf(Font_6x8, "%d", fileNumbers[k]);
-		// 				}
-		// 				k--;
-		// 			}
-		// 			else
-		// 			{
-		// 				break;
-		// 			}
-		// 		}
-		// 	}
-		// 	else
-		// 	{
-		// 		break;
-		// 	}
-		// }
 
 		break;
 	}
