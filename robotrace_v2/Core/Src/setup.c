@@ -55,7 +55,7 @@ void setup(void)
 {
 	uint8_t cntLed, i, j, k;
 	static uint8_t beforePparam, beforeBATLV, beforeHEX = 255, beforeMotorTest;
-	static int16_t x = 0, y = 0, offset;
+	static int16_t x = 0, y = 0, offset, ret = 0;
 
 	SchmittBatery(); // バッテリレベルを取得
 	if (batteryLevel != beforeBATLV)
@@ -686,25 +686,77 @@ void setup(void)
 			// 切替時に実行
 			ssd1306_printf(Font_6x8, "microSD  ");
 			y = endFileIndex + 1;
+			ssd1306_SetCursor(30, 16);
+			ssd1306_printf(Font_6x8, "Dist <");
+			ssd1306_SetCursor(80, 16);
+			ssd1306_printf(Font_6x8, "> XYcalc");
+			ssd1306_SetCursor(46, 25);
+			ssd1306_printf(Font_6x8, "index :%4d", numPPADarry);
+			ssd1306_SetCursor(46, 34);
+			ssd1306_printf(Font_6x8, "marker:%4d", numPPAMarry);
 		}
 
-		ssd1306_SetCursor(52, 16);
+		ssd1306_SetCursor(0, 16);
 		ssd1306_printf(Font_6x8, "%4d", fileNumbers[fileIndexLog]);
 
 		dataTuningUD(&y, 1, 0, endFileIndex + 1);
 
+		j = swValTact;
+		if (j == SW_LEFT || j == SW_RIGHT)
+		{
+			ssd1306_FillRectangle(30, 25, 127, 63, Black); // メイン表示空白埋め
+			ssd1306_SetCursor(46, 38);
+			ssd1306_printf(Font_6x8, "Calculating");
+			ssd1306_UpdateScreen(); // グラフィック液晶更新
+
+			if (y == endFileIndex + 1)
+			{
+				y = fileIndexLog;
+			}
+
+			if (j == SW_LEFT)
+			{
+				// 距離基準解析
+				ret = readLogDistance(fileNumbers[y]);
+			}
+			else if (j == SW_RIGHT)
+			{
+				// ショートカット解析
+				ret = calcXYcies(fileNumbers[y]);
+			}
+
+			if (ret > 0)
+			{
+				optimalIndex = 0;
+				ssd1306_FillRectangle(30, 25, 127, 63, Black); // メイン表示空白埋め
+				ssd1306_SetCursor(46, 25);
+				ssd1306_printf(Font_6x8, "index :%4d", numPPADarry);
+				ssd1306_SetCursor(46, 34);
+				ssd1306_printf(Font_6x8, "marker:%4d", numPPAMarry);
+			}
+			else
+			{
+				ssd1306_FillRectangle(30, 25, 127, 63, Black); // メイン表示空白埋め
+				ssd1306_SetCursor(64, 30);
+				ssd1306_printf(Font_6x8, "Error");
+				ssd1306_SetCursor(61, 38);
+				ssd1306_printf(Font_6x8, "code:%d", ret);
+			}
+		}
+
+		// ログNoの選択処理
 		for (i = 0; i < 5; i++)
 		{
 			// 前回解析ログNoを選択しているとき
 			if (y == endFileIndex + 1)
 			{
-				ssd1306_SetCursor(52, 16);
+				ssd1306_SetCursor(0, 16);
 				ssd1306_printfB(Font_6x8, "%4d", fileNumbers[fileIndexLog]);
 			}
 
 			// ログNoを選択するとき
 			offset = endFileIndex - y - 4; // 前回解析Noと一番下のNoを除く表示中の4つ中一番上のインデックスを計算
-			ssd1306_SetCursor(52, 24 + (8 * i));
+			ssd1306_SetCursor(0, 24 + (8 * i));
 
 			// 最新4つのデータを表示するとき
 			if (offset < 0)
@@ -714,6 +766,7 @@ void setup(void)
 
 			if (endFileIndex - y == i || (i == 4 && offset > 0))
 			{
+				// 選択したログNoをハイライト表示
 				ssd1306_printfB(Font_6x8, "%4d", fileNumbers[endFileIndex - offset - i]);
 			}
 			else
@@ -1265,7 +1318,7 @@ void dataTuningUD(int16_t *data, int16_t add, int16_t min, int16_t max)
 			if (swValTact == SW_UP)
 			{
 				// インクリメント
-				if (cntSwitchUDLong >= 20)
+				if (cntSwitchUDLong >= PUSHTIME)
 				{ // 長押し処理
 					*data += sign * add;
 				}
@@ -1278,7 +1331,7 @@ void dataTuningUD(int16_t *data, int16_t add, int16_t min, int16_t max)
 			else if (swValTact == SW_DOWN)
 			{
 				// デクリメント
-				if (cntSwitchUDLong >= 20)
+				if (cntSwitchUDLong >= PUSHTIME)
 				{ // 長押し処理
 					*data -= sign * add;
 				}
@@ -1347,7 +1400,7 @@ void dataTuningLR(int16_t *data, int16_t add, int16_t min, int16_t max)
 			if (swValTact == SW_RIGHT)
 			{
 				// インクリメント
-				if (cntSwitchLRLong >= 20)
+				if (cntSwitchLRLong >= PUSHTIME)
 				{ // 長押し処理
 					*data += sign * add;
 				}
@@ -1360,7 +1413,7 @@ void dataTuningLR(int16_t *data, int16_t add, int16_t min, int16_t max)
 			else if (swValTact == SW_LEFT)
 			{
 				// デクリメント
-				if (cntSwitchLRLong >= 20)
+				if (cntSwitchLRLong >= PUSHTIME)
 				{ // 長押し処理
 					*data -= sign * add;
 				}
@@ -1429,7 +1482,7 @@ void dataTuningUDF(float *data, float add, float min, float max)
 			if (swValTact == SW_UP)
 			{
 				// インクリメント
-				if (cntSwitchUDLong >= 20)
+				if (cntSwitchUDLong >= PUSHTIME)
 				{ // 長押し処理
 					*data += sign * add;
 				}
@@ -1442,7 +1495,7 @@ void dataTuningUDF(float *data, float add, float min, float max)
 			else if (swValTact == SW_DOWN)
 			{
 				// デクリメント
-				if (cntSwitchUDLong >= 20)
+				if (cntSwitchUDLong >= PUSHTIME)
 				{ // 長押し処理
 					*data -= sign * add;
 				}

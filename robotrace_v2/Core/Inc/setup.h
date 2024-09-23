@@ -10,6 +10,8 @@
 #define UD 0 // 5方向タクトスイッチの上下方向
 #define LR 1 // 5方向タクトスイッチの左右方向
 
+#define PUSHTIME 5 // 長押し判定時間[x50ms]
+
 #define CALIBRATIONSPEED -1500.0F // ラインセンサのキャリブレーション時の角速度[rad/s]
 
 #define HEX_START 0x0
