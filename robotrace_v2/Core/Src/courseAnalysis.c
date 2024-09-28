@@ -10,6 +10,7 @@ uint8_t optimalTrace = 0;
 uint16_t optimalIndex;
 int16_t numPPADarry; // path palanning analysis distance (PPAD)
 int16_t numPPAMarry; // path palanning analysis marker (PPAM1)
+int16_t indexSC;
 int16_t pathedMarker = 0;
 float boostSpeed;
 int32_t DistanceOptimal = 0; // 2次走行用走行距離変数
@@ -21,7 +22,7 @@ float xydegz = 0;
 AnalysisData PPAD[OPT_BUFF_SIZE];
 EventPos markerPos[OPT_BUFF_SIZE];
 Courseplot xycie;							   // xy座標値(走行中計算、ログ保存用)
-Courseplot shortCutxycie[OPT_SHORT_BUFF_SIZE]; // xy座標値(走行中計算、ログ保存用)
+Courseplot shortCutxycie[OPT_SHORT_BUFF_SIZE]; // xy座標値(目標値、ログ保存用)
 /////////////////////////////////////////////////////////////////////
 // モジュール名 calcROC
 // 処理概要     曲率半径の計算
@@ -458,16 +459,17 @@ int16_t calcXYcies(int logNumber)
 		TCHAR log[512];
 		int32_t time, marker, velo, distance;
 		float angVelo;
-		int32_t beforeTime = 0, startEnc = 0;
+		int32_t beforeTime = 0, startEnc = 0, distEnc = 0;
 		float degz = 0, degzR, velocity = 0, dt;
 		float x = 0, y = 0, xm = 0, ym = 0, degzm = 0;
 		float xValues[SHORTCUTWINDOW], yValues[SHORTCUTWINDOW], degzValues[SHORTCUTWINDOW];
-		int16_t i = 0, j = 0, indexSC = 0;
+		int16_t i = 0, j = 0;
 
 		// 配列の初期化
 		memset(&xValues, 0, sizeof(float) * SHORTCUTWINDOW);
 		memset(&yValues, 0, sizeof(float) * SHORTCUTWINDOW);
 		memset(&degzValues, 0, sizeof(float) * SHORTCUTWINDOW);
+		indexSC = 0;
 
 		// ショートカット軌跡初期値の設定
 		shortCutxycie[indexSC].x = 0;
@@ -475,18 +477,19 @@ int16_t calcXYcies(int logNumber)
 		shortCutxycie[indexSC].w = 0;
 		indexSC++;
 
-		f_printf(&fil_Plot, "xm,ym,degzm\n");
+		// f_printf(&fil_Plot, "xm,ym,degzm\n");
 
 		// ログデータ取得開始
 		while (f_gets(log, sizeof(log), &fil_Read) != NULL)
 		{
-			sscanf(log, "%d,%d,%f,%d,%d", &time, &marker, &velo, &angVelo, &distance);
+			sscanf(log, "%d,%d,%f,%d,%d", &time, &velo, &angVelo, &marker, &distance);
 
 			dt = (float)(time - beforeTime) / 1000;
 
 			degz = degz + (angVelo * dt);			   // 角度
 			degzR = degz * DEG2RAD;					   // [rad]に変換
 			velocity = (float)velo / PALSE_MILLIMETER; // 速度
+			distEnc += velo;
 
 			// 座標計算
 			x = x + (velocity * sin(degzR));
@@ -510,11 +513,11 @@ int16_t calcXYcies(int logNumber)
 			ym /= SHORTCUTWINDOW;
 			degzm /= SHORTCUTWINDOW;
 
-			if (distance - startEnc >= encMM(CALCDISTANCE_SHORTCUT))
+			if (distEnc - startEnc >= encMM(CALCDISTANCE_SHORTCUT))
 			{
 				shortCutxycie[indexSC].x = xm;
 				shortCutxycie[indexSC].y = ym;
-				startEnc = distance; // 距離計測開始位置を更新
+				startEnc = distEnc; // 距離計測開始位置を更新
 				indexSC++;
 			}
 
@@ -528,7 +531,7 @@ int16_t calcXYcies(int logNumber)
 
 		degz = 0;
 		// 初期値記録
-		f_printf(&fil_Plot, "%d,%d,%d\n", (int32_t)(shortCutxycie[0].x * 10000), (int32_t)(shortCutxycie[0].y * 10000), (int32_t)(shortCutxycie[0].w * 10000));
+		// f_printf(&fil_Plot, "%d,%d,%d\n", (int32_t)(shortCutxycie[0].x * 10000), (int32_t)(shortCutxycie[0].y * 10000), (int32_t)(shortCutxycie[0].w * 10000));
 
 		for (i = 1; i <= indexSC; i++)
 		{
@@ -551,7 +554,7 @@ int16_t calcXYcies(int logNumber)
 
 			shortCutxycie[i].w = degz; // yaw軸角度
 
-			f_printf(&fil_Plot, "%d,%d,%d\n", (int32_t)(shortCutxycie[i].x * 10000), (int32_t)(shortCutxycie[i].y * 10000), (int32_t)(shortCutxycie[i].w * 10000));
+			// f_printf(&fil_Plot, "%d,%d,%d\n", (int32_t)(shortCutxycie[i].x * 10000), (int32_t)(shortCutxycie[i].y * 10000), (int32_t)(shortCutxycie[i].w * 10000));
 			// f_printf(&fil_Plot, "%d,%d\n",(int32_t)(thetaBefore*10000),(int32_t)(theta*10000));
 
 			thetaBefore = theta; // 前回のyaw軸角度を更新

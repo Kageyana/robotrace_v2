@@ -125,9 +125,9 @@ void Interrupt1ms(void)
 		beforeCourseMarker = courseMarker;
 	}
 
-	// 走行前に処理
 	if (patternTrace < 10 || patternTrace > 100)
 	{
+		// 走行前に処理
 		getSwitches(); // スイッチの入力を取得
 		countDown();
 		cntSetup1++;
@@ -137,62 +137,28 @@ void Interrupt1ms(void)
 
 		wheelClick();
 	}
-
-	switch (cnt5)
+	else
 	{
-	case 1:
-		// xy座標計算
-		// // ショートカット走行の目標値インデックスを更新
-		// if (optimalTrace == BOOST_SHORTCUT && DistanceOptimal > 0) {
-		//     // calcXYcie(encCurrentN,BMI088val.gyro.z, DEFF_TIME);
-		//     // distLen = (float)encCurrentN * PALSE_MILLIMETER * 0.005; // 現在速度から5ms後の移動距離を計算
-		//     // optimalIndex = (int32_t)( encTotalOptimal / PALSE_MILLIMETER ) / CALCDISTANCE_SHORTCUT; // 50mmごとにショートカット配列を作っているので移動距離[mm]を50mmで割った商がインデクス
-		//     // if(optimalIndex+1 <= numPPADarry) {
-		//     //     optimalIndex++;
-		//     // }
-
-		//     if(targetDist - encPID < 200) {
-		//         if(optimalIndex+1 <= numPPADarry) {
-		//             optimalIndex++;
-		//         }
-		//     }
-
-		//     setShortCutTarget(); // 目標値更新
-		// }
-		break;
-	case 2:
-		break;
-	case 3:
-		break;
-	case 5:
-		// if (initIMU)
-		// {
-		// 	BMI088getAccele();
-		// }
-		cnt5 = 0;
-		break;
-	}
-
-	if (patternTrace > 11 && patternTrace < 100) // 走行中に処理
-	{
-		if (encLog >= encMM(CALCDISTANCE_SHORTCUT)) // 一定距離ごとに処理
+		// 走行中に処理
+		if (encLog >= encMM(CALCDISTANCE_SHORTCUT))
 		{
-			// static float rocCorrection = 0;
-			// // ROC計算
-			// rocCorrection = calcROC(encCurrentN, BMI088val.gyro.z, (float)cntLog / 1000);
-			// if (fabs(rocCorrection) >= 700.0F) // 直線判断
-			// {
-			// 	straightMeter += CALCDISTANCE_SHORTCUT; // 距離積算
-			// }
-			// else
-			// {
-			// 	straightMeter = 0;
-			// }
+			// 一定距離ごとに処理
+			static float rocCorrection = 0;
+			// ROC(曲率半径)計算
+			rocCorrection = calcROC(encCurrentN, BMI088val.gyro.z, (float)cntLog / 1000);
+			if (fabs(rocCorrection) >= 700.0F) // 直線判断
+			{
+				straightMeter += CALCDISTANCE_SHORTCUT; // 距離積算
+			}
+			else
+			{
+				straightMeter = 0;
+			}
 
-			// if (straightMeter >= 100) // 直線が100mm以上のとき
-			// {
-			// 	straightState = true;
-			// }
+			if (straightMeter >= 100) // 直線が100mm以上のとき
+			{
+				straightState = true;
+			}
 
 			if (modeLOG)
 			{
@@ -225,6 +191,45 @@ void Interrupt1ms(void)
 				encLog = 0;
 			}
 		}
+	}
+
+	switch (cnt5)
+	{
+	case 1:
+		// xy座標計算
+		// // ショートカット走行の目標値インデックスを更新
+		if (optimalTrace == BOOST_SHORTCUT && DistanceOptimal > 0)
+		{
+			calcXYcie(encCurrentN, BMI088val.gyro.z, DEFF_TIME);
+			// distLen = (float)encCurrentN * PALSE_MILLIMETER * 0.005; // 現在速度から5ms後の移動距離を計算
+			optimalIndex = (int32_t)(encTotalOptimal / PALSE_MILLIMETER) / CALCDISTANCE_SHORTCUT; // 50mmごとにショートカット配列を作っているので移動距離[mm]を50mmで割った商がインデクス
+			if (optimalIndex + 1 <= numPPADarry)
+			{
+				optimalIndex++;
+			}
+
+			if (targetDist - encPID < 200)
+			{
+				if (optimalIndex + 1 <= numPPADarry)
+				{
+					optimalIndex++;
+				}
+			}
+
+			setShortCutTarget(); // 目標値更新
+		}
+		break;
+	case 2:
+		break;
+	case 3:
+		break;
+	case 5:
+		// if (initIMU)
+		// {
+		// 	BMI088getAccele();
+		// }
+		cnt5 = 0;
+		break;
 	}
 
 	switch (cnt10)

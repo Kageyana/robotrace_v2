@@ -431,7 +431,7 @@ void loopSystem(void)
 
 	case 12:
 		// 目標速度設定
-		if (optimalTrace == 0)
+		if (optimalTrace == BOOST_NONE)
 		{
 			// 探索走行のとき
 			if (modeCurve == 0)

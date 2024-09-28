@@ -16,6 +16,7 @@
 #define CALCDISTANCE_SHORTCUT 10 // 距離解析ステップ(ショートカット走行)[mm]
 #define MACHINEACCELE 3.4F		 // 加速度[m/s^2]
 #define MACHINEDECREACE 3.4F	 // 減速度[m/s^2]
+#define BOOST_NONE 0			 // 1次走行
 #define BOOST_MARKER 1			 // マーカー基準2次走行
 #define BOOST_DISTANCE 2		 // 距離基準2次走行
 #define BOOST_SHORTCUT 3		 // ショートカット2次走行
@@ -53,6 +54,7 @@ extern uint8_t optimalTrace;
 extern uint16_t optimalIndex;
 extern int16_t numPPADarry;
 extern int16_t numPPAMarry;
+extern int16_t indexSC;
 extern int16_t pathedMarker;
 extern float boostSpeed;
 extern int32_t DistanceOptimal;

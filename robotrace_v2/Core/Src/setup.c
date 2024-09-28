@@ -126,6 +126,22 @@ void setup(void)
 			ssd1306_printf(Font_6x8, "Start  ");
 			ssd1306_SetCursor(30, 25);
 			ssd1306_printf(Font_11x18, "Ready?");
+			ssd1306_SetCursor(20, 50);
+			switch (optimalTrace)
+			{
+			case BOOST_NONE:
+				ssd1306_printf(Font_6x8, "BOOST NONE");
+				break;
+			case BOOST_MARKER:
+				ssd1306_printf(Font_6x8, "BOOST MARKER");
+				break;
+			case BOOST_DISTANCE:
+				ssd1306_printf(Font_6x8, "BOOST DISTANCE");
+				break;
+			case BOOST_SHORTCUT:
+				ssd1306_printf(Font_6x8, "BOOST SHORTCUT");
+				break;
+			}
 			patternCalibration = 1;
 		}
 
@@ -691,8 +707,10 @@ void setup(void)
 			ssd1306_SetCursor(80, 16);
 			ssd1306_printf(Font_6x8, "> XYcalc");
 			ssd1306_SetCursor(46, 25);
-			ssd1306_printf(Font_6x8, "index :%4d", numPPADarry);
+			ssd1306_printf(Font_6x8, "indexD:%4d", numPPADarry);
 			ssd1306_SetCursor(46, 34);
+			ssd1306_printf(Font_6x8, "indexS:%4d", indexSC);
+			ssd1306_SetCursor(46, 43);
 			ssd1306_printf(Font_6x8, "marker:%4d", numPPAMarry);
 		}
 
@@ -730,8 +748,10 @@ void setup(void)
 				optimalIndex = 0;
 				ssd1306_FillRectangle(30, 25, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(46, 25);
-				ssd1306_printf(Font_6x8, "index :%4d", numPPADarry);
+				ssd1306_printf(Font_6x8, "indexD:%4d", numPPADarry);
 				ssd1306_SetCursor(46, 34);
+				ssd1306_printf(Font_6x8, "indexS:%4d", indexSC);
+				ssd1306_SetCursor(46, 43);
 				ssd1306_printf(Font_6x8, "marker:%4d", numPPAMarry);
 			}
 			else
