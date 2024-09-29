@@ -31,6 +31,7 @@ typedef struct
 	float zg;
 	int16_t targetSpeed;
 	int16_t opIndex;
+	int16_t spare;
 } logData;
 logData logVal[BUFFER_SIZW_LOG];
 #endif
@@ -316,10 +317,10 @@ void writeLogBufferPrint(void)
 		logVal[logValIndex].time = cntLog;
 		logVal[logValIndex].speed = encCurrentN;
 		logVal[logValIndex].zg = BMI088val.gyro.z;
-		// logVal[logValIndex].opIndex = optimalIndex;
-		// logVal[logValIndex].targetSpeed = targetSpeed;
+		logVal[logValIndex].opIndex = optimalIndex;
+		logVal[logValIndex].targetSpeed = targetSpeed;
 		logVal[logValIndex].opIndex = (int32_t)(motorCurrentL * 10000);
-		logVal[logValIndex].targetSpeed = (int32_t)(motorCurrentR * 10000);
+		// logVal[logValIndex].targetSpeed = (int32_t)(motorCurrentR * 10000);
 		logValIndex++;
 	}
 }

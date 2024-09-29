@@ -457,6 +457,7 @@ int16_t calcXYcies(int logNumber)
 	{
 		// ログデータの取得
 		TCHAR log[512];
+		uint8_t plotStr[128];
 		int32_t time, marker, velo, distance;
 		float angVelo;
 		int32_t beforeTime = 0, startEnc = 0, distEnc = 0;
@@ -477,18 +478,19 @@ int16_t calcXYcies(int logNumber)
 		shortCutxycie[indexSC].w = 0;
 		indexSC++;
 
-		// f_printf(&fil_Plot, "xm,ym,degzm\n");
+		// plotファイルのヘッダ書き込み
+		f_printf(&fil_Plot, "xm,ym,degzm\n");
 
 		// ログデータ取得開始
 		while (f_gets(log, sizeof(log), &fil_Read) != NULL)
 		{
 			sscanf(log, "%d,%d,%f,%d,%d", &time, &velo, &angVelo, &marker, &distance);
 
-			dt = (float)(time - beforeTime) / 1000;
+			dt = (float)(time - beforeTime) / 1000;		// 時間[s]
 
-			degz = degz + (angVelo * dt);			   // 角度
-			degzR = degz * DEG2RAD;					   // [rad]に変換
-			velocity = (float)velo / PALSE_MILLIMETER; // 速度
+			degz = degz + (angVelo * dt);			   	// 角度
+			degzR = degz * DEG2RAD;					   	// [rad]に変換
+			velocity = (float)velo / PALSE_MILLIMETER;	// 速度
 			distEnc += velo;
 
 			// 座標計算
@@ -512,7 +514,6 @@ int16_t calcXYcies(int logNumber)
 			xm /= SHORTCUTWINDOW;
 			ym /= SHORTCUTWINDOW;
 			degzm /= SHORTCUTWINDOW;
-
 			if (distEnc - startEnc >= encMM(CALCDISTANCE_SHORTCUT))
 			{
 				shortCutxycie[indexSC].x = xm;
@@ -530,8 +531,8 @@ int16_t calcXYcies(int logNumber)
 		float theta = 0, thetaBefore = 90, thetae, tanc;
 
 		degz = 0;
-		// 初期値記録
-		// f_printf(&fil_Plot, "%d,%d,%d\n", (int32_t)(shortCutxycie[0].x * 10000), (int32_t)(shortCutxycie[0].y * 10000), (int32_t)(shortCutxycie[0].w * 10000));
+		// plotファイルに初期値記録
+		f_printf(&fil_Plot, "%d,%d,%d\n", (int32_t)(shortCutxycie[0].x * 10000), (int32_t)(shortCutxycie[0].y * 10000), (int32_t)(shortCutxycie[0].w * 10000));
 
 		for (i = 1; i <= indexSC; i++)
 		{
@@ -554,9 +555,10 @@ int16_t calcXYcies(int logNumber)
 
 			shortCutxycie[i].w = degz; // yaw軸角度
 
-			// f_printf(&fil_Plot, "%d,%d,%d\n", (int32_t)(shortCutxycie[i].x * 10000), (int32_t)(shortCutxycie[i].y * 10000), (int32_t)(shortCutxycie[i].w * 10000));
-			// f_printf(&fil_Plot, "%d,%d\n",(int32_t)(thetaBefore*10000),(int32_t)(theta*10000));
-
+			// plotファイルに書き込み
+			sprintf(plotStr,"%f,%f,%f\n",shortCutxycie[i].x,shortCutxycie[i].y,shortCutxycie[i].w);
+			f_puts(plotStr, &fil_Plot);
+			
 			thetaBefore = theta; // 前回のyaw軸角度を更新
 		}
 

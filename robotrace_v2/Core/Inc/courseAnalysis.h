@@ -15,7 +15,7 @@
 #define CALCDISTANCE 50			 // 距離解析ステップ[mm]
 #define CALCDISTANCE_SHORTCUT 10 // 距離解析ステップ(ショートカット走行)[mm]
 #define MACHINEACCELE 3.4F		 // 加速度[m/s^2]
-#define MACHINEDECREACE 3.4F	 // 減速度[m/s^2]
+#define MACHINEDECREACE 3.0F	 // 減速度[m/s^2]
 #define BOOST_NONE 0			 // 1次走行
 #define BOOST_MARKER 1			 // マーカー基準2次走行
 #define BOOST_DISTANCE 2		 // 距離基準2次走行
@@ -23,7 +23,7 @@
 #define SEARCHRANGE 150			 // 距離補正時の距離検索範囲[mm]
 #define DEG2RAD M_PI / 180.0F	 // deg→rad
 #define RAD2DEG 180.0F / M_PI	 // rad→deg
-#define SHORTCUTWINDOW 32		 // ショートカットコース生成時の移動平均サンプル数
+#define SHORTCUTWINDOW 4		 // ショートカットコース生成時の移動平均サンプル数
 
 // ファイル名
 #define FILENAME_ANALIZENUMBER "analize"

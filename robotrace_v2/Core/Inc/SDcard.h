@@ -29,8 +29,7 @@
 //====================================//
 // グローバル変数の宣言
 //====================================//
-extern int16_t fileNumbers[1000],
-	fileIndexLog, endFileIndex;
+extern int16_t fileNumbers[1000],fileIndexLog, endFileIndex;
 extern uint8_t cntLog;
 extern int32_t encLog;
 //====================================//
