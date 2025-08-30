@@ -50,6 +50,7 @@ extern uint8_t trace_test;
 // プロトタイプ宣言
 //======================================//
 void setup(void);
+void setup_sensors(void); // センサ表示とテストメニューを制御する処理
 void data_select(uint8_t *data, uint8_t button);
 void dataTuningUD(int16_t *data, int16_t add, int16_t min, int16_t max);
 void dataTuningLR(int16_t *data, int16_t add, int16_t min, int16_t max);
