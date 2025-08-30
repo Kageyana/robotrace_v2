@@ -512,6 +512,8 @@ int16_t calcXYcies(int logNumber)
 			yValues[i & (SHORTCUTWINDOW - 1)] = y;
 			degzValues[i & (SHORTCUTWINDOW - 1)] = degz;
 
+			// リングバッファの総和計算前に初期化
+			xm = ym = degzm = 0.0f; // 各周回で正しい平均値を得るためリセット
 			// リングバッファの総和を計算
 			for (j = 0; j < SHORTCUTWINDOW; j++)
 			{
