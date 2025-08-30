@@ -140,6 +140,8 @@ int16_t readLogDistance(int logNumber)
 		{
 			sscanf(log, "%d,%d,%f,%d,%d,%d,", &time, &velo, &angVelo, &marker, &distance, &roc);
 			// 解析処理
+			// marker==3: 交差線マーカー
+			// marker==2: 左マーカー。直線走行中のみカーブマーカーとして扱う
 			if (marker == 3 || (marker == 2 && straightState))
 			{
 				// カーブマーカーを通過したときにマーカー位置を記録
@@ -148,6 +150,7 @@ int16_t readLogDistance(int logNumber)
 
 				if (marker == 2 && straightState)
 				{
+				// 直線後の左マーカー検出でフラグと距離をリセット
 					straightState = false;
 					straightMeter = 0;
 				}
@@ -210,6 +213,8 @@ int16_t readLogDistance(int logNumber)
 				straightMeter = 0;
 			}
 
+			// 直線区間が100mm以上続いたら直線走行中と判定し、
+			// 次に検出する左マーカーをカーブ開始とするためのフラグを立てる
 			if (straightMeter >= 100)
 			{
 				straightState = true;
