@@ -233,7 +233,7 @@ static void setup_speed_param(void)
 			ssd1306_printf(Font_6x8, "BST acceleD:%3gm/ss", tgtParam.acceleD);
 			break;
 		}
-		case 18: // 2次走行_減速度
+		case 18: // 2次走行_ショートカット
 		{
 			dataTuningUDF(&tgtParam.shortCut, 0.1, 0.0, 10.0);
 			ssd1306_SetCursor(0, 24);
