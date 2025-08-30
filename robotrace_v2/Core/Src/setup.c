@@ -1863,10 +1863,10 @@ void wheelClick(void)
 		}
 		break;
 
-        case 4:
-                motorPwmOut(0, 0);
-                clickStart = 0;
-                pattern.click = 1;
-                break;
-        }
+	case 4:
+		motorPwmOut(0, 0);
+		clickStart = 0;
+		pattern.click = 1;
+		break;
+	}
 }
