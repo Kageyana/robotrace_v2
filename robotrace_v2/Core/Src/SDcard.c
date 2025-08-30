@@ -17,12 +17,14 @@ uint8_t columnTitle[512] = "", formatLog[256] = "";
 
 // ログバッファ
 #ifdef LOG_RUNNING_WRITE
-uint8_t logBuffer[2][BUFFER_SIZE_LOG];
+#define LOG_BUFFER_SIZE (512 * 4) // バッファ増量
+#define LOG_BUFFER_COUNT 4        // バッファ増量
+uint8_t logBuffer[LOG_BUFFER_COUNT][LOG_BUFFER_SIZE]; // バッファ増量
 uint8_t *activeBuf = logBuffer[0]; // 書き込み中のバッファ
-uint8_t *flushBuf = logBuffer[1];  // SD書き込み待ちバッファ
+uint8_t activeIndex = 0;          // 現在のバッファ番号
+uint8_t flushIndex = 0;           // SD書き込み待ちバッファ番号
 int16_t logBuffIndex = 0;          // 一時記録バッファ書込アドレス
-uint32_t logBuffSendIndex = 0;     // flushBufに溜まったバイト数
-bool sendSD = false;               // flushBufをSDへ送るフラグ
+bool sendSD = false;               // SD書き込み要求フラグ
 uint16_t cntSend = 0;
 uint8_t *logaddress;
 #else
@@ -269,17 +271,17 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 			send32bit(ftoi.i);
 		}
 		va_end(args);
-		cntSend++;
+		cntSend++; // 書き込み回数をカウント
 
-		// バッファが512バイト付近まで溜まったら確認
-		if (logBuffIndex + LOG_SIZE > BUFFER_SIZE_LOG && !sendSD)
+		// バッファ容量を超えたらリングバッファを進める
+		if (logBuffIndex + LOG_SIZE > LOG_BUFFER_SIZE)
 		{
-			logBuffSendIndex = logBuffIndex;         // 書き込み待ちバッファのサイズを記録
-			uint8_t *tmp = flushBuf;                 // flushBufのポインタを退避
-			flushBuf = activeBuf;                    // 現在のバッファをflushBufに切り替え
-			activeBuf = tmp;                         // 退避したバッファを新たなactiveに
-			logBuffIndex = 0;                        // 新バッファの書込位置をリセット
-			sendSD = true;                           // SD書き込みを要求
+			logBuffIndex = 0;                                        // 書込位置をリセット
+			activeIndex = (activeIndex + 1) % LOG_BUFFER_COUNT;      // リングバッファ切替
+			if (activeIndex == flushIndex)                           // 追い越し防止
+				flushIndex = (flushIndex + 1) % LOG_BUFFER_COUNT; // 最古のデータを更新
+			activeBuf = logBuffer[activeIndex];                      // アクティブバッファ更新
+			sendSD = true;                                           // SD書き込みを要求
 		}
 	}
 }
@@ -293,14 +295,17 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 #ifdef LOG_RUNNING_WRITE
 void writeLogPuts(void)
 {
-	uint32_t writtenlog = 0;
+	UINT writtenlog = 0; // 実際に書き込んだサイズ
 
 	if (modeLOG)
 	{
-		if (sendSD)
+		if (sendSD) // 書き込み要求がある場合
 		{
-			f_write(&fil_W, flushBuf, logBuffSendIndex, writtenlog); // flushBufをSDへ書き出す
-			sendSD = false;                                         // 書き込み完了フラグをクリア
+			// 未書き込みバッファをSDカードへ転送
+			f_write(&fil_W, logBuffer[flushIndex], LOG_BUFFER_SIZE, &writtenlog); // リングバッファから書き出し
+			flushIndex = (flushIndex + 1) % LOG_BUFFER_COUNT;                     // 次のバッファへ
+			if (flushIndex == activeIndex)                                       // 全バッファ書き込み済みなら終了
+				sendSD = false;
 		}
 	}
 }
@@ -395,7 +400,8 @@ void endLog(void)
 	FIL fil;
 	uint8_t log[LOG_SIZE];
 	uint8_t logStr[256];
-	uint16_t readByte, writtenlog, j, cnt;
+	UINT readByte, writtenlog; // FatFsの読み書きサイズ
+	uint16_t j, cnt;
 	uint16_t marker, time, beforeTime = 0, speed, beforeSpeed = 0;
 	uint32_t distance;
 	float dt, zg;
@@ -410,9 +416,10 @@ void endLog(void)
 	uint32_t logval32[10];
 	float logvalf[10];
 
-	logBuffSendIndex = logBuffIndex;							// バッファのバイト数を記録
-	f_write(&fil_W, activeBuf, logBuffSendIndex, writtenlog); // アクティブバッファの残りをSDカードに送信
-	f_close(&fil_W);                                                                                        // 一時ファイルを閉じる
+	while (sendSD)                                                                          // 溜まったバッファをすべて書き出す
+		writeLogPuts();                                                                 // リングバッファ書き込み
+	f_write(&fil_W, logBuffer[activeIndex], logBuffIndex, &writtenlog); // 残りのデータを送信
+	f_close(&fil_W);                                                                        // 一時ファイルを閉じる
 
 	createLog(); // ログファイル(csv)を作成
 
