@@ -52,6 +52,7 @@ int32_t encClick = 0;
 //======================================//
 static void setup_sensors(void); // センサ表示とテストメニューを制御する処理
 static void setup_pid_trace(void); // ゲイン調整(直線トレース)
+static void setup_pid_dist(void); // ゲイン調整(距離)
 static void setup_pid_angle(void); // ゲイン調整(角度)
 static void setup_pid_angular(void); // ゲイン調整(角速度)
 static void setup_pid_speed(void); // ゲイン調整(速度)
@@ -354,6 +355,75 @@ static void setup_sensors(void)
 	}
 	beforeSensors = patternSensors;	// 選択状態の更新
 }
+/////////////////////////////////////////////////////////////////////////////////////
+// モジュール名 setup_pid_dist
+// 処理概要     ゲイン調整(距離)
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////////////////////
+static void setup_pid_dist(void)
+{
+	if (patternDisplay != beforeHEX)
+	{
+		// 切替時に実行
+		ssd1306_printf(Font_6x8, "Dist PID");
+
+		ssd1306_SetCursor(0, 18);
+		ssd1306_printf(Font_7x10, "kp:");
+		ssd1306_SetCursor(0, 32);
+		ssd1306_printf(Font_7x10, "ki:");
+		ssd1306_SetCursor(0, 44);
+		ssd1306_printf(Font_7x10, "kd:");
+		ssd1306_SetCursor(60, 30);
+		ssd1306_printf(Font_7x10, "pwm:");
+
+		// 距離制御テスト用初期値
+		setTargetDist(50.0);		// 目標距離を設定[mm]
+		setTargetSpeed(0.3);		// 目標速度を設定[m/s]
+	}
+
+	// ゲイン表示
+	dataTuningUD(&patternGain, 1, 3, 1);	// 上下ボタンで調整対象を選択
+	if (trace_test == 0)	// 動作開始前のみ調整を許可
+	{
+		ssd1306_SetCursor(21, 18);
+		if (patternGain == 1)
+			ssd1306_printfB(Font_7x10, "%3d", distCtrl.kp);
+		else
+			ssd1306_printf(Font_7x10, "%3d", distCtrl.kp);
+		ssd1306_SetCursor(21, 32);
+		if (patternGain == 2)
+			ssd1306_printfB(Font_7x10, "%3d", distCtrl.ki);
+		else
+			ssd1306_printf(Font_7x10, "%3d", distCtrl.ki);
+		ssd1306_SetCursor(21, 44);
+		if (patternGain == 3)
+			ssd1306_printfB(Font_7x10, "%3d", distCtrl.kd);
+		else
+			ssd1306_printf(Font_7x10, "%3d", distCtrl.kd);
+
+		// 制御量表示
+		ssd1306_SetCursor(88, 30);
+		ssd1306_printf(Font_7x10, "%4d", distCtrl.pwm);	// 出力PWM値
+
+		switch (patternGain)	// 選択したゲインを変更
+		{
+		case 1:
+			// kp
+			dataTuningLR(&distCtrl.kp, 1, 0, 255);
+			break;
+		case 2:
+			// ki
+			dataTuningLR(&distCtrl.ki, 1, 0, 255);
+			break;
+		case 3:
+			// kd
+			dataTuningLR(&distCtrl.kd, 1, 0, 255);
+			break;
+		}
+	}
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_pid_trace
 // 処理概要     ゲイン調整(直線トレース)
@@ -1258,71 +1328,14 @@ void setup(void)
 		setup_pid_angle(); // ゲイン調整(角度)
 		break;
 	}
-	//------------------------------------------------------------------
-	// ゲイン調整(距離)
-	//------------------------------------------------------------------
-	case HEX_PID_DIST:
-	{
-		if (patternDisplay != beforeHEX)
-		{
-			// 切替時に実行
-			ssd1306_printf(Font_6x8, "Dist PID");
-
-			ssd1306_SetCursor(0, 18);
-			ssd1306_printf(Font_7x10, "kp:");
-			ssd1306_SetCursor(0, 32);
-			ssd1306_printf(Font_7x10, "ki:");
-			ssd1306_SetCursor(0, 44);
-			ssd1306_printf(Font_7x10, "kd:");
-			ssd1306_SetCursor(60, 30);
-			ssd1306_printf(Font_7x10, "pwm:");
-
-			setTargetDist(50.0);
-			setTargetSpeed(0.3);
-		}
-
-		// ゲイン表示
-		dataTuningUD(&patternGain, 1, 3, 1);
-		if (trace_test == 0)
-		{
-			ssd1306_SetCursor(21, 18);
-			if (patternGain == 1)
-				ssd1306_printfB(Font_7x10, "%3d", distCtrl.kp);
-			else
-				ssd1306_printf(Font_7x10, "%3d", distCtrl.kp);
-			ssd1306_SetCursor(21, 32);
-			if (patternGain == 2)
-				ssd1306_printfB(Font_7x10, "%3d", distCtrl.ki);
-			else
-				ssd1306_printf(Font_7x10, "%3d", distCtrl.ki);
-			ssd1306_SetCursor(21, 44);
-			if (patternGain == 3)
-				ssd1306_printfB(Font_7x10, "%3d", distCtrl.kd);
-			else
-				ssd1306_printf(Font_7x10, "%3d", distCtrl.kd);
-
-			// 制御量表示
-			ssd1306_SetCursor(88, 30);
-			ssd1306_printf(Font_7x10, "%4d", distCtrl.pwm);
-
-			switch (patternGain)
-			{
-			case 1:
-				// kp
-				dataTuningLR(&distCtrl.kp, 1, 0, 255);
-				break;
-			case 2:
-				// ki
-				dataTuningLR(&distCtrl.ki, 1, 0, 255);
-				break;
-			case 3:
-				// kd
-				dataTuningLR(&distCtrl.kd, 1, 0, 255);
-				break;
-			}
-		}
-		break;
-	}
+        //------------------------------------------------------------------
+        // ゲイン調整(距離)
+        //------------------------------------------------------------------
+        case HEX_PID_DIST:
+        {
+                setup_pid_dist(); // 距離PID調整処理を実行
+                break;
+        }
 
 	default:
 	{
