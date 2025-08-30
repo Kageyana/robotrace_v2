@@ -56,6 +56,7 @@ static void setup_pid_dist(void); // ゲイン調整(距離)
 static void setup_pid_angle(void); // ゲイン調整(角度)
 static void setup_pid_angular(void); // ゲイン調整(角速度)
 static void setup_pid_speed(void); // ゲイン調整(速度)
+static void setup_start(void); // スタート待ち画面とキャリブレーションを制御する処理
 static void setup_log(void); // ログ解析と表示を制御
 static void setup_calibration(void); // キャリブレーション(ラインセンサ)
 static void setup_speed_param(void); // 速度パラメータ調整
@@ -1102,6 +1103,143 @@ static void setup_log(void)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
+// モジュール名 setup_start
+// 処理概要     スタート待ち画面とキャリブレーションを制御
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////////////////
+static void setup_start(void)
+{
+	if (patternDisplay != beforeHEX)
+	{
+		// 切替時にスタート画面とブースト設定を表示
+		ssd1306_printf(Font_6x8, "Start  ");
+		ssd1306_SetCursor(30, 25);
+		ssd1306_printf(Font_11x18, "Ready?");
+		ssd1306_SetCursor(20, 50);
+		switch (optimalTrace)
+		{
+		case BOOST_NONE:
+			ssd1306_printf(Font_6x8, "BOOST NONE");
+			break;
+		case BOOST_MARKER:
+			ssd1306_printf(Font_6x8, "BOOST MARKER");
+			break;
+		case BOOST_DISTANCE:
+			ssd1306_printf(Font_6x8, "BOOST DISTANCE");
+			break;
+		case BOOST_SHORTCUT:
+			ssd1306_printf(Font_6x8, "BOOST SHORTCUT");
+			break;
+		}
+		patternCalibration = 1;
+	}
+
+	// キャリブレーションの進行状況に応じて処理を分岐
+	switch (patternCalibration)
+	{
+	case 1: // スイッチ入力待ち
+	{
+		// 停止状態を維持
+		setTargetSpeed(0);
+
+		if (swValTact == SW_PUSH)
+		{
+			if (lSensorOffset[0] > 0)
+			{
+				// キャリブレーション実施済み
+				start = 1;
+			}
+			else
+			{
+				patternCalibration = 2;
+			}
+		}
+		else if (swValTact == SW_RIGHT)
+		{
+			// オートスタート
+			if (lSensorOffset[0] > 0)
+			{
+				// キャリブレーション実施済み
+				autoStart = 1;
+			}
+			else
+			{
+				patternCalibration = 2;
+			}
+		}
+		break;
+	}
+	case 2: // キャリブレーション未実施
+	{
+		veloCtrl.Int = 0;                                                         // I成分リセット
+		ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+		ssd1306_SetCursor(22, 28);
+		ssd1306_printf(Font_7x10, "Calibration");
+		ssd1306_SetCursor(53, 42);
+		ssd1306_printf(Font_7x10, "Now");
+		ssd1306_UpdateScreen(); // グラフィック液晶更新
+
+		trace_test = true;
+		cntSetup1 = 0;
+		enc1 = 0;
+		powerLineSensors(1); // 先に点灯させて安定させる
+
+		patternCalibration = 3;
+		break;
+	}
+	case 3: // 開始準備
+	{
+		if (cntSetup1 > 1000)
+		{
+			veloCtrl.Int = 0;                // I成分リセット
+			BMI088val.angle.z = 0.0; // 角度リセット
+			yawRateCtrl.Int = 0.0;   // I成分リセット
+			setTargetSpeed(0);               // 目標速度0[m/s]
+			enc1 = 0;
+			modeCalLinesensors = 1; // キャリブレーション開始
+			patternCalibration = 4;
+		}
+		break;
+	}
+	case 4: // 左旋回
+	{
+		setTargetAngularVelocity(CALIBRATIONSPEED);
+		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+		if (BMI088val.angle.z < -320.0)
+		{
+			patternCalibration = 5;
+		}
+		break;
+	}
+	case 5: // 初期位置に戻る
+	{
+		setTargetAngularVelocity(-400.0F);
+		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+		if (lSensor[5] < 1000)
+		{
+			modeCalLinesensors = 0;
+			countdown = 500;
+			patternCalibration = 6;
+		}
+		break;
+	}
+	case 6: // 停止
+	{
+		motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+		if (countdown <= 0)
+		{
+			powerLineSensors(0); // ラインセンサ消灯
+			start = 1;
+		}
+		break;
+	}
+	default:
+		break;
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup
 // 処理概要     走行前設定
 // 引数         なし
@@ -1176,131 +1314,7 @@ void setup(void)
 	//------------------------------------------------------------------
 	case HEX_START:
 	{
-		if (patternDisplay != beforeHEX)
-		{
-			// 切替時に実行
-			ssd1306_printf(Font_6x8, "Start  ");
-			ssd1306_SetCursor(30, 25);
-			ssd1306_printf(Font_11x18, "Ready?");
-			ssd1306_SetCursor(20, 50);
-			switch (optimalTrace)
-			{
-			case BOOST_NONE:
-				ssd1306_printf(Font_6x8, "BOOST NONE");
-				break;
-			case BOOST_MARKER:
-				ssd1306_printf(Font_6x8, "BOOST MARKER");
-				break;
-			case BOOST_DISTANCE:
-				ssd1306_printf(Font_6x8, "BOOST DISTANCE");
-				break;
-			case BOOST_SHORTCUT:
-				ssd1306_printf(Font_6x8, "BOOST SHORTCUT");
-				break;
-			}
-			patternCalibration = 1;
-		}
-
-		switch (patternCalibration)
-		{
-		case 1: // スイッチ入力待ち
-		{
-			setTargetSpeed(0);
-
-			if (swValTact == SW_PUSH)
-			{
-				if (lSensorOffset[0] > 0)
-				{
-					// キャリブレーション実施済み
-					start = 1;
-				}
-				else
-				{
-					patternCalibration = 2;
-				}
-			}
-			else if (swValTact == SW_RIGHT)
-			{
-				// オートスタート
-				if (lSensorOffset[0] > 0)
-				{
-					// キャリブレーション実施済み
-					autoStart = 1;
-				}
-				else
-				{
-					patternCalibration = 2;
-				}
-			}
-			break;
-		}
-		case 2: // キャリブレーション未実施
-		{
-			veloCtrl.Int = 0;							  // I成分リセット
-			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-			ssd1306_SetCursor(22, 28);
-			ssd1306_printf(Font_7x10, "Calibration");
-			ssd1306_SetCursor(53, 42);
-			ssd1306_printf(Font_7x10, "Now");
-			ssd1306_UpdateScreen(); // グラフィック液晶更新
-
-			trace_test = true;
-			cntSetup1 = 0;
-			enc1 = 0;
-			powerLineSensors(1); // 先に点灯させて安定させる
-
-			patternCalibration = 3;
-			break;
-		}
-		case 3: // 開始準備
-		{
-			if (cntSetup1 > 1000)
-			{
-				veloCtrl.Int = 0;		 // I成分リセット
-				BMI088val.angle.z = 0.0; // 角度リセット
-				yawRateCtrl.Int = 0.0;	 // I成分リセット
-				setTargetSpeed(0);		 // 目標速度0[m/s]
-				enc1 = 0;
-				modeCalLinesensors = 1; // キャリブレーション開始
-				patternCalibration = 4;
-			}
-			break;
-		}
-		case 4: // 左旋回
-		{
-			setTargetAngularVelocity(CALIBRATIONSPEED);
-			motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-			if (BMI088val.angle.z < -320.0)
-			{
-				patternCalibration = 5;
-			}
-			break;
-		}
-		case 5: // 初期位置に戻る
-		{
-			setTargetAngularVelocity(-400.0F);
-			motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-			if (lSensor[5] < 1000)
-			{
-				modeCalLinesensors = 0;
-				countdown = 500;
-				patternCalibration = 6;
-			}
-			break;
-		}
-		case 6: // 停止
-		{
-			motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
-			if (countdown <= 0)
-			{
-				powerLineSensors(0); // ラインセンサ消灯
-				start = 1;
-			}
-			break;
-		}
-		default:
-			break;
-		}
+		setup_start(); // スタート待ち画面とキャリブレーションを制御
 		break;
 	}
 	//------------------------------------------------------------------
