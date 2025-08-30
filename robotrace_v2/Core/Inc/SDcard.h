@@ -8,7 +8,7 @@
 //====================================//
 // シンボル定義
 //====================================//
-// #define LOG_RUNNING_WRITE
+#define LOG_RUNNING_WRITE
 
 #ifdef LOG_RUNNING_WRITE
 
