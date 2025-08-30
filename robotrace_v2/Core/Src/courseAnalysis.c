@@ -178,7 +178,7 @@ int16_t readLogDistance(int logNumber)
 			}
 
 			// 一定距離ごとに処理
-			if (i % (CALCDISTANCE / 10) == 0)
+			if (i > 0 && i % (CALCDISTANCE / 10) == 0) // i==0では処理しない
 			{
 				sortROC = (int16_t *)malloc(sizeof(int16_t) * cntCurR); // 計算した曲率半径カウント分の配列を作成
 				memcpy(sortROC, ROCbuff, sizeof(int16_t) * cntCurR);	// 作成した配列に曲率半径をコピーする
@@ -199,7 +199,8 @@ int16_t readLogDistance(int logNumber)
 
 				PPAD[numD].boostSpeed = asignVelocity(PPAD[numD].ROC); // 曲率半径ごとの速度を計算する
 
-				if (PPAD[i].ROC == PPAD[i - 1].ROC)
+				// 前回の曲率半径と比較(numDが1以上の場合のみ)
+				if (numD >= 1 && PPAD[numD].ROC == PPAD[numD - 1].ROC)
 				{
 					numStraight++;
 				}
