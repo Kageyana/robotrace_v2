@@ -3,6 +3,7 @@
 //====================================//
 #include "SDcard.h"
 #include "fatfs.h"
+#include <string.h>
 //====================================//
 // グローバル変数の宣
 //====================================//
@@ -616,8 +617,11 @@ void send8bit(uint8_t data)
 #ifdef LOG_RUNNING_WRITE
 void send16bit(uint16_t data)
 {
-	activeBuf[logBuffIndex++] = data >> 8; // 上位バイトを追加
-	activeBuf[logBuffIndex++] = data & 0xff; // 下位バイトを追加
+	uint8_t buf[2];        // 一時バッファに配置
+	buf[0] = data >> 8;
+	buf[1] = data & 0xff;
+	memcpy(&activeBuf[logBuffIndex], buf, sizeof(buf)); // memcpyで高速化
+	logBuffIndex += sizeof(buf);
 }
 #endif
 /////////////////////////////////////////////////////////////////////
@@ -629,10 +633,13 @@ void send16bit(uint16_t data)
 #ifdef LOG_RUNNING_WRITE
 void send32bit(uint32_t data)
 {
-	activeBuf[logBuffIndex++] = data >> 24;                    // 24-31bit
-	activeBuf[logBuffIndex++] = (data & 0x00ff0000) >> 16;     // 16-23bit
-	activeBuf[logBuffIndex++] = (data & 0x0000ff00) >> 8;      // 8-15bit
-	activeBuf[logBuffIndex++] = data & 0x000000ff;             // 0-7bit
+	uint8_t buf[4];        // 一時バッファに配置
+	buf[0] = data >> 24;
+	buf[1] = (data & 0x00ff0000) >> 16;
+	buf[2] = (data & 0x0000ff00) >> 8;
+	buf[3] = data & 0x000000ff;
+	memcpy(&activeBuf[logBuffIndex], buf, sizeof(buf)); // memcpyで高速化
+	logBuffIndex += sizeof(buf);
 }
 #endif
 /////////////////////////////////////////////////////////////////////
