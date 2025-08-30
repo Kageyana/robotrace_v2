@@ -52,6 +52,7 @@ int32_t encClick = 0;
 //======================================//
 static void setup_sensors(void); // センサ表示とテストメニューを制御する処理
 static void setup_pid_trace(void); // ゲイン調整(直線トレース)
+static void setup_pid_angular(void); // ゲイン調整(角速度)
 /////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_sensors
 // 処理概要     センサ表示とテストメニューを制御
@@ -434,6 +435,93 @@ static void setup_pid_trace(void)
 			// kd
 			dataTuningLR(&lineTraceCtrl.kd, 1, 0, 255);
 			break;
+        }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////
+// モジュール名 setup_pid_angular
+// 処理概要     ゲイン調整(角速度)
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////////////////////
+static void setup_pid_angular(void)
+{
+	if (patternDisplay != beforeHEX)
+	{
+		// 切替時に実行
+		ssd1306_printf(Font_6x8, "YawRate PID");
+
+		ssd1306_SetCursor(0, 18);
+		ssd1306_printf(Font_7x10, "kp:");
+		ssd1306_SetCursor(0, 32);
+		ssd1306_printf(Font_7x10, "ki:");
+		ssd1306_SetCursor(0, 44);
+		ssd1306_printf(Font_7x10, "kd:");
+		ssd1306_SetCursor(60, 30);
+		ssd1306_printf(Font_7x10, "pwm:");
+
+		setTargetAngularVelocity(0); // 角速度制御の目標値を初期化
+		setTargetSpeed(0);           // 速度制御の目標値を初期化
+	}
+
+	data_select(&trace_test, SW_PUSH); // トレースON/OFFを選択
+	// PUSHでトレースON/OFF
+	if (trace_test == 1)
+	{
+		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+	}
+	else
+	{
+		motorPwmOutSynth(0, 0, 0, 0);
+	}
+	if (trace_test != beforeMotorTest && trace_test == 0)
+	{
+		trace_test = 2;
+	}
+	if (trace_test == 2 && encCurrentL == 0) // ホイールの回転が停止したら0
+	{
+		trace_test = 0;
+	}
+	beforeMotorTest = trace_test;
+
+	// ゲイン表示
+	dataTuningUD(&patternGain, 1, 3, 1);
+	if (trace_test == 0)
+	{
+		ssd1306_SetCursor(21, 18);
+		if (patternGain == 1)
+		        ssd1306_printfB(Font_7x10, "%3d", yawRateCtrl.kp);
+		else
+		        ssd1306_printf(Font_7x10, "%3d", yawRateCtrl.kp);
+		ssd1306_SetCursor(21, 32);
+		if (patternGain == 2)
+		        ssd1306_printfB(Font_7x10, "%3d", yawRateCtrl.ki);
+		else
+		        ssd1306_printf(Font_7x10, "%3d", yawRateCtrl.ki);
+		ssd1306_SetCursor(21, 44);
+		if (patternGain == 3)
+		        ssd1306_printfB(Font_7x10, "%3d", yawRateCtrl.kd);
+		else
+		        ssd1306_printf(Font_7x10, "%3d", yawRateCtrl.kd);
+
+		// 制御量表示
+		ssd1306_SetCursor(88, 30);
+		ssd1306_printf(Font_7x10, "%4d", yawRateCtrl.pwm);
+
+		switch (patternGain)
+		{
+		case 1:
+		        // kp
+		        dataTuningLR(&yawRateCtrl.kp, 1, 0, 255);
+		        break;
+		case 2:
+		        // ki
+		        dataTuningLR(&yawRateCtrl.ki, 1, 0, 255);
+		        break;
+		case 3:
+		        // kd
+		        dataTuningLR(&yawRateCtrl.kd, 1, 0, 255);
+		        break;
 		}
 	}
 }
@@ -1068,84 +1156,7 @@ void setup(void)
 	//------------------------------------------------------------------
 	case HEX_PID_ANGULAR:
 	{
-		if (patternDisplay != beforeHEX)
-		{
-			// 切替時に実行
-			ssd1306_printf(Font_6x8, "YawRate PID");
-
-			ssd1306_SetCursor(0, 18);
-			ssd1306_printf(Font_7x10, "kp:");
-			ssd1306_SetCursor(0, 32);
-			ssd1306_printf(Font_7x10, "ki:");
-			ssd1306_SetCursor(0, 44);
-			ssd1306_printf(Font_7x10, "kd:");
-			ssd1306_SetCursor(60, 30);
-			ssd1306_printf(Font_7x10, "pwm:");
-
-			setTargetAngularVelocity(0);
-			setTargetSpeed(0);
-		}
-
-		data_select(&trace_test, SW_PUSH);
-		// PUSHでトレースON/OFF
-		if (trace_test == 1)
-		{
-			motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-		}
-		else
-		{
-			motorPwmOutSynth(0, 0, 0, 0);
-		}
-		if (trace_test != beforeMotorTest && trace_test == 0)
-		{
-			trace_test = 2;
-		}
-		if (trace_test == 2 && encCurrentL == 0) // ホイールの回転が停止したら0
-		{
-			trace_test = 0;
-		}
-		beforeMotorTest = trace_test;
-
-		// ゲイン表示
-		dataTuningUD(&patternGain, 1, 3, 1);
-		if (trace_test == 0)
-		{
-			ssd1306_SetCursor(21, 18);
-			if (patternGain == 1)
-				ssd1306_printfB(Font_7x10, "%3d", yawRateCtrl.kp);
-			else
-				ssd1306_printf(Font_7x10, "%3d", yawRateCtrl.kp);
-			ssd1306_SetCursor(21, 32);
-			if (patternGain == 2)
-				ssd1306_printfB(Font_7x10, "%3d", yawRateCtrl.ki);
-			else
-				ssd1306_printf(Font_7x10, "%3d", yawRateCtrl.ki);
-			ssd1306_SetCursor(21, 44);
-			if (patternGain == 3)
-				ssd1306_printfB(Font_7x10, "%3d", yawRateCtrl.kd);
-			else
-				ssd1306_printf(Font_7x10, "%3d", yawRateCtrl.kd);
-
-			// 制御量表示
-			ssd1306_SetCursor(88, 30);
-			ssd1306_printf(Font_7x10, "%4d", yawRateCtrl.pwm);
-
-			switch (patternGain)
-			{
-			case 1:
-				// kp
-				dataTuningLR(&yawRateCtrl.kp, 1, 0, 255);
-				break;
-			case 2:
-				// ki
-				dataTuningLR(&yawRateCtrl.ki, 1, 0, 255);
-				break;
-			case 3:
-				// kd
-				dataTuningLR(&yawRateCtrl.kd, 1, 0, 255);
-				break;
-			}
-		}
+		setup_pid_angular(); // 角速度PIDの設定処理を呼び出し
 		break;
 	}
 	//------------------------------------------------------------------
