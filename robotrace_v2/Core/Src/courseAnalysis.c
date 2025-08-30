@@ -121,27 +121,11 @@ int16_t readLogDistance(int logNumber)
 
 	if (fresult == FR_OK)
 	{
-		// printf("Analysis distance start\n");
-
-		// // ヘッダーの取得
-		// TCHAR     header[256];
-		// uint8_t   formatLogRead[256] = "", *tmpStr;
-
-		// f_gets(header,256,&fil_Read);
-		// tmpStr = header;
-		// while(*tmpStr != '\0') {
-		//     if (*tmpStr == (uint8_t)',') {
-		//         strcat(formatLogRead,"%d,");
-		//     }
-		//     tmpStr++;
-		// }
-
 		// ログデータの取得
 		TCHAR log[512];
 		int32_t time, marker, velo, distance, roc, i = 0;
 		float angVelo;
 		int32_t numD = 0, numM = 0, cntCurR = 0, numStraight = 0;
-		bool analysis = false;
 		static int16_t ROCbuff[600] = {0};
 		static int16_t *sortROC;
 		int32_t straightMeter = 0;
@@ -150,21 +134,12 @@ int16_t readLogDistance(int logNumber)
 		// 前処理
 		// 構造体配列の初期化
 		memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
-		// memset(&ROCbuff, 0, sizeof(float) * 500);
 
 		// ログデータ取得開始
 		while (f_gets(log, sizeof(log), &fil_Read))
 		{
 			sscanf(log, "%d,%d,%f,%d,%d,%d,", &time, &velo, &angVelo, &marker, &distance, &roc);
 			// 解析処理
-			// if (marker >= 2) {
-			//     // カーブマーカーを通過したときにマーカー位置を記録
-			//     markerPos[numM].distance = distance;
-			//     markerPos[numM].indexPPAD = numD;
-
-			//     numM++;     // マーカー解析インデックス更新
-			// }
-
 			if (marker == 3 || (marker == 2 && straightState))
 			{
 				// カーブマーカーを通過したときにマーカー位置を記録
