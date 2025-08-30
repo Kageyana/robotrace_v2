@@ -47,6 +47,10 @@ static uint8_t beforeMotorTest = 0;  // モータテストの状態を保存
 // パラメータ関連
 int16_t motorTestPwm = 200;
 int32_t encClick = 0;
+//======================================//
+// プロトタイプ宣言
+//======================================//
+static void setup_sensors(void); // センサ表示とテストメニューを制御する処理
 /////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_sensors
 // 処理概要     センサ表示とテストメニューを制御
@@ -343,8 +347,8 @@ static void setup_sensors(void)
 			beforeMotorTest = motor_test;
 			break;
 		}
-		}
-		beforeSensors = patternSensors;	// 選択状態の更新
+	}
+	beforeSensors = patternSensors;	// 選択状態の更新
 }
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup
