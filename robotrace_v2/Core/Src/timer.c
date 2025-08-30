@@ -164,31 +164,24 @@ void Interrupt1ms(void)
 			{
 				// CALCDISTANCEごとにログを保存
 #ifdef LOG_RUNNING_WRITE
-				writeLogBufferPuts(
-					LOG_NUM_8BIT,
-					LOG_NUM_16BIT,
-					LOG_NUM_32BIT,
-					LOG_NUM_FLOAT,
-					// 8bit
-					targetSpeed,
-					courseMarker,
-					// 16bit
-					cntRun,
-					encCurrentN,
-					optimalIndex,
-					(int16_t)(motorCurrentL * 10000),
-					(int16_t)(motorCurrentR * 10000),
-					lineTraceCtrl.pwm,
-					veloCtrl.pwm,
-					// 32bit
-					encTotalOptimal,
-					// float型
-					BMI088val.gyro.z);
+				LogRecord rec;	// ログ記録用構造体
+				rec.targetSpeed = targetSpeed;	// 目標速度
+				rec.courseMarker = courseMarker;	// コースマーカー
+				rec.time = (uint16_t)cntRun;	// 経過時間
+				rec.speed = encCurrentN;	// 現在速度
+				rec.optimalIndex = optimalIndex;	// ショートカットインデックス
+				rec.currentL = (int16_t)(motorCurrentL * 10000);	// 左モータ電流
+				rec.currentR = (int16_t)(motorCurrentR * 10000);	// 右モータ電流
+				rec.lineTracePwm = lineTraceCtrl.pwm;	// ライントレースPWM
+				rec.veloPwm = veloCtrl.pwm;	// 速度制御PWM
+				rec.encTotal = encTotalOptimal;	// 総エンコーダカウント
+				rec.gyroZ = BMI088val.gyro.z;	// ジャイロ角速度
+				writeLogBufferPuts(&rec);	// 構造体をバッファに書き込む
 #else
 				writeLogBufferPrint(); // バッファにログを保存
 #endif
-				cntLog = 0;
-				encLog = 0;
+				cntLog = 0;              // ログ間隔カウンタをリセット
+				encLog = 0;              // ログ距離カウンタをリセット
 			}
 		}
 	}

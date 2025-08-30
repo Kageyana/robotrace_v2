@@ -17,7 +17,23 @@
 #define LOG_NUM_16BIT 7
 #define LOG_NUM_32BIT 1
 #define LOG_NUM_FLOAT 1
-#define LOG_SIZE (LOG_NUM_8BIT * sizeof(uint8_t)) + (LOG_NUM_16BIT * sizeof(uint16_t)) + (LOG_NUM_32BIT * sizeof(uint32_t)) + (LOG_NUM_FLOAT * sizeof(float))
+
+typedef struct
+{
+	uint8_t targetSpeed;	// 目標速度
+	uint8_t courseMarker;	// コースマーカー種別
+	uint16_t time;		// 経過時間[ms]
+	int16_t speed;		// 現在速度
+	uint16_t optimalIndex;	// ショートカット用インデックス
+	int16_t currentL;	// 左モータ電流×10000
+	int16_t currentR;	// 右モータ電流×10000
+	int16_t lineTracePwm;	// ライントレースPWM
+	int16_t veloPwm;		// 速度制御PWM
+	uint32_t encTotal;	// 総エンコーダカウント
+	float gyroZ;		// ジャイロZ軸角速度
+} LogRecord;
+
+#define LOG_SIZE sizeof(LogRecord)
 
 #endif
 
@@ -43,7 +59,7 @@ void endLog(void);
 void writeMarkerPos(uint32_t distance, uint8_t marker);
 void initLog(void);
 #ifdef LOG_RUNNING_WRITE
-void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...);
+void writeLogBufferPuts(const LogRecord *rec);
 void writeLogPuts(void);
 void send8bit(uint8_t data);
 void send16bit(uint16_t data);
