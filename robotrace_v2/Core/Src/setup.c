@@ -62,6 +62,34 @@ static void setup_start(void); // スタート待ち画面とキャリブレー�
 static void setup_log(void); // ログ解析と表示を制御
 static void setup_calibration(void); // キャリブレーション(ラインセンサ)
 static void setup_speed_param(void); // 速度パラメータ調整
+static void test_motor(void); // モータテスト
+static void test_imu_deg(void); // IMU角度表示
+static void test_imu_accel(void); // IMU加速度表示
+static void test_marker(void); // マーカーセンサ
+static void test_switch(void); // タクトスイッチ
+static void test_battery(void); // バッテリ電圧
+static void test_linesensor(void); // ラインセンサ
+static void test_rgbled(void); // RGBLED
+
+typedef void (*SensorTestFunc)(void);
+typedef struct
+{
+uint8_t number;
+SensorTestFunc func;
+const char *desc;
+} SensorTest;
+
+// センサテストのテーブル {番号, 関数ポインタ, 説明文字列}
+static const SensorTest sensorTestTable[] = {
+{1, test_motor, "モータテスト"}, // モータテスト
+{2, test_imu_deg, "IMU角度表示"}, // IMU角度表示
+{3, test_imu_accel, "IMU加速度表示"}, // IMU加速度表示
+{4, test_marker, "マーカーセンサ"}, // マーカーセンサ
+{5, test_switch, "タクトスイッチ"}, // タクトスイッチ
+{6, test_battery, "バッテリ電圧"}, // バッテリ電圧
+{7, test_linesensor, "ラインセンサ"}, // ラインセンサ
+{8, test_rgbled, "RGBLED"} // RGBLED
+};
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_speed_param
 // 処理概要     速度パラメータ調整
@@ -215,7 +243,327 @@ static void setup_speed_param(void)
 	}
 	}
 
-	beforePparam = pattern.parameter1; // 選択項目を記録
+       beforePparam = pattern.parameter1; // 選択項目を記録
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+// モジュール名 test_motor
+// 処理概要     モータテスト
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////////////////
+static void test_motor(void)
+{
+	if (pattern.sensors != pattern.beforeSensors)
+	{
+		// 切替時に実行
+		ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
+		ssd1306_SetCursor(47, 16);
+		ssd1306_printf(Font_6x8, "Motor");
+		motor_test = 0;
+	}
+	// Duty表示
+	ssd1306_SetCursor(35, 30);
+	ssd1306_printf(Font_6x8, "Duty:%4d", motorTestPwm);
+
+	// Left
+	ssd1306_SetCursor(0, 42);
+	ssd1306_printf(Font_6x8, "enc:%5.0f", encTotalL / PALSE_MILLIMETER); // Encoder
+	ssd1306_SetCursor(0, 52);
+	ssd1306_printf(Font_6x8, "Cur:%5.2f", motorCurrentL); // Current
+
+	// // Right
+	ssd1306_SetCursor(70, 42);
+	ssd1306_printf(Font_6x8, "enc:%5.0f", encTotalR / PALSE_MILLIMETER); // Encoder
+	ssd1306_SetCursor(70, 52);
+	ssd1306_printf(Font_6x8, "Cur:%5.2f", motorCurrentR); // Current
+
+	dataTuningUD(&motorTestPwm, 100, -500, 500); // PWM値を調整
+	data_select(&motor_test, SW_PUSH); // モータテストの開始/停止
+	if (motor_test == 1)
+	{
+		motorPwmOut(motorTestPwm, motorTestPwm);
+	}
+	else
+	{
+		motorPwmOut(0, 0);
+	}
+
+	// motor_test 1→0のとき 2にする
+	if (motor_test != beforeMotorTest && motor_test == 0)
+	{
+		motor_test = 2;
+	}
+	// 2のときホイールの回転が止まったらmotor_test=0にする
+	if (motor_test == 2 && encCurrentL == 0)
+	{
+		motor_test = 0;
+	}
+	beforeMotorTest = motor_test; // 次回比較用に状態を保存
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+// モジュール名 test_imu_deg
+// 処理概要     IMU角度表示
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////////////////
+static void test_imu_deg(void)
+{
+	if (pattern.sensors != pattern.beforeSensors)
+	{
+		// 切替時に実行
+		ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
+		ssd1306_SetCursor(36, 16);
+		ssd1306_printf(Font_7x10, "IMU[deg]");
+		motor_test = 1;
+	}
+
+	if (!calibratIMU)
+	{
+		ssd1306_SetCursor(64, 30);
+		ssd1306_printf(Font_7x10, "xd:%6.1f", BMI088val.angle.x);
+		ssd1306_SetCursor(64, 42);
+		ssd1306_printf(Font_7x10, "yd:%6.1f", BMI088val.angle.y);
+		ssd1306_SetCursor(64, 54);
+		ssd1306_printf(Font_7x10, "zd:%6.1f", BMI088val.angle.z);
+	}
+
+	if (swValTact == SW_PUSH)
+	{
+		BMI088val.angle.x = 0;
+		BMI088val.angle.y = 0;
+		BMI088val.angle.z = 0;
+	}
+
+	if (swValTact == SW_UP)
+	{
+		ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+		ssd1306_SetCursor(22, 28);
+		ssd1306_printf(Font_7x10, "Calibration");
+		ssd1306_SetCursor(53, 42);
+		ssd1306_printf(Font_7x10, "Now");
+		ssd1306_UpdateScreen();
+
+		calibratIMU = true;
+		HAL_Delay(1000);
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+// モジュール名 test_imu_accel
+// 処理概要     IMU加速度表示
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////////////////
+static void test_imu_accel(void)
+{
+	if (pattern.sensors != pattern.beforeSensors)
+	{
+		// 切替時に実行
+		ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
+		ssd1306_SetCursor(36, 16);
+		ssd1306_printf(Font_7x10, "IMU[g]");
+	}
+
+	ssd1306_SetCursor(0, 30);
+	ssd1306_printf(Font_7x10, "xa:%6.1f", BMI088val.accele.x);
+	ssd1306_SetCursor(0, 42);
+	ssd1306_printf(Font_7x10, "ya:%6.1f", BMI088val.accele.y);
+	ssd1306_SetCursor(0, 54);
+	ssd1306_printf(Font_7x10, "za:%6.1f", BMI088val.accele.z);
+
+	ssd1306_SetCursor(64, 30);
+	ssd1306_printf(Font_7x10, "T:%4.1f", BMI088val.temp);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+// モジュール名 test_marker
+// 処理概要     マーカーセンサ
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////////////////
+static void test_marker(void)
+{
+	if (pattern.sensors != pattern.beforeSensors)
+	{
+		// 切替時に実行
+		ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
+		ssd1306_SetCursor(15, 16);
+		ssd1306_printf(Font_7x10, "Marker sensors");
+	}
+	ssd1306_SetCursor(0, 30);
+	ssd1306_printf(Font_7x10, "sensors:%d", getMarkerSensor());
+	ssd1306_SetCursor(0, 45);
+	ssd1306_printf(Font_7x10, "britght:%d", motor_test);
+
+	data_select(&motor_test, SW_PUSH);
+	if (motor_test == 1)
+	{
+		powerMarkerSensors(1);
+	}
+	else
+	{
+		powerMarkerSensors(0);
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+// モジュール名 test_switch
+// 処理概要     タクトスイッチ
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////////////////
+static void test_switch(void)
+{
+	if (pattern.sensors != pattern.beforeSensors)
+	{
+		// 切替時に実行
+		ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
+		ssd1306_SetCursor(32, 16);
+		ssd1306_printf(Font_7x10, "Switches");
+	}
+	ssd1306_SetCursor(0, 30);
+	ssd1306_printf(Font_7x10, "Board SW:%d", swValMainTact);
+
+	ssd1306_SetCursor(0, 42);
+	ssd1306_printf(Font_7x10, "5axis SW:%d", swValTact);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+// モジュール名 test_battery
+// 処理概要     バッテリ電圧
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////////////////
+static void test_battery(void)
+{
+	if (pattern.sensors != pattern.beforeSensors)
+	{
+		// 切替時に実行
+		ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
+		ssd1306_SetCursor(32, 16);
+		ssd1306_printf(Font_7x10, "Battery");
+	}
+	ssd1306_SetCursor(0, 30);
+	ssd1306_printf(Font_7x10, "batteryADAD:%d", batteryAD);
+
+	ssd1306_SetCursor(0, 42);
+	ssd1306_printf(Font_7x10, "BatteryLv:%d", batteryLevel);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+// モジュール名 test_linesensor
+// 処理概要     ラインセンサ
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////////////////
+static void test_linesensor(void)
+{
+	if (pattern.sensors != pattern.beforeSensors)
+	{
+		// 切替時に実行
+		ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
+		// センサ基板形状
+		ssd1306_DrawArc(64, 81, 66, 90, 270, White);
+		ssd1306_DrawArc(64, 81, 35, 90, 270, White);
+		ssd1306_Line(2, 63, 34, 63, White);
+		ssd1306_Line(93, 63, 126, 63, White);
+		motor_test = 0;
+	}
+
+	if (lSensorOffset[0] > 0 && modeCalLinesensors == 0)
+	{
+		ssd1306_SetCursor(37, 22);
+		ssd1306_printf(Font_6x8, "%4d", lSensorCari[4]);
+		ssd1306_SetCursor(31, 30);
+		ssd1306_printf(Font_6x8, "%4d", lSensorCari[3]);
+		ssd1306_SetCursor(22, 38);
+		ssd1306_printf(Font_6x8, "%4d", lSensorCari[2]);
+		ssd1306_SetCursor(13, 46);
+		ssd1306_printf(Font_6x8, "%4d", lSensorCari[1]);
+		ssd1306_SetCursor(6, 54);
+		ssd1306_printf(Font_6x8, "%4d", lSensorCari[0]);
+
+		ssd1306_SetCursor(65, 22);
+		ssd1306_printf(Font_6x8, "%4d", lSensorCari[5]);
+		ssd1306_SetCursor(71, 30);
+		ssd1306_printf(Font_6x8, "%4d", lSensorCari[6]);
+		ssd1306_SetCursor(80, 38);
+		ssd1306_printf(Font_6x8, "%4d", lSensorCari[7]);
+		ssd1306_SetCursor(89, 46);
+		ssd1306_printf(Font_6x8, "%4d", lSensorCari[8]);
+		ssd1306_SetCursor(95, 54);
+		ssd1306_printf(Font_6x8, "%4d", lSensorCari[9]);
+	}
+	else
+	{
+		ssd1306_SetCursor(37, 22);
+		ssd1306_printf(Font_6x8, "%4d", lSensor[4]);
+		ssd1306_SetCursor(31, 30);
+		ssd1306_printf(Font_6x8, "%4d", lSensor[3]);
+		ssd1306_SetCursor(22, 38);
+		ssd1306_printf(Font_6x8, "%4d", lSensor[2]);
+		ssd1306_SetCursor(13, 46);
+		ssd1306_printf(Font_6x8, "%4d", lSensor[1]);
+		ssd1306_SetCursor(6, 54);
+		ssd1306_printf(Font_6x8, "%4d", lSensor[0]);
+
+		ssd1306_SetCursor(65, 22);
+		ssd1306_printf(Font_6x8, "%4d", lSensor[5]);
+		ssd1306_SetCursor(71, 30);
+		ssd1306_printf(Font_6x8, "%4d", lSensor[6]);
+		ssd1306_SetCursor(80, 38);
+		ssd1306_printf(Font_6x8, "%4d", lSensor[7]);
+		ssd1306_SetCursor(89, 46);
+		ssd1306_printf(Font_6x8, "%4d", lSensor[8]);
+		ssd1306_SetCursor(95, 54);
+		ssd1306_printf(Font_6x8, "%4d", lSensor[9]);
+	}
+
+	data_select(&motor_test, SW_PUSH);
+	if (motor_test == 1)
+	{
+		powerLineSensors(1);
+	}
+	else
+	{
+		powerLineSensors(0);
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+// モジュール名 test_rgbled
+// 処理概要     RGBLED
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////////////////
+static void test_rgbled(void)
+{
+	if (pattern.sensors != pattern.beforeSensors)
+	{
+		// 切替時に実行
+		ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
+		ssd1306_SetCursor(43, 16);
+		ssd1306_printf(Font_7x10, "RGBLED");
+	}
+
+	data_select(&motor_test, SW_PUSH);
+	if (motor_test == 1)
+	{
+		if (cntSetup2 > 50)
+		{
+			fullColorLED(10, 4);
+			cntSetup2 = 0;
+		}
+	}
+
+	if (motor_test != beforeMotorTest)
+	{
+		clearLED();
+	}
+
+	beforeMotorTest = motor_test;
 }
 /////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_sensors
@@ -228,293 +576,22 @@ static void setup_sensors(void)
 	if (pattern.display != pattern.beforeHex)
 	{
 		// ページ切替時の初期処理
-		ssd1306_printf(Font_6x8, "SENSORS  ");	// センサ画面表示
-		pattern.beforeSensors = 100;	// 初期値
+		ssd1306_printf(Font_6x8, "SENSORS  ");  // センサ画面表示
+		pattern.beforeSensors = 100;    // 初期値
 	}
 
 	// センサメニューの項目切替
-	dataTuningLR(&pattern.sensors, 1, 1, 8);
+	dataTuningLR(&pattern.sensors, 1, 1, sizeof(sensorTestTable) / sizeof(sensorTestTable[0]));
 	// 各種センサテストを実行
-	switch (pattern.sensors)
+	for (uint8_t i = 0; i < sizeof(sensorTestTable) / sizeof(sensorTestTable[0]); i++)
 	{
-	case 1: // モータテスト
-	{
-		if (pattern.sensors != pattern.beforeSensors)
+		if (pattern.sensors == sensorTestTable[i].number)
 		{
-			// 切替時に実行
-			ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
-			ssd1306_SetCursor(47, 16);
-			ssd1306_printf(Font_6x8, "Motor");
-			motor_test = 0;
+			sensorTestTable[i].func();
+			break;
 		}
-		// Duty表示
-		ssd1306_SetCursor(35, 30);
-		ssd1306_printf(Font_6x8, "Duty:%4d", motorTestPwm);
-
-		// Left
-		ssd1306_SetCursor(0, 42);
-		ssd1306_printf(Font_6x8, "enc:%5.0f", encTotalL / PALSE_MILLIMETER); // Encoder
-		ssd1306_SetCursor(0, 52);
-		ssd1306_printf(Font_6x8, "Cur:%5.2f", motorCurrentL); // Current
-
-		// // Right
-		ssd1306_SetCursor(70, 42);
-		ssd1306_printf(Font_6x8, "enc:%5.0f", encTotalR / PALSE_MILLIMETER); // Encoder
-		ssd1306_SetCursor(70, 52);
-		ssd1306_printf(Font_6x8, "Cur:%5.2f", motorCurrentR); // Current
-
-		dataTuningUD(&motorTestPwm, 100, -500, 500); // PWM値を調整
-		data_select(&motor_test, SW_PUSH); // モータテストの開始/停止
-		if (motor_test == 1)
-		{
-			motorPwmOut(motorTestPwm, motorTestPwm);
-		}
-		else
-		{
-			motorPwmOut(0, 0);
-		}
-
-		// motor_test 1→0のとき 2にする
-		if (motor_test != beforeMotorTest && motor_test == 0)
-		{
-			motor_test = 2;
-		}
-		// 2のときホイールの回転が止まったらmotor_test=0にする
-		if (motor_test == 2 && encCurrentL == 0)
-		{
-			motor_test = 0;
-		}
-		beforeMotorTest = motor_test; // 次回比較用に状態を保存
-		break;
 	}
-	case 2: // IMU角度表示
-	{
-		if (pattern.sensors != pattern.beforeSensors)
-		{
-			// 切替時に実行
-			ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
-			ssd1306_SetCursor(36, 16);
-			ssd1306_printf(Font_7x10, "IMU[deg]");
-			motor_test = 1;
-		}
-
-		if (!calibratIMU)
-		{
-			ssd1306_SetCursor(64, 30);
-			ssd1306_printf(Font_7x10, "xd:%6.1f", BMI088val.angle.x);
-			ssd1306_SetCursor(64, 42);
-			ssd1306_printf(Font_7x10, "yd:%6.1f", BMI088val.angle.y);
-			ssd1306_SetCursor(64, 54);
-			ssd1306_printf(Font_7x10, "zd:%6.1f", BMI088val.angle.z);
-		}
-
-		if (swValTact == SW_PUSH)
-		{
-			BMI088val.angle.x = 0;
-			BMI088val.angle.y = 0;
-			BMI088val.angle.z = 0;
-		}
-
-		if (swValTact == SW_UP)
-		{
-			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-			ssd1306_SetCursor(22, 28);
-			ssd1306_printf(Font_7x10, "Calibration");
-			ssd1306_SetCursor(53, 42);
-			ssd1306_printf(Font_7x10, "Now");
-			ssd1306_UpdateScreen();
-
-			calibratIMU = true;
-			HAL_Delay(1000);
-		}
-		break;
-	}
-	case 3: // IMU加速度表示
-	{
-		if (pattern.sensors != pattern.beforeSensors)
-		{
-			// 切替時に実行
-			ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
-			ssd1306_SetCursor(36, 16);
-			ssd1306_printf(Font_7x10, "IMU[g]");
-		}
-
-		ssd1306_SetCursor(0, 30);
-		ssd1306_printf(Font_7x10, "xa:%6.1f", BMI088val.accele.x);
-		ssd1306_SetCursor(0, 42);
-		ssd1306_printf(Font_7x10, "ya:%6.1f", BMI088val.accele.y);
-		ssd1306_SetCursor(0, 54);
-		ssd1306_printf(Font_7x10, "za:%6.1f", BMI088val.accele.z);
-
-		ssd1306_SetCursor(64, 30);
-		ssd1306_printf(Font_7x10, "T:%4.1f", BMI088val.temp);
-		break;
-	}
-	case 4: // マーカーセンサ
-	{
-		if (pattern.sensors != pattern.beforeSensors)
-		{
-			// 切替時に実行
-			ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
-			ssd1306_SetCursor(15, 16);
-			ssd1306_printf(Font_7x10, "Marker sensors");
-		}
-		ssd1306_SetCursor(0, 30);
-		ssd1306_printf(Font_7x10, "sensors:%d", getMarkerSensor());
-		ssd1306_SetCursor(0, 45);
-		ssd1306_printf(Font_7x10, "britght:%d", motor_test);
-
-		data_select(&motor_test, SW_PUSH);
-		if (motor_test == 1)
-		{
-			powerMarkerSensors(1);
-		}
-		else
-		{
-			powerMarkerSensors(0);
-		}
-
-		break;
-	}
-	case 5: // タクトスイッチ
-	{
-		if (pattern.sensors != pattern.beforeSensors)
-		{
-			// 切替時に実行
-			ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
-			ssd1306_SetCursor(32, 16);
-			ssd1306_printf(Font_7x10, "Switches");
-		}
-		ssd1306_SetCursor(0, 30);
-		ssd1306_printf(Font_7x10, "Board SW:%d", swValMainTact);
-
-		ssd1306_SetCursor(0, 42);
-		ssd1306_printf(Font_7x10, "5axis SW:%d", swValTact);
-
-		break;
-	}
-	case 6: // バッテリ電圧
-	{
-		if (pattern.sensors != pattern.beforeSensors)
-		{
-			// 切替時に実行
-			ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
-			ssd1306_SetCursor(32, 16);
-			ssd1306_printf(Font_7x10, "Battery");
-		}
-		ssd1306_SetCursor(0, 30);
-		ssd1306_printf(Font_7x10, "batteryADAD:%d", batteryAD);
-
-		ssd1306_SetCursor(0, 42);
-		ssd1306_printf(Font_7x10, "BatteryLv:%d", batteryLevel);
-
-		break;
-	}
-	case 7: // ラインセンサ
-	{
-		if (pattern.sensors != pattern.beforeSensors)
-		{
-			// 切替時に実行
-			ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
-			// センサ基板形状
-			ssd1306_DrawArc(64, 81, 66, 90, 270, White);
-			ssd1306_DrawArc(64, 81, 35, 90, 270, White);
-			ssd1306_Line(2, 63, 34, 63, White);
-			ssd1306_Line(93, 63, 126, 63, White);
-			motor_test = 0;
-		}
-
-		if (lSensorOffset[0] > 0 && modeCalLinesensors == 0)
-		{
-			ssd1306_SetCursor(37, 22);
-			ssd1306_printf(Font_6x8, "%4d", lSensorCari[4]);
-			ssd1306_SetCursor(31, 30);
-			ssd1306_printf(Font_6x8, "%4d", lSensorCari[3]);
-			ssd1306_SetCursor(22, 38);
-			ssd1306_printf(Font_6x8, "%4d", lSensorCari[2]);
-			ssd1306_SetCursor(13, 46);
-			ssd1306_printf(Font_6x8, "%4d", lSensorCari[1]);
-			ssd1306_SetCursor(6, 54);
-			ssd1306_printf(Font_6x8, "%4d", lSensorCari[0]);
-
-			ssd1306_SetCursor(65, 22);
-			ssd1306_printf(Font_6x8, "%4d", lSensorCari[5]);
-			ssd1306_SetCursor(71, 30);
-			ssd1306_printf(Font_6x8, "%4d", lSensorCari[6]);
-			ssd1306_SetCursor(80, 38);
-			ssd1306_printf(Font_6x8, "%4d", lSensorCari[7]);
-			ssd1306_SetCursor(89, 46);
-			ssd1306_printf(Font_6x8, "%4d", lSensorCari[8]);
-			ssd1306_SetCursor(95, 54);
-			ssd1306_printf(Font_6x8, "%4d", lSensorCari[9]);
-		}
-		else
-		{
-			ssd1306_SetCursor(37, 22);
-			ssd1306_printf(Font_6x8, "%4d", lSensor[4]);
-			ssd1306_SetCursor(31, 30);
-			ssd1306_printf(Font_6x8, "%4d", lSensor[3]);
-			ssd1306_SetCursor(22, 38);
-			ssd1306_printf(Font_6x8, "%4d", lSensor[2]);
-			ssd1306_SetCursor(13, 46);
-			ssd1306_printf(Font_6x8, "%4d", lSensor[1]);
-			ssd1306_SetCursor(6, 54);
-			ssd1306_printf(Font_6x8, "%4d", lSensor[0]);
-
-			ssd1306_SetCursor(65, 22);
-			ssd1306_printf(Font_6x8, "%4d", lSensor[5]);
-			ssd1306_SetCursor(71, 30);
-			ssd1306_printf(Font_6x8, "%4d", lSensor[6]);
-			ssd1306_SetCursor(80, 38);
-			ssd1306_printf(Font_6x8, "%4d", lSensor[7]);
-			ssd1306_SetCursor(89, 46);
-			ssd1306_printf(Font_6x8, "%4d", lSensor[8]);
-			ssd1306_SetCursor(95, 54);
-			ssd1306_printf(Font_6x8, "%4d", lSensor[9]);
-		}
-
-		data_select(&motor_test, SW_PUSH);
-		if (motor_test == 1)
-		{
-			powerLineSensors(1);
-		}
-		else
-		{
-			powerLineSensors(0);
-		}
-
-		break;
-	}
-	case 8: // RGBLED
-	{
-		if (pattern.sensors != pattern.beforeSensors)
-		{
-			// 切替時に実行
-			ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
-			ssd1306_SetCursor(43, 16);
-			ssd1306_printf(Font_7x10, "RGBLED");
-		}
-
-		data_select(&motor_test, SW_PUSH);
-		if (motor_test == 1)
-		{
-			if (cntSetup2 > 50)
-			{
-				fullColorLED(10, 4);
-				cntSetup2 = 0;
-			}
-		}
-
-		if (motor_test != beforeMotorTest)
-		{
-			clearLED();
-		}
-
-		beforeMotorTest = motor_test;
-		break;
-	}
-	}
-	pattern.beforeSensors = pattern.sensors;	// 選択状態の更新
+	pattern.beforeSensors = pattern.sensors;        // 選択状態の更新
 }
 /////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_pid_dist
