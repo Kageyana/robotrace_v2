@@ -102,6 +102,9 @@ void getLogNumber(void)
 // 処理概要     距離基準2次走行の解析
 // 引数         ログ番号(ファイル名)
 // 戻り値       最適速度配列の最大要素数
+//              -1: 解析用配列のサイズを超過
+//              -2: メモリ確保失敗
+//              -4: ログファイルのオープン失敗
 /////////////////////////////////////////////////////////////////////
 int16_t readLogDistance(int logNumber)
 {
@@ -181,8 +184,14 @@ int16_t readLogDistance(int logNumber)
 			if (i > 0 && i % (CALCDISTANCE / 10) == 0) // i==0では処理しない
 			{
 				sortROC = (int16_t *)malloc(sizeof(int16_t) * cntCurR); // 計算した曲率半径カウント分の配列を作成
-				memcpy(sortROC, ROCbuff, sizeof(int16_t) * cntCurR);	// 作成した配列に曲率半径をコピーする
-				qsort(sortROC, cntCurR, sizeof(int16_t), cmpint16_t);	// ソート
+				// メモリ確保の結果をチェックし、失敗時はエラー処理
+				if (!sortROC) { // メモリ確保失敗時の処理
+					printf("sortROC memory allocation error\n"); // エラーメッセージ表示
+					ret = -2;            // エラーコード設定
+					break;               // 未確保のため解放不要、ループを抜ける
+				}
+				memcpy(sortROC, ROCbuff, sizeof(int16_t) * cntCurR);    // 作成した配列に曲率半径をコピーする
+				qsort(sortROC, cntCurR, sizeof(int16_t), cmpint16_t);   // ソート
 
 				// 曲率半径を記録する
 				if (cntCurR % 2 == 0)
