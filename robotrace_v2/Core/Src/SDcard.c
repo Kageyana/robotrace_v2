@@ -3,6 +3,7 @@
 //====================================//
 #include "SDcard.h"
 #include "fatfs.h"
+#include <string.h>
 //====================================//
 // グローバル変数の宣
 //====================================//
@@ -18,7 +19,7 @@ uint8_t columnTitle[512] = "", formatLog[256] = "";
 #ifdef LOG_RUNNING_WRITE
 uint8_t logBuffer[BUFFER_SIZE_LOG], logBufferSend[BUFFER_SIZE_LOG];
 uint8_t *logBufferPointa; // RAM保存バッファ用ポインタ
-int16_t logBuffIndex = 0; // 一時記録バッファ書込アドレス
+int16_t logBuffIndex = 0;		// 書き込みバッファをリセット // 一時記録バッファ書込アドレス
 uint32_t logBuffSendIndex = 0;
 bool sendSD = false;
 uint16_t cntSend = 0;
@@ -236,48 +237,26 @@ void initLog(void)
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogBufferPuts
 // 処理概要     保存する変数をバッファに転送する
-// 引数         c:8bit変数の数s:16bit変数の数i:32bit変数の数f:float変数の数
+// 引数         rec: ログレコード
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 #ifdef LOG_RUNNING_WRITE
-void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
+void writeLogBufferPuts(const LogRecord *rec)
 {
-	va_list args;
-	uint8_t cnt = 0;
-	static union
-	{
-		float f;
-		uint32_t i;
-	} ftoi;
-
 	if (modeLOG)
 	{
-		// 	バッファ配列に保存
-		va_start(args, f);
-		// logBuffer[0] = va_arg( args, uint8_t* );
-		for (cnt = 0; cnt < c; cnt++)
-			send8bit(va_arg(args, uint32_t));
-		for (cnt = 0; cnt < s; cnt++)
-			send16bit(va_arg(args, uint32_t));
-		for (cnt = 0; cnt < i; cnt++)
-			send32bit(va_arg(args, uint32_t));
-		for (cnt = 0; cnt < f; cnt++)
-		{
-			ftoi.f = va_arg(args, double); // 共用体を使用してfloat型のビット操作をできるようにする
-			send32bit(ftoi.i);
-		}
-		va_end(args);
-		cntSend++;
+		memcpy(logBuffer + logBuffIndex, rec, sizeof(LogRecord));	// 構造体をバッファへコピー
+		logBuffIndex += sizeof(LogRecord);	// コピーしたサイズ分インデックスを進める
+		cntSend++;                              // 送信回数を記録
 
-		// バッファが512バイト付近まで溜まったら確認
-		if (logBuffIndex + LOG_SIZE > 512 && !sendSD)
+		if (logBuffIndex + LOG_SIZE > 512 && !sendSD)	// 512バイト(1セクタ)超で送信準備
 		{
-			logBuffSendIndex = logBuffIndex;					// バッファのバイト数を記録
-			memcpy(logBufferSend, logBuffer, logBuffSendIndex); // 送信用配列にコピー
-
-			logBuffIndex = 0;			 // バイト数リセット
-			logBufferPointa = logBuffer; // バッファ配列の先頭アドレスを設定
-			sendSD = true;				 // 送信開始
+			logBuffSendIndex = logBuffIndex;        // 送信バイト数を保存
+			memcpy(logBufferSend, logBuffer, logBuffSendIndex);     // 送信用配列にコピー
+			
+			logBuffIndex = 0;		// 書き込みバッファをリセット
+			logBufferPointa = logBuffer;	// バッファ先頭にポインタを戻す
+			sendSD = true;          // SDカード送信を指示
 		}
 	}
 }
@@ -408,10 +387,10 @@ void endLog(void)
 	uint32_t logval32[10];
 	float logvalf[10];
 
-	logBuffSendIndex = logBuffIndex;							  // バッファのバイト数を記録
-	memcpy(logBufferSend, logBuffer, logBuffSendIndex);			  // 送信用配列にコピー
+	logBuffSendIndex = logBuffIndex;        // 送信バイト数を保存
+	memcpy(logBufferSend, logBuffer, logBuffSendIndex);     // 送信用配列にコピー
 	f_write(&fil_W, logBufferSend, logBuffSendIndex, writtenlog); // 残りのログをSDカードに送信
-	f_close(&fil_W);											  // 一時ファイルを閉じる
+	f_close(&fil_W);        // 一時ファイルを閉じる
 
 	createLog(); // ログファイル(csv)を作成
 
