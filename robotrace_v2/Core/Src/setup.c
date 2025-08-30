@@ -57,6 +57,163 @@ static void setup_pid_angle(void); // ゲイン調整(角度)
 static void setup_pid_angular(void); // ゲイン調整(角速度)
 static void setup_pid_speed(void); // ゲイン調整(速度)
 static void setup_log(void); // ログ解析と表示を制御
+static void setup_calibration(void); // キャリブレーション(ラインセンサ)
+static void setup_speed_param(void); // 速度パラメータ調整
+///////////////////////////////////////////////////////////////////////////////////////
+// モジュール名 setup_speed_param
+// 処理概要     速度パラメータ調整
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////////////////
+static void setup_speed_param(void)
+{
+	static uint8_t beforePparam = 0; // 前回のパラメータ項目を保持
+
+	if (patternDisplay != beforeHEX)
+	{
+		// 切替時に実行
+		ssd1306_printf(Font_6x8, "Parameter");
+	}
+
+	dataTuningLR(&patternParameter1, 1, 1, 18); // パラメータ項目切替
+
+	if (beforePparam != patternParameter1)
+	{
+		ssd1306_FillRectangle(0, 16, 127, 63, Black);
+	}
+
+	switch (patternParameter1)
+	{
+	case 1: // 通常走行速度
+	{
+		dataTuningUDF(&tgtParam.straight, 0.1, 0.0, 10.0);
+		ssd1306_SetCursor(0, 24);
+		ssd1306_printf(Font_6x8, "STRAIGHT:%3gm/s", tgtParam.straight);
+		break;
+	}
+	case 2: // 停止速度
+	{
+		dataTuningUDF(&tgtParam.curve, 0.1, 0.0, 10.0);
+		ssd1306_SetCursor(0, 24);
+		ssd1306_printf(Font_6x8, "CURVE:%3gm/s", tgtParam.curve);
+		break;
+	}
+	case 3: // 停止速度
+	{
+		dataTuningUDF(&tgtParam.stop, 0.1, 0.0, 10.0);
+		ssd1306_SetCursor(0, 24);
+		ssd1306_printf(Font_6x8, "STOP:%3gm/s", tgtParam.stop);
+		break;
+	}
+	case 4: // 2次走行_直線
+	{
+		dataTuningUDF(&tgtParam.bstStraight, 0.1, 0.0, 10.0);
+		ssd1306_SetCursor(0, 24);
+		ssd1306_printf(Font_6x8, "BST STRT:%3gm/s", tgtParam.bstStraight);
+		break;
+	}
+	case 5: // 2次走行_R1500
+	{
+		dataTuningUDF(&tgtParam.bst1500, 0.1, 0.0, 10.0);
+		ssd1306_SetCursor(0, 24);
+		ssd1306_printf(Font_6x8, "BST 1500:%3gm/s", tgtParam.bst1500);
+		break;
+	}
+	case 6: // 2次走行_R1300
+	{
+		dataTuningUDF(&tgtParam.bst1300, 0.1, 0.0, 10.0);
+		ssd1306_SetCursor(0, 24);
+		ssd1306_printf(Font_6x8, "BST 1300:%3gm/s", tgtParam.bst1300);
+		break;
+	}
+	case 7: // 2次走行_R1000
+	{
+		dataTuningUDF(&tgtParam.bst1000, 0.1, 0.0, 10.0);
+		ssd1306_SetCursor(0, 24);
+		ssd1306_printf(Font_6x8, "BST 1000:%3gm/s", tgtParam.bst1000);
+		break;
+	}
+	case 8: // 2次走行_R800
+	{
+		dataTuningUDF(&tgtParam.bst800, 0.1, 0.0, 10.0);
+		ssd1306_SetCursor(0, 24);
+		ssd1306_printf(Font_6x8, "BST 800:%3gm/s", tgtParam.bst800);
+		break;
+	}
+	case 9: // 2次走行_R700
+	{
+		dataTuningUDF(&tgtParam.bst700, 0.1, 0.0, 10.0);
+		ssd1306_SetCursor(0, 24);
+		ssd1306_printf(Font_6x8, "BST 700:%3gm/s", tgtParam.bst700);
+		break;
+	}
+	case 10: // 2次走行_R600
+	{
+		dataTuningUDF(&tgtParam.bst600, 0.1, 0.0, 10.0);
+		ssd1306_SetCursor(0, 24);
+		ssd1306_printf(Font_6x8, "BST 600:%3gm/s", tgtParam.bst600);
+		break;
+	}
+	case 11: // 2次走行_R500
+	{
+		dataTuningUDF(&tgtParam.bst500, 0.1, 0.0, 10.0);
+		ssd1306_SetCursor(0, 24);
+		ssd1306_printf(Font_6x8, "BST 500:%3gm/s", tgtParam.bst500);
+		break;
+	}
+	case 12: // 2次走行_R400
+	{
+		dataTuningUDF(&tgtParam.bst400, 0.1, 0.0, 10.0);
+		ssd1306_SetCursor(0, 24);
+		ssd1306_printf(Font_6x8, "BST 400:%3gm/s", tgtParam.bst400);
+		break;
+	}
+	case 13: // 2次走行_R300
+	{
+		dataTuningUDF(&tgtParam.bst300, 0.1, 0.0, 10.0);
+		ssd1306_SetCursor(0, 24);
+		ssd1306_printf(Font_6x8, "BST 300:%3gm/s", tgtParam.bst300);
+		break;
+	}
+	case 14: // 2次走行_R200
+	{
+		dataTuningUDF(&tgtParam.bst200, 0.1, 0.0, 10.0);
+		ssd1306_SetCursor(0, 24);
+		ssd1306_printf(Font_6x8, "BST 200:%3gm/s", tgtParam.bst200);
+		break;
+	}
+	case 15: // 2次走行_R100
+	{
+		dataTuningUDF(&tgtParam.bst100, 0.1, 0.0, 10.0);
+		ssd1306_SetCursor(0, 24);
+		ssd1306_printf(Font_6x8, "BST 100:%3gm/s", tgtParam.bst100);
+		break;
+	}
+	case 16: // 2次走行_加速度
+	{
+		dataTuningUDF(&tgtParam.acceleF, 0.1, 0.0, 10.0);
+		ssd1306_SetCursor(0, 24);
+		ssd1306_printf(Font_6x8, "BST acceleF:%3gm/ss", tgtParam.acceleF);
+		break;
+	}
+	case 17: // 2次走行_減速度
+	{
+		dataTuningUDF(&tgtParam.acceleD, 0.1, 0.0, 10.0);
+		ssd1306_SetCursor(0, 24);
+		ssd1306_printf(Font_6x8, "BST acceleD:%3gm/ss", tgtParam.acceleD);
+		break;
+	}
+	case 18: // 2次走行_減速度
+	{
+		dataTuningUDF(&tgtParam.shortCut, 0.1, 0.0, 10.0);
+		ssd1306_SetCursor(0, 24);
+		ssd1306_printf(Font_6x8, "BST shortCut:%3gm/s", tgtParam.shortCut);
+		break;
+	}
+	}
+
+	beforePparam = patternParameter1; // 選択項目を記録
+}
 /////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_sensors
 // 処理概要     センサ表示とテストメニューを制御
@@ -680,6 +837,85 @@ static void setup_pid_speed(void)
 		}
 	}
 }
+/////////////////////////////////////////////////////////////////////////////////////
+// モジュール名 setup_calibration
+// 処理概要     キャリブレーション(ラインセンサ)
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////////////////////
+static void setup_calibration(void)
+{
+	if (patternDisplay != beforeHEX)
+	{
+		// 切替時に実行
+		ssd1306_printf(Font_6x8, "Calibrate");
+		patternCalibration = 1;
+	}
+
+	switch (patternCalibration)
+	{
+	case 1: // スイッチ入力待ち
+	{
+		setTargetSpeed(0); // 速度をゼロに設定
+		ssd1306_SetCursor(65, 22);
+		ssd1306_printf(Font_6x8, "%4d", lSensorOffset[0]);
+
+		data_select(&trace_test, SW_PUSH); // SW_PUSH入力を監視
+		if (trace_test)
+		{
+				cntSetup1 = 0; // カウンタリセット
+				patternCalibration = 2; // 次のステップへ
+		}
+		break;
+	}
+	case 2: // 開始準備
+	{
+		if (cntSetup1 > 1000) // 一定時間待機
+		{
+			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+			ssd1306_SetCursor(22, 28);
+			ssd1306_printf(Font_7x10, "Calibration");
+			ssd1306_SetCursor(53, 42);
+			ssd1306_printf(Font_7x10, "Now");
+			ssd1306_UpdateScreen(); // グラフィック液晶更新
+
+			// 配列初期化
+			memset(&lSensorOffset, 0, sizeof(uint16_t) * NUM_SENSORS);
+
+			powerLineSensors(1);    // ラインセンサ点灯
+			modeCalLinesensors = 1; // キャリブレーション開始
+
+			// 手動で機体を動かしキャリブレーションする
+
+			patternCalibration = 3; // 次のステップへ
+		}
+		break;
+	}
+	case 3: // スイッチ押下で終了
+	{
+		data_select(&trace_test, SW_PUSH); // SW_PUSH入力を監視
+		if (!trace_test) // スイッチが離されたら
+		{
+			modeCalLinesensors = 0;                                           // キャリブレーション終了
+			powerLineSensors(0);                                              // ラインセンサ消灯
+			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+			ssd1306_UpdateScreen();                                           // グラフィック液晶更新
+
+			if (initMSD)
+			{
+				initIMU = false;
+				writeLinesenval(); // オフセット値をSDカードに書き込み
+				initIMU = true;
+			}
+			patternCalibration = 1; // 最初の状態に戻る
+		}
+		break;
+	}
+
+	default:
+	    break;
+	}
+}
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_pid_angle
 // 処理概要     ゲイン調整(角度)
@@ -873,9 +1109,9 @@ static void setup_log(void)
 ///////////////////////////////////////////////////////////////////////////////////////
 void setup(void)
 {
-        uint8_t cntLed, i, j, k;
-        static uint8_t beforePparam, beforeBATLV;
-        static int16_t x = 0;
+	uint8_t cntLed, i, j, k;
+	static uint8_t beforeBATLV;
+	static int16_t x = 0, y = 0, offset, ret = 0;
 
 	SchmittBatery(); // バッテリレベルを取得
 	if (batteryLevel != beforeBATLV)
@@ -1072,149 +1308,7 @@ void setup(void)
 	//------------------------------------------------------------------
 	case HEX_SPEED_PARAM:
 	{
-		if (patternDisplay != beforeHEX)
-		{
-			// 切替時に実行
-			ssd1306_printf(Font_6x8, "Parameter");
-		}
-
-		dataTuningLR(&patternParameter1, 1, 1, 18);
-
-		if (beforePparam != patternParameter1)
-		{
-			ssd1306_FillRectangle(0, 16, 127, 63, Black);
-		}
-
-		switch (patternParameter1)
-		{
-		case 1: // 通常走行速度
-		{
-			dataTuningUDF(&tgtParam.straight, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "STRAIGHT:%3gm/s", tgtParam.straight);
-			break;
-		}
-		case 2: // 停止速度
-		{
-			dataTuningUDF(&tgtParam.curve, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "CURVE:%3gm/s", tgtParam.curve);
-			break;
-		}
-		case 3: // 停止速度
-		{
-			dataTuningUDF(&tgtParam.stop, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "STOP:%3gm/s", tgtParam.stop);
-			break;
-		}
-		case 4: // 2次走行_直線
-		{
-			dataTuningUDF(&tgtParam.bstStraight, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST STRT:%3gm/s", tgtParam.bstStraight);
-			break;
-		}
-		case 5: // 2次走行_R1500
-		{
-			dataTuningUDF(&tgtParam.bst1500, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 1500:%3gm/s", tgtParam.bst1500);
-			break;
-		}
-		case 6: // 2次走行_R1300
-		{
-			dataTuningUDF(&tgtParam.bst1300, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 1300:%3gm/s", tgtParam.bst1300);
-			break;
-		}
-		case 7: // 2次走行_R1000
-		{
-			dataTuningUDF(&tgtParam.bst1000, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 1000:%3gm/s", tgtParam.bst1000);
-			break;
-		}
-		case 8: // 2次走行_R800
-		{
-			dataTuningUDF(&tgtParam.bst800, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 800:%3gm/s", tgtParam.bst800);
-			break;
-		}
-		case 9: // 2次走行_R700
-		{
-			dataTuningUDF(&tgtParam.bst700, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 700:%3gm/s", tgtParam.bst700);
-			break;
-		}
-		case 10: // 2次走行_R600
-		{
-			dataTuningUDF(&tgtParam.bst600, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 600:%3gm/s", tgtParam.bst600);
-			break;
-		}
-		case 11: // 2次走行_R500
-		{
-			dataTuningUDF(&tgtParam.bst500, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 500:%3gm/s", tgtParam.bst500);
-			break;
-		}
-		case 12: // 2次走行_R400
-		{
-			dataTuningUDF(&tgtParam.bst400, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 400:%3gm/s", tgtParam.bst400);
-			break;
-		}
-		case 13: // 2次走行_R300
-		{
-			dataTuningUDF(&tgtParam.bst300, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 300:%3gm/s", tgtParam.bst300);
-			break;
-		}
-		case 14: // 2次走行_R200
-		{
-			dataTuningUDF(&tgtParam.bst200, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 200:%3gm/s", tgtParam.bst200);
-			break;
-		}
-		case 15: // 2次走行_R100
-		{
-			dataTuningUDF(&tgtParam.bst100, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 100:%3gm/s", tgtParam.bst100);
-			break;
-		}
-		case 16: // 2次走行_加速度
-		{
-			dataTuningUDF(&tgtParam.acceleF, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST acceleF:%3gm/ss", tgtParam.acceleF);
-			break;
-		}
-		case 17: // 2次走行_減速度
-		{
-			dataTuningUDF(&tgtParam.acceleD, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST acceleD:%3gm/ss", tgtParam.acceleD);
-			break;
-		}
-		case 18: // 2次走行_減速度
-		{
-			dataTuningUDF(&tgtParam.shortCut, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST shortCut:%3gm/s", tgtParam.shortCut);
-			break;
-		}
-		}
-		beforePparam = patternParameter1;
+		setup_speed_param(); // 速度パラメータ調整
 		break;
 	}
 	//------------------------------------------------------------------
@@ -1238,76 +1332,7 @@ void setup(void)
 	//------------------------------------------------------------------
 	case HEX_CALIBRATION:
 	{
-		if (patternDisplay != beforeHEX)
-		{
-			// 切替時に実行
-			ssd1306_printf(Font_6x8, "Calibrate");
-			patternCalibration = 1;
-		}
-
-		switch (patternCalibration)
-		{
-		case 1: // スイッチ入力待ち
-		{
-			setTargetSpeed(0);
-			ssd1306_SetCursor(65, 22);
-			ssd1306_printf(Font_6x8, "%4d", lSensorOffset[0]);
-
-			data_select(&trace_test, SW_PUSH);
-			if (trace_test)
-			{
-				cntSetup1 = 0;
-				patternCalibration = 2;
-			}
-			break;
-		}
-		case 2: // 開始準備
-		{
-			if (cntSetup1 > 1000)
-			{
-				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-				ssd1306_SetCursor(22, 28);
-				ssd1306_printf(Font_7x10, "Calibration");
-				ssd1306_SetCursor(53, 42);
-				ssd1306_printf(Font_7x10, "Now");
-				ssd1306_UpdateScreen(); // グラフィック液晶更新
-
-				// 配列初期化
-				memset(&lSensorOffset, 0, sizeof(uint16_t) * NUM_SENSORS);
-
-				powerLineSensors(1);	// ラインセンサ点灯
-				modeCalLinesensors = 1; // キャリブレーション開始
-
-				// 手動で機体を動かしキャリブレーションする
-
-				patternCalibration = 3;
-			}
-			break;
-		}
-		case 3: // スイッチ押下で終了
-		{
-			data_select(&trace_test, SW_PUSH);
-			if (!trace_test)
-			{
-				modeCalLinesensors = 0;						  // キャリブレーション終了
-				powerLineSensors(0);						  // ラインセンサ消灯
-				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-				ssd1306_UpdateScreen();						  // グラフィック液晶更新
-
-				if (initMSD)
-				{
-					initIMU = false;
-					writeLinesenval(); // オフセット値をSDカードに書き込み
-					initIMU = true;
-				}
-				patternCalibration = 1;
-			}
-			break;
-		}
-
-		default:
-			break;
-		}
+		setup_calibration(); // キャリブレーション(ラインセンサ)
 		break;
 	}
 	//------------------------------------------------------------------
@@ -1822,10 +1847,10 @@ void wheelClick(void)
 		}
 		break;
 
-	case 4:
-		motorPwmOut(0, 0);
-		clickStart = 0;
-		patternClick = 1;
-		break;
-	}
+        case 4:
+                motorPwmOut(0, 0);
+                clickStart = 0;
+                patternClick = 1;
+                break;
+        }
 }
