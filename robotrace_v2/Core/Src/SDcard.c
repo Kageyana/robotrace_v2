@@ -227,20 +227,20 @@ void writeMarkerPos(uint32_t distance, uint8_t marker)
 /////////////////////////////////////////////////////////////////////
 void initLog(void)
 {
-        FRESULT fresult;
+    FRESULT fresult;
 #ifdef LOG_RUNNING_WRITE
-        fresult = f_open(&fil_W, "temp", FA_OPEN_ALWAYS | FA_WRITE); // create file
-        freeBufCount = LOG_BUFFER_COUNT - 1;                          // 未使用バッファ数を初期化
-        activeIndex = 0;                                              // バッファ番号を初期化
-        flushIndex = 0;                                               // フラッシュ待ち番号を初期化
-        logBuffIndex = 0;                                             // 書込位置を初期化
-        activeBuf = logBuffer[0];                                     // アクティブバッファを初期化
-        sendSD = false;                                               // 書き込み要求をリセット
+	fresult = f_open(&fil_W, "temp", FA_OPEN_ALWAYS | FA_WRITE); // create file
+	freeBufCount = LOG_BUFFER_COUNT - 1;                          // 未使用バッファ数を初期化
+	activeIndex = 0;                                              // バッファ番号を初期化
+	flushIndex = 0;                                               // フラッシュ待ち番号を初期化
+	logBuffIndex = 0;                                             // 書込位置を初期化
+	activeBuf = logBuffer[0];                                     // アクティブバッファを初期化
+	sendSD = false;                                               // 書き込み要求をリセット
 #else
-        // 構造体配列の初期化
-        memset(&logVal, 0, sizeof(logData) * BUFFER_SIZW_LOG);
-        memset(&markerVal, 0, sizeof(markerData) * BUFFER_SIZW_MARKER);
-        logValIndex = 0;
+	// 構造体配列の初期化
+	memset(&logVal, 0, sizeof(logData) * BUFFER_SIZW_LOG);
+	memset(&markerVal, 0, sizeof(markerData) * BUFFER_SIZW_MARKER);
+	logValIndex = 0;
 	markerValIndex = 0;
 #endif
 }
@@ -281,17 +281,16 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 		cntSend++; // 書き込み回数をカウント
 
 		// バッファ容量を超えたらリングバッファを進める
-                if (logBuffIndex + LOG_SIZE > LOG_BUFFER_SIZE)
-                {
-                        // バッファが枯渇している場合は空きができるまで待機
-                        while (freeBufCount == 0)
-                                ;                                       // 空きバッファ待機
-                        logBuffIndex = 0;                                // 書込位置をリセット
-                        activeIndex = (activeIndex + 1) % LOG_BUFFER_COUNT; // リングバッファ切替
-                        activeBuf = logBuffer[activeIndex];              // アクティブバッファ更新
-                        freeBufCount--;                                   // 使用バッファを減算
-                        sendSD = true;                                   // SD書き込みを要求
-                }
+		if (logBuffIndex + LOG_SIZE > LOG_BUFFER_SIZE)
+		{
+			// バッファが枯渇している場合は空きができるまで待機
+			while (freeBufCount == 0);							// 空きバッファ待機
+			logBuffIndex = 0;									// 書込位置をリセット
+			activeIndex = (activeIndex + 1) % LOG_BUFFER_COUNT; // リングバッファ切替
+			activeBuf = logBuffer[activeIndex];					// アクティブバッファ更新
+			freeBufCount--;										// 使用バッファを減算
+			sendSD = true;										// SD書き込みを要求
+		}
 	}
 }
 #endif
@@ -311,12 +310,12 @@ void writeLogPuts(void)
 		if (sendSD) // 書き込み要求がある場合
 		{
 			// 未書き込みバッファをSDカードへ転送
-                        f_write(&fil_W, logBuffer[flushIndex], LOG_BUFFER_SIZE, &writtenlog); // リングバッファから書き出し
-                        freeBufCount++;                                                       // バッファ解放
-                        flushIndex = (flushIndex + 1) % LOG_BUFFER_COUNT;                     // 次のバッファへ
-                        if (flushIndex == activeIndex)                                       // 全バッファ書き込み済みなら終了
-                                sendSD = false;                                              // 書き込み要求を解除
-                }
+			f_write(&fil_W, logBuffer[flushIndex], LOG_BUFFER_SIZE, &writtenlog);	// リングバッファから書き出し
+			freeBufCount++;															// バッファ解放
+			flushIndex = (flushIndex + 1) % LOG_BUFFER_COUNT;						// 次のバッファへ
+			if (flushIndex == activeIndex)											// 全バッファ書き込み済みなら終了
+				sendSD = false;														// 書き込み要求を解除
+			}
         }
 }
 #endif
@@ -426,10 +425,10 @@ void endLog(void)
 	uint32_t logval32[10];
 	float logvalf[10];
 
-	while (sendSD)                                                                          // 溜まったバッファをすべて書き出す
-		writeLogPuts();                                                                 // リングバッファ書き込み
+	while (sendSD)														// 溜まったバッファをすべて書き出す
+		writeLogPuts();													// リングバッファ書き込み
 	f_write(&fil_W, logBuffer[activeIndex], logBuffIndex, &writtenlog); // 残りのデータを送信
-	f_close(&fil_W);                                                                        // 一時ファイルを閉じる
+	f_close(&fil_W);													// 一時ファイルを閉じる
 
 	createLog(); // ログファイル(csv)を作成
 
