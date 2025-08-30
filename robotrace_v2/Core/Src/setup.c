@@ -446,78 +446,78 @@ static void setup_pid_trace(void)
 ///////////////////////////////////////////////////////////////////////////////////////
 static void setup_pid_speed(void)
 {
-       if (patternDisplay != beforeHEX)
-       {
-       // 切替時に表示項目を初期化
-       ssd1306_printf(Font_6x8, "Speed PID");
+	if (patternDisplay != beforeHEX)
+	{
+		// 切替時に表示項目を初期化
+		ssd1306_printf(Font_6x8, "Speed PID");
 
-       ssd1306_SetCursor(0, 18);
-       ssd1306_printf(Font_7x10, "kp:");
-       ssd1306_SetCursor(0, 32);
-       ssd1306_printf(Font_7x10, "ki:");
-       ssd1306_SetCursor(0, 44);
-       ssd1306_printf(Font_7x10, "kd:");
-       ssd1306_SetCursor(60, 30);
-       ssd1306_printf(Font_7x10, "pwm:");
-       }
+		ssd1306_SetCursor(0, 18);
+		ssd1306_printf(Font_7x10, "kp:");
+		ssd1306_SetCursor(0, 32);
+		ssd1306_printf(Font_7x10, "ki:");
+		ssd1306_SetCursor(0, 44);
+		ssd1306_printf(Font_7x10, "kd:");
+		ssd1306_SetCursor(60, 30);
+		ssd1306_printf(Font_7x10, "pwm:");
+	}
 
-       data_select(&trace_test, SW_PUSH); // PUSHでトレースON/OFFの選択
-       // PUSHでトレースON/OFF
-       if (trace_test == 1)
-       {
-       // トレースON時の制御
-       powerLineSensors(1); // ラインセンサを有効化
-       setTargetSpeed(0.0); // 目標速度をリセット
-       motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.kp, 0, 0); // モータを指定PWMで駆動
-       }
-       else
-       {
-       // トレースOFF時の制御
-       motorPwmOutSynth(0, 0, 0, 0); // モータ停止
-       powerLineSensors(0);          // ラインセンサ停止
-       }
+	data_select(&trace_test, SW_PUSH); // PUSHでトレースON/OFFの選択
+	// PUSHでトレースON/OFF
+	if (trace_test == 1)
+	{
+		// トレースON時の制御
+		powerLineSensors(1); // ラインセンサを有効化
+		setTargetSpeed(0.0); // 目標速度をリセット
+		motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.kp, 0, 0); // モータを指定PWMで駆動
+	}
+	else
+	{
+		// トレースOFF時の制御
+		motorPwmOutSynth(0, 0, 0, 0); // モータ停止
+		powerLineSensors(0);          // ラインセンサ停止
+	}
 
-       // ゲイン表示
-       dataTuningUD(&patternGain, 1, 3, 1); // 調整対象のゲインを選択
-       if (trace_test == 0)
-       {
-       ssd1306_SetCursor(21, 18);
-       if (patternGain == 1)
-       ssd1306_printfB(Font_7x10, "%3d", veloCtrl.kp);
-       else
-       ssd1306_printf(Font_7x10, "%3d", veloCtrl.kp);
-       ssd1306_SetCursor(21, 32);
-       if (patternGain == 2)
-       ssd1306_printfB(Font_7x10, "%3d", veloCtrl.ki);
-       else
-       ssd1306_printf(Font_7x10, "%3d", veloCtrl.ki);
-       ssd1306_SetCursor(21, 44);
-       if (patternGain == 3)
-       ssd1306_printfB(Font_7x10, "%3d", veloCtrl.kd);
-       else
-       ssd1306_printf(Font_7x10, "%3d", veloCtrl.kd);
+	// ゲイン表示
+	dataTuningUD(&patternGain, 1, 3, 1); // 調整対象のゲインを選択
+	if (trace_test == 0)
+	{
+		ssd1306_SetCursor(21, 18);
+		if (patternGain == 1)
+			ssd1306_printfB(Font_7x10, "%3d", veloCtrl.kp);
+		else
+			ssd1306_printf(Font_7x10, "%3d", veloCtrl.kp);
+			ssd1306_SetCursor(21, 32);
+		if (patternGain == 2)
+			ssd1306_printfB(Font_7x10, "%3d", veloCtrl.ki);
+		else
+			ssd1306_printf(Font_7x10, "%3d", veloCtrl.ki);
+			ssd1306_SetCursor(21, 44);
+		if (patternGain == 3)
+			ssd1306_printfB(Font_7x10, "%3d", veloCtrl.kd);
+		else
+			ssd1306_printf(Font_7x10, "%3d", veloCtrl.kd);
 
-       // 制御量表示
-       ssd1306_SetCursor(88, 30);
-       ssd1306_printf(Font_7x10, "%4d", veloCtrl.pwm);
+		// 制御量表示
+		ssd1306_SetCursor(88, 30);
+		ssd1306_printf(Font_7x10, "%4d", veloCtrl.pwm);
 
-       // 選択したゲインを調整
-       switch (patternGain)
-       {
-       case 1:
-       // kpゲインを調整
-       dataTuningLR(&veloCtrl.kp, 1, 0, 255);
-       break;
-       case 2:
-       // kiゲインを調整
-       dataTuningLR(&veloCtrl.ki, 1, 0, 255);
-       break;
-       case 3:
-       // kdゲインを調整
-       dataTuningLR(&veloCtrl.kd, 1, 0, 255);
-       break;
-       }
-       }
+		// 選択したゲインを調整
+		switch (patternGain)
+		{
+		case 1:
+			// kpゲインを調整
+			dataTuningLR(&veloCtrl.kp, 1, 0, 255);
+			break;
+		case 2:
+			// kiゲインを調整
+			dataTuningLR(&veloCtrl.ki, 1, 0, 255);
+			break;
+		case 3:
+			// kdゲインを調整
+			dataTuningLR(&veloCtrl.kd, 1, 0, 255);
+			break;
+		}
+	}
 }
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup
