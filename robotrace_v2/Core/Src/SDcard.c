@@ -3,6 +3,7 @@
 //====================================//
 #include "SDcard.h"
 #include "fatfs.h"
+#include <string.h>
 //====================================//
 // グローバル変数の宣
 //====================================//
@@ -237,38 +238,17 @@ void initLog(void)
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogBufferPuts
 // 処理概要     保存する変数をバッファに転送する
-// 引数         c:8bit変数の数s:16bit変数の数i:32bit変数の数f:float変数の数
+// 引数         rec: ログレコード
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 #ifdef LOG_RUNNING_WRITE
-void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
+void writeLogBufferPuts(const LogRecord *rec)
 {
-	va_list args;
-	uint8_t cnt = 0;
-	static union
-	{
-		float f;
-		uint32_t i;
-	} ftoi;
-
 	if (modeLOG)
 	{
-		// 	バッファ配列に保存
-		va_start(args, f);
-		// logBuffer[0] = va_arg( args, uint8_t* );
-		for (cnt = 0; cnt < c; cnt++)
-			send8bit(va_arg(args, uint32_t));
-		for (cnt = 0; cnt < s; cnt++)
-			send16bit(va_arg(args, uint32_t));
-		for (cnt = 0; cnt < i; cnt++)
-			send32bit(va_arg(args, uint32_t));
-		for (cnt = 0; cnt < f; cnt++)
-		{
-			ftoi.f = va_arg(args, double); // 共用体を使用してfloat型のビット操作をできるようにする
-			send32bit(ftoi.i);
-		}
-		va_end(args);
-		cntSend++;
+		memcpy(logBuffer + logBuffIndex, rec, sizeof(LogRecord));	// 構造体をバッファへコピー
+		logBuffIndex += sizeof(LogRecord);	// コピーしたサイズ分インデックスを進める
+		cntSend++;                              // 送信回数を記録
 
 		// バッファが512バイト付近まで溜まったら確認
 		if (logBuffIndex + LOG_SIZE > BUFFER_SIZE_LOG && !sendSD)
