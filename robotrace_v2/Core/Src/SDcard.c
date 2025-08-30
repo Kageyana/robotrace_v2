@@ -87,12 +87,8 @@ bool initMicroSD(void)
 {
 	FATFS *pfs;
 	FRESULT fresult;
-	DIR dir;	 // Directory
-	FILINFO fno; // File Info
 	DWORD fre_clust;
 	uint32_t total, free_space;
-	uint8_t dirSetting = 0;
-	FIL fil_T;
 
 	// SDcardをマウント
 	fresult = f_mount(&fs, "", 0);
@@ -134,7 +130,7 @@ bool initMicroSD(void)
 void createLog(void)
 {
 	FRESULT fresult;
-	DIR dir;	 // Directory
+	DIR dir;         // Directory
 	FILINFO fno; // File Info
 	uint8_t *tp, fileName[10];
 	uint16_t fileNumber = 0;
@@ -530,13 +526,13 @@ void endLog(void)
 /////////////////////////////////////////////////////////////////////
 void getFileNumbers(void)
 {
-	DIR dir;	 // Directory
+	DIR dir;         // Directory
 	FILINFO fno; // File Info
 	FRESULT fresult;
 	uint8_t fileName[10];
 	uint8_t *tp, i;
 
-	fresult = f_opendir(&dir, "/"); // directory open
+       fresult = f_opendir(&dir, "/"); // directory open
 	if (fresult == FR_OK)
 	{
 		do
@@ -585,7 +581,7 @@ void setLogStr(uint8_t *column, uint8_t *format)
 /////////////////////////////////////////////////////////////////////
 void SDtest(void)
 {
-	FIL fil_T;
+	FIL fil_T; // テスト用ファイル
 	FRESULT fresult;
 
 	fresult = f_open(&fil_T, "test.csv", FA_OPEN_ALWAYS | FA_WRITE); // create file
@@ -602,7 +598,7 @@ void SDtest(void)
 void createDir(uint8_t *dirName)
 {
 	FRESULT fresult;
-	DIR dir;	 // Directory
+	DIR dir;         // Directory
 	FILINFO fno; // File Info
 	uint8_t exist = 0;
 
