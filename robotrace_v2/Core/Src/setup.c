@@ -690,73 +690,73 @@ static void setup_calibration(void)
 {
 	if (patternDisplay != beforeHEX)
 	{
-	        // 切替時に実行
-	        ssd1306_printf(Font_6x8, "Calibrate");
-	        patternCalibration = 1;
+		// 切替時に実行
+		ssd1306_printf(Font_6x8, "Calibrate");
+		patternCalibration = 1;
 	}
 
 	switch (patternCalibration)
 	{
 	case 1: // スイッチ入力待ち
 	{
-	        setTargetSpeed(0); // 速度をゼロに設定
-	        ssd1306_SetCursor(65, 22);
-	        ssd1306_printf(Font_6x8, "%4d", lSensorOffset[0]);
+		setTargetSpeed(0); // 速度をゼロに設定
+		ssd1306_SetCursor(65, 22);
+		ssd1306_printf(Font_6x8, "%4d", lSensorOffset[0]);
 
-	        data_select(&trace_test, SW_PUSH); // SW_PUSH入力を監視
-	        if (trace_test)
-	        {
-	                cntSetup1 = 0; // カウンタリセット
-	                patternCalibration = 2; // 次のステップへ
-	        }
-	        break;
+		data_select(&trace_test, SW_PUSH); // SW_PUSH入力を監視
+		if (trace_test)
+		{
+				cntSetup1 = 0; // カウンタリセット
+				patternCalibration = 2; // 次のステップへ
+		}
+		break;
 	}
 	case 2: // 開始準備
 	{
-	        if (cntSetup1 > 1000) // 一定時間待機
-	        {
-	                ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-	                ssd1306_SetCursor(22, 28);
-	                ssd1306_printf(Font_7x10, "Calibration");
-	                ssd1306_SetCursor(53, 42);
-	                ssd1306_printf(Font_7x10, "Now");
-	                ssd1306_UpdateScreen(); // グラフィック液晶更新
+		if (cntSetup1 > 1000) // 一定時間待機
+		{
+			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+			ssd1306_SetCursor(22, 28);
+			ssd1306_printf(Font_7x10, "Calibration");
+			ssd1306_SetCursor(53, 42);
+			ssd1306_printf(Font_7x10, "Now");
+			ssd1306_UpdateScreen(); // グラフィック液晶更新
 
-	                // 配列初期化
-	                memset(&lSensorOffset, 0, sizeof(uint16_t) * NUM_SENSORS);
+			// 配列初期化
+			memset(&lSensorOffset, 0, sizeof(uint16_t) * NUM_SENSORS);
 
-	                powerLineSensors(1);    // ラインセンサ点灯
-	                modeCalLinesensors = 1; // キャリブレーション開始
+			powerLineSensors(1);    // ラインセンサ点灯
+			modeCalLinesensors = 1; // キャリブレーション開始
 
-	                // 手動で機体を動かしキャリブレーションする
+			// 手動で機体を動かしキャリブレーションする
 
-	                patternCalibration = 3; // 次のステップへ
-	        }
-	        break;
+			patternCalibration = 3; // 次のステップへ
+		}
+		break;
 	}
 	case 3: // スイッチ押下で終了
 	{
-	        data_select(&trace_test, SW_PUSH); // SW_PUSH入力を監視
-	        if (!trace_test) // スイッチが離されたら
-	        {
-	                modeCalLinesensors = 0;                                           // キャリブレーション終了
-	                powerLineSensors(0);                                              // ラインセンサ消灯
-	                ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-	                ssd1306_UpdateScreen();                                           // グラフィック液晶更新
+		data_select(&trace_test, SW_PUSH); // SW_PUSH入力を監視
+		if (!trace_test) // スイッチが離されたら
+		{
+			modeCalLinesensors = 0;                                           // キャリブレーション終了
+			powerLineSensors(0);                                              // ラインセンサ消灯
+			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+			ssd1306_UpdateScreen();                                           // グラフィック液晶更新
 
-	                if (initMSD)
-	                {
-	                        initIMU = false;
-	                        writeLinesenval(); // オフセット値をSDカードに書き込み
-	                        initIMU = true;
-	                }
-	                patternCalibration = 1; // 最初の状態に戻る
-	        }
-	        break;
+			if (initMSD)
+			{
+				initIMU = false;
+				writeLinesenval(); // オフセット値をSDカードに書き込み
+				initIMU = true;
+			}
+			patternCalibration = 1; // 最初の状態に戻る
+		}
+		break;
 	}
 
 	default:
-	        break;
+	    break;
 	}
 }
 ///////////////////////////////////////////////////////////////////////////////////////
