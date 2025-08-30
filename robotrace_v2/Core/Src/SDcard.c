@@ -284,7 +284,15 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 		if (logBuffIndex + LOG_SIZE > LOG_BUFFER_SIZE)
 		{
 			// バッファが枯渇している場合は空きができるまで待機
-			while (freeBufCount == 0);							// 空きバッファ待機
+			uint32_t startTick = HAL_GetTick(); // タイムアウト計測開始
+			while (freeBufCount == 0)
+			{
+				// 空きバッファの解放を待機（HAL_Delayは全処理を停止するため使用しない）
+				if (HAL_GetTick() - startTick > 1000) // 一定時間待機しても空きがない場合はタイムアウト
+				{
+					break;
+				}
+			}
 			logBuffIndex = 0;									// 書込位置をリセット
 			activeIndex = (activeIndex + 1) % LOG_BUFFER_COUNT; // リングバッファ切替
 			activeBuf = logBuffer[activeIndex];					// アクティブバッファ更新
