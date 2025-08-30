@@ -6,6 +6,7 @@
 #include "main.h"
 #include "stm32f4xx_hal.h"
 #include "diskio.h"
+#include <stdbool.h>
 //======================================//
 // マクロ定義
 //======================================//
@@ -31,6 +32,22 @@ DSTATUS SD_disk_status (BYTE pdrv);
 DRESULT SD_disk_read (BYTE pdrv, BYTE* buff, DWORD sector, UINT count);
 DRESULT SD_disk_write (BYTE pdrv, const BYTE* buff, DWORD sector, UINT count);
 DRESULT SD_disk_ioctl (BYTE pdrv, BYTE cmd, void* buff);
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 SD_TxDataBlockAsync
+// 処理概要     DMAで512バイトのデータブロックを非同期送信
+// 引数         buff: 送信元バッファ token: データトークン
+// 戻り値       bool: 送信開始成功=true 送信中/失敗=false
+/////////////////////////////////////////////////////////////////////
+bool SD_TxDataBlockAsync(const BYTE *buff, BYTE token);
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 SD_IsBusy
+// 処理概要     DMA送信中かどうかを返す
+// 引数         なし
+// 戻り値       bool: 送信中=true 非送信=false
+/////////////////////////////////////////////////////////////////////
+bool SD_IsBusy(void);
 
 #define SPI_TIMEOUT 1000
 
