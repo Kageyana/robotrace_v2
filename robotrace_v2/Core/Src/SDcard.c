@@ -634,7 +634,8 @@ void createDir(uint8_t *dirName)
 #ifdef LOG_RUNNING_WRITE
 void send8bit(uint8_t data)
 {
-	activeBuf[logBuffIndex++] = data; // アクティブバッファに追加
+	// アクティブバッファに値を格納し、書き込み位置を進める
+	activeBuf[logBuffIndex++] = data;
 }
 #endif
 /////////////////////////////////////////////////////////////////////
@@ -646,11 +647,12 @@ void send8bit(uint8_t data)
 #ifdef LOG_RUNNING_WRITE
 void send16bit(uint16_t data)
 {
-	uint8_t buf[2];        // 一時バッファに配置
-	buf[0] = data >> 8;
-	buf[1] = data & 0xff;
-	memcpy(&activeBuf[logBuffIndex], buf, sizeof(buf)); // memcpyで高速化
-	logBuffIndex += sizeof(buf);
+	// バイト順を変換して一時変数に格納
+	uint16_t swapped = __builtin_bswap16(data);
+	// アクティブバッファに高速コピー
+	memcpy(&activeBuf[logBuffIndex], &swapped, sizeof(swapped));
+	// 書き込み位置を更新
+	logBuffIndex += sizeof(swapped);
 }
 #endif
 /////////////////////////////////////////////////////////////////////
@@ -662,13 +664,12 @@ void send16bit(uint16_t data)
 #ifdef LOG_RUNNING_WRITE
 void send32bit(uint32_t data)
 {
-	uint8_t buf[4];        // 一時バッファに配置
-	buf[0] = data >> 24;
-	buf[1] = (data & 0x00ff0000) >> 16;
-	buf[2] = (data & 0x0000ff00) >> 8;
-	buf[3] = data & 0x000000ff;
-	memcpy(&activeBuf[logBuffIndex], buf, sizeof(buf)); // memcpyで高速化
-	logBuffIndex += sizeof(buf);
+	// バイト順を変換して一時変数に格納
+	uint32_t swapped = __builtin_bswap32(data);
+	// アクティブバッファに高速コピー
+	memcpy(&activeBuf[logBuffIndex], &swapped, sizeof(swapped));
+	// 書き込み位置を更新
+	logBuffIndex += sizeof(swapped);
 }
 #endif
 /////////////////////////////////////////////////////////////////////
