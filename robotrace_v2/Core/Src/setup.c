@@ -5,7 +5,7 @@
 //====================================//
 // グローバル変数の宣言
 //====================================//
-	uint8_t start = 0; // 0:セットアップ中	1:セットアップ完了
+uint8_t start = 0; // 0:セットアップ中	1:セットアップ完了
 
 // タイマ関連
 uint16_t cntSetup1 = 0;		  // セットアップで使用
@@ -20,7 +20,7 @@ int8_t pushLR = 0;
 int8_t pushUD = 0;
 
 // パターン関連
-	uint8_t push1 = 0;
+uint8_t push1 = 0;
 int16_t patternDisplay = 0;
 int16_t patternSensors = 1;
 int16_t beforeSensors = 0;
@@ -39,8 +39,8 @@ int16_t patternCalibration = 1;
 int16_t patternClick = 1;
 
 // フラグ関連
-	uint8_t motor_test = 0;
-	uint8_t trace_test = 0;
+uint8_t motor_test = 0;
+uint8_t trace_test = 0;
 int8_t clickStart = 0;
 static uint8_t beforeMotorTest = 0;  // モータテストの状態を保存
 
@@ -753,7 +753,7 @@ static void setup_pid_angle(void)
 			dataTuningLR(&yawCtrl.kd, 1, 0, 255);
 			break;
 		}
-        }
+    }
 }
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_log
@@ -766,103 +766,103 @@ static void setup_log(void)
 	static int16_t y = 0, offset, ret = 0; // y: 選択中のログNo, offset: 表示開始位置, ret: 解析結果
 	uint8_t i, j; // i: 表示ループ用, j: スイッチ入力用
 
-        if (patternDisplay != beforeHEX)
-        {
-                // 切替時に実行
-                ssd1306_printf(Font_6x8, "microSD  ");
-                y = endFileIndex + 1; // 前回解析したログを初期選択
-                ssd1306_SetCursor(30, 16);
-                ssd1306_printf(Font_6x8, "Dist <");
-                ssd1306_SetCursor(80, 16);
-                ssd1306_printf(Font_6x8, "> XYcalc");
-                ssd1306_SetCursor(46, 25);
-                ssd1306_printf(Font_6x8, "indexD:%4d", numPPADarry);
-                ssd1306_SetCursor(46, 34);
-                ssd1306_printf(Font_6x8, "indexS:%4d", indexSC);
-                ssd1306_SetCursor(46, 43);
-                ssd1306_printf(Font_6x8, "marker:%4d", numPPAMarry);
-        }
+	if (patternDisplay != beforeHEX)
+	{
+		// 切替時に実行
+		ssd1306_printf(Font_6x8, "microSD  ");
+		y = endFileIndex + 1; // 前回解析したログを初期選択
+		ssd1306_SetCursor(30, 16);
+		ssd1306_printf(Font_6x8, "Dist <");
+		ssd1306_SetCursor(80, 16);
+		ssd1306_printf(Font_6x8, "> XYcalc");
+		ssd1306_SetCursor(46, 25);
+		ssd1306_printf(Font_6x8, "indexD:%4d", numPPADarry);
+		ssd1306_SetCursor(46, 34);
+		ssd1306_printf(Font_6x8, "indexS:%4d", indexSC);
+		ssd1306_SetCursor(46, 43);
+		ssd1306_printf(Font_6x8, "marker:%4d", numPPAMarry);
+	}
 
-        ssd1306_SetCursor(0, 16);
-        ssd1306_printf(Font_6x8, "%4d", fileNumbers[fileIndexLog]);
+	ssd1306_SetCursor(0, 16);
+	ssd1306_printf(Font_6x8, "%4d", fileNumbers[fileIndexLog]);
 
-        dataTuningUD(&y, 1, 0, endFileIndex + 1); // ログNoを上下スイッチで選択
+	dataTuningUD(&y, 1, 0, endFileIndex + 1); // ログNoを上下スイッチで選択
 
-        j = swValTact; // タクトスイッチの状態を取得
-        if (j == SW_LEFT || j == SW_RIGHT) // 左右スイッチで解析を実行
-        {
-                ssd1306_FillRectangle(30, 25, 127, 63, Black); // メイン表示空白埋め
-                ssd1306_SetCursor(46, 38);
-                ssd1306_printf(Font_6x8, "Calculating");
-                ssd1306_UpdateScreen(); // グラフィック液晶更新
+	j = swValTact; // タクトスイッチの状態を取得
+	if (j == SW_LEFT || j == SW_RIGHT) // 左右スイッチで解析を実行
+	{
+		ssd1306_FillRectangle(30, 25, 127, 63, Black); // メイン表示空白埋め
+		ssd1306_SetCursor(46, 38);
+		ssd1306_printf(Font_6x8, "Calculating");
+		ssd1306_UpdateScreen(); // グラフィック液晶更新
 
-                if (y == endFileIndex + 1)
-                {
-                        y = fileIndexLog; // 前回解析したログを再解析
-                }
+		if (y == endFileIndex + 1)
+		{
+			y = fileIndexLog; // 前回解析したログを再解析
+		}
 
-                if (j == SW_LEFT)
-                {
-                        // 距離基準解析
-                        ret = readLogDistance(fileNumbers[y]);
-                }
-                else if (j == SW_RIGHT)
-                {
-                        // ショートカット解析
-                        ret = calcXYcies(fileNumbers[y]);
-                }
+		if (j == SW_LEFT)
+		{
+			// 距離基準解析
+			ret = readLogDistance(fileNumbers[y]);
+		}
+		else if (j == SW_RIGHT)
+		{
+			// ショートカット解析
+			ret = calcXYcies(fileNumbers[y]);
+		}
 
-                if (ret > 0)
-                {
-                        optimalIndex = 0; // 解析結果インデックスをリセット
-                        ssd1306_FillRectangle(30, 25, 127, 63, Black); // メイン表示空白埋め
-                        ssd1306_SetCursor(46, 25);
-                        ssd1306_printf(Font_6x8, "indexD:%4d", numPPADarry);
-                        ssd1306_SetCursor(46, 34);
-                        ssd1306_printf(Font_6x8, "indexS:%4d", indexSC);
-                        ssd1306_SetCursor(46, 43);
-                        ssd1306_printf(Font_6x8, "marker:%4d", numPPAMarry);
-                }
-                else
-                {
-                        ssd1306_FillRectangle(30, 25, 127, 63, Black); // メイン表示空白埋め
-                        ssd1306_SetCursor(64, 30);
-                        ssd1306_printf(Font_6x8, "Error");
-                        ssd1306_SetCursor(61, 38);
-                        ssd1306_printf(Font_6x8, "code:%d", ret);
-                }
-        }
+		if (ret > 0)
+		{
+			optimalIndex = 0; // 解析結果インデックスをリセット
+			ssd1306_FillRectangle(30, 25, 127, 63, Black); // メイン表示空白埋め
+			ssd1306_SetCursor(46, 25);
+			ssd1306_printf(Font_6x8, "indexD:%4d", numPPADarry);
+			ssd1306_SetCursor(46, 34);
+			ssd1306_printf(Font_6x8, "indexS:%4d", indexSC);
+			ssd1306_SetCursor(46, 43);
+			ssd1306_printf(Font_6x8, "marker:%4d", numPPAMarry);
+		}
+		else
+		{
+			ssd1306_FillRectangle(30, 25, 127, 63, Black); // メイン表示空白埋め
+			ssd1306_SetCursor(64, 30);
+			ssd1306_printf(Font_6x8, "Error");
+			ssd1306_SetCursor(61, 38);
+			ssd1306_printf(Font_6x8, "code:%d", ret);
+		}
+	}
 
-        // ログNoの選択処理
-        for (i = 0; i < 5; i++)
-        {
-                // 前回解析ログNoを選択しているとき
-                if (y == endFileIndex + 1)
-                {
-                        ssd1306_SetCursor(0, 16);
-                        ssd1306_printfB(Font_6x8, "%4d", fileNumbers[fileIndexLog]);
-                }
+	// ログNoの選択処理
+	for (i = 0; i < 5; i++)
+	{
+		// 前回解析ログNoを選択しているとき
+		if (y == endFileIndex + 1)
+		{
+			ssd1306_SetCursor(0, 16);
+			ssd1306_printfB(Font_6x8, "%4d", fileNumbers[fileIndexLog]);
+		}
 
-                // ログNoを選択するとき
-                offset = endFileIndex - y - 4; // 前回解析Noと一番下のNoを除く表示中の4つ中一番上のインデックスを計算
-                ssd1306_SetCursor(0, 24 + (8 * i));
+		// ログNoを選択するとき
+		offset = endFileIndex - y - 4; // 前回解析Noと一番下のNoを除く表示中の4つ中一番上のインデックスを計算
+		ssd1306_SetCursor(0, 24 + (8 * i));
 
-                // 最新4つのデータを表示するとき
-                if (offset < 0)
-                {
-                        offset = 0;
-                }
+		// 最新4つのデータを表示するとき
+		if (offset < 0)
+		{
+			offset = 0;
+		}
 
-                if (endFileIndex - y == i || (i == 4 && offset > 0))
-                {
-                        // 選択したログNoをハイライト表示
-                        ssd1306_printfB(Font_6x8, "%4d", fileNumbers[endFileIndex - offset - i]);
-                }
-                else
-                {
-                        ssd1306_printf(Font_6x8, "%4d", fileNumbers[endFileIndex - offset - i]);
-                }
-        }
+		if (endFileIndex - y == i || (i == 4 && offset > 0))
+		{
+			// 選択したログNoをハイライト表示
+			ssd1306_printfB(Font_6x8, "%4d", fileNumbers[endFileIndex - offset - i]);
+		}
+		else
+		{
+			ssd1306_printf(Font_6x8, "%4d", fileNumbers[endFileIndex - offset - i]);
+		}
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -1225,16 +1225,16 @@ void setup(void)
 		setup_sensors(); // センサ表示とテストメニューを制御
 		break;
 	}
-        //------------------------------------------------------------------
-        // Log analysis
-        //------------------------------------------------------------------
-        case HEX_LOG:
-        {
-                setup_log(); // ログ解析表示と操作を制御
-                break;
-        }
-        //------------------------------------------------------------------
-        // キャリブレーション(ラインセンサ)
+	//------------------------------------------------------------------
+	// Log analysis
+	//------------------------------------------------------------------
+	case HEX_LOG:
+	{
+		setup_log(); // ログ解析表示と操作を制御
+		break;
+	}
+	//------------------------------------------------------------------
+	// キャリブレーション(ラインセンサ)
 	//------------------------------------------------------------------
 	case HEX_CALIBRATION:
 	{
