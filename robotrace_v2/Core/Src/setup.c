@@ -21,22 +21,24 @@ int8_t pushUD = 0;
 
 // パターン関連
 uint8_t push1 = 0;
-int16_t patternDisplay = 0;
-int16_t patternSensors = 1;
-int16_t beforeSensors = 0;
-static uint8_t beforeHEX = 255;      // 前回の表示HEXを保持
-int16_t patternSensorLine = 1;
-int16_t patternSensorAccele = 1;
-int16_t patternSensorGyro = 1;
-int16_t patternParameter1 = 1;
-int16_t patternParameter2 = 1;
-int16_t patternParameter3 = 1;
-int16_t patternParameter4 = 1;
-int16_t patternGain = 3;
-int16_t patternSpeedseting = 1;
-int16_t patternLog = 1;
-int16_t patternCalibration = 1;
-int16_t patternClick = 1;
+Pattern pattern = {
+        .display = 0,
+        .sensors = 1,
+        .beforeSensors = 0,
+        .beforeHex = 255,
+        .sensorLine = 1,
+        .sensorAccele = 1,
+        .sensorGyro = 1,
+        .parameter1 = 1,
+        .parameter2 = 1,
+        .parameter3 = 1,
+        .parameter4 = 1,
+        .gain = 3,
+        .speedseting = 1,
+        .log = 1,
+        .calibration = 1,
+        .click = 1
+}; // パターンの状態を保持
 
 // フラグ関連
 uint8_t motor_test = 0;
@@ -70,20 +72,20 @@ static void setup_speed_param(void)
 {
 	static uint8_t beforePparam = 0; // 前回のパラメータ項目を保持
 
-	if (patternDisplay != beforeHEX)
+	if (pattern.display != pattern.beforeHex)
 	{
 		// 切替時に実行
 		ssd1306_printf(Font_6x8, "Parameter");
 	}
 
-	dataTuningLR(&patternParameter1, 1, 1, 18); // パラメータ項目切替
+	dataTuningLR(&pattern.parameter1, 1, 1, 18); // パラメータ項目切替
 
-	if (beforePparam != patternParameter1)
+	if (beforePparam != pattern.parameter1)
 	{
 		ssd1306_FillRectangle(0, 16, 127, 63, Black);
 	}
 
-	switch (patternParameter1)
+	switch (pattern.parameter1)
 	{
 	case 1: // 通常走行速度
 	{
@@ -213,7 +215,7 @@ static void setup_speed_param(void)
 	}
 	}
 
-	beforePparam = patternParameter1; // 選択項目を記録
+	beforePparam = pattern.parameter1; // 選択項目を記録
 }
 /////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_sensors
@@ -223,21 +225,21 @@ static void setup_speed_param(void)
 /////////////////////////////////////////////////////////////////////////////////////
 static void setup_sensors(void)
 {
-	if (patternDisplay != beforeHEX)
+	if (pattern.display != pattern.beforeHex)
 	{
 		// ページ切替時の初期処理
 		ssd1306_printf(Font_6x8, "SENSORS  ");	// センサ画面表示
-		beforeSensors = 100;	// 初期値
+		pattern.beforeSensors = 100;	// 初期値
 	}
 
 	// センサメニューの項目切替
-	dataTuningLR(&patternSensors, 1, 1, 8);
+	dataTuningLR(&pattern.sensors, 1, 1, 8);
 	// 各種センサテストを実行
-	switch (patternSensors)
+	switch (pattern.sensors)
 	{
 	case 1: // モータテスト
 	{
-		if (patternSensors != beforeSensors)
+		if (pattern.sensors != pattern.beforeSensors)
 		{
 			// 切替時に実行
 			ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
@@ -287,7 +289,7 @@ static void setup_sensors(void)
 	}
 	case 2: // IMU角度表示
 	{
-		if (patternSensors != beforeSensors)
+		if (pattern.sensors != pattern.beforeSensors)
 		{
 			// 切替時に実行
 			ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
@@ -329,7 +331,7 @@ static void setup_sensors(void)
 	}
 	case 3: // IMU加速度表示
 	{
-		if (patternSensors != beforeSensors)
+		if (pattern.sensors != pattern.beforeSensors)
 		{
 			// 切替時に実行
 			ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
@@ -350,7 +352,7 @@ static void setup_sensors(void)
 	}
 	case 4: // マーカーセンサ
 	{
-		if (patternSensors != beforeSensors)
+		if (pattern.sensors != pattern.beforeSensors)
 		{
 			// 切替時に実行
 			ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
@@ -376,7 +378,7 @@ static void setup_sensors(void)
 	}
 	case 5: // タクトスイッチ
 	{
-		if (patternSensors != beforeSensors)
+		if (pattern.sensors != pattern.beforeSensors)
 		{
 			// 切替時に実行
 			ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
@@ -393,7 +395,7 @@ static void setup_sensors(void)
 	}
 	case 6: // バッテリ電圧
 	{
-		if (patternSensors != beforeSensors)
+		if (pattern.sensors != pattern.beforeSensors)
 		{
 			// 切替時に実行
 			ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
@@ -410,7 +412,7 @@ static void setup_sensors(void)
 	}
 	case 7: // ラインセンサ
 	{
-		if (patternSensors != beforeSensors)
+		if (pattern.sensors != pattern.beforeSensors)
 		{
 			// 切替時に実行
 			ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
@@ -485,7 +487,7 @@ static void setup_sensors(void)
 	}
 	case 8: // RGBLED
 	{
-		if (patternSensors != beforeSensors)
+		if (pattern.sensors != pattern.beforeSensors)
 		{
 			// 切替時に実行
 			ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
@@ -512,7 +514,7 @@ static void setup_sensors(void)
 		break;
 	}
 	}
-	beforeSensors = patternSensors;	// 選択状態の更新
+	pattern.beforeSensors = pattern.sensors;	// 選択状態の更新
 }
 /////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_pid_dist
@@ -522,7 +524,7 @@ static void setup_sensors(void)
 /////////////////////////////////////////////////////////////////////////////////////
 static void setup_pid_dist(void)
 {
-	if (patternDisplay != beforeHEX)
+	if (pattern.display != pattern.beforeHex)
 	{
 		// 切替時に実行
 		ssd1306_printf(Font_6x8, "Dist PID");
@@ -542,21 +544,21 @@ static void setup_pid_dist(void)
 	}
 
 	// ゲイン表示
-	dataTuningUD(&patternGain, 1, 3, 1);	// 上下ボタンで調整対象を選択
+	dataTuningUD(&pattern.gain, 1, 3, 1);	// 上下ボタンで調整対象を選択
 	if (trace_test == 0)	// 動作開始前のみ調整を許可
 	{
 		ssd1306_SetCursor(21, 18);
-		if (patternGain == 1)
+		if (pattern.gain == 1)
 			ssd1306_printfB(Font_7x10, "%3d", distCtrl.kp);
 		else
 			ssd1306_printf(Font_7x10, "%3d", distCtrl.kp);
 		ssd1306_SetCursor(21, 32);
-		if (patternGain == 2)
+		if (pattern.gain == 2)
 			ssd1306_printfB(Font_7x10, "%3d", distCtrl.ki);
 		else
 			ssd1306_printf(Font_7x10, "%3d", distCtrl.ki);
 		ssd1306_SetCursor(21, 44);
-		if (patternGain == 3)
+		if (pattern.gain == 3)
 			ssd1306_printfB(Font_7x10, "%3d", distCtrl.kd);
 		else
 			ssd1306_printf(Font_7x10, "%3d", distCtrl.kd);
@@ -565,7 +567,7 @@ static void setup_pid_dist(void)
 		ssd1306_SetCursor(88, 30);
 		ssd1306_printf(Font_7x10, "%4d", distCtrl.pwm);	// 出力PWM値
 
-		switch (patternGain)	// 選択したゲインを変更
+		switch (pattern.gain)	// 選択したゲインを変更
 		{
 		case 1:
 			// kp
@@ -591,7 +593,7 @@ static void setup_pid_dist(void)
 ///////////////////////////////////////////////////////////////////////////////////////
 static void setup_pid_trace(void)
 {
-	if (patternDisplay != beforeHEX)
+	if (pattern.display != pattern.beforeHex)
 	{
 		// 切替時に実行
 		ssd1306_printf(Font_6x8, "Trace PID");
@@ -629,21 +631,21 @@ static void setup_pid_trace(void)
 	beforeMotorTest = trace_test;                        // 状態を保存
 
 	// ゲイン表示
-	dataTuningUD(&patternGain, 1, 3, 1);
+	dataTuningUD(&pattern.gain, 1, 3, 1);
 	if (trace_test == 0)
 	{
 		ssd1306_SetCursor(21, 18);
-		if (patternGain == 1)
+		if (pattern.gain == 1)
 			ssd1306_printfB(Font_7x10, "%3d", lineTraceCtrl.kp);
 		else
 			ssd1306_printf(Font_7x10, "%3d", lineTraceCtrl.kp);
 		ssd1306_SetCursor(21, 32);
-		if (patternGain == 2)
+		if (pattern.gain == 2)
 			ssd1306_printfB(Font_7x10, "%3d", lineTraceCtrl.ki);
 		else
 			ssd1306_printf(Font_7x10, "%3d", lineTraceCtrl.ki);
 		ssd1306_SetCursor(21, 44);
-		if (patternGain == 3)
+		if (pattern.gain == 3)
 			ssd1306_printfB(Font_7x10, "%3d", lineTraceCtrl.kd);
 		else
 			ssd1306_printf(Font_7x10, "%3d", lineTraceCtrl.kd);
@@ -652,7 +654,7 @@ static void setup_pid_trace(void)
 		ssd1306_SetCursor(88, 30);
 		ssd1306_printf(Font_7x10, "%4d", lineTraceCtrl.pwm);
 
-		switch (patternGain)
+		switch (pattern.gain)
 		{
 		case 1:
 			// kp
@@ -678,7 +680,7 @@ static void setup_pid_trace(void)
 /////////////////////////////////////////////////////////////////////////////////////
 static void setup_pid_angular(void)
 {
-	if (patternDisplay != beforeHEX)
+	if (pattern.display != pattern.beforeHex)
 	{
 		// 切替時に実行
 		ssd1306_printf(Font_6x8, "YawRate PID");
@@ -717,21 +719,21 @@ static void setup_pid_angular(void)
 	beforeMotorTest = trace_test;
 
 	// ゲイン表示
-	dataTuningUD(&patternGain, 1, 3, 1);
+	dataTuningUD(&pattern.gain, 1, 3, 1);
 	if (trace_test == 0)
 	{
 		ssd1306_SetCursor(21, 18);
-		if (patternGain == 1)
+		if (pattern.gain == 1)
 		        ssd1306_printfB(Font_7x10, "%3d", yawRateCtrl.kp);
 		else
 		        ssd1306_printf(Font_7x10, "%3d", yawRateCtrl.kp);
 		ssd1306_SetCursor(21, 32);
-		if (patternGain == 2)
+		if (pattern.gain == 2)
 		        ssd1306_printfB(Font_7x10, "%3d", yawRateCtrl.ki);
 		else
 		        ssd1306_printf(Font_7x10, "%3d", yawRateCtrl.ki);
 		ssd1306_SetCursor(21, 44);
-		if (patternGain == 3)
+		if (pattern.gain == 3)
 		        ssd1306_printfB(Font_7x10, "%3d", yawRateCtrl.kd);
 		else
 		        ssd1306_printf(Font_7x10, "%3d", yawRateCtrl.kd);
@@ -740,7 +742,7 @@ static void setup_pid_angular(void)
 		ssd1306_SetCursor(88, 30);
 		ssd1306_printf(Font_7x10, "%4d", yawRateCtrl.pwm);
 
-		switch (patternGain)
+		switch (pattern.gain)
 		{
 		case 1:
 		        // kp
@@ -765,7 +767,7 @@ static void setup_pid_angular(void)
 ///////////////////////////////////////////////////////////////////////////////////////
 static void setup_pid_speed(void)
 {
-	if (patternDisplay != beforeHEX)
+	if (pattern.display != pattern.beforeHex)
 	{
 		// 切替時に表示項目を初期化
 		ssd1306_printf(Font_6x8, "Speed PID");
@@ -797,21 +799,21 @@ static void setup_pid_speed(void)
 	}
 
 	// ゲイン表示
-	dataTuningUD(&patternGain, 1, 3, 1); // 調整対象のゲインを選択
+	dataTuningUD(&pattern.gain, 1, 3, 1); // 調整対象のゲインを選択
 	if (trace_test == 0)
 	{
 		ssd1306_SetCursor(21, 18);
-		if (patternGain == 1)
+		if (pattern.gain == 1)
 			ssd1306_printfB(Font_7x10, "%3d", veloCtrl.kp);
 		else
 			ssd1306_printf(Font_7x10, "%3d", veloCtrl.kp);
 			ssd1306_SetCursor(21, 32);
-		if (patternGain == 2)
+		if (pattern.gain == 2)
 			ssd1306_printfB(Font_7x10, "%3d", veloCtrl.ki);
 		else
 			ssd1306_printf(Font_7x10, "%3d", veloCtrl.ki);
 			ssd1306_SetCursor(21, 44);
-		if (patternGain == 3)
+		if (pattern.gain == 3)
 			ssd1306_printfB(Font_7x10, "%3d", veloCtrl.kd);
 		else
 			ssd1306_printf(Font_7x10, "%3d", veloCtrl.kd);
@@ -821,7 +823,7 @@ static void setup_pid_speed(void)
 		ssd1306_printf(Font_7x10, "%4d", veloCtrl.pwm);
 
 		// 選択したゲインを調整
-		switch (patternGain)
+		switch (pattern.gain)
 		{
 		case 1:
 			// kpゲインを調整
@@ -846,14 +848,14 @@ static void setup_pid_speed(void)
 /////////////////////////////////////////////////////////////////////////////////////
 static void setup_calibration(void)
 {
-	if (patternDisplay != beforeHEX)
+	if (pattern.display != pattern.beforeHex)
 	{
 		// 切替時に実行
 		ssd1306_printf(Font_6x8, "Calibrate");
-		patternCalibration = 1;
+		pattern.calibration = 1;
 	}
 
-	switch (patternCalibration)
+	switch (pattern.calibration)
 	{
 	case 1: // スイッチ入力待ち
 	{
@@ -865,7 +867,7 @@ static void setup_calibration(void)
 		if (trace_test)
 		{
 				cntSetup1 = 0; // カウンタリセット
-				patternCalibration = 2; // 次のステップへ
+				pattern.calibration = 2; // 次のステップへ
 		}
 		break;
 	}
@@ -888,7 +890,7 @@ static void setup_calibration(void)
 
 			// 手動で機体を動かしキャリブレーションする
 
-			patternCalibration = 3; // 次のステップへ
+			pattern.calibration = 3; // 次のステップへ
 		}
 		break;
 	}
@@ -908,7 +910,7 @@ static void setup_calibration(void)
 				writeLinesenval(); // オフセット値をSDカードに書き込み
 				initIMU = true;
 			}
-			patternCalibration = 1; // 最初の状態に戻る
+			pattern.calibration = 1; // 最初の状態に戻る
 		}
 		break;
 	}
@@ -925,7 +927,7 @@ static void setup_calibration(void)
 ///////////////////////////////////////////////////////////////////////////////////////
 static void setup_pid_angle(void)
 {
-	if (patternDisplay != beforeHEX)
+	if (pattern.display != pattern.beforeHex)
 	{
 		// 切替時に実行
 		ssd1306_printf(Font_6x8, "Yaw PID");
@@ -951,22 +953,22 @@ static void setup_pid_angle(void)
 	// }
 
 	// 上下スイッチで調整対象のゲインを選択
-	dataTuningUD(&patternGain, 1, 3, 1);
+	dataTuningUD(&pattern.gain, 1, 3, 1);
 	if (trace_test == 0)
 	{
 		// 選択したゲインを表示
 		ssd1306_SetCursor(21, 18);
-		if (patternGain == 1)
+		if (pattern.gain == 1)
 			ssd1306_printfB(Font_7x10, "%3d", yawCtrl.kp);
 		else
 			ssd1306_printf(Font_7x10, "%3d", yawCtrl.kp);
 		ssd1306_SetCursor(21, 32);
-		if (patternGain == 2)
+		if (pattern.gain == 2)
 			ssd1306_printfB(Font_7x10, "%3d", yawCtrl.ki);
 		else
 			ssd1306_printf(Font_7x10, "%3d", yawCtrl.ki);
 		ssd1306_SetCursor(21, 44);
-		if (patternGain == 3)
+		if (pattern.gain == 3)
 			ssd1306_printfB(Font_7x10, "%3d", yawCtrl.kd);
 		else
 			ssd1306_printf(Font_7x10, "%3d", yawCtrl.kd);
@@ -975,7 +977,7 @@ static void setup_pid_angle(void)
 		ssd1306_SetCursor(88, 30);
 		ssd1306_printf(Font_7x10, "%4d", yawCtrl.pwm);
 
-		switch (patternGain)
+		switch (pattern.gain)
 		{
 		case 1:
 			// kpを左右スイッチで調整
@@ -1003,7 +1005,7 @@ static void setup_log(void)
 	static int16_t y = 0, offset, ret = 0; // y: 選択中のログNo, offset: 表示開始位置, ret: 解析結果
 	uint8_t i, j; // i: 表示ループ用, j: スイッチ入力用
 
-	if (patternDisplay != beforeHEX)
+	if (pattern.display != pattern.beforeHex)
 	{
 		// 切替時に実行
 		ssd1306_printf(Font_6x8, "microSD  ");
@@ -1110,7 +1112,7 @@ static void setup_log(void)
 ///////////////////////////////////////////////////////////////////////////////////////
 static void setup_start(void)
 {
-	if (patternDisplay != beforeHEX)
+	if (pattern.display != pattern.beforeHex)
 	{
 		// 切替時にスタート画面とブースト設定を表示
 		ssd1306_printf(Font_6x8, "Start  ");
@@ -1132,11 +1134,11 @@ static void setup_start(void)
 			ssd1306_printf(Font_6x8, "BOOST SHORTCUT");
 			break;
 		}
-		patternCalibration = 1;
+		pattern.calibration = 1;
 	}
 
 	// キャリブレーションの進行状況に応じて処理を分岐
-	switch (patternCalibration)
+	switch (pattern.calibration)
 	{
 	case 1: // スイッチ入力待ち
 	{
@@ -1152,7 +1154,7 @@ static void setup_start(void)
 			}
 			else
 			{
-				patternCalibration = 2;
+				pattern.calibration = 2;
 			}
 		}
 		else if (swValTact == SW_RIGHT)
@@ -1165,7 +1167,7 @@ static void setup_start(void)
 			}
 			else
 			{
-				patternCalibration = 2;
+				pattern.calibration = 2;
 			}
 		}
 		break;
@@ -1185,7 +1187,7 @@ static void setup_start(void)
 		enc1 = 0;
 		powerLineSensors(1); // 先に点灯させて安定させる
 
-		patternCalibration = 3;
+		pattern.calibration = 3;
 		break;
 	}
 	case 3: // 開始準備
@@ -1198,7 +1200,7 @@ static void setup_start(void)
 			setTargetSpeed(0);               // 目標速度0[m/s]
 			enc1 = 0;
 			modeCalLinesensors = 1; // キャリブレーション開始
-			patternCalibration = 4;
+			pattern.calibration = 4;
 		}
 		break;
 	}
@@ -1208,7 +1210,7 @@ static void setup_start(void)
 		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 		if (BMI088val.angle.z < -320.0)
 		{
-			patternCalibration = 5;
+			pattern.calibration = 5;
 		}
 		break;
 	}
@@ -1220,7 +1222,7 @@ static void setup_start(void)
 		{
 			modeCalLinesensors = 0;
 			countdown = 500;
-			patternCalibration = 6;
+			pattern.calibration = 6;
 		}
 		break;
 	}
@@ -1265,19 +1267,19 @@ void setup(void)
 		{
 			if (encClick > 400)
 			{
-				patternDisplay++;
+				pattern.display++;
 				clickStart = 1;
 			}
 			else if (encClick < -400)
 			{
-				patternDisplay--;
+				pattern.display--;
 				clickStart = -1;
 			}
 
-			if (patternDisplay > 0x9)
-				patternDisplay = 0;
-			else if (patternDisplay < 0)
-				patternDisplay = 0x9;
+			if (pattern.display > 0x9)
+				pattern.display = 0;
+			else if (pattern.display < 0)
+				pattern.display = 0x9;
 			encClick = 0;
 		}
 	}
@@ -1287,11 +1289,11 @@ void setup(void)
 	}
 
 	// ページ番号表示
-	if (patternDisplay != beforeHEX)
+	if (pattern.display != pattern.beforeHex)
 	{
 		if (!modeDSP) // ディスプレイが無いとき番号をLEDで表示
 		{
-			led_out(patternDisplay);
+			led_out(pattern.display);
 		}
 
 		// ロータリスイッチ切替時に実行
@@ -1299,7 +1301,7 @@ void setup(void)
 
 		// ロータリスイッチ値を表示
 		ssd1306_SetCursor(0, 3);
-		ssd1306_printf(Font_6x8, "No.%x", patternDisplay);
+		ssd1306_printf(Font_6x8, "No.%x", pattern.display);
 
 		ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 		ssd1306_FillRectangle(24, 0, 94, 13, Black);  // ヘッダ表示空白埋め
@@ -1307,7 +1309,7 @@ void setup(void)
 	}
 
 	// ディップスイッチで項目選択
-	switch (patternDisplay)
+	switch (pattern.display)
 	{
 	//------------------------------------------------------------------
 	// スタート待ち
@@ -1401,7 +1403,7 @@ void setup(void)
 	} // switch
 
 	// 前回値更新
-	beforeHEX = patternDisplay;
+	pattern.beforeHex = pattern.display;
 	beforeBATLV = batteryLevel;
 
 	if (!modeDSP)
@@ -1698,7 +1700,7 @@ void setupNonDisp(void)
 {
 	static uint8_t mode = 0;
 
-	switch (patternCalibration)
+	switch (pattern.calibration)
 	{
 	case 1:
 		setTargetSpeed(0);
@@ -1727,7 +1729,7 @@ void setupNonDisp(void)
 				cntSetup1 = 0;
 				enc1 = 0;
 				powerLineSensors(1); // 先に点灯させて安定させる
-				patternCalibration = 2;
+				pattern.calibration = 2;
 			}
 		}
 		break;
@@ -1742,7 +1744,7 @@ void setupNonDisp(void)
 			setTargetSpeed(0);		 // 目標速度0[m/s]
 			enc1 = 0;
 			modeCalLinesensors = 1; // キャリブレーション開始
-			patternCalibration = 3;
+			pattern.calibration = 3;
 		}
 		break;
 
@@ -1752,7 +1754,7 @@ void setupNonDisp(void)
 		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 		if (BMI088val.angle.z < -35.0)
 		{
-			patternCalibration = 4;
+			pattern.calibration = 4;
 		}
 		break;
 
@@ -1762,7 +1764,7 @@ void setupNonDisp(void)
 		motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
 		if (abs(encCurrentN) == 0)
 		{
-			patternCalibration = 5;
+			pattern.calibration = 5;
 		}
 		break;
 
@@ -1772,7 +1774,7 @@ void setupNonDisp(void)
 		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 		if (BMI088val.angle.z > 35.0)
 		{
-			patternCalibration = 6;
+			pattern.calibration = 6;
 		}
 		break;
 
@@ -1782,7 +1784,7 @@ void setupNonDisp(void)
 		motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
 		if (abs(encCurrentN) == 0)
 		{
-			patternCalibration = 7;
+			pattern.calibration = 7;
 		}
 		break;
 
@@ -1793,7 +1795,7 @@ void setupNonDisp(void)
 		if (lSensor[5] < 1000)
 		{
 			modeCalLinesensors = 0;
-			patternCalibration = 8;
+			pattern.calibration = 8;
 		}
 		break;
 
@@ -1832,12 +1834,12 @@ void wheelClick(void)
 	static uint8_t cnt = 0;
 	uint16_t pwm = 200;
 
-	switch (patternClick)
+	switch (pattern.click)
 	{
 	case 1:
 		if (clickStart != 0)
 		{
-			patternClick = 2;
+			pattern.click = 2;
 		}
 		break;
 
@@ -1847,7 +1849,7 @@ void wheelClick(void)
 		if (cnt >= 3)
 		{
 			cnt = 0;
-			patternClick = 3;
+			pattern.click = 3;
 		}
 		break;
 
@@ -1857,14 +1859,14 @@ void wheelClick(void)
 		if (cnt >= 3)
 		{
 			cnt = 0;
-			patternClick = 4;
+			pattern.click = 4;
 		}
 		break;
 
         case 4:
                 motorPwmOut(0, 0);
                 clickStart = 0;
-                patternClick = 1;
+                pattern.click = 1;
                 break;
         }
 }
