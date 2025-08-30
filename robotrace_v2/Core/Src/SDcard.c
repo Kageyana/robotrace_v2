@@ -149,12 +149,12 @@ void createLog(void)
 			// エラーが発生した場合はループを抜けてファイル探索を中断
 			break;
 		}
-		tp = strtok(fno.fname, "."); // 拡張子削除
+		tp = strtok(fno.fname, ".");	// 拡張子削除
 		if (atoi(tp) > fileNumber)
-		{                                                  // 番号比較
-			fileNumber = atoi(tp); // 文字列を数値に変換
+		{								// 番号比較
+			fileNumber = atoi(tp);		// 文字列を数値に変換
 		}
-	} while (fno.fname[0] != 0); // ファイルの有無を確認
+	} while (fno.fname[0] != 0);		// ファイルの有無を確認
 
 	f_closedir(&dir); // directory close
 
