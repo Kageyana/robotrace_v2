@@ -16,11 +16,12 @@ uint8_t columnTitle[512] = "", formatLog[256] = "";
 
 // ログバッファ
 #ifdef LOG_RUNNING_WRITE
-uint8_t logBuffer[BUFFER_SIZE_LOG], logBufferSend[BUFFER_SIZE_LOG];
-uint8_t *logBufferPointa; // RAM保存バッファ用ポインタ
-int16_t logBuffIndex = 0; // 一時記録バッファ書込アドレス
-uint32_t logBuffSendIndex = 0;
-bool sendSD = false;
+uint8_t logBuffer[2][BUFFER_SIZE_LOG];
+uint8_t *activeBuf = logBuffer[0]; // 書き込み中のバッファ
+uint8_t *flushBuf = logBuffer[1];  // SD書き込み待ちバッファ
+int16_t logBuffIndex = 0;          // 一時記録バッファ書込アドレス
+uint32_t logBuffSendIndex = 0;     // flushBufに溜まったバイト数
+bool sendSD = false;               // flushBufをSDへ送るフラグ
 uint16_t cntSend = 0;
 uint8_t *logaddress;
 #else
@@ -270,14 +271,14 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 		cntSend++;
 
 		// バッファが512バイト付近まで溜まったら確認
-		if (logBuffIndex + LOG_SIZE > 512 && !sendSD)
+		if (logBuffIndex + LOG_SIZE > BUFFER_SIZE_LOG && !sendSD)
 		{
-			logBuffSendIndex = logBuffIndex;					// バッファのバイト数を記録
-			memcpy(logBufferSend, logBuffer, logBuffSendIndex); // 送信用配列にコピー
-
-			logBuffIndex = 0;			 // バイト数リセット
-			logBufferPointa = logBuffer; // バッファ配列の先頭アドレスを設定
-			sendSD = true;				 // 送信開始
+			logBuffSendIndex = logBuffIndex;         // 書き込み待ちバッファのサイズを記録
+			uint8_t *tmp = flushBuf;                 // flushBufのポインタを退避
+			flushBuf = activeBuf;                    // 現在のバッファをflushBufに切り替え
+			activeBuf = tmp;                         // 退避したバッファを新たなactiveに
+			logBuffIndex = 0;                        // 新バッファの書込位置をリセット
+			sendSD = true;                           // SD書き込みを要求
 		}
 	}
 }
@@ -297,8 +298,8 @@ void writeLogPuts(void)
 	{
 		if (sendSD)
 		{
-			sendSD = false;
-			f_write(&fil_W, logBufferSend, logBuffSendIndex, writtenlog);
+			f_write(&fil_W, flushBuf, logBuffSendIndex, writtenlog); // flushBufをSDへ書き出す
+			sendSD = false;                                         // 書き込み完了フラグをクリア
 		}
 	}
 }
@@ -408,10 +409,9 @@ void endLog(void)
 	uint32_t logval32[10];
 	float logvalf[10];
 
-	logBuffSendIndex = logBuffIndex;							  // バッファのバイト数を記録
-	memcpy(logBufferSend, logBuffer, logBuffSendIndex);			  // 送信用配列にコピー
-	f_write(&fil_W, logBufferSend, logBuffSendIndex, writtenlog); // 残りのログをSDカードに送信
-	f_close(&fil_W);											  // 一時ファイルを閉じる
+	logBuffSendIndex = logBuffIndex;							// バッファのバイト数を記録
+	f_write(&fil_W, activeBuf, logBuffSendIndex, writtenlog); // アクティブバッファの残りをSDカードに送信
+	f_close(&fil_W);                                                                                        // 一時ファイルを閉じる
 
 	createLog(); // ログファイル(csv)を作成
 
@@ -597,42 +597,42 @@ void createDir(uint8_t *dirName)
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 send8bit
-// 処理概要     8bit変数をlogBufferに送る
+// 処理概要     8bit変数をアクティブバッファに送る
 // 引数         変換する8bit変数
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 #ifdef LOG_RUNNING_WRITE
 void send8bit(uint8_t data)
 {
-	logBuffer[logBuffIndex++] = data;
+	activeBuf[logBuffIndex++] = data; // アクティブバッファに追加
 }
 #endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 send16bit
-// 処理概要     16bit変数を1バイトごとに分割してlogBufferに送る
+// 処理概要     16bit変数を1バイトごとに分割してアクティブバッファに送る
 // 引数         変換する16bit変数
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 #ifdef LOG_RUNNING_WRITE
 void send16bit(uint16_t data)
 {
-	logBuffer[logBuffIndex++] = data >> 8;
-	logBuffer[logBuffIndex++] = data & 0xff;
+	activeBuf[logBuffIndex++] = data >> 8; // 上位バイトを追加
+	activeBuf[logBuffIndex++] = data & 0xff; // 下位バイトを追加
 }
 #endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 send32bit
-// 処理概要     32bit変数を1バイトごとに分割してlogBufferに送る
+// 処理概要     32bit変数を1バイトごとに分割してアクティブバッファに送る
 // 引数         変換する32bit変数
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 #ifdef LOG_RUNNING_WRITE
 void send32bit(uint32_t data)
 {
-	logBuffer[logBuffIndex++] = data >> 24;
-	logBuffer[logBuffIndex++] = (data & 0x00ff0000) >> 16;
-	logBuffer[logBuffIndex++] = (data & 0x0000ff00) >> 8;
-	logBuffer[logBuffIndex++] = data & 0x000000ff;
+	activeBuf[logBuffIndex++] = data >> 24;                    // 24-31bit
+	activeBuf[logBuffIndex++] = (data & 0x00ff0000) >> 16;     // 16-23bit
+	activeBuf[logBuffIndex++] = (data & 0x0000ff00) >> 8;      // 8-15bit
+	activeBuf[logBuffIndex++] = data & 0x000000ff;             // 0-7bit
 }
 #endif
 /////////////////////////////////////////////////////////////////////
