@@ -565,7 +565,8 @@ void getFileNumbers(void)
 /////////////////////////////////////////////////////////////////////
 void setLogStr(uint8_t *column, uint8_t *format)
 {
-	uint8_t *columnStr[30], formatStr[30];
+	uint8_t columnStr[30];	// ヘッダー文字列を一時的に格納するバッファ
+	uint8_t formatStr[30];	// フォーマット文字列を一時的に格納するバッファ
 
 	// copy str to local variable
 	strcpy(columnStr, column);
