@@ -25,11 +25,34 @@
 #define HEX_PID_ANGLE 0x8
 #define HEX_PID_DIST 0x9
 
+// パターン構造体
+typedef struct
+{
+        int16_t display;                // 表示パターン
+        int16_t sensors;                // センサメニュー
+        int16_t beforeSensors;          // 前回のセンサメニュー
+        uint8_t beforeHex;              // 前回の表示HEX
+        int16_t sensorLine;             // ラインセンサ項目
+        int16_t sensorAccele;           // 加速度センサ項目
+        int16_t sensorGyro;             // ジャイロセンサ項目
+        int16_t parameter1;             // パラメータ1
+        int16_t parameter2;             // パラメータ2
+        int16_t parameter3;             // パラメータ3
+        int16_t parameter4;             // パラメータ4
+        int16_t gain;                   // ゲイン選択
+        int16_t speedseting;            // 速度設定
+        int16_t log;                    // ログメニュー
+        int16_t calibration;            // キャリブレーション
+        int16_t click;                  // クリックメニュー
+        // 新しいパターンを追加する場合はここにメンバとコメントを追加
+} Pattern;
+
 //======================================//
 // グローバル変数の宣言
 //======================================//
 // パターン関連
 extern uint8_t start;
+extern Pattern pattern;
 
 // タイマ関連
 extern uint16_t cntSetup1;
