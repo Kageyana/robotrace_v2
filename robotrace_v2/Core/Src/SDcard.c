@@ -4,6 +4,7 @@
 #include "SDcard.h"
 #include "fatfs.h"
 #include <string.h>
+#include <stdio.h>
 //====================================//
 // グローバル変数の宣
 //====================================//
@@ -173,8 +174,8 @@ void createLog(void)
 		fileNumber++; // index pulus
 	}
 
-	sprintf(fileName, "%d", fileNumber);						   // 数値を文字列に変換
-	strcat(fileName, ".csv");									   // 拡張子を追加
+	snprintf((char *)fileName, sizeof(fileName), "%d", fileNumber); // バッファサイズを指定して安全に文字列化
+	strncat((char *)fileName, ".csv", sizeof(fileName) - strlen((char *)fileName) - 1); // バッファサイズを指定して安全に拡張子を追加
 	fresult = f_open(&fil_W, fileName, FA_OPEN_ALWAYS | FA_WRITE); // create file
 	if (fresult != FR_OK)
 	{
@@ -182,8 +183,8 @@ void createLog(void)
 		return; // エラーが発生したため処理を終了
 	}
 
-	strcpy(columnTitle, "");
-	strcpy(formatLog, "");
+	columnTitle[0] = 0; // バッファを安全に初期化
+	formatLog[0] = 0;   // バッファを安全に初期化
 #ifdef LOG_RUNNING_WRITE
 	setLogStr("cntlog", "%d");
 	setLogStr("encCurrentN", "%d");
@@ -215,8 +216,8 @@ void createLog(void)
 	// setLogStr("courseMarker",  "%d");
 	// setLogStr("encTotalN",    "%d");
 #endif
-	strcat(columnTitle, "\n");
-	strcat(formatLog, "\n");
+    strncat((char *)columnTitle, "\n", sizeof(columnTitle) - strlen((char *)columnTitle) - 1); // バッファサイズを指定して安全に改行を追加
+    strncat((char *)formatLog, "\n", sizeof(formatLog) - strlen((char *)formatLog) - 1);       // バッファサイズを指定して安全に改行を追加
 	f_printf(&fil_W, columnTitle);
 }
 /////////////////////////////////////////////////////////////////////
@@ -426,7 +427,7 @@ void writeLogPrint(void)
 		}
 
 		// 文字列に変換
-		sprintf(logStr, formatLog,
+        snprintf((char *)logStr, sizeof(logStr), (char *)formatLog, // バッファサイズを指定して安全に文字列化
 				totalTime,
 				logVal[i].speed,
 				logVal[i].zg,
@@ -530,7 +531,7 @@ void endLog(void)
 		beforeTime = time; // 時間を更新
 
 		// 文字列に変換
-		sprintf(logStr, formatLog,
+        snprintf((char *)logStr, sizeof(logStr), (char *)formatLog, // バッファサイズを指定して安全に文字列化
 				time,
 				speed,
 				zg,
@@ -608,14 +609,14 @@ void setLogStr(uint8_t *column, uint8_t *format)
 	uint8_t columnStr[30];	// ヘッダー文字列を一時的に格納するバッファ
 	uint8_t formatStr[30];	// フォーマット文字列を一時的に格納するバッファ
 
-	// copy str to local variable
-	strcpy(columnStr, column);
-	strcpy(formatStr, format);
+       // copy str to local variable
+       snprintf((char *)columnStr, sizeof(columnStr), "%s", column); // バッファサイズを指定して安全にコピー
+       snprintf((char *)formatStr, sizeof(formatStr), "%s", format); // バッファサイズを指定して安全にコピー
 
-	strcat(columnStr, ",");
-	strcat(formatStr, ",");
-	strcat(columnTitle, columnStr);
-	strcat(formatLog, formatStr);
+       strncat((char *)columnStr, ",", sizeof(columnStr) - strlen((char *)columnStr) - 1); // バッファサイズを指定して安全に結合
+       strncat((char *)formatStr, ",", sizeof(formatStr) - strlen((char *)formatStr) - 1); // バッファサイズを指定して安全に結合
+       strncat((char *)columnTitle, (char *)columnStr, sizeof(columnTitle) - strlen((char *)columnTitle) - 1); // バッファサイズを指定して安全に結合
+       strncat((char *)formatLog, (char *)formatStr, sizeof(formatLog) - strlen((char *)formatLog) - 1);       // バッファサイズを指定して安全に結合
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SDtest
