@@ -19,5 +19,6 @@ extern float bootTime;
 void Interrupt1ms(void);
 void Interrupt100us(void);
 void Interrupt300ns(void);
+void logWriteTask(void);
 
 #endif // TIMER_H_
