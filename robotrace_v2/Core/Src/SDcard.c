@@ -174,8 +174,8 @@ void createLog(void)
 		fileNumber++; // index pulus
 	}
 
-       snprintf((char *)fileName, sizeof(fileName), "%d", fileNumber); // バッファサイズを指定して安全に文字列化
-       strncat((char *)fileName, ".csv", sizeof(fileName) - strlen((char *)fileName) - 1); // バッファサイズを指定して安全に拡張子を追加
+	snprintf((char *)fileName, sizeof(fileName), "%d", fileNumber); // バッファサイズを指定して安全に文字列化
+	strncat((char *)fileName, ".csv", sizeof(fileName) - strlen((char *)fileName) - 1); // バッファサイズを指定して安全に拡張子を追加
 	fresult = f_open(&fil_W, fileName, FA_OPEN_ALWAYS | FA_WRITE); // create file
 	if (fresult != FR_OK)
 	{
@@ -183,8 +183,8 @@ void createLog(void)
 		return; // エラーが発生したため処理を終了
 	}
 
-        columnTitle[0] = 0; // バッファを安全に初期化
-        formatLog[0] = 0;   // バッファを安全に初期化
+	columnTitle[0] = 0; // バッファを安全に初期化
+	formatLog[0] = 0;   // バッファを安全に初期化
 #ifdef LOG_RUNNING_WRITE
 	setLogStr("cntlog", "%d");
 	setLogStr("encCurrentN", "%d");
@@ -216,8 +216,8 @@ void createLog(void)
 	// setLogStr("courseMarker",  "%d");
 	// setLogStr("encTotalN",    "%d");
 #endif
-       strncat((char *)columnTitle, "\n", sizeof(columnTitle) - strlen((char *)columnTitle) - 1); // バッファサイズを指定して安全に改行を追加
-       strncat((char *)formatLog, "\n", sizeof(formatLog) - strlen((char *)formatLog) - 1);       // バッファサイズを指定して安全に改行を追加
+    strncat((char *)columnTitle, "\n", sizeof(columnTitle) - strlen((char *)columnTitle) - 1); // バッファサイズを指定して安全に改行を追加
+    strncat((char *)formatLog, "\n", sizeof(formatLog) - strlen((char *)formatLog) - 1);       // バッファサイズを指定して安全に改行を追加
 	f_printf(&fil_W, columnTitle);
 }
 /////////////////////////////////////////////////////////////////////
