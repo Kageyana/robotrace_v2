@@ -18,12 +18,12 @@ uint8_t columnTitle[512] = "", formatLog[256] = "";
 
 // ログバッファ
 #ifdef LOG_RUNNING_WRITE
-uint8_t logBuffer[2][BUFFER_SIZE_LOG];               // バッファは2個で固定
-uint8_t *activeBuf = logBuffer[0];                   // 書き込み中のバッファ
-uint8_t *flushBuf = logBuffer[1];                    // SD書き込み待ちバッファ
-int16_t logBuffIndex = 0;                            // 一時記録バッファ書込アドレス
-uint32_t logBuffSendIndex = 0;                       // flushBufに溜まったバイト数
-volatile bool sendSD = false;                        // flushBufをSDへ送るフラグ(割込み共有)
+uint8_t logBuffer[2][BUFFER_SIZE_LOG];	// バッファは2個で固定
+uint8_t *activeBuf = logBuffer[0];		// 書き込み中のバッファ
+uint8_t *flushBuf = logBuffer[1];		// SD書き込み待ちバッファ
+int16_t logBuffIndex = 0;				// 一時記録バッファ書込アドレス
+uint32_t logBuffSendIndex = 0;			// flushBufに溜まったバイト数
+volatile bool sendSD = false;			// flushBufをSDへ送るフラグ(割込み共有)
 uint16_t cntSend = 0;
 uint8_t *logaddress;
 #else
@@ -100,7 +100,7 @@ bool initMicroSD(void)
 		printf("SD CARD mounted successfully...\r\n");
 
 		// 空き容量を計算
-		fresult = f_getfree("", &fre_clust, &pfs);							// cluster size
+		fresult = f_getfree("", &fre_clust, &pfs);	// cluster size
 		if (fresult != FR_OK)
 		{
 			// 空き容量取得に失敗した場合はエラーメッセージを出力して終了
@@ -304,7 +304,6 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
         uint16_t requiredSize = c + (s * sizeof(uint16_t)) + (i * sizeof(uint32_t)) + (f * sizeof(float)); // 引数数に応じたバッファ必要量を算出
 		// 	バッファ配列に保存
 		va_start(args, f);
-		// logBuffer[0] = va_arg( args, uint8_t* );
 		// 8bitデータをバッファへ送る
 		for (cnt = 0; cnt < c; cnt++)
 			send8bit(va_arg(args, unsigned int)); // 可変長引数の型昇格に合わせる
@@ -345,8 +344,8 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 #ifdef LOG_RUNNING_WRITE
 void writeLogPuts(void)
 {
-	FRESULT fresult;                            // f_writeの戻り値
-	UINT writtenlog = 0; // 実際に書き込んだサイズ
+	FRESULT fresult;		// f_writeの戻り値
+	UINT writtenlog = 0;	// 実際に書き込んだサイズ
 
 	if (modeLOG)
 	{
@@ -425,17 +424,17 @@ void writeLogPrint(void)
 
 		// 文字列に変換
         snprintf((char *)logStr, sizeof(logStr), (char *)formatLog, // バッファサイズを指定して安全に文字列化
-				totalTime,
-				logVal[i].speed,
-				logVal[i].zg,
-				marker,
-				distance,
-				calcROC(logVal[i].speed, logVal[i].zg, (float)logVal[i].time / 1000),
+			totalTime,
+			logVal[i].speed,
+			logVal[i].zg,
+			marker,
+			distance,
+			calcROC(logVal[i].speed, logVal[i].zg, (float)logVal[i].time / 1000),
 
-				xycie.x,
-				xycie.y,
-				logVal[i].opIndex,
-				logVal[i].targetSpeed);
+			xycie.x,
+			xycie.y,
+			logVal[i].opIndex,
+			logVal[i].targetSpeed);
 
 		// 文字列をSDカードに送信
 		f_puts(logStr, &fil_W);
@@ -452,8 +451,7 @@ void endLog(void)
 {
 	initIMU = false; // IMUの使用を停止(SPIが競合するため)
 	modeLOG = false; // ログ取得停止
-	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY)
-		; // SPIバスが空くまで待つ
+	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY); // SPIバスが空くまで待つ
 
 #ifdef LOG_RUNNING_WRITE
 	FRESULT fresult;
@@ -483,26 +481,27 @@ void endLog(void)
 	fresult = f_write(&fil_W, activeBuf, logBuffSendIndex, &writtenlog);     // 残りのデータを送信
 	if (fresult != FR_OK)
 	{
-		printf("f_write error in endLog\r\n"); // 追記: エラー通知
+		printf("f_write error in endLog\r\n"); // エラー通知
 	}
 	f_close(&fil_W); // 一時ファイルを閉じる
 
 	createLog(); // ログファイル(csv)を作成
 
-	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ); // ログファイルを開く
+	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ); // 一時ファイルファイルを開く
 	if (fresult != FR_OK)
 	{
-		printf("f_open error in endLog\r\n"); // 追記: エラー通知
+		printf("f_open error in endLog\r\n"); // エラー通知
 		f_close(&fil_W); // 作成したログファイルを閉じる
 		return; // 一時ファイルが読めないと変換できないため中断
 	}
+
 	clearXYcie(); // xy座標クリア
 	for (j = 0; j < cntSend; j++)
 	{
 		fresult = f_read(&fil, log, sizeof(log), &readByte); // 読み込んだバイト数を取得するためポインタを渡す
 		if (fresult != FR_OK)
 		{
-			printf("f_read error in endLog\r\n"); // 追記: エラー通知
+			printf("f_read error in endLog\r\n"); // エラー通知
 			f_close(&fil_W); // CSVファイルを閉じる
 			f_close(&fil); // 一時ファイルを閉じる
 			return; // データが読めないと解析不能なため中断
@@ -547,21 +546,21 @@ void endLog(void)
 
 		// 文字列に変換
         snprintf((char *)logStr, sizeof(logStr), (char *)formatLog, // バッファサイズを指定して安全に文字列化
-				time,
-				speed,
-				zg,
-				marker,
-				distance,
-				logvalf[1],
+			time,
+			speed,
+			zg,
+			marker,
+			distance,
+			logvalf[1],
 
-				logval8[0],
-				logval16[2],
-				(float)logval16[3] / 10000,
-				(float)logval16[4] / 10000,
-				(int16_t)logval16[5],
-				(int16_t)logval16[6],
-				logvalf[2],
-				logvalf[3]);
+			logval8[0],
+			logval16[2],
+			(float)logval16[3] / 10000,
+			(float)logval16[4] / 10000,
+			(int16_t)logval16[5],
+			(int16_t)logval16[6],
+			logvalf[2],
+			logvalf[3]);
 
 		// 文字列をSDカードに送信
 		f_puts(logStr, &fil_W);
