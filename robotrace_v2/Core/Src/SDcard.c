@@ -543,7 +543,7 @@ void getFileNumbers(void)
 	uint8_t fileName[10];
 	uint8_t *tp, i;
 
-       fresult = f_opendir(&dir, "/"); // directory open
+    fresult = f_opendir(&dir, "/"); // directory open
 	if (fresult == FR_OK)
 	{
 		do
