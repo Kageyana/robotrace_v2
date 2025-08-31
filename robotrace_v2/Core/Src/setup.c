@@ -22,13 +22,13 @@ int8_t pushUD = 0;
 // パターン関連
 uint8_t push1 = 0;
 Pattern pattern = {
-        .display = 0,
-        .sensors = TEST_MOTOR, // 初期選択:モータテスト
-        .beforeSensors = 0,
-        .beforeHex = 255,
-        .sensorLine = 1,
-        .sensorAccele = 1,
-        .sensorGyro = 1,
+	.display = 0,
+	.sensors = TEST_MOTOR, // 初期選択:モータテスト
+	.beforeSensors = 0,
+	.beforeHex = 255,
+	.sensorLine = 1,
+	.sensorAccele = 1,
+	.sensorGyro = 1,
 	.parameter1 = 1,
 	.parameter2 = 1,
 	.parameter3 = 1,
@@ -586,12 +586,12 @@ static void setup_sensors(void)
         // テーブルを走査して該当テストを探索
         for (uint8_t i = 0; i < sizeof(sensorTestTable) / sizeof(sensorTestTable[0]); i++)
         {
-                // テーブルから選択IDに対応するテストを探索
-                if (pattern.sensors == sensorTestTable[i].id)
-                {
-                        sensorTestTable[i].func(); // 選択されたテストを実行
-                        break; // 一致したらループ終了
-                }
+			// テーブルから選択IDに対応するテストを探索
+			if (pattern.sensors == sensorTestTable[i].id)
+			{
+				sensorTestTable[i].func(); // 選択されたテストを実行
+				break; // 一致したらループ終了
+			}
         }
 	pattern.beforeSensors = pattern.sensors;        // 選択状態の更新
 }
