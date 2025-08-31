@@ -589,8 +589,14 @@ void SDtest(void)
 	FRESULT fresult;
 
 	fresult = f_open(&fil_T, "test.csv", FA_OPEN_ALWAYS | FA_WRITE); // create file
+	uint32_t start = HAL_GetTick(); // SPI待ちにタイムアウトを設定
 	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY)
-		;
+	{
+		if (HAL_GetTick() - start > SPI_TIMEOUT)
+		{
+			break;
+		}
+	}
 	f_close(&fil_T);
 }
 /////////////////////////////////////////////////////////////////////
