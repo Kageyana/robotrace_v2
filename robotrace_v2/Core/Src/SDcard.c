@@ -309,7 +309,7 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 			uint32_t startTick = HAL_GetTick(); // タイムアウト計測開始
 			while (freeBufCount == 0)
 			{
-				// 空きバッファの解放を待機（HAL_Delayは全処理を停止するため使用しない）
+				HAL_Delay(1); // 空きバッファ解放待ちでCPU負荷を抑えるため短時間待機
 				if (HAL_GetTick() - startTick > 1000) // 一定時間待機しても空きがない場合はタイムアウト
 				{
 					break;
