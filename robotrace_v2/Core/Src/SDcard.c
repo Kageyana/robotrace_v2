@@ -102,7 +102,14 @@ bool initMicroSD(void)
 		printf("SD CARD mounted successfully...\r\n");
 
 		// 空き容量を計算
-		f_getfree("", &fre_clust, &pfs);							// cluster size
+		fresult = f_getfree("", &fre_clust, &pfs);							// cluster size
+		if (fresult != FR_OK)
+		{
+			// 空き容量取得に失敗した場合はエラーメッセージを出力して終了
+			initMSD = false;
+			printf("error in getting SD CARD free space...\r\n");
+			return false;
+		}
 		total = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5); // total capacity
 		printf("SD_SIZE: \t%lu\r\n", total);
 		free_space = (uint32_t)(fre_clust * pfs->csize * 0.5); // empty capacity
