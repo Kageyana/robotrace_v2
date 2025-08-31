@@ -62,6 +62,7 @@ int16_t endFileIndex = 0; // ログの最終番号
 // カウンタ
 uint8_t cntLog = 0;
 int32_t encLog = 0;
+bool getFileNumbersError = false; // getFileNumbersでエラーが発生した際のフラグ
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 insertSD
@@ -619,11 +620,18 @@ void getFileNumbers(void)
 	{
 		do
 		{
-			f_readdir(&dir, &fno);
+			fresult = f_readdir(&dir, &fno);
+			if (fresult != FR_OK)
+			{
+				// ディレクトリ読み込みに失敗した場合はループを抜けてフラグを設定
+				getFileNumbersError = true;
+				printf("f_readdir error: %d\r\n", fresult); // エラー内容を出力
+				break;
+			}
 			if (strstr(fno.fname, ".csv") != NULL)
 			{
 				// csvファイルのとき
-				tp = strtok(fno.fname, ".");		  // 拡張子削除
+				tp = strtok(fno.fname, ".");              // 拡張子削除
 				fileNumbers[endFileIndex] = atoi(tp); // 文字列を数値に変換
 				endFileIndex++;
 			}
