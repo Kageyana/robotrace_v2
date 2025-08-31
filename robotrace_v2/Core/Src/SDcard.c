@@ -18,18 +18,14 @@ uint8_t columnTitle[512] = "", formatLog[256] = "";
 
 // ログバッファ
 #ifdef LOG_RUNNING_WRITE
-#define LOG_BUFFER_SIZE (512 * 4) // バッファ増量
-#define LOG_BUFFER_COUNT 8        // バッファ数増量
-uint8_t logBuffer[LOG_BUFFER_COUNT][LOG_BUFFER_SIZE]; // バッファ増量
-uint8_t *activeBuf = logBuffer[0]; // 書き込み中のバッファ
-uint8_t activeIndex = 0;          // 現在のバッファ番号
-uint8_t flushIndex = 0;           // SD書き込み待ちバッファ番号
-int16_t logBuffIndex = 0;          // 一時記録バッファ書込アドレス
-volatile bool sendSD = false;      // SD書き込み要求フラグ
-                                   // 割込みとの共有のため volatile 指定
+uint8_t logBuffer[2][BUFFER_SIZE_LOG];               // バッファは2個で固定
+uint8_t *activeBuf = logBuffer[0];                   // 書き込み中のバッファ
+uint8_t *flushBuf = logBuffer[1];                    // SD書き込み待ちバッファ
+int16_t logBuffIndex = 0;                            // 一時記録バッファ書込アドレス
+uint32_t logBuffSendIndex = 0;                       // flushBufに溜まったバイト数
+volatile bool sendSD = false;                        // flushBufをSDへ送るフラグ(割込み共有)
 uint16_t cntSend = 0;
 uint8_t *logaddress;
-volatile uint8_t freeBufCount = LOG_BUFFER_COUNT - 1; // 未使用バッファ数を管理
 #else
 typedef struct
 {
@@ -106,7 +102,7 @@ bool initMicroSD(void)
 		// 空き容量を計算
 		fresult = f_getfree("", &fre_clust, &pfs);							// cluster size
 		if (fresult != FR_OK)
-		{
+	{
 			// 空き容量取得に失敗した場合はエラーメッセージを出力して終了
 			initMSD = false;
 			printf("error in getting SD CARD free space...\r\n");
@@ -149,17 +145,17 @@ void createLog(void)
 
 	fresult = f_opendir(&dir, "/"); // directory open
 	if (fresult != FR_OK)
-{
+	{
 		printf("failed to open root directory: %d\r\n", fresult);
 		// SDカードが未接続などでディレクトリを開けないため、ログ作成を中断する
 		return;
-	}
+			}
 
 	do
 	{
 		fresult = f_readdir(&dir, &fno);
 		if (fresult != FR_OK)
-		{
+	{
 			// エラーが発生した場合はループを抜けてファイル探索を中断
 			break;
 		}
@@ -196,7 +192,7 @@ void createLog(void)
 	{
 		// ファイルオープンに失敗した場合はログ作成を中止する
 		return; // エラーが発生したため処理を終了
-	}
+			}
 
 	columnTitle[0] = 0; // バッファを安全に初期化
 	formatLog[0] = 0;   // バッファを安全に初期化
@@ -272,13 +268,12 @@ void initLog(void)
 		printf("error opening log file: %d\r\n", fresult); // エラー内容を出力
 		initMSD = false; // ファイルオープンに失敗した場合はmicroSDを使用不可とする
 		return;          // ログ初期化を中止
-	}
-	freeBufCount = LOG_BUFFER_COUNT - 1;                          // 未使用バッファ数を初期化
-	activeIndex = 0;                                              // バッファ番号を初期化
-	flushIndex = 0;                                               // フラッシュ待ち番号を初期化
-	logBuffIndex = 0;                                             // 書込位置を初期化
-	activeBuf = logBuffer[0];                                     // アクティブバッファを初期化
-	sendSD = false;                                               // 書き込み要求をリセット
+			}
+        logBuffIndex = 0;                                             // 書込位置を初期化
+        activeBuf = logBuffer[0];                                     // アクティブバッファを初期化
+        flushBuf = logBuffer[1];                                      // フラッシュバッファを初期化
+	logBuffSendIndex = logBuffIndex;                                         // バッファのバイト数を記録
+        sendSD = false;                                               // 書き込み要求をリセット
 #else
     // 構造体配列の初期化
     memset(&logVal, 0, sizeof(logData) * BUFFER_SIZE_LOG);     // 綴りの誤りを修正
@@ -328,36 +323,15 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 		va_end(args);
 		cntSend++; // 書き込み回数をカウント
 
-		// バッファ容量を超えたらリングバッファを進める
-                if (logBuffIndex + requiredSize > LOG_BUFFER_SIZE) // 追加データ分のバッファ残量をチェック
+		// バッファが512バイト付近まで溜まったら確認
+		if (logBuffIndex + requiredSize > BUFFER_SIZE_LOG && !sendSD)
 		{
-			// バッファが枯渇している場合は空きができるまで待機
-			uint32_t startTick = HAL_GetTick(); // タイムアウト計測開始
-			while (freeBufCount == 0)
-			{
-				HAL_Delay(1); // 空きバッファ解放待ちでCPU負荷を抑えるため短時間待機
-				if (HAL_GetTick() - startTick > 1000) // 一定時間待機しても空きがない場合はタイムアウト
-				{
-					break;
-				}
-			}
-			// タイムアウト後に空きバッファ数を確認
-			if (freeBufCount == 0)
-			{
-				// タイムアウト後も空きバッファがない場合はアンダーフロー防止のためエラー扱い
-				logOverflow = true; // バッファ不足エラーフラグ
-				logBuffIndex = 0; // タイムアウト時は書き込みを中止
-				return; // タイムアウト時は書き込みを中止
-			}
-			else
-			{
-				// 空きバッファが確保できた場合のみリングバッファを進める
-				logBuffIndex = 0;									// 書込位置をリセット
-				activeIndex = (activeIndex + 1) % LOG_BUFFER_COUNT; // リングバッファ切替
-				activeBuf = logBuffer[activeIndex];					// アクティブバッファ更新
-				freeBufCount--;										// 使用バッファを減算
-				sendSD = true;										// SD書き込みを要求
-			}
+			logBuffSendIndex = logBuffIndex;         // 書き込み待ちバッファのサイズを記録
+			uint8_t *tmp = flushBuf;                 // flushBufのポインタを退避
+			flushBuf = activeBuf;                    // 現在のバッファをflushBufに切り替え
+			activeBuf = tmp;                         // 退避したバッファを新たなactiveに
+			logBuffIndex = 0;                        // 新バッファの書込位置をリセット
+			sendSD = true;                           // SD書き込みを要求
 		}
 	}
 }
@@ -378,25 +352,14 @@ void writeLogPuts(void)
 	{
 		if (sendSD) // 書き込み要求がある場合
 		{
-			// 未書き込みバッファをSDカードへ転送
-			fresult = f_write(&fil_W, logBuffer[flushIndex], LOG_BUFFER_SIZE, &writtenlog);	// リングバッファから書き出し
-			if (fresult != FR_OK)
+			fresult = f_write(&fil_W, flushBuf, logBuffSendIndex, &writtenlog); // flushBufをSDへ書き出す
+			if (fresult != FR_OK || writtenlog != logBuffSendIndex)
 			{
-				// 書き込みに失敗した場合は要求を解除して終了
-				sendSD = false;
+				sendSD = false; // エラー時は要求を解除
 				return;
 			}
-			// 実際の書き込みサイズを検証
-			if (writtenlog != LOG_BUFFER_SIZE)
-			{
-				sendSD = false;
-				return;
-			}
-			freeBufCount++;															// バッファ解放
-			flushIndex = (flushIndex + 1) % LOG_BUFFER_COUNT;						// 次のバッファへ
-			if (flushIndex == activeIndex)											// 全バッファ書き込み済みなら終了
-				sendSD = false;														// 書き込み要求を解除
-			}
+			sendSD = false; // 書き込み完了フラグをクリア
+            }
         }
 }
 #endif
@@ -514,14 +477,13 @@ void endLog(void)
 	float logvalf[10];
 
 	while (sendSD) // 溜まったバッファをすべて書き出す
-		writeLogPuts(); // リングバッファ書き込み
-	
-	fresult = f_write(&fil_W, logBuffer[activeIndex], logBuffIndex, &writtenlog); // 残りのデータを送信
+		writeLogPuts(); // 未処理バッファを書き込む
+
+	logBuffSendIndex = logBuffIndex;                                         // バッファのバイト数を記録
+	fresult = f_write(&fil_W, activeBuf, logBuffSendIndex, &writtenlog);     // 残りのデータを送信
 	if (fresult != FR_OK)
 	{
 		printf("f_write error in endLog\r\n"); // 追記: エラー通知
-		// f_close(&fil_W); // ファイルを閉じてリソース解放
-		// return; // ログが不完全になるため中断
 	}
 	f_close(&fil_W); // 一時ファイルを閉じる
 
@@ -533,18 +495,18 @@ void endLog(void)
 		printf("f_open error in endLog\r\n"); // 追記: エラー通知
 		f_close(&fil_W); // 作成したログファイルを閉じる
 		return; // 一時ファイルが読めないと変換できないため中断
-	}
+		}
 	clearXYcie(); // xy座標クリア
 	for (j = 0; j < cntSend; j++)
 	{
 		fresult = f_read(&fil, log, sizeof(log), &readByte); // 読み込んだバイト数を取得するためポインタを渡す
 		if (fresult != FR_OK)
-		{
+	{
 			printf("f_read error in endLog\r\n"); // 追記: エラー通知
 			f_close(&fil_W); // CSVファイルを閉じる
 			f_close(&fil); // 一時ファイルを閉じる
 			return; // データが読めないと解析不能なため中断
-		}
+			}
 		logaddress = log; // 読み込んだ配列の先頭アドレスを取得
 
 		// 型ごとに変数を復元
@@ -637,7 +599,7 @@ void getFileNumbers(void)
 		{
 			fresult = f_readdir(&dir, &fno);
 			if (fresult != FR_OK)
-			{
+	{
 				// ディレクトリ読み込みに失敗した場合はループを抜けてフラグを設定
 				getFileNumbersError = true;
 				printf("f_readdir error: %d\r\n", fresult); // エラー内容を出力
