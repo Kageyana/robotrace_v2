@@ -138,9 +138,15 @@ void createLog(void)
 	uint8_t *tp, fileName[10];
 	uint16_t fileNumber = 0;
 
-	f_opendir(&dir, "/"); // directory open
+        fresult = f_opendir(&dir, "/"); // directory open
+        if (fresult != FR_OK)
+        {
+                printf("failed to open root directory: %d\r\n", fresult);
+                // SDカードが未接続などでディレクトリを開けないため、ログ作成を中断する
+                return;
+        }
 
-	do
+        do
 	{
 		fresult = f_readdir(&dir, &fno);
 		if (fresult != FR_OK)
