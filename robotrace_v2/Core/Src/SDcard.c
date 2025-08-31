@@ -306,6 +306,7 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 
 	if (modeLOG)
 	{
+                uint16_t requiredSize = c + (s * sizeof(uint16_t)) + (i * sizeof(uint32_t)) + (f * sizeof(float)); // 引数数に応じたバッファ必要量を算出
 		// 	バッファ配列に保存
 		va_start(args, f);
 		// logBuffer[0] = va_arg( args, uint8_t* );
@@ -328,7 +329,7 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 		cntSend++; // 書き込み回数をカウント
 
 		// バッファ容量を超えたらリングバッファを進める
-		if (logBuffIndex + LOG_SIZE > LOG_BUFFER_SIZE)
+                if (logBuffIndex + requiredSize > LOG_BUFFER_SIZE) // 追加データ分のバッファ残量をチェック
 		{
 			// バッファが枯渇している場合は空きができるまで待機
 			uint32_t startTick = HAL_GetTick(); // タイムアウト計測開始
