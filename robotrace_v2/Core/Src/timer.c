@@ -128,11 +128,11 @@ void Interrupt1ms(void)
 	if (patternTrace < 10 || patternTrace > 100)
 	{
 		// 走行前に処理
-                getSwitches(); // スイッチの入力を取得
-                countDown();
-                setupCount(); // セットアップ用タイマを更新
+		getSwitches(); // スイッチの入力を取得
+		countDown();
+		setupCount(); // セットアップ用タイマを更新
 
-                wheelClick();
+		wheelClick();
 	}
 	else
 	{

@@ -59,23 +59,23 @@ typedef struct
 	int16_t speedseting;            // 速度設定
 	int16_t log;                    // ログメニュー
 	int16_t calibration;            // キャリブレーション
-        int16_t click;                  // クリックメニュー
-        // 新しいパターンを追加する場合はここにメンバとコメントを追加
+	int16_t click;                  // クリックメニュー
+	// 新しいパターンを追加する場合はここにメンバとコメントを追加
 } Pattern;
 
 // セットアップ状態を管理するフラグ構造体
 typedef struct
 {
-        uint8_t start;       // 0:セットアップ中 1:セットアップ完了
-        int8_t clickStart;   // スタート方向
+	uint8_t start;       // 0:セットアップ中 1:セットアップ完了
+	int8_t clickStart;   // スタート方向
 } SetupFlags;
 
 // テスト関連のフラグ構造体
 typedef struct
 {
-        uint8_t motor_test;      // モータテスト
-        uint8_t trace_test;      // トレーステスト
-        uint8_t beforeMotorTest; // テスト状態保存用
+	uint8_t motor_test;      // モータテスト
+	uint8_t trace_test;      // トレーステスト
+	uint8_t beforeMotorTest; // テスト状態保存用
 } TestFlags;
 
 //======================================//
