@@ -70,6 +70,7 @@ static void test_switch(void); // タクトスイッチ
 static void test_battery(void); // バッテリ電圧
 static void test_linesensor(void); // ラインセンサ
 static void test_rgbled(void); // RGBLED
+static void init_sensor_test(const char* title, FontDef font, uint8_t x); // 表示初期化
 
 // センサテストで使用する関数ポインタ型
 typedef void (*SensorTestFunc)(void);
@@ -241,10 +242,25 @@ static void setup_speed_param(void)
 			ssd1306_SetCursor(0, 24);
 			ssd1306_printf(Font_6x8, "BST shortCut:%3gm/s", tgtParam.shortCut);
 			break;
-		}
-	}
+        }
+    }
 
     beforePparam = pattern.parameter1; // 選択項目を記録
+}
+
+///////////////////////////////////////////////////////////////////////////////////////
+// モジュール名 init_sensor_test
+// 処理概要     センサテスト画面の初期化
+// 引数         title : 表示文字列
+//              font  : 使用フォント
+//              x     : タイトル表示位置
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////////////////
+static void init_sensor_test(const char* title, FontDef font, uint8_t x)
+{
+	ssd1306_FillRectangle(0, 16, 127, 63, Black); // 表示領域をクリア
+	ssd1306_SetCursor(x, 16); // タイトルの位置設定
+	ssd1306_printf(font, title); // タイトルを描画
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -258,9 +274,7 @@ static void test_motor(void)
 	if (pattern.sensors != pattern.beforeSensors)
 	{
 		// 切替時に実行
-		ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
-		ssd1306_SetCursor(47, 16);
-		ssd1306_printf(Font_6x8, "Motor");
+		init_sensor_test("Motor", Font_6x8, 47); // 画面クリアとタイトル表示
 		motor_test = 0;
 	}
 	// Duty表示
@@ -314,9 +328,7 @@ static void test_imu_deg(void)
 	if (pattern.sensors != pattern.beforeSensors)
 	{
 		// 切替時に実行
-		ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
-		ssd1306_SetCursor(36, 16);
-		ssd1306_printf(Font_7x10, "IMU[deg]");
+		init_sensor_test("IMU[deg]", Font_7x10, 36); // 画面クリアとタイトル表示
 		motor_test = 1;
 	}
 
@@ -362,9 +374,7 @@ static void test_imu_accel(void)
 	if (pattern.sensors != pattern.beforeSensors)
 	{
 		// 切替時に実行
-		ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
-		ssd1306_SetCursor(36, 16);
-		ssd1306_printf(Font_7x10, "IMU[g]");
+		init_sensor_test("IMU[g]", Font_7x10, 36); // 画面クリアとタイトル表示
 	}
 
 	ssd1306_SetCursor(0, 30);
@@ -389,9 +399,7 @@ static void test_marker(void)
 	if (pattern.sensors != pattern.beforeSensors)
 	{
 		// 切替時に実行
-		ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
-		ssd1306_SetCursor(15, 16);
-		ssd1306_printf(Font_7x10, "Marker sensors");
+		init_sensor_test("Marker sensors", Font_7x10, 15); // 画面クリアとタイトル表示
 	}
 	ssd1306_SetCursor(0, 30);
 	ssd1306_printf(Font_7x10, "sensors:%d", getMarkerSensor());
@@ -420,9 +428,7 @@ static void test_switch(void)
 	if (pattern.sensors != pattern.beforeSensors)
 	{
 		// 切替時に実行
-		ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
-		ssd1306_SetCursor(32, 16);
-		ssd1306_printf(Font_7x10, "Switches");
+		init_sensor_test("Switches", Font_7x10, 32); // 画面クリアとタイトル表示
 	}
 	ssd1306_SetCursor(0, 30);
 	ssd1306_printf(Font_7x10, "Board SW:%d", swValMainTact);
@@ -442,9 +448,7 @@ static void test_battery(void)
 	if (pattern.sensors != pattern.beforeSensors)
 	{
 		// 切替時に実行
-		ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
-		ssd1306_SetCursor(32, 16);
-		ssd1306_printf(Font_7x10, "Battery");
+		init_sensor_test("Battery", Font_7x10, 32); // 画面クリアとタイトル表示
 	}
 	ssd1306_SetCursor(0, 30);
 	ssd1306_printf(Font_7x10, "batteryADAD:%d", batteryAD);
@@ -464,7 +468,7 @@ static void test_linesensor(void)
 	if (pattern.sensors != pattern.beforeSensors)
 	{
 		// 切替時に実行
-		ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
+		init_sensor_test("", Font_6x8, 0); // 画面クリア
 		// センサ基板形状
 		ssd1306_DrawArc(64, 81, 66, 90, 270, White);
 		ssd1306_DrawArc(64, 81, 35, 90, 270, White);
@@ -544,9 +548,7 @@ static void test_rgbled(void)
 	if (pattern.sensors != pattern.beforeSensors)
 	{
 		// 切替時に実行
-		ssd1306_FillRectangle(0, 16, 127, 63, Black); // 黒塗り
-		ssd1306_SetCursor(43, 16);
-		ssd1306_printf(Font_7x10, "RGBLED");
+		init_sensor_test("RGBLED", Font_7x10, 43); // 画面クリアとタイトル表示
 	}
 
 	data_select(&motor_test, SW_PUSH);
