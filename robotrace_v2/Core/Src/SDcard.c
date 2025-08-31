@@ -475,7 +475,7 @@ void endLog(void)
 	clearXYcie(); // xy座標クリア
 	for (j = 0; j < cntSend; j++)
 	{
-		f_read(&fil, log, sizeof(log), readByte);
+		f_read(&fil, log, sizeof(log), &readByte); // 読み込んだバイト数を取得するためポインタを渡す
 		logaddress = log; // 読み込んだ配列の先頭アドレスを取得
 
 		// 型ごとに変数を復元
