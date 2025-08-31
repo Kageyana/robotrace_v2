@@ -586,16 +586,26 @@ void loopSystem(void)
 			}
 			else
 			{
-				if (modeDSP)
-				{
-					ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-					ssd1306_SetCursor(0, 25);
-					ssd1306_printf(Font_11x18, "Time %d", optimalTrace);
-					ssd1306_SetCursor(0, 45);
-					ssd1306_printf(Font_11x18, "%6.3f[s]", (float)goalTime / 1000);
-					ssd1306_UpdateScreen(); // グラフィック液晶更新
-				}
-			}
+                               if (modeDSP)
+                               {
+                                       ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+                                       if (logOverflow || markerOverflow)
+                                       {       // バッファ上限エラー表示
+                                               ssd1306_SetCursor(0, 25);                               // 1行目の表示位置
+                                               ssd1306_printf(Font_11x18, "buff overflow");  // エラーメッセージ1行目
+                                               ssd1306_SetCursor(0, 45);                               // 2行目の表示位置
+                                               ssd1306_printf(Font_11x18, "error");         // エラーメッセージ2行目
+                                       }
+                                       else
+                                       {
+                                               ssd1306_SetCursor(0, 25);
+                                               ssd1306_printf(Font_11x18, "Time %d", optimalTrace);
+                                               ssd1306_SetCursor(0, 45);
+                                               ssd1306_printf(Font_11x18, "%6.3f[s]", (float)goalTime / 1000);
+                                       }
+                                       ssd1306_UpdateScreen(); // グラフィック液晶更新
+                               }
+                       }
 
 			goalTime = cntRun;
 			patternTrace = 102;

@@ -32,6 +32,8 @@ extern int16_t fileNumbers[1000],fileIndexLog, endFileIndex;
 extern uint8_t cntLog;
 extern int32_t encLog;
 extern volatile uint8_t freeBufCount; // 未使用バッファ数を監視
+extern bool logOverflow;     // ログバッファ上限超過フラグ
+extern bool markerOverflow;  // マーカーバッファ上限超過フラグ
 //====================================//
 // プロトタイプ宣言
 //====================================//
