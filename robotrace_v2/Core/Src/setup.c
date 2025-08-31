@@ -83,15 +83,48 @@ typedef struct
 
 // センサテストのテーブル {列挙体, 関数ポインタ}
 static const SensorTest sensorTestTable[] = {
-{TEST_MOTOR, test_motor}, // モータテスト
-{TEST_IMU_DEG, test_imu_deg}, // IMU角度表示
-{TEST_IMU_ACCEL, test_imu_accel}, // IMU加速度表示
-{TEST_MARKER, test_marker}, // マーカーセンサ
-{TEST_SWITCH, test_switch}, // タクトスイッチ
-{TEST_BATTERY, test_battery}, // バッテリ電圧
-{TEST_LINESENSOR, test_linesensor}, // ラインセンサ
-{TEST_RGBLED, test_rgbled} // RGBLED
+	{TEST_MOTOR, test_motor}, // モータテスト
+	{TEST_IMU_DEG, test_imu_deg}, // IMU角度表示
+	{TEST_IMU_ACCEL, test_imu_accel}, // IMU加速度表示
+	{TEST_MARKER, test_marker}, // マーカーセンサ
+	{TEST_SWITCH, test_switch}, // タクトスイッチ
+	{TEST_BATTERY, test_battery}, // バッテリ電圧
+	{TEST_LINESENSOR, test_linesensor}, // ラインセンサ
+	{TEST_RGBLED, test_rgbled} // RGBLED
 }; // IDと処理の対応テーブル
+
+// 速度パラメータの情報を保持する構造体
+typedef struct
+{
+	const char* label; // 表示文字列
+	float* value; // 対応する変数ポインタ
+	float step; // 増分値
+	float min; // 最小値
+	float max; // 最大値
+	const char* unit; // 表示単位
+} SpeedParamInfo; // 速度パラメータ情報
+
+// 速度パラメータの一覧テーブル
+static const SpeedParamInfo speedParamTable[] = {
+	{"STRAIGHT", &tgtParam.straight, 0.1, 0.0, 10.0, "m/s"},
+	{"CURVE", &tgtParam.curve, 0.1, 0.0, 10.0, "m/s"},
+	{"STOP", &tgtParam.stop, 0.1, 0.0, 10.0, "m/s"},
+	{"BST STRT", &tgtParam.bstStraight, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 1500", &tgtParam.bst1500, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 1300", &tgtParam.bst1300, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 1000", &tgtParam.bst1000, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 800", &tgtParam.bst800, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 700", &tgtParam.bst700, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 600", &tgtParam.bst600, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 500", &tgtParam.bst500, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 400", &tgtParam.bst400, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 300", &tgtParam.bst300, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 200", &tgtParam.bst200, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 100", &tgtParam.bst100, 0.1, 0.0, 10.0, "m/s"},
+	{"BST acceleF", &tgtParam.acceleF, 0.1, 0.0, 10.0, "m/ss"},
+	{"BST acceleD", &tgtParam.acceleD, 0.1, 0.0, 10.0, "m/ss"},
+	{"BST shortCut", &tgtParam.shortCut, 0.1, 0.0, 10.0, "m/s"}
+}; // 速度パラメータの対応テーブル
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_speed_param
 // 処理概要     速度パラメータ調整
@@ -115,137 +148,19 @@ static void setup_speed_param(void)
 		ssd1306_FillRectangle(0, 16, 127, 63, Black);
 	}
 
-	switch (pattern.parameter1)
+	// 選択番号に対応する速度パラメータを処理
+	for (uint8_t i = 0; i < sizeof(speedParamTable) / sizeof(speedParamTable[0]); i++)
 	{
-		case 1: // 通常走行速度
+		if (pattern.parameter1 == i + 1)
 		{
-			dataTuningUDF(&tgtParam.straight, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "STRAIGHT:%3gm/s", tgtParam.straight);
-			break;
+		dataTuningUDF(speedParamTable[i].value, speedParamTable[i].step, speedParamTable[i].min, speedParamTable[i].max);
+		ssd1306_SetCursor(0, 24);
+		ssd1306_printf(Font_6x8, "%s:%3gm/%s", speedParamTable[i].label, *speedParamTable[i].value, speedParamTable[i].unit);
+		break;
 		}
-		case 2: // 停止速度
-		{
-			dataTuningUDF(&tgtParam.curve, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "CURVE:%3gm/s", tgtParam.curve);
-			break;
-		}
-		case 3: // 停止速度
-		{
-			dataTuningUDF(&tgtParam.stop, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "STOP:%3gm/s", tgtParam.stop);
-			break;
-		}
-		case 4: // 2次走行_直線
-		{
-			dataTuningUDF(&tgtParam.bstStraight, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST STRT:%3gm/s", tgtParam.bstStraight);
-			break;
-		}
-		case 5: // 2次走行_R1500
-		{
-			dataTuningUDF(&tgtParam.bst1500, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 1500:%3gm/s", tgtParam.bst1500);
-			break;
-		}
-		case 6: // 2次走行_R1300
-		{
-			dataTuningUDF(&tgtParam.bst1300, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 1300:%3gm/s", tgtParam.bst1300);
-			break;
-		}
-		case 7: // 2次走行_R1000
-		{
-			dataTuningUDF(&tgtParam.bst1000, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 1000:%3gm/s", tgtParam.bst1000);
-			break;
-		}
-		case 8: // 2次走行_R800
-		{
-			dataTuningUDF(&tgtParam.bst800, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 800:%3gm/s", tgtParam.bst800);
-			break;
-		}
-		case 9: // 2次走行_R700
-		{
-			dataTuningUDF(&tgtParam.bst700, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 700:%3gm/s", tgtParam.bst700);
-			break;
-		}
-		case 10: // 2次走行_R600
-		{
-			dataTuningUDF(&tgtParam.bst600, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 600:%3gm/s", tgtParam.bst600);
-			break;
-		}
-		case 11: // 2次走行_R500
-		{
-			dataTuningUDF(&tgtParam.bst500, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 500:%3gm/s", tgtParam.bst500);
-			break;
-		}
-		case 12: // 2次走行_R400
-		{
-			dataTuningUDF(&tgtParam.bst400, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 400:%3gm/s", tgtParam.bst400);
-			break;
-		}
-		case 13: // 2次走行_R300
-		{
-			dataTuningUDF(&tgtParam.bst300, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 300:%3gm/s", tgtParam.bst300);
-			break;
-		}
-		case 14: // 2次走行_R200
-		{
-			dataTuningUDF(&tgtParam.bst200, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 200:%3gm/s", tgtParam.bst200);
-			break;
-		}
-		case 15: // 2次走行_R100
-		{
-			dataTuningUDF(&tgtParam.bst100, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST 100:%3gm/s", tgtParam.bst100);
-			break;
-		}
-		case 16: // 2次走行_加速度
-		{
-			dataTuningUDF(&tgtParam.acceleF, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST acceleF:%3gm/ss", tgtParam.acceleF);
-			break;
-		}
-		case 17: // 2次走行_減速度
-		{
-			dataTuningUDF(&tgtParam.acceleD, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST acceleD:%3gm/ss", tgtParam.acceleD);
-			break;
-		}
-		case 18: // 2次走行_ショートカット
-		{
-			dataTuningUDF(&tgtParam.shortCut, 0.1, 0.0, 10.0);
-			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "BST shortCut:%3gm/s", tgtParam.shortCut);
-			break;
-        }
-    }
+	}
 
-    beforePparam = pattern.parameter1; // 選択項目を記録
+	beforePparam = pattern.parameter1; // 選択項目を記録
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -749,7 +664,7 @@ static void setup_pid_trace(void)
 			// kd
 			dataTuningLR(&lineTraceCtrl.kd, 1, 0, 255);
 			break;
-	}
+		}
 	}
 }
 
