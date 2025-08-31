@@ -384,6 +384,12 @@ void writeLogPuts(void)
 				sendSD = false;
 				return;
 			}
+			// 実際の書き込みサイズを検証
+			if (writtenlog != LOG_BUFFER_SIZE)
+			{
+				sendSD = false;
+				return;
+			}
 			freeBufCount++;															// バッファ解放
 			flushIndex = (flushIndex + 1) % LOG_BUFFER_COUNT;						// 次のバッファへ
 			if (flushIndex == activeIndex)											// 全バッファ書き込み済みなら終了
