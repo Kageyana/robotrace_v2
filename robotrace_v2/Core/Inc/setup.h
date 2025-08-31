@@ -27,6 +27,20 @@
 #define HEX_PID_ANGLE 0x8
 #define HEX_PID_DIST 0x9
 
+// センサテストを表す列挙体
+typedef enum
+{
+        // 1から順にテストIDを割り当てる
+        TEST_MOTOR = 1,       // モータテスト
+        TEST_IMU_DEG,         // IMU角度表示
+        TEST_IMU_ACCEL,       // IMU加速度表示
+        TEST_MARKER,          // マーカーセンサ
+        TEST_SWITCH,          // タクトスイッチ
+        TEST_BATTERY,         // バッテリ電圧
+        TEST_LINESENSOR,      // ラインセンサ
+        TEST_RGBLED           // RGBLED
+} SensorTestId;
+
 // パターン構造体
 typedef struct
 {

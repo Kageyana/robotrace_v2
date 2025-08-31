@@ -22,13 +22,13 @@ int8_t pushUD = 0;
 // パターン関連
 uint8_t push1 = 0;
 Pattern pattern = {
-	.display = 0,
-	.sensors = 1,
-	.beforeSensors = 0,
-	.beforeHex = 255,
-	.sensorLine = 1,
-	.sensorAccele = 1,
-	.sensorGyro = 1,
+        .display = 0,
+        .sensors = TEST_MOTOR, // 初期選択:モータテスト
+        .beforeSensors = 0,
+        .beforeHex = 255,
+        .sensorLine = 1,
+        .sensorAccele = 1,
+        .sensorGyro = 1,
 	.parameter1 = 1,
 	.parameter2 = 1,
 	.parameter3 = 1,
@@ -71,24 +71,26 @@ static void test_battery(void); // バッテリ電圧
 static void test_linesensor(void); // ラインセンサ
 static void test_rgbled(void); // RGBLED
 
+// センサテストで使用する関数ポインタ型
 typedef void (*SensorTestFunc)(void);
+// テストIDと実行関数を保持する構造体
 typedef struct
 {
-uint8_t number;
-SensorTestFunc func;
-} SensorTest;
+	SensorTestId id; // テスト種別
+	SensorTestFunc func; // 実行関数
+} SensorTest; // センサテスト情報
 
-// センサテストのテーブル {番号, 関数ポインタ}
+// センサテストのテーブル {列挙体, 関数ポインタ}
 static const SensorTest sensorTestTable[] = {
-{1, test_motor}, // モータテスト
-{2, test_imu_deg}, // IMU角度表示
-{3, test_imu_accel}, // IMU加速度表示
-{4, test_marker}, // マーカーセンサ
-{5, test_switch}, // タクトスイッチ
-{6, test_battery}, // バッテリ電圧
-{7, test_linesensor}, // ラインセンサ
-{8, test_rgbled} // RGBLED
-};
+{TEST_MOTOR, test_motor}, // モータテスト
+{TEST_IMU_DEG, test_imu_deg}, // IMU角度表示
+{TEST_IMU_ACCEL, test_imu_accel}, // IMU加速度表示
+{TEST_MARKER, test_marker}, // マーカーセンサ
+{TEST_SWITCH, test_switch}, // タクトスイッチ
+{TEST_BATTERY, test_battery}, // バッテリ電圧
+{TEST_LINESENSOR, test_linesensor}, // ラインセンサ
+{TEST_RGBLED, test_rgbled} // RGBLED
+}; // IDと処理の対応テーブル
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_speed_param
 // 処理概要     速度パラメータ調整
@@ -579,17 +581,18 @@ static void setup_sensors(void)
 		pattern.beforeSensors = 100;    // 初期値
 	}
 
-	// センサメニューの項目切替
-	dataTuningLR(&pattern.sensors, 1, 1, sizeof(sensorTestTable) / sizeof(sensorTestTable[0]));
-	// 各種センサテストを実行
-	for (uint8_t i = 0; i < sizeof(sensorTestTable) / sizeof(sensorTestTable[0]); i++)
-	{
-		if (pattern.sensors == sensorTestTable[i].number)
-		{
-			sensorTestTable[i].func();
-			break;
-		}
-	}
+        // センサメニューの項目切替（範囲は列挙体で指定）
+        dataTuningLR(&pattern.sensors, 1, TEST_MOTOR, TEST_RGBLED); // センサメニュー項目切替
+        // テーブルを走査して該当テストを探索
+        for (uint8_t i = 0; i < sizeof(sensorTestTable) / sizeof(sensorTestTable[0]); i++)
+        {
+                // テーブルから選択IDに対応するテストを探索
+                if (pattern.sensors == sensorTestTable[i].id)
+                {
+                        sensorTestTable[i].func(); // 選択されたテストを実行
+                        break; // 一致したらループ終了
+                }
+        }
 	pattern.beforeSensors = pattern.sensors;        // 選択状態の更新
 }
 /////////////////////////////////////////////////////////////////////////////////////
