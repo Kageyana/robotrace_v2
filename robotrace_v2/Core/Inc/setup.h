@@ -27,26 +27,40 @@
 #define HEX_PID_ANGLE 0x8
 #define HEX_PID_DIST 0x9
 
+// センサテストを表す列挙体
+typedef enum
+{
+	// 1から順にテストIDを割り当てる
+	TEST_MOTOR = 1,       // モータテスト
+	TEST_IMU_DEG,         // IMU角度表示
+	TEST_IMU_ACCEL,       // IMU加速度表示
+	TEST_MARKER,          // マーカーセンサ
+	TEST_SWITCH,          // タクトスイッチ
+	TEST_BATTERY,         // バッテリ電圧
+	TEST_LINESENSOR,      // ラインセンサ
+	TEST_RGBLED           // RGBLED
+} SensorTestId;
+
 // パターン構造体
 typedef struct
 {
-        int16_t display;                // 表示パターン
-        int16_t sensors;                // センサメニュー
-        int16_t beforeSensors;          // 前回のセンサメニュー
-        uint8_t beforeHex;              // 前回の表示HEX
-        int16_t sensorLine;             // ラインセンサ項目
-        int16_t sensorAccele;           // 加速度センサ項目
-        int16_t sensorGyro;             // ジャイロセンサ項目
-        int16_t parameter1;             // パラメータ1
-        int16_t parameter2;             // パラメータ2
-        int16_t parameter3;             // パラメータ3
-        int16_t parameter4;             // パラメータ4
-        int16_t gain;                   // ゲイン選択
-        int16_t speedseting;            // 速度設定
-        int16_t log;                    // ログメニュー
-        int16_t calibration;            // キャリブレーション
-        int16_t click;                  // クリックメニュー
-        // 新しいパターンを追加する場合はここにメンバとコメントを追加
+	int16_t display;                // 表示パターン
+	int16_t sensors;                // センサメニュー
+	int16_t beforeSensors;          // 前回のセンサメニュー
+	uint8_t beforeHex;              // 前回の表示HEX
+	int16_t sensorLine;             // ラインセンサ項目
+	int16_t sensorAccele;           // 加速度センサ項目
+	int16_t sensorGyro;             // ジャイロセンサ項目
+	int16_t parameter1;             // パラメータ1
+	int16_t parameter2;             // パラメータ2
+	int16_t parameter3;             // パラメータ3
+	int16_t parameter4;             // パラメータ4
+	int16_t gain;                   // ゲイン選択
+	int16_t speedseting;            // 速度設定
+	int16_t log;                    // ログメニュー
+	int16_t calibration;            // キャリブレーション
+	int16_t click;                  // クリックメニュー
+	// 新しいパターンを追加する場合はここにメンバとコメントを追加
 } Pattern;
 
 //======================================//
