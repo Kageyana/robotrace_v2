@@ -349,8 +349,7 @@ void writeLogBufferPrint(void)
 		logVal[logValIndex].zg = BMI088val.gyro.z;
 		logVal[logValIndex].opIndex = optimalIndex;
 		logVal[logValIndex].targetSpeed = targetSpeed;
-		logVal[logValIndex].opIndex = (int32_t)(motorCurrentL * 10000);
-		// logVal[logValIndex].targetSpeed = (int32_t)(motorCurrentR * 10000);
+		logVal[logValIndex].spare = (int16_t)(motorCurrentL * 10000);
 		logValIndex++;
 	}
 }
