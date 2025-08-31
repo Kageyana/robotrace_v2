@@ -38,7 +38,7 @@ Pattern pattern = {
 	.log = 1,
 	.calibration = 1,
 	.click = 1
-	}; // パターンの状態を保持
+}; // パターンの状態を保持
 
 // フラグ関連
 uint8_t motor_test = 0;
@@ -83,14 +83,14 @@ typedef struct
 
 // センサテストのテーブル {列挙体, 関数ポインタ}
 static const SensorTest sensorTestTable[] = {
-{TEST_MOTOR, test_motor}, // モータテスト
-{TEST_IMU_DEG, test_imu_deg}, // IMU角度表示
-{TEST_IMU_ACCEL, test_imu_accel}, // IMU加速度表示
-{TEST_MARKER, test_marker}, // マーカーセンサ
-{TEST_SWITCH, test_switch}, // タクトスイッチ
-{TEST_BATTERY, test_battery}, // バッテリ電圧
-{TEST_LINESENSOR, test_linesensor}, // ラインセンサ
-{TEST_RGBLED, test_rgbled} // RGBLED
+	{TEST_MOTOR, test_motor}, // モータテスト
+	{TEST_IMU_DEG, test_imu_deg}, // IMU角度表示
+	{TEST_IMU_ACCEL, test_imu_accel}, // IMU加速度表示
+	{TEST_MARKER, test_marker}, // マーカーセンサ
+	{TEST_SWITCH, test_switch}, // タクトスイッチ
+	{TEST_BATTERY, test_battery}, // バッテリ電圧
+	{TEST_LINESENSOR, test_linesensor}, // ラインセンサ
+	{TEST_RGBLED, test_rgbled} // RGBLED
 }; // IDと処理の対応テーブル
 
 // 速度パラメータの情報を保持する構造体
@@ -106,24 +106,24 @@ typedef struct
 
 // 速度パラメータの一覧テーブル
 static const SpeedParamInfo speedParamTable[] = {
-{"STRAIGHT", &tgtParam.straight, 0.1, 0.0, 10.0, "m/s"},
-{"CURVE", &tgtParam.curve, 0.1, 0.0, 10.0, "m/s"},
-{"STOP", &tgtParam.stop, 0.1, 0.0, 10.0, "m/s"},
-{"BST STRT", &tgtParam.bstStraight, 0.1, 0.0, 10.0, "m/s"},
-{"BST 1500", &tgtParam.bst1500, 0.1, 0.0, 10.0, "m/s"},
-{"BST 1300", &tgtParam.bst1300, 0.1, 0.0, 10.0, "m/s"},
-{"BST 1000", &tgtParam.bst1000, 0.1, 0.0, 10.0, "m/s"},
-{"BST 800", &tgtParam.bst800, 0.1, 0.0, 10.0, "m/s"},
-{"BST 700", &tgtParam.bst700, 0.1, 0.0, 10.0, "m/s"},
-{"BST 600", &tgtParam.bst600, 0.1, 0.0, 10.0, "m/s"},
-{"BST 500", &tgtParam.bst500, 0.1, 0.0, 10.0, "m/s"},
-{"BST 400", &tgtParam.bst400, 0.1, 0.0, 10.0, "m/s"},
-{"BST 300", &tgtParam.bst300, 0.1, 0.0, 10.0, "m/s"},
-{"BST 200", &tgtParam.bst200, 0.1, 0.0, 10.0, "m/s"},
-{"BST 100", &tgtParam.bst100, 0.1, 0.0, 10.0, "m/s"},
-{"BST acceleF", &tgtParam.acceleF, 0.1, 0.0, 10.0, "m/ss"},
-{"BST acceleD", &tgtParam.acceleD, 0.1, 0.0, 10.0, "m/ss"},
-{"BST shortCut", &tgtParam.shortCut, 0.1, 0.0, 10.0, "m/s"}
+	{"STRAIGHT", &tgtParam.straight, 0.1, 0.0, 10.0, "m/s"},
+	{"CURVE", &tgtParam.curve, 0.1, 0.0, 10.0, "m/s"},
+	{"STOP", &tgtParam.stop, 0.1, 0.0, 10.0, "m/s"},
+	{"BST STRT", &tgtParam.bstStraight, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 1500", &tgtParam.bst1500, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 1300", &tgtParam.bst1300, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 1000", &tgtParam.bst1000, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 800", &tgtParam.bst800, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 700", &tgtParam.bst700, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 600", &tgtParam.bst600, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 500", &tgtParam.bst500, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 400", &tgtParam.bst400, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 300", &tgtParam.bst300, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 200", &tgtParam.bst200, 0.1, 0.0, 10.0, "m/s"},
+	{"BST 100", &tgtParam.bst100, 0.1, 0.0, 10.0, "m/s"},
+	{"BST acceleF", &tgtParam.acceleF, 0.1, 0.0, 10.0, "m/ss"},
+	{"BST acceleD", &tgtParam.acceleD, 0.1, 0.0, 10.0, "m/ss"},
+	{"BST shortCut", &tgtParam.shortCut, 0.1, 0.0, 10.0, "m/s"}
 }; // 速度パラメータの対応テーブル
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_speed_param
@@ -135,7 +135,7 @@ static void setup_speed_param(void)
 {
 	static uint8_t beforePparam = 0; // 前回のパラメータ項目を保持
 
-		if (pattern.display != pattern.beforeHex)
+	if (pattern.display != pattern.beforeHex)
 	{
 		// 切替時に実行
 		ssd1306_printf(Font_6x8, "Parameter");
@@ -153,7 +153,7 @@ static void setup_speed_param(void)
 	{
 		if (pattern.parameter1 == i + 1)
 		{
-			dataTuningUDF(speedParamTable[i].value, speedParamTable[i].step, speedParamTable[i].min, speedParamTable[i].max);
+		dataTuningUDF(speedParamTable[i].value, speedParamTable[i].step, speedParamTable[i].min, speedParamTable[i].max);
 		ssd1306_SetCursor(0, 24);
 		ssd1306_printf(Font_6x8, "%s:%3gm/%s", speedParamTable[i].label, *speedParamTable[i].value, speedParamTable[i].unit);
 		break;
