@@ -328,6 +328,7 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 				activeBuf = logBuffer[activeIndex];					// アクティブバッファ更新
 				freeBufCount--;										// 使用バッファを減算
 				sendSD = true;										// SD書き込みを要求
+			}
 		}
 	}
 }
@@ -356,7 +357,7 @@ void writeLogPuts(void)
 				sendSD = false;
 				return;
 			}
-				freeBufCount++;															// バッファ解放
+			freeBufCount++;															// バッファ解放
 			flushIndex = (flushIndex + 1) % LOG_BUFFER_COUNT;						// 次のバッファへ
 			if (flushIndex == activeIndex)											// 全バッファ書き込み済みなら終了
 				sendSD = false;														// 書き込み要求を解除
