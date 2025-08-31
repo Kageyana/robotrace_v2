@@ -310,7 +310,7 @@ void loopSystem(void)
 				setupNonDisp();
 			}
 
-			if (start || autoStart)
+            if (setupFlags.start || autoStart)
 			{
 				motorPwmOut(0, 0);
 				countdown = 5000;							  // カウントダウンスタート

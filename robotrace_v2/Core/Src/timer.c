@@ -130,10 +130,7 @@ void Interrupt1ms(void)
 		// 走行前に処理
 		getSwitches(); // スイッチの入力を取得
 		countDown();
-		cntSetup1++;
-		cntSetup2++;
-		cntSwitchUD++;
-		cntSwitchLR++;
+		setupCount(); // セットアップ用タイマを更新
 
 		wheelClick();
 	}
