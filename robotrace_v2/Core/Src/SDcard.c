@@ -31,14 +31,14 @@ volatile uint8_t freeBufCount = LOG_BUFFER_COUNT - 1; // 未使用バッファ�
 #else
 typedef struct
 {
-	uint8_t time;
-	uint8_t speed;
-	float zg;
-	int16_t targetSpeed;
-	int16_t opIndex;
-	int16_t spare;
+        uint8_t time;
+        uint8_t speed;
+        float zg;
+        int16_t targetSpeed;
+        int16_t opIndex;
+        int16_t spare;
 } logData;
-logData logVal[BUFFER_SIZW_LOG];
+logData logVal[BUFFER_SIZE_LOG]; // 綴りの誤りを修正
 #endif
 uint16_t logValIndex = 0;
 bool logOverflow = false; // ログバッファ上限超過フラグ
@@ -49,7 +49,7 @@ typedef struct
 	int32_t distance;
 	uint8_t marker;
 } markerData;
-markerData markerVal[BUFFER_SIZW_MARKER];
+markerData markerVal[BUFFER_SIZE_MARKER]; // 綴りの誤りを修正
 uint16_t markerValIndex = 0;
 bool markerOverflow = false; // マーカーバッファ上限超過フラグ
 
@@ -223,7 +223,7 @@ void createLog(void)
 void writeMarkerPos(uint32_t distance, uint8_t marker)
 {
 	// バッファ上限チェック
-	if (markerValIndex < BUFFER_SIZW_MARKER)
+    if (markerValIndex < BUFFER_SIZE_MARKER) // 綴りの誤りを修正
 	{
 		markerVal[markerValIndex].index = logValIndex; // ログの位置を記録
 		markerVal[markerValIndex].distance = distance;  // 走行距離を記録
@@ -254,8 +254,8 @@ void initLog(void)
 	sendSD = false;                                               // 書き込み要求をリセット
 #else
 	// 構造体配列の初期化
-	memset(&logVal, 0, sizeof(logData) * BUFFER_SIZW_LOG);
-	memset(&markerVal, 0, sizeof(markerData) * BUFFER_SIZW_MARKER);
+    memset(&logVal, 0, sizeof(logData) * BUFFER_SIZE_LOG);     // 綴りの誤りを修正
+    memset(&markerVal, 0, sizeof(markerData) * BUFFER_SIZE_MARKER); // 綴りの誤りを修正
 	logValIndex = 0;
 	markerValIndex = 0;
 #endif
@@ -362,7 +362,7 @@ void writeLogBufferPrint(void)
 	if (modeLOG)
 	{
 		// バッファ上限チェック
-		if (logValIndex < BUFFER_SIZW_LOG)
+            if (logValIndex < BUFFER_SIZE_LOG) // 綴りの誤りを修正
 		{
 			logVal[logValIndex].time = cntLog;                        // ログ時刻を記録
 			logVal[logValIndex].speed = encCurrentN;                  // 現在速度を記録

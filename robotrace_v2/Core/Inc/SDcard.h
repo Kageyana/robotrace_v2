@@ -18,10 +18,10 @@
 #define LOG_NUM_FLOAT 1
 #define LOG_SIZE (LOG_NUM_8BIT * sizeof(uint8_t)) + (LOG_NUM_16BIT * sizeof(uint16_t)) + (LOG_NUM_32BIT * sizeof(uint32_t)) + (LOG_NUM_FLOAT * sizeof(float))
 #else
-#define BUFFER_SIZW_LOG 5000
+#define BUFFER_SIZE_LOG 5000 // 綴りの誤りを修正
 #endif
 
-#define BUFFER_SIZW_MARKER 500
+#define BUFFER_SIZE_MARKER 500 // 綴りの誤りを修正
 
 #define PATH_SETTING "./setting/"
 
