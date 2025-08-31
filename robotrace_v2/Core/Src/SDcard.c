@@ -31,12 +31,12 @@ volatile uint8_t freeBufCount = LOG_BUFFER_COUNT - 1; // 未使用バッファ�
 #else
 typedef struct
 {
-        uint8_t time;
-        uint8_t speed;
-        float zg;
-        int16_t targetSpeed;
-        int16_t opIndex;
-        int16_t spare;
+	uint8_t time;
+	uint8_t speed;
+	float zg;
+	int16_t targetSpeed;
+	int16_t opIndex;
+	int16_t spare;
 } logData;
 logData logVal[BUFFER_SIZE_LOG]; // 綴りの誤りを修正
 #endif
@@ -362,7 +362,7 @@ void writeLogBufferPrint(void)
 	if (modeLOG)
 	{
 		// バッファ上限チェック
-            if (logValIndex < BUFFER_SIZE_LOG) // 綴りの誤りを修正
+        if (logValIndex < BUFFER_SIZE_LOG) // 綴りの誤りを修正
 		{
 			logVal[logValIndex].time = cntLog;                        // ログ時刻を記録
 			logVal[logValIndex].speed = encCurrentN;                  // 現在速度を記録
