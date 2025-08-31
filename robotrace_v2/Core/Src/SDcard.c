@@ -308,12 +308,16 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 		// 	バッファ配列に保存
 		va_start(args, f);
 		// logBuffer[0] = va_arg( args, uint8_t* );
+		// 8bitデータをバッファへ送る
 		for (cnt = 0; cnt < c; cnt++)
-			send8bit(va_arg(args, uint32_t));
+			send8bit(va_arg(args, unsigned int)); // 可変長引数の型昇格に合わせる
+		// 16bitデータをバッファへ送る
 		for (cnt = 0; cnt < s; cnt++)
-			send16bit(va_arg(args, uint32_t));
+			send16bit(va_arg(args, unsigned int)); // 可変長引数の型昇格に合わせる
+		// 32bitデータをバッファへ送る
 		for (cnt = 0; cnt < i; cnt++)
 			send32bit(va_arg(args, uint32_t));
+		// floatデータをバッファへ送る
 		for (cnt = 0; cnt < f; cnt++)
 		{
 			ftoi.f = va_arg(args, double); // 共用体を使用してfloat型のビット操作をできるようにする
