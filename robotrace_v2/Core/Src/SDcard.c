@@ -513,12 +513,13 @@ void endLog(void)
 
 	while (sendSD) // 溜まったバッファをすべて書き出す
 		writeLogPuts(); // リングバッファ書き込み
+	
 	fresult = f_write(&fil_W, logBuffer[activeIndex], logBuffIndex, &writtenlog); // 残りのデータを送信
 	if (fresult != FR_OK)
 	{
 		printf("f_write error in endLog\r\n"); // 追記: エラー通知
-		f_close(&fil_W); // ファイルを閉じてリソース解放
-		return; // ログが不完全になるため中断
+		// f_close(&fil_W); // ファイルを閉じてリソース解放
+		// return; // ログが不完全になるため中断
 	}
 	f_close(&fil_W); // 一時ファイルを閉じる
 
