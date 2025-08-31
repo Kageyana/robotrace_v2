@@ -251,13 +251,13 @@ void initLog(void)
 {
     FRESULT fresult;
 #ifdef LOG_RUNNING_WRITE
-        fresult = f_open(&fil_W, "temp", FA_OPEN_ALWAYS | FA_WRITE); // create file
-        if (fresult != FR_OK)
-        {
-                printf("error opening log file: %d\r\n", fresult); // エラー内容を出力
-                initMSD = false; // ファイルオープンに失敗した場合はmicroSDを使用不可とする
-                return;          // ログ初期化を中止
-        }
+	fresult = f_open(&fil_W, "temp", FA_OPEN_ALWAYS | FA_WRITE); // create file
+	if (fresult != FR_OK)
+	{
+		printf("error opening log file: %d\r\n", fresult); // エラー内容を出力
+		initMSD = false; // ファイルオープンに失敗した場合はmicroSDを使用不可とする
+		return;          // ログ初期化を中止
+	}
 	freeBufCount = LOG_BUFFER_COUNT - 1;                          // 未使用バッファ数を初期化
 	activeIndex = 0;                                              // バッファ番号を初期化
 	flushIndex = 0;                                               // フラッシュ待ち番号を初期化
@@ -265,7 +265,7 @@ void initLog(void)
 	activeBuf = logBuffer[0];                                     // アクティブバッファを初期化
 	sendSD = false;                                               // 書き込み要求をリセット
 #else
-        // 構造体配列の初期化
+    // 構造体配列の初期化
     memset(&logVal, 0, sizeof(logData) * BUFFER_SIZE_LOG);     // 綴りの誤りを修正
     memset(&markerVal, 0, sizeof(markerData) * BUFFER_SIZE_MARKER); // 綴りの誤りを修正
 	logValIndex = 0;
