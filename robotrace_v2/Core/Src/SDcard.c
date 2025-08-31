@@ -102,7 +102,7 @@ bool initMicroSD(void)
 		// 空き容量を計算
 		fresult = f_getfree("", &fre_clust, &pfs);							// cluster size
 		if (fresult != FR_OK)
-	{
+		{
 			// 空き容量取得に失敗した場合はエラーメッセージを出力して終了
 			initMSD = false;
 			printf("error in getting SD CARD free space...\r\n");
@@ -149,13 +149,13 @@ void createLog(void)
 		printf("failed to open root directory: %d\r\n", fresult);
 		// SDカードが未接続などでディレクトリを開けないため、ログ作成を中断する
 		return;
-			}
+	}
 
 	do
 	{
 		fresult = f_readdir(&dir, &fno);
 		if (fresult != FR_OK)
-	{
+		{
 			// エラーが発生した場合はループを抜けてファイル探索を中断
 			break;
 		}
@@ -192,7 +192,7 @@ void createLog(void)
 	{
 		// ファイルオープンに失敗した場合はログ作成を中止する
 		return; // エラーが発生したため処理を終了
-			}
+	}
 
 	columnTitle[0] = 0; // バッファを安全に初期化
 	formatLog[0] = 0;   // バッファを安全に初期化
@@ -268,12 +268,12 @@ void initLog(void)
 		printf("error opening log file: %d\r\n", fresult); // エラー内容を出力
 		initMSD = false; // ファイルオープンに失敗した場合はmicroSDを使用不可とする
 		return;          // ログ初期化を中止
-			}
-        logBuffIndex = 0;                                             // 書込位置を初期化
-        activeBuf = logBuffer[0];                                     // アクティブバッファを初期化
-        flushBuf = logBuffer[1];                                      // フラッシュバッファを初期化
-	logBuffSendIndex = logBuffIndex;                                         // バッファのバイト数を記録
-        sendSD = false;                                               // 書き込み要求をリセット
+	}
+	logBuffIndex = 0;					// 書込位置を初期化
+	activeBuf = logBuffer[0];			// アクティブバッファを初期化
+	flushBuf = logBuffer[1];			// フラッシュバッファを初期化
+	logBuffSendIndex = logBuffIndex;	// バッファのバイト数を記録
+	sendSD = false;						// 書き込み要求をリセット
 #else
     // 構造体配列の初期化
     memset(&logVal, 0, sizeof(logData) * BUFFER_SIZE_LOG);     // 綴りの誤りを修正
@@ -301,7 +301,7 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 
 	if (modeLOG)
 	{
-                uint16_t requiredSize = c + (s * sizeof(uint16_t)) + (i * sizeof(uint32_t)) + (f * sizeof(float)); // 引数数に応じたバッファ必要量を算出
+        uint16_t requiredSize = c + (s * sizeof(uint16_t)) + (i * sizeof(uint32_t)) + (f * sizeof(float)); // 引数数に応じたバッファ必要量を算出
 		// 	バッファ配列に保存
 		va_start(args, f);
 		// logBuffer[0] = va_arg( args, uint8_t* );
@@ -359,8 +359,8 @@ void writeLogPuts(void)
 				return;
 			}
 			sendSD = false; // 書き込み完了フラグをクリア
-            }
         }
+    }
 }
 #endif
 ////////////////////////////////////////////////////////////////////
@@ -495,18 +495,18 @@ void endLog(void)
 		printf("f_open error in endLog\r\n"); // 追記: エラー通知
 		f_close(&fil_W); // 作成したログファイルを閉じる
 		return; // 一時ファイルが読めないと変換できないため中断
-		}
+	}
 	clearXYcie(); // xy座標クリア
 	for (j = 0; j < cntSend; j++)
 	{
 		fresult = f_read(&fil, log, sizeof(log), &readByte); // 読み込んだバイト数を取得するためポインタを渡す
 		if (fresult != FR_OK)
-	{
+		{
 			printf("f_read error in endLog\r\n"); // 追記: エラー通知
 			f_close(&fil_W); // CSVファイルを閉じる
 			f_close(&fil); // 一時ファイルを閉じる
 			return; // データが読めないと解析不能なため中断
-			}
+		}
 		logaddress = log; // 読み込んだ配列の先頭アドレスを取得
 
 		// 型ごとに変数を復元
@@ -599,7 +599,7 @@ void getFileNumbers(void)
 		{
 			fresult = f_readdir(&dir, &fno);
 			if (fresult != FR_OK)
-	{
+			{
 				// ディレクトリ読み込みに失敗した場合はループを抜けてフラグを設定
 				getFileNumbersError = true;
 				printf("f_readdir error: %d\r\n", fresult); // エラー内容を出力
