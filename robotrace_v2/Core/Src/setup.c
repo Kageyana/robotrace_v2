@@ -1787,7 +1787,7 @@ void setupCount(void)
 	setupTimer.cntSwitchUD++;
 	setupTimer.cntSwitchLR++;
 }
-
+///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 wheelClick
 // 処理概要     ホイールを短時間回転させクリック感を出す
 // 引数         なし
