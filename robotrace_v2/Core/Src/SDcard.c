@@ -344,6 +344,8 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 			{
 				// タイムアウト後も空きバッファがない場合はアンダーフロー防止のためエラー扱い
 				logOverflow = true; // バッファ不足エラーフラグ
+				logBuffIndex = 0; // タイムアウト時は書き込みを中止
+				return; // タイムアウト時は書き込みを中止
 			}
 			else
 			{
