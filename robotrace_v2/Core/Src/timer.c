@@ -8,6 +8,7 @@
 int32_t cnt5 = 0;
 int32_t cnt10 = 0;
 float bootTime;
+static volatile bool logWriteReq = false;
 /////////////////////////////////////////////////////////////////////
 // モジュール名 Interrupt1ms
 // 処理概要     タイマー割り込み(1ms)
@@ -255,7 +256,23 @@ void Interrupt1ms(void)
 void Interrupt100us(void)
 {
 #ifdef LOG_RUNNING_WRITE
-	writeLogPuts();
+        logWriteReq = true;
+#endif
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logWriteTask
+// 処理概要     SD書き込み要求処理
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void logWriteTask(void)
+{
+#ifdef LOG_RUNNING_WRITE
+        if (logWriteReq)
+        {
+                writeLogPuts();        // 割り込み外でSD書き込みを実行する
+                logWriteReq = false;
+        }
 #endif
 }
 /////////////////////////////////////////////////////////////////////
