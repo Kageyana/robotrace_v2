@@ -719,8 +719,8 @@ void send16bit(uint16_t data)
 {
 	// バイト順を変換して一時変数に格納
 	uint16_t swapped = __builtin_bswap16(data);
-	// アクティブバッファに高速コピー
-	memcpy(&activeBuf[logBuffIndex], &swapped, sizeof(swapped));
+	// バイトスワップ後の値をポインタキャストでバッファへ直接書き込む
+	*(uint16_t *)&activeBuf[logBuffIndex] = swapped;        // 2バイト分をそのまま格納
 	// 書き込み位置を更新
 	logBuffIndex += sizeof(swapped);
 }
@@ -736,8 +736,8 @@ void send32bit(uint32_t data)
 {
 	// バイト順を変換して一時変数に格納
 	uint32_t swapped = __builtin_bswap32(data);
-	// アクティブバッファに高速コピー
-	memcpy(&activeBuf[logBuffIndex], &swapped, sizeof(swapped));
+	// バイトスワップ後の値をポインタキャストでバッファへ直接書き込む
+	*(uint32_t *)&activeBuf[logBuffIndex] = swapped;        // 4バイト分をそのまま格納
 	// 書き込み位置を更新
 	logBuffIndex += sizeof(swapped);
 }
