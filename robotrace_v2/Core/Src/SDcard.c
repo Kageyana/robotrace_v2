@@ -145,8 +145,13 @@ void createLog(void)
 			// エラーが発生した場合はループを抜けてファイル探索を中断
 			break;
 		}
+		if (fno.fname[0] == 0)
+		{
+			// ファイル名が空の場合はループを終了
+			break;
+		}
 		tp = strtok(fno.fname, ".");	// 拡張子削除
-		if (atoi(tp) > fileNumber)
+		if (tp != NULL && atoi(tp) > fileNumber)
 		{								// 番号比較
 			fileNumber = atoi(tp);		// 文字列を数値に変換
 		}
