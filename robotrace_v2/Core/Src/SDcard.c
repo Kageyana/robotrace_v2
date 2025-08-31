@@ -176,6 +176,11 @@ void createLog(void)
 	sprintf(fileName, "%d", fileNumber);						   // 数値を文字列に変換
 	strcat(fileName, ".csv");									   // 拡張子を追加
 	fresult = f_open(&fil_W, fileName, FA_OPEN_ALWAYS | FA_WRITE); // create file
+	if (fresult != FR_OK)
+	{
+		// ファイルオープンに失敗した場合はログ作成を中止する
+		return; // エラーが発生したため処理を終了
+	}
 
 	strcpy(columnTitle, "");
 	strcpy(formatLog, "");
