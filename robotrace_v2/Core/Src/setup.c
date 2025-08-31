@@ -70,7 +70,7 @@ static void test_switch(void); // タクトスイッチ
 static void test_battery(void); // バッテリ電圧
 static void test_linesensor(void); // ラインセンサ
 static void test_rgbled(void); // RGBLED
-static void init_sensor_test(const char* title, Font font, uint8_t x); // 表示初期化
+static void init_sensor_test(const char* title, FontDef font, uint8_t x); // 表示初期化
 
 typedef void (*SensorTestFunc)(void);
 typedef struct
@@ -236,12 +236,12 @@ static void setup_speed_param(void)
 		}
 		case 18: // 2次走行_ショートカット
 		{
-        dataTuningUDF(&tgtParam.shortCut, 0.1, 0.0, 10.0);
-        ssd1306_SetCursor(0, 24);
-        ssd1306_printf(Font_6x8, "BST shortCut:%3gm/s", tgtParam.shortCut);
-        break;
-                }
+			dataTuningUDF(&tgtParam.shortCut, 0.1, 0.0, 10.0);
+			ssd1306_SetCursor(0, 24);
+			ssd1306_printf(Font_6x8, "BST shortCut:%3gm/s", tgtParam.shortCut);
+			break;
         }
+    }
 
     beforePparam = pattern.parameter1; // 選択項目を記録
 }
@@ -254,7 +254,7 @@ static void setup_speed_param(void)
 //              x     : タイトル表示位置
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////////////////
-static void init_sensor_test(const char* title, Font font, uint8_t x)
+static void init_sensor_test(const char* title, FontDef font, uint8_t x)
 {
 	ssd1306_FillRectangle(0, 16, 127, 63, Black); // 表示領域をクリア
 	ssd1306_SetCursor(x, 16); // タイトルの位置設定
