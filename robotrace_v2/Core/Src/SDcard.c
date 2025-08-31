@@ -479,19 +479,37 @@ void endLog(void)
 	uint32_t logval32[10];
 	float logvalf[10];
 
-	while (sendSD)														// 溜まったバッファをすべて書き出す
-		writeLogPuts();													// リングバッファ書き込み
-	f_write(&fil_W, logBuffer[activeIndex], logBuffIndex, &writtenlog); // 残りのデータを送信
-	f_close(&fil_W);													// 一時ファイルを閉じる
+	while (sendSD) // 溜まったバッファをすべて書き出す
+		writeLogPuts(); // リングバッファ書き込み
+	fresult = f_write(&fil_W, logBuffer[activeIndex], logBuffIndex, &writtenlog); // 残りのデータを送信
+	if (fresult != FR_OK)
+	{
+		printf("f_write error in endLog\r\n"); // 追記: エラー通知
+		f_close(&fil_W); // ファイルを閉じてリソース解放
+		return; // ログが不完全になるため中断
+	}
+	f_close(&fil_W); // 一時ファイルを閉じる
 
 	createLog(); // ログファイル(csv)を作成
 
 	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ); // ログファイルを開く
-
+	if (fresult != FR_OK)
+	{
+		printf("f_open error in endLog\r\n"); // 追記: エラー通知
+		f_close(&fil_W); // 作成したログファイルを閉じる
+		return; // 一時ファイルが読めないと変換できないため中断
+	}
 	clearXYcie(); // xy座標クリア
 	for (j = 0; j < cntSend; j++)
 	{
-		f_read(&fil, log, sizeof(log), &readByte); // 読み込んだバイト数を取得するためポインタを渡す
+		fresult = f_read(&fil, log, sizeof(log), &readByte); // 読み込んだバイト数を取得するためポインタを渡す
+		if (fresult != FR_OK)
+		{
+			printf("f_read error in endLog\r\n"); // 追記: エラー通知
+			f_close(&fil_W); // CSVファイルを閉じる
+			f_close(&fil); // 一時ファイルを閉じる
+			return; // データが読めないと解析不能なため中断
+		}
 		logaddress = log; // 読み込んだ配列の先頭アドレスを取得
 
 		// 型ごとに変数を復元
