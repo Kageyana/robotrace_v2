@@ -317,6 +317,7 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 #ifdef LOG_RUNNING_WRITE
 void writeLogPuts(void)
 {
+	FRESULT fresult;                            // f_writeの戻り値
 	UINT writtenlog = 0; // 実際に書き込んだサイズ
 
 	if (modeLOG)
@@ -324,7 +325,13 @@ void writeLogPuts(void)
 		if (sendSD) // 書き込み要求がある場合
 		{
 			// 未書き込みバッファをSDカードへ転送
-			f_write(&fil_W, logBuffer[flushIndex], LOG_BUFFER_SIZE, &writtenlog);	// リングバッファから書き出し
+			fresult = f_write(&fil_W, logBuffer[flushIndex], LOG_BUFFER_SIZE, &writtenlog);	// リングバッファから書き出し
+			if (fresult != FR_OK)
+			{
+				// 書き込みに失敗した場合は要求を解除して終了
+				sendSD = false;
+				return;
+			}
 			freeBufCount++;															// バッファ解放
 			flushIndex = (flushIndex + 1) % LOG_BUFFER_COUNT;						// 次のバッファへ
 			if (flushIndex == activeIndex)											// 全バッファ書き込み済みなら終了
