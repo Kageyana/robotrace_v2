@@ -5,15 +5,21 @@
 //====================================//
 // グローバル変数の宣言
 //====================================//
-uint8_t start = 0; // 0:セットアップ中	1:セットアップ完了
+SetupFlags setupFlags = {0}; // セットアップ状態を管理
 
-// タイマ関連
-uint16_t cntSetup1 = 0;		  // セットアップで使用
-uint16_t cntSetup2 = 0;		  // セットアップで使用
-uint16_t cntSwitchUD = 0;	  // スイッチ判定用右
-uint16_t cntSwitchLR = 0;	  // スイッチ判定用左
-uint16_t cntSwitchUDLong = 0; // スイッチ長押し判定用右
-uint16_t cntSwitchLRLong = 0; // スイッチ長押し判定用左
+// タイマ関連のカウンタをまとめた構造体
+typedef struct
+{
+	uint16_t cntSetup1;           // セットアップで使用
+	uint16_t cntSetup2;           // セットアップで使用
+	uint16_t cntSwitchUD;         // スイッチ判定用右
+	uint16_t cntSwitchLR;         // スイッチ判定用左
+	uint16_t cntSwitchUDLong;     // スイッチ長押し判定用右
+	uint16_t cntSwitchLRLong;     // スイッチ長押し判定用左
+} SetupTimer; // タイマ関連構造体
+
+static SetupTimer setupTimer = {0}; // タイマ関連変数
+
 
 // スイッチ関連
 int8_t pushLR = 0;
@@ -39,12 +45,8 @@ Pattern pattern = {
 	.calibration = 1,
 	.click = 1
 }; // パターンの状態を保持
-
 // フラグ関連
-uint8_t motor_test = 0;
-uint8_t trace_test = 0;
-int8_t clickStart = 0;
-static uint8_t beforeMotorTest = 0;  // モータテストの状態を保存
+TestFlags testFlags = {0};
 
 // パラメータ関連
 int16_t motorTestPwm = 200;
@@ -190,7 +192,7 @@ static void test_motor(void)
 	{
 		// 切替時に実行
 		init_sensor_test("Motor", Font_6x8, 47); // 画面クリアとタイトル表示
-		motor_test = 0;
+		testFlags.motor_test = 0;
 	}
 	// Duty表示
 	ssd1306_SetCursor(35, 30);
@@ -209,8 +211,8 @@ static void test_motor(void)
 	ssd1306_printf(Font_6x8, "Cur:%5.2f", motorCurrentR); // Current
 
 	dataTuningUD(&motorTestPwm, 100, -500, 500); // PWM値を調整
-	data_select(&motor_test, SW_PUSH); // モータテストの開始/停止
-	if (motor_test == 1)
+	data_select(&testFlags.motor_test, SW_PUSH); // モータテストの開始/停止
+	if (testFlags.motor_test == 1)
 	{
 		motorPwmOut(motorTestPwm, motorTestPwm);
 	}
@@ -219,17 +221,17 @@ static void test_motor(void)
 		motorPwmOut(0, 0);
 	}
 
-	// motor_test 1→0のとき 2にする
-	if (motor_test != beforeMotorTest && motor_test == 0)
+	// testFlags.motor_test 1→0のとき 2にする
+	if (testFlags.motor_test != testFlags.beforeMotorTest && testFlags.motor_test == 0)
 	{
-		motor_test = 2;
+		testFlags.motor_test = 2;
 	}
-	// 2のときホイールの回転が止まったらmotor_test=0にする
-	if (motor_test == 2 && encCurrentL == 0)
+	// 2のときホイールの回転が止まったらtestFlags.motor_test=0にする
+	if (testFlags.motor_test == 2 && encCurrentL == 0)
 	{
-		motor_test = 0;
+		testFlags.motor_test = 0;
 	}
-	beforeMotorTest = motor_test; // 次回比較用に状態を保存
+	testFlags.beforeMotorTest = testFlags.motor_test; // 次回比較用に状態を保存
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -244,7 +246,7 @@ static void test_imu_deg(void)
 	{
 		// 切替時に実行
 		init_sensor_test("IMU[deg]", Font_7x10, 36); // 画面クリアとタイトル表示
-		motor_test = 1;
+		testFlags.motor_test = 1;
 	}
 
 	if (!calibratIMU)
@@ -319,10 +321,10 @@ static void test_marker(void)
 	ssd1306_SetCursor(0, 30);
 	ssd1306_printf(Font_7x10, "sensors:%d", getMarkerSensor());
 	ssd1306_SetCursor(0, 45);
-	ssd1306_printf(Font_7x10, "britght:%d", motor_test);
+	ssd1306_printf(Font_7x10, "britght:%d", testFlags.motor_test);
 
-	data_select(&motor_test, SW_PUSH);
-	if (motor_test == 1)
+	data_select(&testFlags.motor_test, SW_PUSH);
+	if (testFlags.motor_test == 1)
 	{
 		powerMarkerSensors(1);
 	}
@@ -389,7 +391,7 @@ static void test_linesensor(void)
 		ssd1306_DrawArc(64, 81, 35, 90, 270, White);
 		ssd1306_Line(2, 63, 34, 63, White);
 		ssd1306_Line(93, 63, 126, 63, White);
-		motor_test = 0;
+		testFlags.motor_test = 0;
 	}
 
 	if (lSensorOffset[0] > 0 && modeCalLinesensors == 0)
@@ -441,8 +443,8 @@ static void test_linesensor(void)
 		ssd1306_printf(Font_6x8, "%4d", lSensor[9]);
 	}
 
-	data_select(&motor_test, SW_PUSH);
-	if (motor_test == 1)
+	data_select(&testFlags.motor_test, SW_PUSH);
+	if (testFlags.motor_test == 1)
 	{
 		powerLineSensors(1);
 	}
@@ -466,22 +468,22 @@ static void test_rgbled(void)
 		init_sensor_test("RGBLED", Font_7x10, 43); // 画面クリアとタイトル表示
 	}
 
-	data_select(&motor_test, SW_PUSH);
-	if (motor_test == 1)
+	data_select(&testFlags.motor_test, SW_PUSH);
+	if (testFlags.motor_test == 1)
 	{
-		if (cntSetup2 > 50)
+		if (setupTimer.cntSetup2 > 50)
 		{
 			fullColorLED(10, 4);
-			cntSetup2 = 0;
+			setupTimer.cntSetup2 = 0;
 		}
 	}
 
-	if (motor_test != beforeMotorTest)
+	if (testFlags.motor_test != testFlags.beforeMotorTest)
 	{
 		clearLED();
 	}
 
-	beforeMotorTest = motor_test;
+	testFlags.beforeMotorTest = testFlags.motor_test;
 }
 /////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_sensors
@@ -541,7 +543,7 @@ static void setup_pid_dist(void)
 
 	// ゲイン表示
 	dataTuningUD(&pattern.gain, 1, 3, 1);	// 上下ボタンで調整対象を選択
-	if (trace_test == 0)	// 動作開始前のみ調整を許可
+	if (testFlags.trace_test == 0)	// 動作開始前のみ調整を許可
 	{
 		ssd1306_SetCursor(21, 18);
 		if (pattern.gain == 1)
@@ -604,9 +606,9 @@ static void setup_pid_trace(void)
 		ssd1306_printf(Font_7x10, "pwm:");
 	}
 
-	data_select(&trace_test, SW_PUSH); // PUSHでトレースON/OFFの選択
+	data_select(&testFlags.trace_test, SW_PUSH); // PUSHでトレースON/OFFの選択
 	// PUSHでトレースON/OFF
-	if (trace_test == 1)
+	if (testFlags.trace_test == 1)
 	{
 		motorPwmOutSynth(lineTraceCtrl.pwm, 0, 0, 0); // モータを指定PWMで駆動
 		powerLineSensors(1);                          // ラインセンサを有効化
@@ -616,19 +618,19 @@ static void setup_pid_trace(void)
 		motorPwmOutSynth(0, 0, 0, 0);                // モータ停止
 		powerLineSensors(0);                         // ラインセンサ停止
 	}
-	if (trace_test != beforeMotorTest && trace_test == 0)
+	if (testFlags.trace_test != testFlags.beforeMotorTest && testFlags.trace_test == 0)
 	{
-		trace_test = 2;                              // 停止待機状態へ遷移
+		testFlags.trace_test = 2;                              // 停止待機状態へ遷移
 	}
-	if (trace_test == 2 && encCurrentL == 0) // ホイールの回転が停止したら0
+	if (testFlags.trace_test == 2 && encCurrentL == 0) // ホイールの回転が停止したら0
 	{
-		trace_test = 0;                              // 完全停止後に終了
+		testFlags.trace_test = 0;                              // 完全停止後に終了
 	}
-	beforeMotorTest = trace_test;                        // 状態を保存
+	testFlags.beforeMotorTest = testFlags.trace_test;                        // 状態を保存
 
 	// ゲイン表示
 	dataTuningUD(&pattern.gain, 1, 3, 1);
-	if (trace_test == 0)
+	if (testFlags.trace_test == 0)
 	{
 		ssd1306_SetCursor(21, 18);
 		if (pattern.gain == 1)
@@ -694,9 +696,9 @@ static void setup_pid_angular(void)
 		setTargetSpeed(0);           // 速度制御の目標値を初期化
 	}
 
-	data_select(&trace_test, SW_PUSH); // トレースON/OFFを選択
+	data_select(&testFlags.trace_test, SW_PUSH); // トレースON/OFFを選択
 	// PUSHでトレースON/OFF
-	if (trace_test == 1)
+	if (testFlags.trace_test == 1)
 	{
 		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 	}
@@ -704,19 +706,19 @@ static void setup_pid_angular(void)
 	{
 		motorPwmOutSynth(0, 0, 0, 0);
 	}
-	if (trace_test != beforeMotorTest && trace_test == 0)
+	if (testFlags.trace_test != testFlags.beforeMotorTest && testFlags.trace_test == 0)
 	{
-		trace_test = 2;
+		testFlags.trace_test = 2;
 	}
-	if (trace_test == 2 && encCurrentL == 0) // ホイールの回転が停止したら0
+	if (testFlags.trace_test == 2 && encCurrentL == 0) // ホイールの回転が停止したら0
 	{
-		trace_test = 0;
+		testFlags.trace_test = 0;
 	}
-	beforeMotorTest = trace_test;
+	testFlags.beforeMotorTest = testFlags.trace_test;
 
 	// ゲイン表示
 	dataTuningUD(&pattern.gain, 1, 3, 1);
-	if (trace_test == 0)
+	if (testFlags.trace_test == 0)
 	{
 		ssd1306_SetCursor(21, 18);
 		if (pattern.gain == 1)
@@ -778,9 +780,9 @@ static void setup_pid_speed(void)
 		ssd1306_printf(Font_7x10, "pwm:");
 	}
 
-	data_select(&trace_test, SW_PUSH); // PUSHでトレースON/OFFの選択
+	data_select(&testFlags.trace_test, SW_PUSH); // PUSHでトレースON/OFFの選択
 	// PUSHでトレースON/OFF
-	if (trace_test == 1)
+	if (testFlags.trace_test == 1)
 	{
 		// トレースON時の制御
 		powerLineSensors(1); // ラインセンサを有効化
@@ -796,7 +798,7 @@ static void setup_pid_speed(void)
 
 	// ゲイン表示
 	dataTuningUD(&pattern.gain, 1, 3, 1); // 調整対象のゲインを選択
-	if (trace_test == 0)
+	if (testFlags.trace_test == 0)
 	{
 		ssd1306_SetCursor(21, 18);
 		if (pattern.gain == 1)
@@ -859,17 +861,17 @@ static void setup_calibration(void)
 		ssd1306_SetCursor(65, 22);
 		ssd1306_printf(Font_6x8, "%4d", lSensorOffset[0]);
 
-		data_select(&trace_test, SW_PUSH); // SW_PUSH入力を監視
-		if (trace_test)
+		data_select(&testFlags.trace_test, SW_PUSH); // SW_PUSH入力を監視
+		if (testFlags.trace_test)
 		{
-				cntSetup1 = 0; // カウンタリセット
+				setupTimer.cntSetup1 = 0; // カウンタリセット
 				pattern.calibration = 2; // 次のステップへ
 		}
 		break;
 	}
 	case 2: // 開始準備
 	{
-		if (cntSetup1 > 1000) // 一定時間待機
+		if (setupTimer.cntSetup1 > 1000) // 一定時間待機
 		{
 			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 			ssd1306_SetCursor(22, 28);
@@ -892,8 +894,8 @@ static void setup_calibration(void)
 	}
 	case 3: // スイッチ押下で終了
 	{
-		data_select(&trace_test, SW_PUSH); // SW_PUSH入力を監視
-		if (!trace_test) // スイッチが離されたら
+		data_select(&testFlags.trace_test, SW_PUSH); // SW_PUSH入力を監視
+		if (!testFlags.trace_test) // スイッチが離されたら
 		{
 			modeCalLinesensors = 0;                                           // キャリブレーション終了
 			powerLineSensors(0);                                              // ラインセンサ消灯
@@ -941,8 +943,8 @@ static void setup_pid_angle(void)
 		setTargetSpeed(0.3);    // PID調整用の走行速度
 	}
 
-	data_select(&trace_test, SW_PUSH);       // PUSHでトレースON/OFF
-	// if ( trace_test == 1 ) {
+	data_select(&testFlags.trace_test, SW_PUSH);       // PUSHでトレースON/OFF
+	// if ( testFlags.trace_test == 1 ) {
 	//      motorPwmOutSynth( 0, veloCtrl.pwm, distCtrl.pwm, 0 );
 	// } else {
 	//      motorPwmOutSynth( 0, 0, 0, 0 );
@@ -950,7 +952,7 @@ static void setup_pid_angle(void)
 
 	// 上下スイッチで調整対象のゲインを選択
 	dataTuningUD(&pattern.gain, 1, 3, 1);
-	if (trace_test == 0)
+	if (testFlags.trace_test == 0)
 	{
 		// 選択したゲインを表示
 		ssd1306_SetCursor(21, 18);
@@ -1146,7 +1148,7 @@ static void setup_start(void)
 			if (lSensorOffset[0] > 0)
 			{
 				// キャリブレーション実施済み
-				start = 1;
+				setupFlags.start = 1;
 			}
 			else
 			{
@@ -1178,8 +1180,8 @@ static void setup_start(void)
 		ssd1306_printf(Font_7x10, "Now");
 		ssd1306_UpdateScreen(); // グラフィック液晶更新
 
-		trace_test = true;
-		cntSetup1 = 0;
+		testFlags.trace_test = true;
+		setupTimer.cntSetup1 = 0;
 		enc1 = 0;
 		powerLineSensors(1); // 先に点灯させて安定させる
 
@@ -1188,7 +1190,7 @@ static void setup_start(void)
 	}
 	case 3: // 開始準備
 	{
-		if (cntSetup1 > 1000)
+		if (setupTimer.cntSetup1 > 1000)
 		{
 			veloCtrl.Int = 0;                // I成分リセット
 			BMI088val.angle.z = 0.0; // 角度リセット
@@ -1228,7 +1230,7 @@ static void setup_start(void)
 		if (countdown <= 0)
 		{
 			powerLineSensors(0); // ラインセンサ消灯
-			start = 1;
+			setupFlags.start = 1;
 		}
 		break;
 	}
@@ -1257,19 +1259,19 @@ void setup(void)
 	}
 
 	// 左ホイールをロータリスイッチ代わりに使用する
-	if (!trace_test && !motor_test)
+	if (!testFlags.trace_test && !testFlags.motor_test)
 	{
 		if (abs(encClick) > 400)
 		{
 			if (encClick > 400)
 			{
 				pattern.display++;
-				clickStart = 1;
+				setupFlags.clickStart = 1;
 			}
 			else if (encClick < -400)
 			{
 				pattern.display--;
-				clickStart = -1;
+				setupFlags.clickStart = -1;
 			}
 
 			if (pattern.display > 0x9)
@@ -1407,7 +1409,7 @@ void setup(void)
 		sendLED();
 	}
 
-	if (!trace_test && !calibratIMU)
+	if (!testFlags.trace_test && !calibratIMU)
 	{
 		ssd1306_UpdateScreen(); // グラフィック液晶更新
 	}
@@ -1468,16 +1470,16 @@ void dataTuning(void *data, double add, double min, double max, uint8_t dir, uin
 	// 方向に応じて使用するスイッチとカウンタを設定
 	if (dir == UD)
 	{
-		cntSwitch = &cntSwitchUD;
-		cntSwitchLong = &cntSwitchUDLong;
+		cntSwitch = &setupTimer.cntSwitchUD;
+		cntSwitchLong = &setupTimer.cntSwitchUDLong;
 		push = &pushUD;
 		swPlus = SW_UP;     // 増加方向のスイッチ
 		swMinus = SW_DOWN;  // 減少方向のスイッチ
 	}
 	else
 	{
-		cntSwitch = &cntSwitchLR;
-		cntSwitchLong = &cntSwitchLRLong;
+		cntSwitch = &setupTimer.cntSwitchLR;
+		cntSwitchLong = &setupTimer.cntSwitchLRLong;
 		push = &pushLR;
 		swPlus = SW_RIGHT;  // 増加方向のスイッチ
 		swMinus = SW_LEFT;  // 減少方向のスイッチ
@@ -1670,12 +1672,12 @@ void setupNonDisp(void)
 			if (lSensorOffset[0] > 0)
 			{
 				// キャリブレーション実施済み
-				start = 1;
+				setupFlags.start = 1;
 			}
 			else
 			{
 				// キャリブレーション未実施
-				cntSetup1 = 0;
+				setupTimer.cntSetup1 = 0;
 				enc1 = 0;
 				powerLineSensors(1); // 先に点灯させて安定させる
 				pattern.calibration = 2;
@@ -1685,7 +1687,7 @@ void setupNonDisp(void)
 
 	case 2:
 		// 開始準備
-		if (cntSetup1 > 1000)
+		if (setupTimer.cntSetup1 > 1000)
 		{
 			veloCtrl.Int = 0;		 // I成分リセット
 			BMI088val.angle.z = 0.0; // 角度リセット
@@ -1764,7 +1766,7 @@ void setupNonDisp(void)
 					optimalIndex = 0;
 				}
 			}
-			start = mode;
+			setupFlags.start = mode;
 		}
 		break;
 
@@ -1772,7 +1774,20 @@ void setupNonDisp(void)
 		break;
 	}
 }
-///////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////
+// モジュール名 setupCount
+// 処理概要     セットアップ用タイマを加算
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void setupCount(void)
+{
+	setupTimer.cntSetup1++;
+	setupTimer.cntSetup2++;
+	setupTimer.cntSwitchUD++;
+	setupTimer.cntSwitchLR++;
+}
+
 // モジュール名 wheelClick
 // 処理概要     ホイールを短時間回転させクリック感を出す
 // 引数         なし
@@ -1786,14 +1801,14 @@ void wheelClick(void)
 	switch (pattern.click)
 	{
 	case 1:
-		if (clickStart != 0)
+		if (setupFlags.clickStart != 0)
 		{
 			pattern.click = 2;
 		}
 		break;
 
 	case 2:
-		motorPwmOut(-pwm * clickStart, 0);
+		motorPwmOut(-pwm * setupFlags.clickStart, 0);
 		cnt++;
 		if (cnt >= 3)
 		{
@@ -1803,7 +1818,7 @@ void wheelClick(void)
 		break;
 
 	case 3:
-		motorPwmOut(pwm * clickStart, 0);
+		motorPwmOut(pwm * setupFlags.clickStart, 0);
 		cnt++;
 		if (cnt >= 3)
 		{
@@ -1814,7 +1829,7 @@ void wheelClick(void)
 
 	case 4:
 		motorPwmOut(0, 0);
-		clickStart = 0;
+		setupFlags.clickStart = 0;
 		pattern.click = 1;
 		break;
 	}

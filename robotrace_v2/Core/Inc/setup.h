@@ -59,31 +59,39 @@ typedef struct
 	int16_t speedseting;            // 速度設定
 	int16_t log;                    // ログメニュー
 	int16_t calibration;            // キャリブレーション
-	int16_t click;                  // クリックメニュー
-	// 新しいパターンを追加する場合はここにメンバとコメントを追加
+        int16_t click;                  // クリックメニュー
+        // 新しいパターンを追加する場合はここにメンバとコメントを追加
 } Pattern;
+
+// セットアップ状態を管理するフラグ構造体
+typedef struct
+{
+        uint8_t start;       // 0:セットアップ中 1:セットアップ完了
+        int8_t clickStart;   // スタート方向
+} SetupFlags;
+
+// テスト関連のフラグ構造体
+typedef struct
+{
+        uint8_t motor_test;      // モータテスト
+        uint8_t trace_test;      // トレーステスト
+        uint8_t beforeMotorTest; // テスト状態保存用
+} TestFlags;
 
 //======================================//
 // グローバル変数の宣言
 //======================================//
 // パターン関連
-extern uint8_t start;
+extern SetupFlags setupFlags;
 extern Pattern pattern;
-
-// タイマ関連
-extern uint16_t cntSetup1;
-extern uint16_t cntSetup2;
-extern uint16_t cntSwitchUD;	 // スイッチ判定用右
-extern uint16_t cntSwitchLR;	 // スイッチ判定用左
-extern uint16_t cntSwitchUDLong; // スイッチ長押し判定用右
-extern uint16_t cntSwitchLRLong; // スイッチ長押し判定用左
 
 // パラメータ関連
 extern uint8_t fixSpeed;
 extern int32_t encClick;
 
 // フラグ関連
-extern uint8_t trace_test;
+extern TestFlags testFlags;
+
 
 //======================================//
 // プロトタイプ宣言
@@ -96,5 +104,6 @@ void dataTuningLR(int16_t *data, int16_t add, int16_t min, int16_t max);
 void dataTuningUDF(float *data, float add, float min, float max);
 void setupNonDisp(void);
 void wheelClick(void);
+void setupCount(void);
 
 #endif /* SETUP_H_ */
