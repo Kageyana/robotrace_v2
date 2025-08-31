@@ -22,22 +22,22 @@ int8_t pushUD = 0;
 // パターン関連
 uint8_t push1 = 0;
 Pattern pattern = {
-        .display = 0,
-        .sensors = 1,
-        .beforeSensors = 0,
-        .beforeHex = 255,
-        .sensorLine = 1,
-        .sensorAccele = 1,
-        .sensorGyro = 1,
-        .parameter1 = 1,
-        .parameter2 = 1,
-        .parameter3 = 1,
-        .parameter4 = 1,
-        .gain = 3,
-        .speedseting = 1,
-        .log = 1,
-        .calibration = 1,
-        .click = 1
+	.display = 0,
+	.sensors = 1,
+	.beforeSensors = 0,
+	.beforeHex = 255,
+	.sensorLine = 1,
+	.sensorAccele = 1,
+	.sensorGyro = 1,
+	.parameter1 = 1,
+	.parameter2 = 1,
+	.parameter3 = 1,
+	.parameter4 = 1,
+	.gain = 3,
+	.speedseting = 1,
+	.log = 1,
+	.calibration = 1,
+	.click = 1
 }; // パターンの状態を保持
 
 // フラグ関連
@@ -744,7 +744,7 @@ static void setup_pid_trace(void)
 			// kd
 			dataTuningLR(&lineTraceCtrl.kd, 1, 0, 255);
 			break;
-        }
+	}
 	}
 }
 
@@ -800,19 +800,19 @@ static void setup_pid_angular(void)
 	{
 		ssd1306_SetCursor(21, 18);
 		if (pattern.gain == 1)
-		        ssd1306_printfB(Font_7x10, "%3d", yawRateCtrl.kp);
+			ssd1306_printfB(Font_7x10, "%3d", yawRateCtrl.kp);
 		else
-		        ssd1306_printf(Font_7x10, "%3d", yawRateCtrl.kp);
+			ssd1306_printf(Font_7x10, "%3d", yawRateCtrl.kp);
 		ssd1306_SetCursor(21, 32);
 		if (pattern.gain == 2)
-		        ssd1306_printfB(Font_7x10, "%3d", yawRateCtrl.ki);
+			ssd1306_printfB(Font_7x10, "%3d", yawRateCtrl.ki);
 		else
-		        ssd1306_printf(Font_7x10, "%3d", yawRateCtrl.ki);
+			ssd1306_printf(Font_7x10, "%3d", yawRateCtrl.ki);
 		ssd1306_SetCursor(21, 44);
 		if (pattern.gain == 3)
-		        ssd1306_printfB(Font_7x10, "%3d", yawRateCtrl.kd);
+			ssd1306_printfB(Font_7x10, "%3d", yawRateCtrl.kd);
 		else
-		        ssd1306_printf(Font_7x10, "%3d", yawRateCtrl.kd);
+			ssd1306_printf(Font_7x10, "%3d", yawRateCtrl.kd);
 
 		// 制御量表示
 		ssd1306_SetCursor(88, 30);
@@ -821,17 +821,17 @@ static void setup_pid_angular(void)
 		switch (pattern.gain)
 		{
 		case 1:
-		        // kp
-		        dataTuningLR(&yawRateCtrl.kp, 1, 0, 255);
-		        break;
+			// kp
+			dataTuningLR(&yawRateCtrl.kp, 1, 0, 255);
+			break;
 		case 2:
-		        // ki
-		        dataTuningLR(&yawRateCtrl.ki, 1, 0, 255);
-		        break;
+			// ki
+			dataTuningLR(&yawRateCtrl.ki, 1, 0, 255);
+			break;
 		case 3:
-		        // kd
-		        dataTuningLR(&yawRateCtrl.kd, 1, 0, 255);
-		        break;
+			// kd
+			dataTuningLR(&yawRateCtrl.kd, 1, 0, 255);
+			break;
 		}
 	}
 }
@@ -1459,14 +1459,14 @@ void setup(void)
 		setup_pid_angle(); // ゲイン調整(角度)
 		break;
 	}
-        //------------------------------------------------------------------
-        // ゲイン調整(距離)
-        //------------------------------------------------------------------
-        case HEX_PID_DIST:
-        {
-                setup_pid_dist(); // 距離PID調整処理を実行
-                break;
-        }
+	//------------------------------------------------------------------
+	// ゲイン調整(距離)
+	//------------------------------------------------------------------
+	case HEX_PID_DIST:
+	{
+		setup_pid_dist(); // 距離PID調整処理を実行
+		break;
+	}
 
 	default:
 	{
@@ -1521,250 +1521,203 @@ void data_select(uint8_t *data, uint8_t button)
 	}
 }
 ///////////////////////////////////////////////////////////////////////////////////////
+// モジュール名 dataTuning
+// 処理概要     タクトスイッチの方向と数値型を指定して値を加減する
+// 引数         data: 調整対象の変数 add: 変化量 min: 最小値 max: 最大値 dir: 方向 UD/LR type: 型 int16_t/float
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////////////////
+void dataTuning(void *data, double add, double min, double max, uint8_t dir, uint8_t type)
+{
+	int16_t sign;
+	uint16_t *cntSwitch;
+	uint16_t *cntSwitchLong;
+	int8_t *push;
+	uint8_t swPlus;
+	uint8_t swMinus;
+
+	// max と min の差から加算方向を決定
+	if (max - min > 0)
+	{
+		sign = 1;
+	}
+	else
+	{
+		sign = -1;
+	}
+
+	// 方向に応じて使用するスイッチとカウンタを設定
+	if (dir == UD)
+	{
+		cntSwitch = &cntSwitchUD;
+		cntSwitchLong = &cntSwitchUDLong;
+		push = &pushUD;
+		swPlus = SW_UP;     // 増加方向のスイッチ
+		swMinus = SW_DOWN;  // 減少方向のスイッチ
+	}
+	else
+	{
+		cntSwitch = &cntSwitchLR;
+		cntSwitchLong = &cntSwitchLRLong;
+		push = &pushLR;
+		swPlus = SW_RIGHT;  // 増加方向のスイッチ
+		swMinus = SW_LEFT;  // 減少方向のスイッチ
+	}
+
+	// スイッチ入力に応じて値を更新
+	if (*cntSwitch >= 50)        // 一定周期で判定
+	{
+		if (swValTact == swPlus || swValTact == swMinus)
+		{
+			(*cntSwitchLong)++; // 長押し時間を加算
+			if (swValTact == swPlus)
+			{
+				// インクリメント処理
+				if (*cntSwitchLong >= PUSHTIME)
+				{ // 長押し時
+					if (type == TYPE_FLOAT)
+					{
+						*(float *)data += sign * (float)add;
+					}
+					else
+					{
+						*(int16_t *)data += sign * (int16_t)add;
+					}
+				}
+				else if (*push == 0)
+				{ // 1回押し
+					*push = 1;
+					if (type == TYPE_FLOAT)
+					{
+						*(float *)data += sign * (float)add;
+					}
+					else
+					{
+						*(int16_t *)data += sign * (int16_t)add;
+					}
+				}
+			}
+			else if (swValTact == swMinus)
+			{
+				// デクリメント処理
+				if (*cntSwitchLong >= PUSHTIME)
+				{ // 長押し時
+					if (type == TYPE_FLOAT)
+					{
+						*(float *)data -= sign * (float)add;
+					}
+					else
+					{
+						*(int16_t *)data -= sign * (int16_t)add;
+					}
+				}
+				else if (*push == 0)
+				{ // 1回押し
+					*push = 1;
+					if (type == TYPE_FLOAT)
+					{
+						*(float *)data -= sign * (float)add;
+					}
+					else
+					{
+						*(int16_t *)data -= sign * (int16_t)add;
+					}
+				}
+			}
+		}
+		else
+		{
+			*push = 0;          // 押下状態をリセット
+			*cntSwitchLong = 0; // 長押しカウンタをリセット
+		}
+		*cntSwitch = 0;             // 判定後にカウンタをリセット
+
+		// 上限・下限を超えた場合の折り返し処理
+		if (type == TYPE_FLOAT)
+		{
+			float *d = (float *)data;
+			if (sign > 0)
+			{
+				if (*d > (float)max)
+				{
+					*d = (float)min;
+				}
+				else if (*d < (float)min)
+				{
+					*d = (float)max;
+				}
+			}
+			else
+			{
+				if (*d > (float)min)
+				{
+					*d = (float)max;
+				}
+				else if (*d < (float)max)
+				{
+					*d = (float)min;
+				}
+			}
+		}
+		else
+		{
+			int16_t *d = (int16_t *)data;
+			if (sign > 0)
+			{
+				if (*d > (int16_t)max)
+				{
+					*d = (int16_t)min;
+				}
+				else if (*d < (int16_t)min)
+				{
+					*d = (int16_t)max;
+				}
+			}
+			else
+			{
+				if (*d > (int16_t)min)
+				{
+					*d = (int16_t)max;
+				}
+				else if (*d < (int16_t)max)
+				{
+					*d = (int16_t)min;
+				}
+			}
+		}
+	}
+}
+///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 dataTuningUD
-// 処理概要     タクトスイッチで整数型dataを加減する
-// 引数         data: 加減させる変数 add: 0: 変化量 dir: 0:上下 1:左右
+// 処理概要     上下方向でint16_t値を調整するラッパー
+// 引数         data: 調整対象の変数 add: 変化量 min: 最小値 max: 最大値
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////////////////
 void dataTuningUD(int16_t *data, int16_t add, int16_t min, int16_t max)
 {
-	int16_t sign;
-
-	if (max - min > 0)
-	{
-		sign = 1;
-	}
-	else
-	{
-		sign = -1;
-	}
-
-	if (cntSwitchUD >= 50)
-	{
-		if (swValTact == SW_UP || swValTact == SW_DOWN)
-		{
-			cntSwitchUDLong++; // 長押し時間計測
-			if (swValTact == SW_UP)
-			{
-				// インクリメント
-				if (cntSwitchUDLong >= PUSHTIME)
-				{ // 長押し処理
-					*data += sign * add;
-				}
-				else if (pushUD == 0)
-				{ // 1回押し処理
-					pushUD = 1;
-					*data += sign * add;
-				}
-			}
-			else if (swValTact == SW_DOWN)
-			{
-				// デクリメント
-				if (cntSwitchUDLong >= PUSHTIME)
-				{ // 長押し処理
-					*data -= sign * add;
-				}
-				else if (pushUD == 0)
-				{ // 1回押し処理
-					pushUD = 1;
-					*data -= sign * add;
-				}
-			}
-		}
-		else
-		{
-			pushUD = 0;
-			cntSwitchUDLong = 0;
-		}
-		cntSwitchUD = 0;
-
-		if (sign > 0)
-		{
-			if (*data > max)
-			{
-				*data = min;
-			}
-			else if (*data < min)
-			{
-				*data = max;
-			}
-		}
-		else
-		{
-			if (*data > min)
-			{
-				*data = max;
-			}
-			else if (*data < max)
-			{
-				*data = min;
-			}
-		}
-	}
+	// 汎用関数へ上下方向とint16_t型を指定して委譲
+	dataTuning(data, add, min, max, UD, TYPE_INT16);
 }
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 dataTuningLR
-// 処理概要     タクトスイッチで整数型dataを加減する
-// 引数         data: 加減させる変数 add: 0: 変化量 dir: 0:上下 1:左右
+// 処理概要     左右方向でint16_t値を調整するラッパー
+// 引数         data: 調整対象の変数 add: 変化量 min: 最小値 max: 最大値
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////////////////
 void dataTuningLR(int16_t *data, int16_t add, int16_t min, int16_t max)
 {
-	int16_t sign;
-
-	if (max - min > 0)
-	{
-		sign = 1;
-	}
-	else
-	{
-		sign = -1;
-	}
-
-	if (cntSwitchLR >= 50)
-	{
-		if (swValTact == SW_LEFT || swValTact == SW_RIGHT)
-		{
-			cntSwitchLRLong++; // 長押し時間計測
-			if (swValTact == SW_RIGHT)
-			{
-				// インクリメント
-				if (cntSwitchLRLong >= PUSHTIME)
-				{ // 長押し処理
-					*data += sign * add;
-				}
-				else if (pushLR == 0)
-				{ // 1回押し処理
-					pushLR = 1;
-					*data += sign * add;
-				}
-			}
-			else if (swValTact == SW_LEFT)
-			{
-				// デクリメント
-				if (cntSwitchLRLong >= PUSHTIME)
-				{ // 長押し処理
-					*data -= sign * add;
-				}
-				else if (pushLR == 0)
-				{ // 1回押し処理
-					pushLR = 1;
-					*data -= sign * add;
-				}
-			}
-		}
-		else
-		{
-			pushLR = 0;
-			cntSwitchLRLong = 0;
-		}
-		cntSwitchLR = 0;
-
-		if (sign > 0)
-		{
-			if (*data > max)
-			{
-				*data = min;
-			}
-			else if (*data < min)
-			{
-				*data = max;
-			}
-		}
-		else
-		{
-			if (*data > min)
-			{
-				*data = max;
-			}
-			else if (*data < max)
-			{
-				*data = min;
-			}
-		}
-	}
+	// 汎用関数へ左右方向とint16_t型を指定して委譲
+	dataTuning(data, add, min, max, LR, TYPE_INT16);
 }
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 dataTuningUDF
-// 処理概要     タクトスイッチでfloat型dataを加減する
-// 引数         data: 加減させる変数 add: 0: 変化量 dir: 0:上下 1:左右
+// 処理概要     上下方向でfloat値を調整するラッパー
+// 引数         data: 調整対象の変数 add: 変化量 min: 最小値 max: 最大値
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////////////////
 void dataTuningUDF(float *data, float add, float min, float max)
 {
-	int16_t sign;
-
-	if (max - min > 0)
-	{
-		sign = 1;
-	}
-	else
-	{
-		sign = -1;
-	}
-
-	if (cntSwitchUD >= 50)
-	{
-		if (swValTact == SW_UP || swValTact == SW_DOWN)
-		{
-			cntSwitchUDLong++; // 長押し時間計測
-			if (swValTact == SW_UP)
-			{
-				// インクリメント
-				if (cntSwitchUDLong >= PUSHTIME)
-				{ // 長押し処理
-					*data += sign * add;
-				}
-				else if (pushUD == 0)
-				{ // 1回押し処理
-					pushUD = 1;
-					*data += sign * add;
-				}
-			}
-			else if (swValTact == SW_DOWN)
-			{
-				// デクリメント
-				if (cntSwitchUDLong >= PUSHTIME)
-				{ // 長押し処理
-					*data -= sign * add;
-				}
-				else if (pushUD == 0)
-				{ // 1回押し処理
-					pushUD = 1;
-					*data -= sign * add;
-				}
-			}
-		}
-		else
-		{
-			pushUD = 0;
-			cntSwitchUDLong = 0;
-		}
-		cntSwitchUD = 0;
-
-		if (sign > 0)
-		{
-			if (*data > max)
-			{
-				*data = min;
-			}
-			else if (*data < min)
-			{
-				*data = max;
-			}
-		}
-		else
-		{
-			if (*data > min)
-			{
-				*data = max;
-			}
-			else if (*data < max)
-			{
-				*data = min;
-			}
-		}
-	}
+	// 汎用関数へ上下方向とfloat型を指定して委譲
+	dataTuning(data, add, min, max, UD, TYPE_FLOAT);
 }
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setupNonDisp
