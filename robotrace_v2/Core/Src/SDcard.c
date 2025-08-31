@@ -41,6 +41,7 @@ typedef struct
 logData logVal[BUFFER_SIZW_LOG];
 #endif
 uint16_t logValIndex = 0;
+bool logOverflow = false; // ログバッファ上限超過フラグ
 
 typedef struct
 {
@@ -50,6 +51,7 @@ typedef struct
 } markerData;
 markerData markerVal[BUFFER_SIZW_MARKER];
 uint16_t markerValIndex = 0;
+bool markerOverflow = false; // マーカーバッファ上限超過フラグ
 
 // ログファイルナンバー
 int16_t fileNumbers[1000];
@@ -220,10 +222,18 @@ void createLog(void)
 /////////////////////////////////////////////////////////////////////
 void writeMarkerPos(uint32_t distance, uint8_t marker)
 {
-	markerVal[markerValIndex].index = logValIndex;
-	markerVal[markerValIndex].distance = distance;
-	markerVal[markerValIndex].marker = marker;
-	markerValIndex++;
+	// バッファ上限チェック
+	if (markerValIndex < BUFFER_SIZW_MARKER)
+	{
+		markerVal[markerValIndex].index = logValIndex; // ログの位置を記録
+		markerVal[markerValIndex].distance = distance;  // 走行距離を記録
+		markerVal[markerValIndex].marker = marker;      // マーカー種別を記録
+		markerValIndex++;                               // インデックス更新
+	}
+	else
+	{
+		markerOverflow = true; // 上限超過を記録
+	}
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 initLog
@@ -351,13 +361,21 @@ void writeLogBufferPrint(void)
 {
 	if (modeLOG)
 	{
-		logVal[logValIndex].time = cntLog;
-		logVal[logValIndex].speed = encCurrentN;
-		logVal[logValIndex].zg = BMI088val.gyro.z;
-		logVal[logValIndex].opIndex = optimalIndex;
-		logVal[logValIndex].targetSpeed = targetSpeed;
-		logVal[logValIndex].spare = (int16_t)(motorCurrentL * 10000);
-		logValIndex++;
+		// バッファ上限チェック
+		if (logValIndex < BUFFER_SIZW_LOG)
+		{
+			logVal[logValIndex].time = cntLog;                        // ログ時刻を記録
+			logVal[logValIndex].speed = encCurrentN;                  // 現在速度を記録
+			logVal[logValIndex].zg = BMI088val.gyro.z;                // 角速度を記録
+			logVal[logValIndex].opIndex = optimalIndex;               // 最適軌道番号を記録
+			logVal[logValIndex].targetSpeed = targetSpeed;           // 目標速度を記録
+			logVal[logValIndex].spare = (int16_t)(motorCurrentL * 10000); // 予備情報を記録
+			logValIndex++;                                           // インデックス更新
+		}
+		else
+		{
+			logOverflow = true; // 上限超過を記録
+		}
 	}
 }
 #endif
