@@ -25,7 +25,8 @@ uint8_t *activeBuf = logBuffer[0]; // 書き込み中のバッファ
 uint8_t activeIndex = 0;          // 現在のバッファ番号
 uint8_t flushIndex = 0;           // SD書き込み待ちバッファ番号
 int16_t logBuffIndex = 0;          // 一時記録バッファ書込アドレス
-bool sendSD = false;               // SD書き込み要求フラグ
+volatile bool sendSD = false;      // SD書き込み要求フラグ
+                                   // 割込みとの共有のため volatile 指定
 uint16_t cntSend = 0;
 uint8_t *logaddress;
 volatile uint8_t freeBufCount = LOG_BUFFER_COUNT - 1; // 未使用バッファ数を管理
