@@ -54,24 +54,24 @@ int32_t encClick = 0;
 //======================================//
 // プロトタイプ宣言
 //======================================//
-static void setup_sensors(void); // センサ表示とテストメニューを制御する処理
-static void setup_pid_trace(void); // ゲイン調整(直線トレース)
-static void setup_pid_dist(void); // ゲイン調整(距離)
-static void setup_pid_angle(void); // ゲイン調整(角度)
-static void setup_pid_angular(void); // ゲイン調整(角速度)
-static void setup_pid_speed(void); // ゲイン調整(速度)
-static void setup_start(void); // スタート待ち画面とキャリブレーションを制御する処理
-static void setup_log(void); // ログ解析と表示を制御
-static void setup_calibration(void); // キャリブレーション(ラインセンサ)
-static void setup_speed_param(void); // 速度パラメータ調整
-static void test_motor(void); // モータテスト
-static void test_imu_deg(void); // IMU角度表示
-static void test_imu_accel(void); // IMU加速度表示
-static void test_marker(void); // マーカーセンサ
-static void test_switch(void); // タクトスイッチ
-static void test_battery(void); // バッテリ電圧
-static void test_linesensor(void); // ラインセンサ
-static void test_rgbled(void); // RGBLED
+static void setup_sensors(void); 		// センサ表示とテストメニューを制御する処理
+static void setup_pid_trace(void);		// ゲイン調整(直線トレース)
+static void setup_pid_dist(void);		// ゲイン調整(距離)
+static void setup_pid_angle(void);		// ゲイン調整(角度)
+static void setup_pid_angular(void);	// ゲイン調整(角速度)
+static void setup_pid_speed(void);		// ゲイン調整(速度)
+static void setup_start(void);			// スタート待ち画面とキャリブレーションを制御する処理
+static void setup_log(void);			// ログ解析と表示を制御
+static void setup_calibration(void);	// キャリブレーション(ラインセンサ)
+static void setup_speed_param(void);	// 速度パラメータ調整
+static void test_motor(void);			// モータテスト
+static void test_imu_deg(void);			// IMU角度表示
+static void test_imu_accel(void);		// IMU加速度表示
+static void test_marker(void);			// マーカーセンサ
+static void test_switch(void); 			// タクトスイッチ
+static void test_battery(void);			// バッテリ電圧
+static void test_linesensor(void); 		// ラインセンサ
+static void test_rgbled(void); 			// RGBLED
 static void init_sensor_test(const char* title, FontDef font, uint8_t x); // 表示初期化
 
 // センサテストで使用する関数ポインタ型
@@ -155,10 +155,10 @@ static void setup_speed_param(void)
 	{
 		if (pattern.parameter1 == i + 1)
 		{
-		dataTuningUDF(speedParamTable[i].value, speedParamTable[i].step, speedParamTable[i].min, speedParamTable[i].max);
-		ssd1306_SetCursor(0, 24);
-		ssd1306_printf(Font_6x8, "%s:%3gm/%s", speedParamTable[i].label, *speedParamTable[i].value, speedParamTable[i].unit);
-		break;
+			dataTuningUDF(speedParamTable[i].value, speedParamTable[i].step, speedParamTable[i].min, speedParamTable[i].max);
+			ssd1306_SetCursor(0, 24);
+			ssd1306_printf(Font_6x8, "%s:%3gm/%s", speedParamTable[i].label, *speedParamTable[i].value, speedParamTable[i].unit);
+			break;
 		}
 	}
 
