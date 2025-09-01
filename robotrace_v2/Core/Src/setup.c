@@ -43,7 +43,7 @@ uint8_t trace_test = 0;
 int8_t clickStart = 0;
 
 // パラメータ関連
-int16_t motorTestPwm = 200;
+int16_t motorTestPwm = -500;
 int32_t encClick = 0;
 ///////////////////////////////////////////////////////////////
 // モジュール名 setup
