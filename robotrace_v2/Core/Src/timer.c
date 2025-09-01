@@ -43,7 +43,8 @@ void Interrupt1ms(void)
 		if (!calibratIMU)
 		{
 			BMI088getGyro(); // 角速度取得
-			calcDegrees();	 // 角度計算
+			BMI088getAccele(); // 加速度取得（角度補正に使用）
+			calcDegrees();	// コンプリメンタリフィルタで角度算出
 			if (optimalTrace == 0)
 				checkCurve();	   // 1次走行 カーブ検出
 			motorControlYawRate(); // 角速度制御

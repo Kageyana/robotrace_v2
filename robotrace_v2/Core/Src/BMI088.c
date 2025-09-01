@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "BMI088.h"
+#include <math.h> // 加速度補正の計算で使用
 //====================================//
 // グローバル変数の宣
 //====================================//
@@ -164,23 +165,23 @@ bool initBMI088(void)
 /////////////////////////////////////////////////////////////////////
 void BMI088getGyro(void)
 {
-	uint8_t rawData[6];
-	int16_t gyroVal[3];
+        uint8_t rawData[6];
+        int16_t gyroVal[3];
 
-	// 角速度の生データを取得
-	BMI088ReadAxisDataG(REG_RATE_Z_LSB, rawData, 2);
-	// LSBとMSBを結合
-	// gyroVal[0] = ((rawData[1] << 8) | rawData[0]) - angleOffset[0];
-	// gyroVal[1] = ((rawData[3] << 8) | rawData[2]) - angleOffset[1];
-	gyroVal[2] = ((rawData[1] << 8) | rawData[0]) - angleOffset[2];
+        // 角速度の生データを取得
+        BMI088ReadAxisDataG(REG_RATE_X_LSB, rawData, 6); // x,y,z軸の生データを取得
+        // LSBとMSBを結合
+        gyroVal[0] = ((rawData[1] << 8) | rawData[0]) - angleOffset[0]; // x軸角速度
+        gyroVal[1] = ((rawData[3] << 8) | rawData[2]) - angleOffset[1]; // y軸角速度
+        gyroVal[2] = ((rawData[5] << 8) | rawData[4]) - angleOffset[2]; // z軸角速度
 
-	// BMI088val.gyro.x = (float)gyroVal[0] / GYROLSB * COEFF_DPD;
-	// BMI088val.gyro.y = (float)gyroVal[1] / GYROLSB * COEFF_DPD;
-	BMI088val.gyro.z = (float)gyroVal[2] / GYROLSB * COEFF_DPD;
+        BMI088val.gyro.x = (float)gyroVal[0] / GYROLSB * COEFF_DPD; // x軸角速度[deg/s]
+        BMI088val.gyro.y = (float)gyroVal[1] / GYROLSB * COEFF_DPD; // y軸角速度[deg/s]
+        BMI088val.gyro.z = (float)gyroVal[2] / GYROLSB * COEFF_DPD; // z軸角速度[deg/s]
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 BMI088getAccele
-// 処理概要     加速度の取得
+// 処理概要     加速度の取得（角度補正に使用）
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
@@ -196,9 +197,9 @@ void BMI088getAccele(void)
 	accelVal[1] = (rawData[3] << 8) | rawData[2];
 	accelVal[2] = (rawData[5] << 8) | rawData[4];
 
-	BMI088val.accele.x = (float)accelVal[0] / ACCELELSB;
-	BMI088val.accele.y = (float)accelVal[1] / ACCELELSB;
-	BMI088val.accele.z = (float)accelVal[2] / ACCELELSB;
+	BMI088val.accele.x = (float)accelVal[0] / ACCELELSB; // x軸加速度[g]
+	BMI088val.accele.y = (float)accelVal[1] / ACCELELSB; // y軸加速度[g]
+	BMI088val.accele.z = (float)accelVal[2] / ACCELELSB; // z軸加速度[g]
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 BMI088getTemp
@@ -229,15 +230,23 @@ void BMI088getTemp(void)
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 calcDegrees
-// 処理概要     角度の計算
+// 処理概要     角度の計算（加速度とジャイロの融合）
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void calcDegrees(void)
 {
-	BMI088val.angle.x += BMI088val.gyro.x * DEFF_TIME;
-	BMI088val.angle.y += BMI088val.gyro.y * DEFF_TIME;
-	BMI088val.angle.z += BMI088val.gyro.z * DEFF_TIME;
+        const float alpha = 0.98F; // コンプリメンタリフィルタ係数（ジャイロ優先度）
+        float accelAngleX; // 加速度から求めたX軸角度[deg]
+        float accelAngleY; // 加速度から求めたY軸角度[deg]
+
+        accelAngleX = atan2f(BMI088val.accele.y, BMI088val.accele.z) * 180.0F / M_PI; // X軸角度計算
+        accelAngleY = atan2f(-BMI088val.accele.x, sqrtf(BMI088val.accele.y * BMI088val.accele.y + BMI088val.accele.z * BMI088val.accele.z)) * 180.0F / M_PI; // Y軸角度計算
+
+	// 加速度で算出した角度とジャイロ積分値を組み合わせてドリフトを補正
+        BMI088val.angle.x = alpha * (BMI088val.angle.x + BMI088val.gyro.x * DEFF_TIME) + (1.0F - alpha) * accelAngleX; // 加速度角とジャイロ積分を融合してX軸角度を算出
+        BMI088val.angle.y = alpha * (BMI088val.angle.y + BMI088val.gyro.y * DEFF_TIME) + (1.0F - alpha) * accelAngleY; // 加速度角とジャイロ積分を融合してY軸角度を算出
+        BMI088val.angle.z += BMI088val.gyro.z * DEFF_TIME; // Z軸はジャイロ積分のみで算出
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 cariblationIMU
