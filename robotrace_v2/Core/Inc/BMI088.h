@@ -8,6 +8,10 @@
 //====================================//
 // シンボル定義
 //====================================//
+// sensor Type
+#define GYRO		true
+#define ACCELE		false
+
 //  unit settings
 #define ACCELELSB 5460.0F
 #define GYROLSB 16.384F
@@ -15,6 +19,7 @@
 
 #define DEFF_TIME 0.001F
 #define COEFF_DPD -1.00F
+#define COEFF_COMPFILTER 0.96F
 #define IMU_TRANSMIT true
 #define IMU_STOP false
 
@@ -60,22 +65,21 @@ typedef struct
 	axis gyroTotal;
 	axis angle;
 	float temp;
-	uint16_t id;
+	uint8_t Aid;
+	uint8_t Gid;
+	uint8_t Initialized;
 } IMUval;
 //====================================//
 // グローバル変数の宣言
 //====================================//
-extern IMUval BMI088val;
+extern volatile IMUval BMI088val;
 extern bool calibratIMU;
 //====================================//
 // プロトタイプ宣言
 //====================================//
-uint8_t BMI088ReadByteG(uint8_t reg);
-void BMI088WriteByteG(uint8_t reg, uint8_t val);
-uint8_t BMI088ReadByteA(uint8_t reg);
-void BMI088WriteByteA(uint8_t reg, uint8_t val);
-void BMI088ReadAxisDataG(uint8_t reg, uint8_t *rxData, uint8_t rxNum);
-void BMI088ReadAxisDataA(uint8_t reg, uint8_t *rxData, uint8_t rxNum);
+uint8_t BMI088readByte(bool sensorType, uint8_t reg);
+void BMI088writeByte(bool sensorType, uint8_t reg, uint8_t val);
+void BMI088readAxisData(bool sensorType, uint8_t reg, uint8_t *rxData, uint8_t rxNum);
 bool initBMI088(void);
 void BMI088getGyro(void);
 void BMI088getAccele(void);
