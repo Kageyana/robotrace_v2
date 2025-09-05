@@ -264,7 +264,7 @@ void ssd1306_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c)
 
 __weak void ssd1306_TransferCompletedCallback(void)
 {
-        // ユーザー定義の処理をここに追加
+	// ユーザー定義の処理をここに追加
 }
 #endif
 
