@@ -22,6 +22,12 @@ void ssd1306_WriteData(uint8_t *buffer, size_t buff_size)
 	HAL_I2C_Mem_Write(&SSD1306_I2C_PORT, SSD1306_I2C_ADDR, 0x40, 1, buffer, buff_size, HAL_MAX_DELAY);
 }
 
+// Send data using DMA
+void ssd1306_WriteData_DMA(uint8_t *buffer, size_t buff_size)
+{
+	HAL_I2C_Mem_Write_DMA(&SSD1306_I2C_PORT, SSD1306_I2C_ADDR, 0x40, 1, buffer, buff_size); // DMA送信開始
+}
+
 #elif defined(SSD1306_USE_SPI)
 
 void ssd1306_Reset(void)
@@ -63,6 +69,9 @@ static uint8_t SSD1306_Buffer[SSD1306_BUFFER_SIZE];
 
 // Screen object
 static SSD1306_t SSD1306;
+
+static volatile uint8_t SSD1306_DMA_Busy = 0; // DMA転送中フラグ
+static uint8_t SSD1306_DMA_Page = 0;          // 送信中のページ番号
 
 /* Fills the Screenbuffer with values from a given buffer of a fixed length */
 SSD1306_Error_t ssd1306_FillBuffer(uint8_t *buf, uint32_t len)
@@ -207,6 +216,57 @@ void ssd1306_UpdateScreen(void)
 		ssd1306_WriteData(&SSD1306_Buffer[SSD1306_WIDTH * i], SSD1306_WIDTH);
 	}
 }
+
+#if defined(SSD1306_USE_I2C)
+void ssd1306_UpdateScreen_DMA(void)
+{
+	if (SSD1306_DMA_Busy) // 既に転送中なら無視
+	{
+		return;
+	}
+
+	SSD1306_DMA_Busy = 1;     // 転送中フラグ設定
+	SSD1306_DMA_Page = 0;     // 0ページ目から送信開始
+
+	ssd1306_WriteCommand(0xB0 + SSD1306_DMA_Page); // ページアドレス設定
+	ssd1306_WriteCommand(0x00 + SSD1306_X_OFFSET_LOWER); // 列アドレス下位設定
+	ssd1306_WriteCommand(0x10 + SSD1306_X_OFFSET_UPPER); // 列アドレス上位設定
+	ssd1306_WriteData_DMA(&SSD1306_Buffer[SSD1306_WIDTH * SSD1306_DMA_Page], SSD1306_WIDTH); // DMA送信
+}
+
+uint8_t ssd1306_IsBusy(void)
+{
+	return SSD1306_DMA_Busy; // 転送中状態を返す
+}
+
+void ssd1306_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+	if (hi2c != &SSD1306_I2C_PORT) // 他デバイスの割り込みは無視
+	{
+		return;
+	}
+
+	SSD1306_DMA_Page++; // 次のページへ
+
+	if (SSD1306_DMA_Page >= SSD1306_HEIGHT / 8)
+	{
+		SSD1306_DMA_Busy = 0; 					// 全ページ送信完了
+		ssd1306_TransferCompletedCallback();	// 完了通知
+	}
+	else
+	{
+		ssd1306_WriteCommand(0xB0 + SSD1306_DMA_Page); 			// 次のページ設定
+		ssd1306_WriteCommand(0x00 + SSD1306_X_OFFSET_LOWER);	// 列アドレス下位設定
+		ssd1306_WriteCommand(0x10 + SSD1306_X_OFFSET_UPPER);	// 列アドレス上位設定
+		ssd1306_WriteData_DMA(&SSD1306_Buffer[SSD1306_WIDTH * SSD1306_DMA_Page], SSD1306_WIDTH); // DMA送信
+	}
+}
+
+__weak void ssd1306_TransferCompletedCallback(void)
+{
+	// ユーザー定義の処理をここに追加
+}
+#endif
 
 /*
  * Draw one pixel in the screenbuffer

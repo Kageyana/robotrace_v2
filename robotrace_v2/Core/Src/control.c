@@ -110,7 +110,8 @@ void initSystem(void)
 		showBattery();	 // 充電Lv表示
 		ssd1306_SetCursor(0, 16);
 		ssd1306_printf(Font_6x8, "Exboard connect");
-		ssd1306_UpdateScreen();
+		if (!ssd1306_IsBusy())       // DMA転送中は更新しない
+			ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
 
 		setLED(0, 0, 50, 0); // 初期化 成功 緑点灯
 	}
@@ -157,7 +158,8 @@ void initSystem(void)
 	}
 	if (modeDSP)
 	{
-		ssd1306_UpdateScreen(); // グラフィック液晶更新
+	if (!ssd1306_IsBusy())			// DMA転送中は更新しない
+		ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
 	}
 	sendLED();
 
@@ -182,7 +184,8 @@ void initSystem(void)
 	}
 	if (modeDSP)
 	{
-		ssd1306_UpdateScreen(); // グラフィック液晶更新
+	if (!ssd1306_IsBusy())			// DMA転送中は更新しない
+		ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
 	}
 	sendLED();
 
@@ -222,7 +225,8 @@ void initSystem(void)
 	}
 	if (modeDSP)
 	{
-		ssd1306_UpdateScreen(); // グラフィック液晶更新
+	if (!ssd1306_IsBusy())			// DMA転送中は更新しない
+		ssd1306_UpdateScreen_DMA();	// グラフィック液晶更新
 	}
 	sendLED();
 
@@ -236,7 +240,8 @@ void initSystem(void)
 			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 			ssd1306_SetCursor(15, 30);
 			ssd1306_printf(Font_11x18, "No SDcard");
-			ssd1306_UpdateScreen(); // グラフィック液晶更新
+			if (!ssd1306_IsBusy())			// DMA転送中は更新しない
+				ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
 
 			HAL_Delay(1000);
 		}
@@ -289,7 +294,8 @@ void loopSystem(void)
 			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 			ssd1306_SetCursor(0, 25);
 			ssd1306_printf(Font_11x18, "Analizing");
-			ssd1306_UpdateScreen(); // グラフィック液晶更新
+			if (!ssd1306_IsBusy())   // DMA転送中は更新しない
+				ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
 			initIMU = false;
 			numPPADarry = readLogDistance(fileNumbers[fileIndexLog]);
 			optimalIndex = 0;
@@ -299,7 +305,8 @@ void loopSystem(void)
 			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 			ssd1306_SetCursor(56, 28);
 			ssd1306_printf(Font_16x26, "2");
-			ssd1306_UpdateScreen(); // グラフィック液晶更新
+			if (!ssd1306_IsBusy())			// DMA転送中は更新しない
+				ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
 			patternTrace = 1;
 		}
 		else
@@ -321,7 +328,8 @@ void loopSystem(void)
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56, 28);
 				ssd1306_printf(Font_16x26, "5");
-				ssd1306_UpdateScreen(); // グラフィック液晶更新
+				if (!ssd1306_IsBusy())			// DMA転送中は更新しない
+					ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
 				patternTrace = 1;
 			}
 		}
@@ -336,28 +344,32 @@ void loopSystem(void)
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56, 28);
 				ssd1306_printf(Font_16x26, "4");
-				ssd1306_UpdateScreen(); // グラフィック液晶更新
+				if (!ssd1306_IsBusy())			// DMA転送中は更新しない
+					ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
 			}
 			if (countdown == 3000)
 			{
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56, 28);
 				ssd1306_printf(Font_16x26, "3");
-				ssd1306_UpdateScreen(); // グラフィック液晶更新
+				if (!ssd1306_IsBusy())			// DMA転送中は更新しない
+					ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
 			}
 			if (countdown == 2000)
 			{
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56, 28);
 				ssd1306_printf(Font_16x26, "2");
-				ssd1306_UpdateScreen(); // グラフィック液晶更新
+				if (!ssd1306_IsBusy())			// DMA転送中は更新しない
+					ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
 			}
 			if (countdown == 1000)
 			{
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56, 28);
 				ssd1306_printf(Font_16x26, "1");
-				ssd1306_UpdateScreen(); // グラフィック液晶更新
+				if (!ssd1306_IsBusy())			// DMA転送中は更新しない
+					ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
 				calibratIMU = true;		// IMUキャリブレーションを開始
 			}
 		}
@@ -541,14 +553,16 @@ void loopSystem(void)
 			ssd1306_printf(Font_11x18, "log");
 			ssd1306_SetCursor(0, 45);
 			ssd1306_printf(Font_11x18, "Writing");
-			ssd1306_UpdateScreen(); // グラフィック液晶更新
+			if (!ssd1306_IsBusy())			// DMA転送中は更新しない
+				ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
 
 			if (modeLOG)
 				endLog(); // ログ保存終了
 
 			ssd1306_SetCursor(0, 45);
 			ssd1306_printf(Font_11x18, "Written");
-			ssd1306_UpdateScreen(); // グラフィック液晶更新
+			if (!ssd1306_IsBusy())			// DMA転送中は更新しない
+				ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
 
 			if (autoStart > 0)
 			{
@@ -576,7 +590,8 @@ void loopSystem(void)
 					ssd1306_printf(Font_11x18, "Auto run");
 					ssd1306_SetCursor(0, 45);
 					ssd1306_printf(Font_11x18, "Finish!");
-					ssd1306_UpdateScreen(); // グラフィック液晶更新
+					if (!ssd1306_IsBusy())			// DMA転送中は更新しない
+						ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
 					patternTrace = 102;
 					break;
 				}
@@ -608,7 +623,8 @@ void loopSystem(void)
 						ssd1306_SetCursor(0, 45);
 						ssd1306_printf(Font_11x18, "%6.3f[s]", (float)goalTime / 1000);
 					}
-					ssd1306_UpdateScreen(); // グラフィック液晶更新
+					if (!ssd1306_IsBusy())			// DMA転送中は更新しない
+						ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
 				}
 			}
 
@@ -671,7 +687,8 @@ void emargencyStop(void)
 			break;
 		}
 
-		ssd1306_UpdateScreen(); // グラフィック液晶更新
+		if (!ssd1306_IsBusy())           // DMA転送中は更新しない
+			ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
 	}
 
 	patternTrace = 102;

@@ -144,6 +144,10 @@ typedef struct {
 void ssd1306_Init(void);
 void ssd1306_Fill(SSD1306_COLOR color);
 void ssd1306_UpdateScreen(void);
+void ssd1306_UpdateScreen_DMA(void); // DMA版画面更新を開始
+uint8_t ssd1306_IsBusy(void);        // DMA転送中フラグ参照
+void ssd1306_TransferCompletedCallback(void); // DMA完了時のコールバック
+void ssd1306_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c); // I2Cメモリ転送完了処理
 void ssd1306_DrawPixel(uint8_t x, uint8_t y, SSD1306_COLOR color);
 char ssd1306_WriteChar(char ch, FontDef Font, SSD1306_COLOR color);
 char ssd1306_WriteString(char* str, FontDef Font, SSD1306_COLOR color);
