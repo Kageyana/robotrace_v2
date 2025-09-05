@@ -23,6 +23,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+/* SSD1306制御用ヘッダ */
+#include "ssd1306.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -1052,20 +1054,26 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	if (htim->Instance == TIM6)
-	{
-		Interrupt1ms();
-	}
-	if (htim->Instance == TIM7)
-	{
-		Interrupt100us();
-	}
+        if (htim->Instance == TIM6)
+        {
+                Interrupt1ms();
+        }
+        if (htim->Instance == TIM7)
+        {
+                Interrupt100us();
+        }
+}
+
+/* I2Cメモリ転送完了割り込み */
+void HAL_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+       ssd1306_I2C_MemTxCpltCallback(hi2c); // SSD1306のDMA完了処理へ委譲
 }
 
 int _write(int file, char *ptr, int len)
 {
-	int DataIdx;
-	for (DataIdx = 0; DataIdx < len; DataIdx++)
+        int DataIdx;
+        for (DataIdx = 0; DataIdx < len; DataIdx++)
 	{
 		ITM_SendChar(*ptr++);
 	}
