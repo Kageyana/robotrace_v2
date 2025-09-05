@@ -13,11 +13,11 @@
 #define ACCELE		false
 
 //  unit settings
-#define ACCELELSB 5460.0F
+#define ACCELELSB 10920.0F
 #define GYROLSB 16.384F
 #define MAGPLSB 16.0F
 
-#define DEFF_TIME 0.001F
+#define DEFF_TIME 0.005F
 #define COEFF_DPD -1.00F
 #define COEFF_COMPFILTER 0.96F
 #define IMU_TRANSMIT true
@@ -44,13 +44,11 @@
 #define REG_TEMP_MSB 0x22
 
 /***************************************自動生成関数*************************************/
+#define SPI_Handle_IMU hspi2
 #define CSB1_RESET HAL_GPIO_WritePin(IMU_CSB1_GPIO_Port, IMU_CSB1_Pin, GPIO_PIN_RESET)
 #define CSB1_SET HAL_GPIO_WritePin(IMU_CSB1_GPIO_Port, IMU_CSB1_Pin, GPIO_PIN_SET)
 #define CSB2_RESET HAL_GPIO_WritePin(IMU_CSB2_GPIO_Port, IMU_CSB2_Pin, GPIO_PIN_RESET)
 #define CSB2_SET HAL_GPIO_WritePin(IMU_CSB2_GPIO_Port, IMU_CSB2_Pin, GPIO_PIN_SET)
-#define BMI088TRANSFER HAL_SPI_Transmit(&hspi2, &txData, txNum, 1000)
-#define BMI088RECEIVE HAL_SPI_Receive(&hspi2, &rxData, rxNum, 1000)
-#define BMI088RECEIVES HAL_SPI_Receive(&hspi2, rxData, rxNum, 1000)
 /***************************************************************************************/
 typedef struct
 {

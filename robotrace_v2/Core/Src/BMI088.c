@@ -22,10 +22,7 @@ bool calibratIMU = false;
 ////////////////////////////////////////////////////////////////////
 uint8_t BMI088readByte(bool sensorType, uint8_t reg)
 {
-	uint8_t txData, rxData;
-	uint8_t txNum = 1, rxNum = 1;
-
-	txData = reg | 0x80;
+	uint8_t txData[2]={reg | 0x80, 0x0}, rxData[2] = {0x0};
 
 	if(sensorType == ACCELE)
 	{
@@ -33,9 +30,8 @@ uint8_t BMI088readByte(bool sensorType, uint8_t reg)
 	} else {
 		CSB2_RESET;
 	}
-	
-	BMI088TRANSFER;
-	BMI088RECEIVE;
+
+	HAL_SPI_TransmitReceive(&SPI_Handle_IMU, txData, rxData, sizeof(txData), 1000);
 
 	if(sensorType == ACCELE)
 	{
@@ -44,7 +40,7 @@ uint8_t BMI088readByte(bool sensorType, uint8_t reg)
 		CSB2_SET;
 	}
 
-	return rxData;
+	return rxData[1];
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 BMI088WriteByteG
@@ -54,8 +50,7 @@ uint8_t BMI088readByte(bool sensorType, uint8_t reg)
 ////////////////////////////////////////////////////////////////////
 void BMI088writeByte(bool sensorType, uint8_t reg, uint8_t val)
 {
-	uint8_t txData[2] = {reg & 0x7F, val};
-	uint8_t txNum = 2;
+	uint8_t txData[2] = {reg, val}, rxData[2];
 
 	if(sensorType == ACCELE)
 	{
@@ -64,7 +59,7 @@ void BMI088writeByte(bool sensorType, uint8_t reg, uint8_t val)
 		CSB2_RESET;
 	}
 
-	BMI088TRANSFER;
+	HAL_SPI_TransmitReceive(&SPI_Handle_IMU, txData, rxData, sizeof(txData), 1000);;
 
 	if(sensorType == ACCELE)
 	{
@@ -81,10 +76,9 @@ void BMI088writeByte(bool sensorType, uint8_t reg, uint8_t val)
 /////////////////////////////////////////////////////////////////////
 void BMI088readAxisData(bool sensorType, uint8_t reg, uint8_t *rxData, uint8_t rxNum)
 {
-	uint8_t txData;
-	uint8_t txNum = 1;
+	uint8_t txData[20] = {0}, rxDatabuff[20];
 
-	txData = reg | 0x80;
+	txData[0] = reg | 0x80; // 送信用データに変換
 
 	if(sensorType == ACCELE)
 	{
@@ -93,8 +87,8 @@ void BMI088readAxisData(bool sensorType, uint8_t reg, uint8_t *rxData, uint8_t r
 		CSB2_RESET;
 	}
 
-	BMI088TRANSFER;
-	BMI088RECEIVES;
+	HAL_SPI_TransmitReceive(&SPI_Handle_IMU, txData, rxDatabuff, rxNum+1, 1000);
+	memcpy(rxData,rxDatabuff+1,rxNum); // レジスタ送信時の受信データを除いてコピー
 
 	if(sensorType == ACCELE)
 	{
@@ -115,27 +109,24 @@ bool initBMI088(void)
 	BMI088readByte(ACCELE, REG_ACC_CHIP_ID); // 加速度センサSPIモードに切り替え(SPIダミーリード)
 	HAL_Delay(100);
 	BMI088val.Aid = BMI088readByte(ACCELE, REG_ACC_CHIP_ID); // ノーマルモード移行前にチップIDを読む
-	BMI088writeByte(ACCELE, REG_ACC_PWR_CTRL, 0x04); // 加速度センサノーマルモードに移行
-	BMI088val.Aid = BMI088readByte(ACCELE, REG_ACC_CHIP_ID); // ノーマルモード移行前にチップIDを読む
+	// BMI088val.Aid = BMI088readByte(ACCELE, REG_ACC_CHIP_ID); // ノーマルモード移行前にチップIDを読む
 
-	BMI088writeByte(GYRO, REG_GYRO_SOFTRESET, 0xB6); // ジャイロセンサ ソフトウェアリセット
-	HAL_Delay(30);
 	BMI088val.Gid = BMI088readByte(GYRO, REG_GYRO_CHIP_ID);
 	
-	if (BMI088val.Gid == 0x0f && BMI088val.Aid == 0x1e)
+	if (BMI088val.Gid == 0x0f || BMI088val.Aid == 0x1e)
 	{
 		// コンフィグ設定
 
 		// 加速度
+		BMI088writeByte(ACCELE, REG_ACC_RANGE, 0x00); // レンジを3gに設定
+		BMI088writeByte(ACCELE, REG_ACC_CONF, 0xA9);  // ODRを200Hzに設定
 		BMI088writeByte(ACCELE, REG_ACC_PWR_CTRL, 0x04); // 加速度センサノーマルモードに移行
 		HAL_Delay(450);
-		BMI088writeByte(ACCELE, REG_ACC_RANGE, 0x01); // レンジを6gに設定
-		BMI088writeByte(ACCELE, REG_ACC_CONF, 0xA9);  // ODRを200Hzに設定
 		
 		// ジャイロ
 		BMI088writeByte(GYRO, REG_GYRO_SOFTRESET, 0xB6); // ソフトウェアリセット
 		HAL_Delay(100);
-		BMI088writeByte(GYRO, REG_GYRO_BANDWISTH, 0x03); // ODRを400Hz バンドフィルタ47Hzに設定
+		BMI088writeByte(GYRO, REG_GYRO_BANDWISTH, 0x06); // ODRを200Hz バンドフィルタ64Hzに設定
 
 		BMI088val.Initialized = 1;
 
@@ -188,11 +179,12 @@ void BMI088getAccele(void)
 	int16_t accelVal[3];
 
 	// 加速度の生データを取得
-	BMI088readAxisData(ACCELE, REG_RATE_X_LSB, rawData, 6); // x,y,z軸の生データを取得
+	BMI088readAxisData(ACCELE, REG_ACC_X_LSB, rawData, 7);
 	// LSBとMSBを結合
-	accelVal[0] = (rawData[1] << 8) | rawData[0];
-	accelVal[1] = (rawData[3] << 8) | rawData[2];
-	accelVal[2] = (rawData[5] << 8) | rawData[4];
+	// 最初のデータは破棄する 
+	accelVal[0] = (rawData[2] << 8) | rawData[1];
+	accelVal[1] = (rawData[4] << 8) | rawData[3];
+	accelVal[2] = (rawData[6] << 8) | rawData[5];
 
 	BMI088val.accele.x = (float)accelVal[0] / ACCELELSB; // x軸加速度[g]
 	BMI088val.accele.y = (float)accelVal[1] / ACCELELSB; // y軸加速度[g]
@@ -217,7 +209,7 @@ void BMI088getTemp(void)
 	// 温度の生データを取得
 	BMI088readAxisData(ACCELE, REG_TEMP_MSB, rawData, 3);
 	// LSBとMSBを結合
-	tempValu = (uint16_t)((rawData[0] << 3) | (rawData[1] >> 5));
+	tempValu = (rawData[1] << 3) | (rawData[2] >> 5);
 	if (tempValu > 1023)
 	{
 		tempVal = ~tempValu + 0x8000;
@@ -247,9 +239,8 @@ void calcDegrees(void)
     BMI088val.angle.z += BMI088val.gyro.z * DEFF_TIME;  // yaw（補正しない）
 
     // 加速度からのピッチ・ロール角算出 度数法
-    float pitchAccele = atan2f(BMI088val.accele.y, BMI088val.accele.z) * 180.0f / M_PI;
-
-    float rollAccele = atan2f(BMI088val.accele.x,sqrtf(BMI088val.accele.y * BMI088val.accele.y +BMI088val.accele.z * BMI088val.accele.z)) * 180.0f / M_PI;
+    volatile float pitchAccele = atan2f(BMI088val.accele.y, BMI088val.accele.z) * 180.0f / M_PI;
+    volatile float rollAccele = atan2f(BMI088val.accele.x,sqrtf(BMI088val.accele.y * BMI088val.accele.y +BMI088val.accele.z * BMI088val.accele.z)) * 180.0f / M_PI;
 
     // 相補フィルタでドリフト補正
     BMI088val.angle.x = COEFF_COMPFILTER * BMI088val.angle.x + (1.0f - COEFF_COMPFILTER) * pitchAccele;
