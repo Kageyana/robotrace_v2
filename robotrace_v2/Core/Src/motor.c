@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "motor.h"
+
 //====================================//
 // グローバル変数の宣言
 //====================================//
@@ -108,9 +109,11 @@ void motorPwmOutSynth(int16_t tPwm, int16_t sPwm, int16_t yrPwm, int16_t dPwm)
 ///////////////////////////////////////////////////////////////////////////
 void getMotorAD(uint16_t LAD, uint16_t RAD)
 {
-	motorCurrentADLInt[cntMotorAD & (MOTOR_AD_WINDOW - 1)] = LAD;
-	motorCurrentADRInt[cntMotorAD & (MOTOR_AD_WINDOW - 1)] = RAD;
-	cntMotorAD++;
+	// MOTOR_AD_WINDOW は2の冪であることを前提にインデックスをマスク
+	// 値を変更する場合はこの前提が崩れないよう注意する
+	motorCurrentADLInt[cntMotorAD & (MOTOR_AD_WINDOW - 1)] = LAD; // リングバッファに格納
+	motorCurrentADRInt[cntMotorAD & (MOTOR_AD_WINDOW - 1)] = RAD; // リングバッファに格納
+	cntMotorAD++; // 次回の格納位置を更新
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 getMotorCurrent
