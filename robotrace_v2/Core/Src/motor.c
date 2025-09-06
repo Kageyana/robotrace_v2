@@ -19,11 +19,11 @@ float motorCurrentL, motorCurrentR;
 /////////////////////////////////////////////////////////////////////
 void motorPwmOut(int16_t pwmL, int16_t pwmR)
 {
-	// 0除算回避
-	if (pwmL == 0)
-		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_L, 0);
-	if (pwmR == 0)
-		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_R, 0);
+        // PWM が 0 のとき比較レジスタを 0 に設定
+        if (pwmL == 0)
+                __HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_L, 0); // 左モータ出力を停止
+        if (pwmR == 0)
+                __HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_R, 0); // 右モータ出力を停止
 
 	if (pwmL != 0)
 	{
@@ -139,9 +139,9 @@ void getMotorCurrent(void)
 /////////////////////////////////////////////////////////////////////
 void MotorFanPwmOut(int16_t pwm)
 {
-	// 0除算回避
-	if (pwm == 0)
-		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_SUCTION_TIM_CH, 0);
+        // PWM が 0 のとき比較レジスタを 0 に設定
+        if (pwm == 0)
+                __HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_SUCTION_TIM_CH, 0); // 吸引モータ出力を停止
 
 	if (pwm != 0)
 	{
