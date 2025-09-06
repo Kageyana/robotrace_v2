@@ -111,7 +111,12 @@ void initSystem(void)
 		ssd1306_SetCursor(0, 16);
 		ssd1306_printf(Font_6x8, "Exboard connect");
 		if (!ssd1306_IsBusy())       // DMA転送中は更新しない
+		{
 			ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
+			while (ssd1306_IsBusy())    // 表示完了まで待機
+			{
+			}
+		}
 
 		setLED(0, 0, 50, 0); // 初期化 成功 緑点灯
 	}
@@ -159,7 +164,12 @@ void initSystem(void)
 	if (modeDSP)
 	{
 	if (!ssd1306_IsBusy())			// DMA転送中は更新しない
+	{
 		ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
+		while (ssd1306_IsBusy())    // 表示完了まで待機
+		{
+		}
+	}
 	}
 	sendLED();
 
@@ -185,7 +195,12 @@ void initSystem(void)
 	if (modeDSP)
 	{
 	if (!ssd1306_IsBusy())			// DMA転送中は更新しない
+	{
 		ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
+		while (ssd1306_IsBusy())    // 表示完了まで待機
+		{
+		}
+	}
 	}
 	sendLED();
 
@@ -226,7 +241,12 @@ void initSystem(void)
 	if (modeDSP)
 	{
 	if (!ssd1306_IsBusy())			// DMA転送中は更新しない
+	{
 		ssd1306_UpdateScreen_DMA();	// グラフィック液晶更新
+		while (ssd1306_IsBusy())    // 表示完了まで待機
+		{
+		}
+	}
 	}
 	sendLED();
 
@@ -241,7 +261,12 @@ void initSystem(void)
 			ssd1306_SetCursor(15, 30);
 			ssd1306_printf(Font_11x18, "No SDcard");
 			if (!ssd1306_IsBusy())			// DMA転送中は更新しない
+			{
 				ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
+				while (ssd1306_IsBusy())    // 表示完了まで待機
+				{
+				}
+			}
 
 			HAL_Delay(1000);
 		}

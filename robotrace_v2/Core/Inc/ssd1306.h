@@ -116,6 +116,9 @@ extern SPI_HandleTypeDef SSD1306_SPI_PORT;
 #define SSD1306_BUFFER_SIZE   SSD1306_WIDTH * SSD1306_HEIGHT / 8
 #endif
 
+#define SSD1306_CMD_LEN       8                                    // コマンド列のバイト数
+#define SSD1306_DMA_BUFFER_SIZE   (SSD1306_BUFFER_SIZE + SSD1306_CMD_LEN) // DMA送信用バッファサイズ
+
 // Enumeration for screen colors
 typedef enum {
     Black = 0x00, // Black color, no pixel

@@ -19,13 +19,13 @@ void ssd1306_WriteCommand(uint8_t byte)
 // Send data
 void ssd1306_WriteData(uint8_t *buffer, size_t buff_size)
 {
-	HAL_I2C_Mem_Write(&SSD1306_I2C_PORT, SSD1306_I2C_ADDR, 0x40, 1, buffer, buff_size, HAL_MAX_DELAY);
+        HAL_I2C_Mem_Write(&SSD1306_I2C_PORT, SSD1306_I2C_ADDR, 0x40, 1, buffer, buff_size, HAL_MAX_DELAY);
 }
 
 // Send data using DMA
 void ssd1306_WriteData_DMA(uint8_t *buffer, size_t buff_size)
 {
-	HAL_I2C_Mem_Write_DMA(&SSD1306_I2C_PORT, SSD1306_I2C_ADDR, 0x40, 1, buffer, buff_size); // DMA送信開始
+        HAL_I2C_Master_Transmit_DMA(&SSD1306_I2C_PORT, SSD1306_I2C_ADDR, buffer, buff_size); // コマンドと画素データを一括送信
 }
 
 #elif defined(SSD1306_USE_SPI)
@@ -64,25 +64,26 @@ void ssd1306_WriteData(uint8_t *buffer, size_t buff_size)
 #error "You should define SSD1306_USE_SPI or SSD1306_USE_I2C macro"
 #endif
 
-// Screenbuffer
-static uint8_t SSD1306_Buffer[SSD1306_BUFFER_SIZE];
+// Screenbuffer (先頭にコマンド列を配置)
+static uint8_t SSD1306_Buffer[SSD1306_DMA_BUFFER_SIZE];
+
+#define SSD1306_DATA_OFFSET  SSD1306_CMD_LEN    // 画素データの開始位置
 
 // Screen object
 static SSD1306_t SSD1306;
 
 static volatile uint8_t SSD1306_DMA_Busy = 0; // DMA転送中フラグ
-static uint8_t SSD1306_DMA_Page = 0;          // 送信中のページ番号
 
 /* Fills the Screenbuffer with values from a given buffer of a fixed length */
 SSD1306_Error_t ssd1306_FillBuffer(uint8_t *buf, uint32_t len)
 {
-	SSD1306_Error_t ret = SSD1306_ERR;
-	if (len <= SSD1306_BUFFER_SIZE)
-	{
-		memcpy(SSD1306_Buffer, buf, len);
-		ret = SSD1306_OK;
-	}
-	return ret;
+        SSD1306_Error_t ret = SSD1306_ERR;
+        if (len <= SSD1306_BUFFER_SIZE)
+        {
+                memcpy(&SSD1306_Buffer[SSD1306_DATA_OFFSET], buf, len); // 画素データ領域へコピー
+                ret = SSD1306_OK;
+        }
+        return ret;
 }
 
 /* Initialize the oled screen */
@@ -191,12 +192,12 @@ void ssd1306_Init(void)
 /* Fill the whole screen with the given color */
 void ssd1306_Fill(SSD1306_COLOR color)
 {
-	uint32_t i;
+        uint32_t i;
 
-	for (i = 0; i < sizeof(SSD1306_Buffer); i++)
-	{
-		SSD1306_Buffer[i] = (color == Black) ? 0x00 : 0xFF;
-	}
+        for (i = 0; i < SSD1306_BUFFER_SIZE; i++)
+        {
+                SSD1306_Buffer[SSD1306_DATA_OFFSET + i] = (color == Black) ? 0x00 : 0xFF; // 画素データを一括設定
+        }
 }
 
 /* Write the screenbuffer with changed to the screen */
@@ -213,25 +214,30 @@ void ssd1306_UpdateScreen(void)
 		ssd1306_WriteCommand(0xB0 + i); // Set the current RAM page address.
 		ssd1306_WriteCommand(0x00 + SSD1306_X_OFFSET_LOWER);
 		ssd1306_WriteCommand(0x10 + SSD1306_X_OFFSET_UPPER);
-		ssd1306_WriteData(&SSD1306_Buffer[SSD1306_WIDTH * i], SSD1306_WIDTH);
-	}
+                ssd1306_WriteData(&SSD1306_Buffer[SSD1306_DATA_OFFSET + SSD1306_WIDTH * i], SSD1306_WIDTH); // コマンド領域を除いて送信
+        }
 }
 
 #if defined(SSD1306_USE_I2C)
 void ssd1306_UpdateScreen_DMA(void)
 {
-	if (SSD1306_DMA_Busy) // 既に転送中なら無視
-	{
-		return;
-	}
+        if (SSD1306_DMA_Busy) // 既に転送中なら無視
+        {
+                return;
+        }
 
-	SSD1306_DMA_Busy = 1;     // 転送中フラグ設定
-	SSD1306_DMA_Page = 0;     // 0ページ目から送信開始
+        SSD1306_Buffer[0] = 0x00;                             // コマンドモード指定
+        SSD1306_Buffer[1] = 0x21;                             // 列アドレス設定開始
+        SSD1306_Buffer[2] = 0x00;                             // 列開始位置
+        SSD1306_Buffer[3] = SSD1306_WIDTH - 1;                // 列終了位置
+        SSD1306_Buffer[4] = 0x22;                             // ページアドレス設定開始
+        SSD1306_Buffer[5] = 0x00;                             // ページ開始位置
+        SSD1306_Buffer[6] = (SSD1306_HEIGHT / 8) - 1;         // ページ終了位置
+        SSD1306_Buffer[7] = 0x40;                             // データモード指定
 
-	ssd1306_WriteCommand(0xB0 + SSD1306_DMA_Page); // ページアドレス設定
-	ssd1306_WriteCommand(0x00 + SSD1306_X_OFFSET_LOWER); // 列アドレス下位設定
-	ssd1306_WriteCommand(0x10 + SSD1306_X_OFFSET_UPPER); // 列アドレス上位設定
-	ssd1306_WriteData_DMA(&SSD1306_Buffer[SSD1306_WIDTH * SSD1306_DMA_Page], SSD1306_WIDTH); // DMA送信
+        SSD1306_DMA_Busy = 1; // 転送中フラグ設定
+
+        ssd1306_WriteData_DMA(SSD1306_Buffer, SSD1306_DMA_BUFFER_SIZE); // コマンド含め一括転送
 }
 
 uint8_t ssd1306_IsBusy(void)
@@ -246,20 +252,8 @@ void ssd1306_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c)
 		return;
 	}
 
-	SSD1306_DMA_Page++; // 次のページへ
-
-	if (SSD1306_DMA_Page >= SSD1306_HEIGHT / 8)
-	{
-		SSD1306_DMA_Busy = 0; 					// 全ページ送信完了
-		ssd1306_TransferCompletedCallback();	// 完了通知
-	}
-	else
-	{
-		ssd1306_WriteCommand(0xB0 + SSD1306_DMA_Page); 			// 次のページ設定
-		ssd1306_WriteCommand(0x00 + SSD1306_X_OFFSET_LOWER);	// 列アドレス下位設定
-		ssd1306_WriteCommand(0x10 + SSD1306_X_OFFSET_UPPER);	// 列アドレス上位設定
-		ssd1306_WriteData_DMA(&SSD1306_Buffer[SSD1306_WIDTH * SSD1306_DMA_Page], SSD1306_WIDTH); // DMA送信
-	}
+        SSD1306_DMA_Busy = 0;                   // DMA送信完了フラグをクリア
+        ssd1306_TransferCompletedCallback();    // 1フレーム送信完了を通知
 }
 
 __weak void ssd1306_TransferCompletedCallback(void)
@@ -276,21 +270,23 @@ __weak void ssd1306_TransferCompletedCallback(void)
  */
 void ssd1306_DrawPixel(uint8_t x, uint8_t y, SSD1306_COLOR color)
 {
-	if (x >= SSD1306_WIDTH || y >= SSD1306_HEIGHT)
-	{
-		// Don't write outside the buffer
-		return;
-	}
+        if (x >= SSD1306_WIDTH || y >= SSD1306_HEIGHT)
+        {
+                // Don't write outside the buffer
+                return;
+        }
 
-	// Draw in the right color
-	if (color == White)
-	{
-		SSD1306_Buffer[x + (y / 8) * SSD1306_WIDTH] |= 1 << (y % 8);
-	}
-	else
-	{
-		SSD1306_Buffer[x + (y / 8) * SSD1306_WIDTH] &= ~(1 << (y % 8));
-	}
+        uint32_t pos = SSD1306_DATA_OFFSET + x + (y / 8) * SSD1306_WIDTH; // 書き込み位置計算
+
+        // Draw in the right color
+        if (color == White)
+        {
+                SSD1306_Buffer[pos] |= 1 << (y % 8); // ビットをセット
+        }
+        else
+        {
+                SSD1306_Buffer[pos] &= ~(1 << (y % 8)); // ビットをクリア
+        }
 }
 
 /*
