@@ -541,88 +541,98 @@ void loopSystem(void)
 
 			if (encCurrentN == 0)
 			{
-				motorPwmOutSynth(0, 0, 0, 0);
-
-				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-				ssd1306_SetCursor(0, 25);
-				ssd1306_printf(Font_11x18, "log");
-				ssd1306_SetCursor(0, 45);
-				ssd1306_printf(Font_11x18, "Writing");
-
-				if (modeLOG)
-					endLog(); // ログ保存終了
-
-				ssd1306_SetCursor(0, 45);
-				ssd1306_printf(Font_11x18, "Written");
-
-				if (autoStart > 0)
-				{
-					autoStart++;
-					if (autoStart >= 3)
-					{
-						tgtParam.bstStraight *= PARAM_UP_STEP;
-						tgtParam.bst1500 *= PARAM_UP_STEP;
-						tgtParam.bst1300 *= PARAM_UP_STEP;
-						tgtParam.bst1000 *= PARAM_UP_STEP;
-						tgtParam.bst800 *= PARAM_UP_STEP;
-						tgtParam.bst700 *= PARAM_UP_STEP;
-						tgtParam.bst600 *= PARAM_UP_STEP;
-						tgtParam.bst500 *= PARAM_UP_STEP;
-						// tgtParam.bst400			*= PARAM_UP_STEP;
-						// tgtParam.bst300			*= PARAM_UP_STEP;
-						// tgtParam.bst200			*= PARAM_UP_STEP;
-						// tgtParam.bst100			*= PARAM_UP_STEP;
-					}
-
-					if (autoStart > 5)
-					{
-						ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-						ssd1306_SetCursor(0, 25);
-						ssd1306_printf(Font_11x18, "Auto run");
-						ssd1306_SetCursor(0, 45);
-						ssd1306_printf(Font_11x18, "Finish!");
-						patternTrace = 102;
-						break;
-					}
-					else
-					{
-						powerLineSensors(0);
-						powerMarkerSensors(0);
-						patternTrace = 0;
-						break;
-					}
-				}
-				else
-				{
-					if (modeDSP)
-					{
-						ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-						if (logOverflow || markerOverflow)
-						{
-							// バッファ上限エラー表示
-							ssd1306_SetCursor(0, 25);					// 1行目の表示位置
-							ssd1306_printf(Font_11x18, "buff overflow");  // エラーメッセージ1行目
-							ssd1306_SetCursor(0, 45);					// 2行目の表示位置
-							ssd1306_printf(Font_11x18, "error");		// エラーメッセージ2行目
-						}
-						else
-						{
-							ssd1306_SetCursor(0, 25);
-							ssd1306_printf(Font_11x18, "Time %d", optimalTrace);
-							ssd1306_SetCursor(0, 45);
-							ssd1306_printf(Font_11x18, "%6.3f[s]", (float)goalTime / 1000);
-						}
-					}
-				}
-
-				goalTime = cntRun;
 				patternTrace = 102;
-				break;
 			}
+				
 
 		break;
 
 	case 102:
+		motorPwmOutSynth(0, 0, 0, 0);
+
+		ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+		ssd1306_SetCursor(0, 25);
+		ssd1306_printf(Font_11x18, "log");
+		ssd1306_SetCursor(0, 45);
+		ssd1306_printf(Font_11x18, "Writing");
+
+		if (modeLOG)
+		{
+			endLog(); // ログ保存終了
+		}
+		
+		ssd1306_SetCursor(0, 45);
+		ssd1306_printf(Font_11x18, "Written");
+
+		
+		if (autoStart > 0)
+		{
+			// 自動走行モードのときは再度走行準備へ
+			autoStart++;
+			if (autoStart >= 3)
+			{
+				// 3走目以降は速度を上げる
+				tgtParam.bstStraight *= PARAM_UP_STEP;
+				tgtParam.bst1500 *= PARAM_UP_STEP;
+				tgtParam.bst1300 *= PARAM_UP_STEP;
+				tgtParam.bst1000 *= PARAM_UP_STEP;
+				tgtParam.bst800 *= PARAM_UP_STEP;
+				tgtParam.bst700 *= PARAM_UP_STEP;
+				tgtParam.bst600 *= PARAM_UP_STEP;
+				tgtParam.bst500 *= PARAM_UP_STEP;
+				// tgtParam.bst400			*= PARAM_UP_STEP;
+				// tgtParam.bst300			*= PARAM_UP_STEP;
+				// tgtParam.bst200			*= PARAM_UP_STEP;
+				// tgtParam.bst100			*= PARAM_UP_STEP;
+			}
+
+			if (autoStart > 5)
+			{
+				// 5走終了
+				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+				ssd1306_SetCursor(0, 25);
+				ssd1306_printf(Font_11x18, "Auto run");
+				ssd1306_SetCursor(0, 45);
+				ssd1306_printf(Font_11x18, "Finish!");
+				patternTrace = 102;
+				break;
+			}
+			else
+			{
+				powerLineSensors(0);
+				powerMarkerSensors(0);
+				patternTrace = 0;
+				break;
+			}
+		}
+		else
+		{
+			// 手動走行のときは停止
+			if (modeDSP)
+			{
+				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+				if (logOverflow || markerOverflow)
+				{
+					// バッファ上限エラー表示
+					ssd1306_SetCursor(0, 25);						// 1行目の表示位置
+					ssd1306_printf(Font_11x18, "buff overflow");	// エラーメッセージ1行目
+					ssd1306_SetCursor(0, 45);						// 2行目の表示位置
+					ssd1306_printf(Font_11x18, "error");			// エラーメッセージ2行目
+				}
+				else
+				{
+					ssd1306_SetCursor(0, 25);
+					ssd1306_printf(Font_11x18, "Time %d", optimalTrace);
+					ssd1306_SetCursor(0, 45);
+					ssd1306_printf(Font_11x18, "%6.3f[s]", (float)goalTime / 1000);
+				}
+			}
+		}
+		patternTrace = 103;
+
+		break;
+
+	case 103:
 		motorPwmOutSynth(0, 0, 0, 0);
 		powerLineSensors(0);
 		powerMarkerSensors(0);
@@ -649,6 +659,10 @@ void emargencyStop(void)
 
 	if (modeDSP)
 	{
+		if (!ssd1306_IsDMARunning())
+		{
+			ssd1306_UpdateScreen_DMA();        // 停止していた画面更新を再開
+		}
 		ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 
 		ssd1306_SetCursor(36, 25);
@@ -675,7 +689,7 @@ void emargencyStop(void)
 		}
 	}
 
-	patternTrace = 102;
+	patternTrace = 103;
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 countDown
