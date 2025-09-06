@@ -57,6 +57,8 @@ void motorPwmOut(int16_t pwmL, int16_t pwmR)
 // モジュール名 motorPwmOutSynth
 // 処理概要     トレースと速度制御のPID制御量をPWMとしてモータに出力する
 // 引数         tPwm: トレースのPID制御量 sPwm: 速度のPID制御量
+//              yrPwm: ヨーレートのPID制御量
+//              dPwm : 距離のPID制御量
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
 void motorPwmOutSynth(int16_t tPwm, int16_t sPwm, int16_t yrPwm, int16_t dPwm)
