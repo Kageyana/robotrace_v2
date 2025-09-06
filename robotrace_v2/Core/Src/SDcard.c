@@ -717,8 +717,8 @@ void send8bit(uint8_t data)
 #ifdef LOG_RUNNING_WRITE
 void send16bit(uint16_t data)
 {
-        activeBuf[logBuffIndex++] = (data >> 8); // 上位バイトをバッファに格納
-        activeBuf[logBuffIndex++] = data;        // 下位バイトをバッファに格納
+	activeBuf[logBuffIndex++] = (data >> 8); // 上位バイトをバッファに格納
+	activeBuf[logBuffIndex++] = data;        // 下位バイトをバッファに格納
 }
 #endif
 /////////////////////////////////////////////////////////////////////
@@ -730,10 +730,10 @@ void send16bit(uint16_t data)
 #ifdef LOG_RUNNING_WRITE
 void send32bit(uint32_t data)
 {
-        activeBuf[logBuffIndex++] = (data >> 24); // 最上位バイトをバッファに格納
-        activeBuf[logBuffIndex++] = (data >> 16); // 上位から2番目のバイトをバッファに格納
-        activeBuf[logBuffIndex++] = (data >> 8);  // 上位から3番目のバイトをバッファに格納
-        activeBuf[logBuffIndex++] = data;         // 最下位バイトをバッファに格納
+	activeBuf[logBuffIndex++] = (data >> 24); // 最上位バイトをバッファに格納
+	activeBuf[logBuffIndex++] = (data >> 16); // 上位から2番目のバイトをバッファに格納
+	activeBuf[logBuffIndex++] = (data >> 8);  // 上位から3番目のバイトをバッファに格納
+	activeBuf[logBuffIndex++] = data;         // 最下位バイトをバッファに格納
 }
 #endif
 /////////////////////////////////////////////////////////////////////
@@ -759,8 +759,7 @@ uint16_t logPut16bit(void)
 {
 	uint16_t s;
 
-	s = (uint16_t)((uint8_t)*logaddress++ * 0x100 +
-				   (uint8_t)*logaddress++);
+	s = (uint16_t)((uint8_t)*logaddress++ * 0x100 +	(uint8_t)*logaddress++);
 
 	return s;
 }
