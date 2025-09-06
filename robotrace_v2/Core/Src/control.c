@@ -390,16 +390,20 @@ void loopSystem(void)
 			if (initMSD)
 				initLog(); // ログ一時ファイル作成
 
-			initIMU = true;
+                        initIMU = true;
 
-			// 変数初期化
-			encRightMarker = encMM(1000);
-			veloCtrl.Int = 0.0;
-			yawRateCtrl.Int = 0.0;
+                        // 変数初期化
+                        encRightMarker = encMM(1000);
+                        veloCtrl.Int = 0.0;
+                        yawRateCtrl.Int = 0.0;
 
-			patternTrace = 11;
-		}
-		break;
+                        if (modeDSP)
+                        {
+                                ssd1306_StopDMA();                        // 走行開始で画面更新停止
+                        }
+                        patternTrace = 11;
+                }
+                break;
 
 	case 11:
 		// スタートマーカー通過までの走行
@@ -521,13 +525,17 @@ void loopSystem(void)
 
 		break;
 
-	case 101:
-		// 停止速度まで減速
-		if (enc1 >= encMM(200))
-		{
-			setTargetSpeed(0);
-		}
-		else
+        case 101:
+                if (modeDSP && !ssd1306_IsDMARunning())
+                {
+                        ssd1306_UpdateScreen_DMA();        // 停止していた画面更新を再開
+                }
+                // 停止速度まで減速
+                if (enc1 >= encMM(200))
+                {
+                        setTargetSpeed(0);
+                }
+                else
 		{
 			setTargetSpeed(tgtParam.stop);
 		}

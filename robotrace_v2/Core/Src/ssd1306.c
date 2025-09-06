@@ -16,6 +16,7 @@ static SSD1306_t SSD1306;
 
 static uint8_t SSD1306_DMA_Page = 0;          // 送信中のページ番号
 volatile uint8_t SSD1306_DMA_Completed = 0;   // 全ページ送信完了フラグ
+static uint8_t SSD1306_DMA_Running = 0;       // DMA送信継続フラグ
 #if defined(SSD1306_USE_I2C)
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_Reset
@@ -273,8 +274,9 @@ void ssd1306_UpdateScreen(void)
 /////////////////////////////////////////////////////////////////////
 void ssd1306_UpdateScreen_DMA(void)
 {
-	SSD1306_DMA_Page = 0;     // 0ページ目から送信開始
-	SSD1306_DMA_Completed = 0; // 送信開始前に完了フラグをリセット
+        SSD1306_DMA_Page = 0;     // 0ページ目から送信開始
+        SSD1306_DMA_Completed = 0; // 送信開始前に完了フラグをリセット
+        SSD1306_DMA_Running = 1;   // DMA送信を有効化
 
 	ssd1306_WriteCommand(0xB0 + SSD1306_DMA_Page); // ページアドレス設定
 	ssd1306_WriteCommand(0x00 + SSD1306_X_OFFSET_LOWER); // 列アドレス下位設定
@@ -292,6 +294,26 @@ uint8_t ssd1306_IsTransferCompleted(void)
         return SSD1306_DMA_Completed; // 完了フラグを返す
 }
 /////////////////////////////////////////////////////////////////////
+// モジュール名 ssd1306_StopDMA
+// 処理概要     DMA版画面更新を停止
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void ssd1306_StopDMA(void)
+{
+        SSD1306_DMA_Running = 0;   // DMA送信継続フラグをリセット
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 ssd1306_IsDMARunning
+// 処理概要     DMA版画面更新状態の参照
+// 引数         なし
+// 戻り値       DMA継続状態
+/////////////////////////////////////////////////////////////////////
+uint8_t ssd1306_IsDMARunning(void)
+{
+        return SSD1306_DMA_Running;        // DMA継続状態を返す
+}
+/////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_I2C_MemTxCpltCallback
 // 処理概要     I2Cメモリ転送完了処理
 // 引数         hi2c:I2Cハンドル
@@ -299,12 +321,19 @@ uint8_t ssd1306_IsTransferCompleted(void)
 /////////////////////////////////////////////////////////////////////
 void ssd1306_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
-	if (hi2c != &SSD1306_I2C_PORT) // 他デバイスの割り込みは無視
-	{
-		return;
-	}
+        if (hi2c != &SSD1306_I2C_PORT) // 他デバイスの割り込みは無視
+        {
+                return;
+        }
 
-	SSD1306_DMA_Page++; // 次のページへ
+        if (!SSD1306_DMA_Running) // DMA停止中は再送信しない
+        {
+                SSD1306_DMA_Completed = 1;           // 完了フラグセット
+                ssd1306_TransferCompletedCallback(); // 完了通知
+                return;
+        }
+
+        SSD1306_DMA_Page++; // 次のページへ
 
 	if (SSD1306_DMA_Page >= SSD1306_HEIGHT / 8)
 	{
