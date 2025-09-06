@@ -1,10 +1,22 @@
+//====================================//
+// インクルード
+//====================================//
 #include "ssd1306.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h> // For memcpy
+//====================================//
+// グローバル変数の宣言
+//====================================//
+// Screenbuffer
+static uint8_t SSD1306_Buffer[SSD1306_BUFFER_SIZE];
 
+// Screen object
+static SSD1306_t SSD1306;
+
+static volatile uint8_t SSD1306_DMA_Busy = 0; // DMA転送中フラグ
+static uint8_t SSD1306_DMA_Page = 0;          // 送信中のページ番号
 #if defined(SSD1306_USE_I2C)
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_Reset
 // 処理概要     I2C版リセット処理(実装なし)
@@ -13,9 +25,8 @@
 /////////////////////////////////////////////////////////////////////
 void ssd1306_Reset(void)
 {
-/* for I2C - do nothing */
+	/* for I2C - do nothing */
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_WriteCommand
 // 処理概要     コマンドレジスタへの書き込み
@@ -24,9 +35,8 @@ void ssd1306_Reset(void)
 /////////////////////////////////////////////////////////////////////
 void ssd1306_WriteCommand(uint8_t byte)
 {
-HAL_I2C_Mem_Write(&SSD1306_I2C_PORT, SSD1306_I2C_ADDR, 0x00, 1, &byte, 1, HAL_MAX_DELAY);
+	HAL_I2C_Mem_Write(&SSD1306_I2C_PORT, SSD1306_I2C_ADDR, 0x00, 1, &byte, 1, HAL_MAX_DELAY);
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_WriteData
 // 処理概要     データレジスタへの書き込み
@@ -35,9 +45,8 @@ HAL_I2C_Mem_Write(&SSD1306_I2C_PORT, SSD1306_I2C_ADDR, 0x00, 1, &byte, 1, HAL_MA
 /////////////////////////////////////////////////////////////////////
 void ssd1306_WriteData(uint8_t *buffer, size_t buff_size)
 {
-HAL_I2C_Mem_Write(&SSD1306_I2C_PORT, SSD1306_I2C_ADDR, 0x40, 1, buffer, buff_size, HAL_MAX_DELAY);
+	HAL_I2C_Mem_Write(&SSD1306_I2C_PORT, SSD1306_I2C_ADDR, 0x40, 1, buffer, buff_size, HAL_MAX_DELAY);
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_WriteData_DMA
 // 処理概要     DMAを使用したデータ送信
@@ -46,11 +55,9 @@ HAL_I2C_Mem_Write(&SSD1306_I2C_PORT, SSD1306_I2C_ADDR, 0x40, 1, buffer, buff_siz
 /////////////////////////////////////////////////////////////////////
 void ssd1306_WriteData_DMA(uint8_t *buffer, size_t buff_size)
 {
-        HAL_I2C_Mem_Write_DMA(&SSD1306_I2C_PORT, SSD1306_I2C_ADDR, 0x40, 1, buffer, buff_size); // DMA送信開始
+	HAL_I2C_Mem_Write_DMA(&SSD1306_I2C_PORT, SSD1306_I2C_ADDR, 0x40, 1, buffer, buff_size); // DMA送信開始
 }
-
 #elif defined(SSD1306_USE_SPI)
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_Reset
 // 処理概要     SPI版リセット処理
@@ -68,7 +75,6 @@ void ssd1306_Reset(void)
 	HAL_GPIO_WritePin(SSD1306_Reset_Port, SSD1306_Reset_Pin, GPIO_PIN_SET);
 	HAL_Delay(10);
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_WriteCommand
 // 処理概要     コマンドレジスタへの書き込み(SPI)
@@ -82,7 +88,6 @@ void ssd1306_WriteCommand(uint8_t byte)
 	HAL_SPI_Transmit(&SSD1306_SPI_PORT, (uint8_t *)&byte, 1, HAL_MAX_DELAY);
 	HAL_GPIO_WritePin(SSD1306_CS_Port, SSD1306_CS_Pin, GPIO_PIN_SET); // un-select OLED
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_WriteData
 // 処理概要     データ送信(SPI)
@@ -96,20 +101,9 @@ void ssd1306_WriteData(uint8_t *buffer, size_t buff_size)
 	HAL_SPI_Transmit(&SSD1306_SPI_PORT, buffer, buff_size, HAL_MAX_DELAY);
 	HAL_GPIO_WritePin(SSD1306_CS_Port, SSD1306_CS_Pin, GPIO_PIN_SET); // un-select OLED
 }
-
 #else
 #error "You should define SSD1306_USE_SPI or SSD1306_USE_I2C macro"
 #endif
-
-// Screenbuffer
-static uint8_t SSD1306_Buffer[SSD1306_BUFFER_SIZE];
-
-// Screen object
-static SSD1306_t SSD1306;
-
-static volatile uint8_t SSD1306_DMA_Busy = 0; // DMA転送中フラグ
-static uint8_t SSD1306_DMA_Page = 0;          // 送信中のページ番号
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_FillBuffer
 // 処理概要     指定バッファ内容を画面バッファへコピー
@@ -126,7 +120,6 @@ SSD1306_Error_t ssd1306_FillBuffer(uint8_t *buf, uint32_t len)
 	}
 	return ret;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_Init
 // 処理概要     OLEDの初期化
@@ -234,7 +227,6 @@ void ssd1306_Init(void)
 
 	SSD1306.Initialized = 1;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_Fill
 // 処理概要     画面全体を指定色で塗りつぶす
@@ -250,7 +242,6 @@ void ssd1306_Fill(SSD1306_COLOR color)
 		SSD1306_Buffer[i] = (color == Black) ? 0x00 : 0xFF;
 	}
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_UpdateScreen
 // 処理概要     画面バッファをディスプレイへ転送
@@ -273,7 +264,6 @@ void ssd1306_UpdateScreen(void)
 		ssd1306_WriteData(&SSD1306_Buffer[SSD1306_WIDTH * i], SSD1306_WIDTH);
 	}
 }
-
 #if defined(SSD1306_USE_I2C)
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_UpdateScreen_DMA
@@ -294,9 +284,8 @@ void ssd1306_UpdateScreen_DMA(void)
 	ssd1306_WriteCommand(0xB0 + SSD1306_DMA_Page); // ページアドレス設定
 	ssd1306_WriteCommand(0x00 + SSD1306_X_OFFSET_LOWER); // 列アドレス下位設定
 	ssd1306_WriteCommand(0x10 + SSD1306_X_OFFSET_UPPER); // 列アドレス上位設定
-        ssd1306_WriteData_DMA(&SSD1306_Buffer[SSD1306_WIDTH * SSD1306_DMA_Page], SSD1306_WIDTH); // DMA送信
+	ssd1306_WriteData_DMA(&SSD1306_Buffer[SSD1306_WIDTH * SSD1306_DMA_Page], SSD1306_WIDTH); // DMA送信
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_IsBusy
 // 処理概要     DMA転送中状態の参照
@@ -305,9 +294,8 @@ void ssd1306_UpdateScreen_DMA(void)
 /////////////////////////////////////////////////////////////////////
 uint8_t ssd1306_IsBusy(void)
 {
-        return SSD1306_DMA_Busy; // 転送中状態を返す
+	return SSD1306_DMA_Busy; // 転送中状態を返す
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_I2C_MemTxCpltCallback
 // 処理概要     I2Cメモリ転送完了処理
@@ -336,7 +324,6 @@ void ssd1306_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c)
 		ssd1306_WriteData_DMA(&SSD1306_Buffer[SSD1306_WIDTH * SSD1306_DMA_Page], SSD1306_WIDTH); // DMA送信
 	}
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_TransferCompletedCallback
 // 処理概要     転送完了時のコールバック
@@ -348,7 +335,6 @@ __weak void ssd1306_TransferCompletedCallback(void)
 	// ユーザー定義の処理をここに追加
 }
 #endif
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_DrawPixel
 // 処理概要     指定座標にピクセルを描画
@@ -373,7 +359,6 @@ void ssd1306_DrawPixel(uint8_t x, uint8_t y, SSD1306_COLOR color)
 		SSD1306_Buffer[x + (y / 8) * SSD1306_WIDTH] &= ~(1 << (y % 8));
 	}
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_WriteChar
 // 処理概要     1文字を画面バッファへ描画
@@ -419,7 +404,6 @@ char ssd1306_WriteChar(char ch, FontDef Font, SSD1306_COLOR color)
 	// Return written char for validation
 	return ch;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_WriteString
 // 処理概要     文字列を画面バッファへ描画
@@ -441,7 +425,6 @@ char ssd1306_WriteString(char *str, FontDef Font, SSD1306_COLOR color)
 	// Everything ok
 	return *str;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_SetCursor
 // 処理概要     描画位置を設定
@@ -453,7 +436,6 @@ void ssd1306_SetCursor(uint8_t x, uint8_t y)
 	SSD1306.CurrentX = x;
 	SSD1306.CurrentY = y;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_Line
 // 処理概要     直線を描画(Bresenham法)
@@ -489,7 +471,6 @@ void ssd1306_Line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, SSD1306_COLOR 
 	}
 	return;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_Polyline
 // 処理概要     複数頂点から折れ線を描画
@@ -511,7 +492,6 @@ void ssd1306_Polyline(const SSD1306_VERTEX *par_vertex, uint16_t par_size, SSD13
 
 	return;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_DegToRad
 // 処理概要     度をラジアンへ変換
@@ -522,7 +502,6 @@ static float ssd1306_DegToRad(float par_deg)
 {
 	return par_deg * 3.14 / 180.0;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_NormalizeTo0_360
 // 処理概要     角度を0〜360度に正規化
@@ -543,7 +522,6 @@ static uint16_t ssd1306_NormalizeTo0_360(uint16_t par_deg)
 	}
 	return loc_angle;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_DrawArc
 // 処理概要     円弧を描画
@@ -587,7 +565,6 @@ void ssd1306_DrawArc(uint8_t x, uint8_t y, uint8_t radius, uint16_t start_angle,
 
 	return;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_DrawArcWithRadiusLine
 // 処理概要     半径線付き円弧を描画
@@ -640,7 +617,6 @@ void ssd1306_DrawArcWithRadiusLine(uint8_t x, uint8_t y, uint8_t radius, uint16_
 	ssd1306_Line(x, y, xp2, yp2, color);
 	return;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_DrawCircle
 // 処理概要     円を描画(Bresenham法)
@@ -686,7 +662,6 @@ void ssd1306_DrawCircle(uint8_t par_x, uint8_t par_y, uint8_t par_r, SSD1306_COL
 
 	return;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_FillCircle
 // 処理概要     塗りつぶし円を描画(Bresenham法)
@@ -735,7 +710,6 @@ void ssd1306_FillCircle(uint8_t par_x, uint8_t par_y, uint8_t par_r, SSD1306_COL
 
 	return;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_DrawRectangle
 // 処理概要     矩形を描画
@@ -751,7 +725,6 @@ void ssd1306_DrawRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, SSD13
 
 	return;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_FillRectangle
 // 処理概要     矩形を塗りつぶし描画
@@ -774,7 +747,6 @@ void ssd1306_FillRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, SSD13
 	}
 	return;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_DrawBitmap
 // 処理概要     ビットマップを描画
@@ -812,7 +784,6 @@ void ssd1306_DrawBitmap(uint8_t x, uint8_t y, const unsigned char *bitmap, uint8
 	}
 	return;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_SetContrast
 // 処理概要     コントラスト値を設定
@@ -858,7 +829,6 @@ uint8_t ssd1306_GetDisplayOn()
 {
 	return SSD1306.DisplayOn;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_printf
 // 処理概要     フォーマット文字列を白色で表示
@@ -876,7 +846,6 @@ void ssd1306_printf(FontDef Font, uint8_t *format, ...)
 
 	ssd1306_WriteString(str, Font, White);
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_printfB
 // 処理概要     フォーマット文字列を黒色で表示
