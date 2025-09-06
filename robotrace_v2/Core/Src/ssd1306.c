@@ -14,8 +14,8 @@ static uint8_t SSD1306_Buffer[SSD1306_BUFFER_SIZE];
 // Screen object
 static SSD1306_t SSD1306;
 
-static volatile uint8_t SSD1306_DMA_Busy = 0; // DMA転送中フラグ
 static uint8_t SSD1306_DMA_Page = 0;          // 送信中のページ番号
+volatile uint8_t SSD1306_DMA_Completed = 0;   // 全ページ送信完了フラグ
 #if defined(SSD1306_USE_I2C)
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_Reset
@@ -273,13 +273,8 @@ void ssd1306_UpdateScreen(void)
 /////////////////////////////////////////////////////////////////////
 void ssd1306_UpdateScreen_DMA(void)
 {
-	if (SSD1306_DMA_Busy) // 既に転送中なら無視
-	{
-		return;
-	}
-
-	SSD1306_DMA_Busy = 1;     // 転送中フラグ設定
-	SSD1306_DMA_Page = 0;     // 0ページ目から送信開始
+        SSD1306_DMA_Page = 0;     // 0ページ目から送信開始
+        SSD1306_DMA_Completed = 0; // 送信開始前に完了フラグをリセット
 
 	ssd1306_WriteCommand(0xB0 + SSD1306_DMA_Page); // ページアドレス設定
 	ssd1306_WriteCommand(0x00 + SSD1306_X_OFFSET_LOWER); // 列アドレス下位設定
@@ -287,14 +282,14 @@ void ssd1306_UpdateScreen_DMA(void)
 	ssd1306_WriteData_DMA(&SSD1306_Buffer[SSD1306_WIDTH * SSD1306_DMA_Page], SSD1306_WIDTH); // DMA送信
 }
 /////////////////////////////////////////////////////////////////////
-// モジュール名 ssd1306_IsBusy
-// 処理概要     DMA転送中状態の参照
+// モジュール名 ssd1306_IsTransferCompleted
+// 処理概要     全ページ送信完了状態の参照
 // 引数         なし
-// 戻り値       DMA転送中状態
+// 戻り値       全ページ送信完了状態
 /////////////////////////////////////////////////////////////////////
-uint8_t ssd1306_IsBusy(void)
+uint8_t ssd1306_IsTransferCompleted(void)
 {
-	return SSD1306_DMA_Busy; // 転送中状態を返す
+        return SSD1306_DMA_Completed; // 完了フラグを返す
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_I2C_MemTxCpltCallback
@@ -309,20 +304,19 @@ void ssd1306_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c)
 		return;
 	}
 
-	SSD1306_DMA_Page++; // 次のページへ
+        SSD1306_DMA_Page++; // 次のページへ
 
-	if (SSD1306_DMA_Page >= SSD1306_HEIGHT / 8)
-	{
-		SSD1306_DMA_Busy = 0; 					// 全ページ送信完了
-		ssd1306_TransferCompletedCallback();	// 完了通知
-	}
-	else
-	{
-		ssd1306_WriteCommand(0xB0 + SSD1306_DMA_Page); 			// 次のページ設定
-		ssd1306_WriteCommand(0x00 + SSD1306_X_OFFSET_LOWER);	// 列アドレス下位設定
-		ssd1306_WriteCommand(0x10 + SSD1306_X_OFFSET_UPPER);	// 列アドレス上位設定
-		ssd1306_WriteData_DMA(&SSD1306_Buffer[SSD1306_WIDTH * SSD1306_DMA_Page], SSD1306_WIDTH); // DMA送信
-	}
+        if (SSD1306_DMA_Page >= SSD1306_HEIGHT / 8)
+        {
+                SSD1306_DMA_Completed = 1;           // 全ページ送信完了フラグセット
+                ssd1306_TransferCompletedCallback(); // 全ページ送信完了通知
+                SSD1306_DMA_Page = 0;                // 0ページに戻して継続
+        }
+
+	ssd1306_WriteCommand(0xB0 + SSD1306_DMA_Page); // ページアドレス設定
+	ssd1306_WriteCommand(0x00 + SSD1306_X_OFFSET_LOWER); // 列アドレス下位設定
+	ssd1306_WriteCommand(0x10 + SSD1306_X_OFFSET_UPPER); // 列アドレス上位設定
+	ssd1306_WriteData_DMA(&SSD1306_Buffer[SSD1306_WIDTH * SSD1306_DMA_Page], SSD1306_WIDTH); // DMA送信
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_TransferCompletedCallback
