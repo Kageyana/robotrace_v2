@@ -157,9 +157,8 @@ void initSystem(void)
 	}
 	if (modeDSP)
 	{
-		SSD1306_DMA_Completed = 0; // 全ページ送信完了フラグリセット
+		SSD1306_DMA_Completed = 0;				// 全ページ送信完了フラグリセット
 		while(!ssd1306_IsTransferCompleted());	// 全ページ送信完了まで待つ
-		HAL_Delay(500);
 	}
 	sendLED();
 
@@ -184,9 +183,8 @@ void initSystem(void)
 	}
 	if (modeDSP)
 	{
-		SSD1306_DMA_Completed = 0; // 全ページ送信完了フラグリセット
+		SSD1306_DMA_Completed = 0;				// 全ページ送信完了フラグリセット
 		while(!ssd1306_IsTransferCompleted());	// 全ページ送信完了まで待つ
-		HAL_Delay(500);
 	}
 	sendLED();
 
@@ -226,9 +224,8 @@ void initSystem(void)
 	}
 	if (modeDSP)
 	{
-		SSD1306_DMA_Completed = 0; // 全ページ送信完了フラグリセット
+		SSD1306_DMA_Completed = 0;				// 全ページ送信完了フラグリセット
 		while(!ssd1306_IsTransferCompleted());	// 全ページ送信完了まで待つ
-		HAL_Delay(500);
 	}
 	sendLED();
 

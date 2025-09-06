@@ -273,8 +273,8 @@ void ssd1306_UpdateScreen(void)
 /////////////////////////////////////////////////////////////////////
 void ssd1306_UpdateScreen_DMA(void)
 {
-        SSD1306_DMA_Page = 0;     // 0ページ目から送信開始
-        SSD1306_DMA_Completed = 0; // 送信開始前に完了フラグをリセット
+	SSD1306_DMA_Page = 0;     // 0ページ目から送信開始
+	SSD1306_DMA_Completed = 0; // 送信開始前に完了フラグをリセット
 
 	ssd1306_WriteCommand(0xB0 + SSD1306_DMA_Page); // ページアドレス設定
 	ssd1306_WriteCommand(0x00 + SSD1306_X_OFFSET_LOWER); // 列アドレス下位設定
@@ -304,14 +304,14 @@ void ssd1306_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c)
 		return;
 	}
 
-        SSD1306_DMA_Page++; // 次のページへ
+	SSD1306_DMA_Page++; // 次のページへ
 
-        if (SSD1306_DMA_Page >= SSD1306_HEIGHT / 8)
-        {
-                SSD1306_DMA_Completed = 1;           // 全ページ送信完了フラグセット
-                ssd1306_TransferCompletedCallback(); // 全ページ送信完了通知
-                SSD1306_DMA_Page = 0;                // 0ページに戻して継続
-        }
+	if (SSD1306_DMA_Page >= SSD1306_HEIGHT / 8)
+	{
+		SSD1306_DMA_Completed = 1;           // 全ページ送信完了フラグセット
+		ssd1306_TransferCompletedCallback(); // 全ページ送信完了通知
+		SSD1306_DMA_Page = 0;                // 0ページに戻して継続
+	}
 
 	ssd1306_WriteCommand(0xB0 + SSD1306_DMA_Page); // ページアドレス設定
 	ssd1306_WriteCommand(0x00 + SSD1306_X_OFFSET_LOWER); // 列アドレス下位設定
