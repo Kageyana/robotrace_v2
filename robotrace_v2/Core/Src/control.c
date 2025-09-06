@@ -293,8 +293,6 @@ void loopSystem(void)
 			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 			ssd1306_SetCursor(0, 25);
 			ssd1306_printf(Font_11x18, "Analizing");
-			SSD1306_DMA_Completed = 0;				// 全ページ送信完了フラグリセット
-			while(!ssd1306_IsTransferCompleted());	// 全ページ送信完了まで待つ
 
 			initIMU = false;
 			numPPADarry = readLogDistance(fileNumbers[fileIndexLog]);
@@ -305,8 +303,6 @@ void loopSystem(void)
 			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 			ssd1306_SetCursor(56, 28);
 			ssd1306_printf(Font_16x26, "2");
-			SSD1306_DMA_Completed = 0;				// 全ページ送信完了フラグリセット
-			while(!ssd1306_IsTransferCompleted());	// 全ページ送信完了まで待つ
 
 			patternTrace = 1;
 		}
@@ -388,22 +384,24 @@ void loopSystem(void)
 			}
 
 			if (initMSD)
+			{
 				initLog(); // ログ一時ファイル作成
+			}
 
-                        initIMU = true;
+			initIMU = true;
 
-                        // 変数初期化
-                        encRightMarker = encMM(1000);
-                        veloCtrl.Int = 0.0;
-                        yawRateCtrl.Int = 0.0;
+			// 変数初期化
+			encRightMarker = encMM(1000);
+			veloCtrl.Int = 0.0;
+			yawRateCtrl.Int = 0.0;
 
-                        if (modeDSP)
-                        {
-                                ssd1306_StopDMA();                        // 走行開始で画面更新停止
-                        }
-                        patternTrace = 11;
-                }
-                break;
+			if (modeDSP)
+			{
+				ssd1306_StopDMA();	// 走行開始で画面更新停止
+			}
+			patternTrace = 11;
+        }
+		break;
 
 	case 11:
 		// スタートマーカー通過までの走行
@@ -526,101 +524,101 @@ void loopSystem(void)
 		break;
 
         case 101:
-                if (modeDSP && !ssd1306_IsDMARunning())
-                {
-                        ssd1306_UpdateScreen_DMA();        // 停止していた画面更新を再開
-                }
-                // 停止速度まで減速
-                if (enc1 >= encMM(200))
-                {
-                        setTargetSpeed(0);
-                }
-                else
-		{
-			setTargetSpeed(tgtParam.stop);
-		}
-		motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
-
-		if (encCurrentN == 0)
-		{
-			motorPwmOutSynth(0, 0, 0, 0);
-
-			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-			ssd1306_SetCursor(0, 25);
-			ssd1306_printf(Font_11x18, "log");
-			ssd1306_SetCursor(0, 45);
-			ssd1306_printf(Font_11x18, "Writing");
-
-			if (modeLOG)
-				endLog(); // ログ保存終了
-
-			ssd1306_SetCursor(0, 45);
-			ssd1306_printf(Font_11x18, "Written");
-
-			if (autoStart > 0)
+			if (modeDSP && !ssd1306_IsDMARunning())
 			{
-				autoStart++;
-				if (autoStart >= 3)
-				{
-					tgtParam.bstStraight *= PARAM_UP_STEP;
-					tgtParam.bst1500 *= PARAM_UP_STEP;
-					tgtParam.bst1300 *= PARAM_UP_STEP;
-					tgtParam.bst1000 *= PARAM_UP_STEP;
-					tgtParam.bst800 *= PARAM_UP_STEP;
-					tgtParam.bst700 *= PARAM_UP_STEP;
-					tgtParam.bst600 *= PARAM_UP_STEP;
-					tgtParam.bst500 *= PARAM_UP_STEP;
-					// tgtParam.bst400			*= PARAM_UP_STEP;
-					// tgtParam.bst300			*= PARAM_UP_STEP;
-					// tgtParam.bst200			*= PARAM_UP_STEP;
-					// tgtParam.bst100			*= PARAM_UP_STEP;
-				}
-
-				if (autoStart > 5)
-				{
-					ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-					ssd1306_SetCursor(0, 25);
-					ssd1306_printf(Font_11x18, "Auto run");
-					ssd1306_SetCursor(0, 45);
-					ssd1306_printf(Font_11x18, "Finish!");
-					patternTrace = 102;
-					break;
-				}
-				else
-				{
-					powerLineSensors(0);
-					powerMarkerSensors(0);
-					patternTrace = 0;
-					break;
-				}
+				ssd1306_UpdateScreen_DMA();        // 停止していた画面更新を再開
+			}
+			// 停止速度まで減速
+			if (enc1 >= encMM(200))
+			{
+				setTargetSpeed(0);
 			}
 			else
 			{
-				if (modeDSP)
+				setTargetSpeed(tgtParam.stop);
+			}
+			motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+
+			if (encCurrentN == 0)
+			{
+				motorPwmOutSynth(0, 0, 0, 0);
+
+				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+				ssd1306_SetCursor(0, 25);
+				ssd1306_printf(Font_11x18, "log");
+				ssd1306_SetCursor(0, 45);
+				ssd1306_printf(Font_11x18, "Writing");
+
+				if (modeLOG)
+					endLog(); // ログ保存終了
+
+				ssd1306_SetCursor(0, 45);
+				ssd1306_printf(Font_11x18, "Written");
+
+				if (autoStart > 0)
 				{
-					ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-					if (logOverflow || markerOverflow)
+					autoStart++;
+					if (autoStart >= 3)
 					{
-						// バッファ上限エラー表示
-						ssd1306_SetCursor(0, 25);					// 1行目の表示位置
-						ssd1306_printf(Font_11x18, "buff overflow");  // エラーメッセージ1行目
-						ssd1306_SetCursor(0, 45);					// 2行目の表示位置
-						ssd1306_printf(Font_11x18, "error");		// エラーメッセージ2行目
+						tgtParam.bstStraight *= PARAM_UP_STEP;
+						tgtParam.bst1500 *= PARAM_UP_STEP;
+						tgtParam.bst1300 *= PARAM_UP_STEP;
+						tgtParam.bst1000 *= PARAM_UP_STEP;
+						tgtParam.bst800 *= PARAM_UP_STEP;
+						tgtParam.bst700 *= PARAM_UP_STEP;
+						tgtParam.bst600 *= PARAM_UP_STEP;
+						tgtParam.bst500 *= PARAM_UP_STEP;
+						// tgtParam.bst400			*= PARAM_UP_STEP;
+						// tgtParam.bst300			*= PARAM_UP_STEP;
+						// tgtParam.bst200			*= PARAM_UP_STEP;
+						// tgtParam.bst100			*= PARAM_UP_STEP;
+					}
+
+					if (autoStart > 5)
+					{
+						ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+						ssd1306_SetCursor(0, 25);
+						ssd1306_printf(Font_11x18, "Auto run");
+						ssd1306_SetCursor(0, 45);
+						ssd1306_printf(Font_11x18, "Finish!");
+						patternTrace = 102;
+						break;
 					}
 					else
 					{
-						ssd1306_SetCursor(0, 25);
-						ssd1306_printf(Font_11x18, "Time %d", optimalTrace);
-						ssd1306_SetCursor(0, 45);
-						ssd1306_printf(Font_11x18, "%6.3f[s]", (float)goalTime / 1000);
+						powerLineSensors(0);
+						powerMarkerSensors(0);
+						patternTrace = 0;
+						break;
 					}
 				}
-			}
+				else
+				{
+					if (modeDSP)
+					{
+						ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+						if (logOverflow || markerOverflow)
+						{
+							// バッファ上限エラー表示
+							ssd1306_SetCursor(0, 25);					// 1行目の表示位置
+							ssd1306_printf(Font_11x18, "buff overflow");  // エラーメッセージ1行目
+							ssd1306_SetCursor(0, 45);					// 2行目の表示位置
+							ssd1306_printf(Font_11x18, "error");		// エラーメッセージ2行目
+						}
+						else
+						{
+							ssd1306_SetCursor(0, 25);
+							ssd1306_printf(Font_11x18, "Time %d", optimalTrace);
+							ssd1306_SetCursor(0, 45);
+							ssd1306_printf(Font_11x18, "%6.3f[s]", (float)goalTime / 1000);
+						}
+					}
+				}
 
-			goalTime = cntRun;
-			patternTrace = 102;
-			break;
-		}
+				goalTime = cntRun;
+				patternTrace = 102;
+				break;
+			}
 
 		break;
 
