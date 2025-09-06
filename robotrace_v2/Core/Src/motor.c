@@ -80,7 +80,13 @@ void motorPwmOutSynth(int16_t tPwm, int16_t sPwm, int16_t yrPwm, int16_t dPwm)
 	}
 
 	motorpwmR = sPwm - tracePwm - yrPwm + dPwm;
+	// PWMの飽和防止
+	if (motorpwmR > 1000) motorpwmR = 1000;
+	else if (motorpwmR < -1000) motorpwmR = -1000;
 	motorpwmL = sPwm + tracePwm + yrPwm + dPwm;
+	// PWMの飽和防止
+	if (motorpwmL > 1000) motorpwmL = 1000;
+	else if (motorpwmL < -1000) motorpwmL = -1000;
 
 	motorPwmOut(motorpwmL, motorpwmR);
 }
