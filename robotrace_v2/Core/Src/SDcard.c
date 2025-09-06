@@ -717,12 +717,8 @@ void send8bit(uint8_t data)
 #ifdef LOG_RUNNING_WRITE
 void send16bit(uint16_t data)
 {
-	// バイト順を変換して一時変数に格納
-	uint16_t swapped = __builtin_bswap16(data);
-	// バイトスワップ後の値をポインタキャストでバッファへ直接書き込む
-	*(uint16_t *)&activeBuf[logBuffIndex] = swapped;        // 2バイト分をそのまま格納
-	// 書き込み位置を更新
-	logBuffIndex += sizeof(swapped);
+	activeBuf[logBuffIndex++] = (data >> 8); // 上位バイトをバッファに格納
+	activeBuf[logBuffIndex++] = data;        // 下位バイトをバッファに格納
 }
 #endif
 /////////////////////////////////////////////////////////////////////
@@ -734,12 +730,10 @@ void send16bit(uint16_t data)
 #ifdef LOG_RUNNING_WRITE
 void send32bit(uint32_t data)
 {
-	// バイト順を変換して一時変数に格納
-	uint32_t swapped = __builtin_bswap32(data);
-	// バイトスワップ後の値をポインタキャストでバッファへ直接書き込む
-	*(uint32_t *)&activeBuf[logBuffIndex] = swapped;        // 4バイト分をそのまま格納
-	// 書き込み位置を更新
-	logBuffIndex += sizeof(swapped);
+	activeBuf[logBuffIndex++] = (data >> 24); // 最上位バイトをバッファに格納
+	activeBuf[logBuffIndex++] = (data >> 16); // 上位から2番目のバイトをバッファに格納
+	activeBuf[logBuffIndex++] = (data >> 8);  // 上位から3番目のバイトをバッファに格納
+	activeBuf[logBuffIndex++] = data;         // 最下位バイトをバッファに格納
 }
 #endif
 /////////////////////////////////////////////////////////////////////
@@ -765,8 +759,7 @@ uint16_t logPut16bit(void)
 {
 	uint16_t s;
 
-	s = (uint16_t)((uint8_t)*logaddress++ * 0x100 +
-				   (uint8_t)*logaddress++);
+	s = (uint16_t)((uint8_t)*logaddress++ * 0x100 +	(uint8_t)*logaddress++);
 
 	return s;
 }
