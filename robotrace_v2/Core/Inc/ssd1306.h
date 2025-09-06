@@ -102,6 +102,8 @@ extern SPI_HandleTypeDef SSD1306_SPI_PORT;
 #error "You should define SSD1306_USE_SPI or SSD1306_USE_I2C macro!"
 #endif
 
+extern volatile uint8_t SSD1306_DMA_Completed; // 全ページ送信完了フラグ
+
 // SSD1306 OLED height in pixels
 #ifndef SSD1306_HEIGHT
 #define SSD1306_HEIGHT          64
@@ -145,7 +147,7 @@ void ssd1306_Init(void);
 void ssd1306_Fill(SSD1306_COLOR color);
 void ssd1306_UpdateScreen(void);
 void ssd1306_UpdateScreen_DMA(void); // DMA版画面更新を開始
-uint8_t ssd1306_IsBusy(void);        // DMA転送中フラグ参照
+uint8_t ssd1306_IsTransferCompleted(void); // 全ページ送信完了フラグ参照
 void ssd1306_TransferCompletedCallback(void); // DMA完了時のコールバック
 void ssd1306_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c); // I2Cメモリ転送完了処理
 void ssd1306_DrawPixel(uint8_t x, uint8_t y, SSD1306_COLOR color);
