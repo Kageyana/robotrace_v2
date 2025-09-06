@@ -33,13 +33,22 @@ float calcROC(int16_t velo, float angvelo, float dt)
 {
 	float dl, drad, ret;
 
-	dl = (float)velo / PALSE_MILLIMETER * 10.0F; // [palse] → [mm/ms] → [mm]
-	drad = angvelo * DEG2RAD * DELTATIME;		 // [deg/s] → [rad]
-	ret = dl / drad;
-	// 曲率半径が大きい＝直線の場合は極大にする
-	if (fabs(ret) > 1500.0F)
+	const float invPulseConst = 10.0F / PALSE_MILLIMETER; // パルス→距離変換係数
+	const float angFactor = DEG2RAD * dt; // 角速度→ラジアン変換係数
+	dl = (float)velo * invPulseConst; // [palse] → [mm]
+	drad = angvelo * angFactor; // [deg/s] → [rad]
+
+	// 角速度が極小の場合は直線とみなして即座に返す
+	if (fabsf(drad) < 1e-6F)
 	{
-		ret = 2000.0;
+		return 2000.0F;
+	}
+
+	ret = dl / drad; // 曲率半径を計算
+	// 曲率半径が大きい＝直線の場合は極大にする
+	if (fabsf(ret) > 1500.0F)
+	{
+		ret = 2000.0F;
 	}
 
 	return ret;
