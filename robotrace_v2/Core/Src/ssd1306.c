@@ -68,6 +68,7 @@ void ssd1306_WriteData(uint8_t *buffer, size_t buff_size)
 static uint8_t SSD1306_Buffer[SSD1306_DMA_BUFFER_SIZE];
 
 #define SSD1306_DATA_OFFSET(page) ((page) * SSD1306_DMA_PAGE_SIZE + SSD1306_CMD_DATA_LEN) // 指定ページの画素データ開始位置
+#define SSD1306_PIXEL_INDEX(x, y) (SSD1306_DATA_OFFSET((y) >> 3) + (x)) // コマンド領域を避けた画素位置
 
 // Screen object
 static SSD1306_t SSD1306;
@@ -83,7 +84,7 @@ SSD1306_Error_t ssd1306_FillBuffer(uint8_t *buf, uint32_t len)
 		for (uint32_t i = 0; i < len; i++) // バッファを1バイトずつコピー
 	{
 			uint32_t page = i / SSD1306_WIDTH;                                  // 対象ページ
-			uint32_t offset = SSD1306_DATA_OFFSET(page) + (i % SSD1306_WIDTH); // ページ内位置
+			uint32_t offset = SSD1306_PIXEL_INDEX(i % SSD1306_WIDTH, page << 3); // コマンド領域を避けたページ内位置
 			SSD1306_Buffer[offset] = buf[i];                                    // 画素データを配置
 	}
 		ret = SSD1306_OK;
@@ -201,7 +202,7 @@ void ssd1306_Fill(SSD1306_COLOR color)
 {
 		for (uint8_t col = 0; col < SSD1306_WIDTH; col++)
 {
-			uint32_t pos = SSD1306_DATA_OFFSET(page) + col;            // 書き込み位置
+			uint32_t pos = SSD1306_PIXEL_INDEX(col, page << 3);            // コマンド領域を避けた書き込み位置
 			SSD1306_Buffer[pos] = (color == Black) ? 0x00 : 0xFF;      // 画素データを設定
 	}
 	}
@@ -284,7 +285,7 @@ void ssd1306_DrawPixel(uint8_t x, uint8_t y, SSD1306_COLOR color)
                 return;
         }
 
-        uint32_t pos = SSD1306_DATA_OFFSET(y / 8) + x; // 書き込み位置計算
+        uint32_t pos = SSD1306_PIXEL_INDEX(x, y); // コマンド領域を避けた書き込み位置計算
 
         // Draw in the right color
         if (color == White)
