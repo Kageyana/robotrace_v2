@@ -1068,10 +1068,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	}
 }
 
-/* I2Cメモリ転送完了割り込み */
-void HAL_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c)
+/* I2C送信完了割り込み */
+void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
-	ssd1306_I2C_MemTxCpltCallback(hi2c); // SSD1306のDMA完了処理へ委譲
+        ssd1306_I2C_MasterTxCpltCallback(hi2c); // SSD1306のDMA完了処理へ委譲
 }
 
 int _write(int file, char *ptr, int len)

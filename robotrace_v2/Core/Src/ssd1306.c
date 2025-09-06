@@ -245,7 +245,7 @@ uint8_t ssd1306_IsBusy(void)
 	return SSD1306_DMA_Busy; // 転送中状態を返す
 }
 
-void ssd1306_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c)
+void ssd1306_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c) // I2C送信完了コールバック
 {
 	if (hi2c != &SSD1306_I2C_PORT) // 他デバイスの割り込みは無視
 	{
