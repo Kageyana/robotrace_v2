@@ -1020,9 +1020,6 @@ static void setup_log(void)
 		ssd1306_printf(Font_6x8, "marker:%4d", numPPAMarry);
 	}
 
-	ssd1306_SetCursor(0, 16);
-	ssd1306_printf(Font_6x8, "%4d", fileNumbers[fileIndexLog]);
-
 	dataTuningUD(&y, 1, 0, endFileIndex + 1); // ログNoを上下スイッチで選択
 
 	j = swValTact; // タクトスイッチの状態を取得
@@ -1078,6 +1075,11 @@ static void setup_log(void)
 		{
 			ssd1306_SetCursor(0, 16);
 			ssd1306_printfB(Font_6x8, "%4d", fileNumbers[fileIndexLog]);
+		}
+		else
+		{
+			ssd1306_SetCursor(0, 16);
+			ssd1306_printf(Font_6x8, "%4d", fileNumbers[fileIndexLog]);
 		}
 
 		// ログNoを選択するとき
