@@ -234,20 +234,22 @@ void ssd1306_UpdateScreen_DMA(void)
 				return;
 	}
 
-	for (uint8_t page = 0; page < SSD1306_HEIGHT / 8; page++)
-	{
-				uint32_t base = page * SSD1306_DMA_PAGE_SIZE;          // ページ先頭位置
-				SSD1306_Buffer[base] = 0x00;                           // コマンドモード指定
-		SSD1306_Buffer[base + 1] = 0xB0 + page;                // ページアドレス設定
-		SSD1306_Buffer[base + 2] = 0x00 + SSD1306_X_OFFSET_LOWER; // 列アドレス下位
-		SSD1306_Buffer[base + 3] = 0x10 + SSD1306_X_OFFSET_UPPER; // 列アドレス上位
-		SSD1306_Buffer[base + 4] = 0x40;                       // データモード指定
-	}
+       for (uint8_t page = 0; page < SSD1306_HEIGHT / 8; page++)
+       {
+                               uint32_t base = page * SSD1306_DMA_PAGE_SIZE;          // ページ先頭位置
+                               SSD1306_Buffer[base] = 0x00;                           // コマンド制御バイト
+               SSD1306_Buffer[base + 1] = 0xB0 + page;                // ページアドレス設定
+               SSD1306_Buffer[base + 2] = 0x00;                       // コマンド制御バイト
+               SSD1306_Buffer[base + 3] = 0x00 + SSD1306_X_OFFSET_LOWER; // 列アドレス下位
+               SSD1306_Buffer[base + 4] = 0x00;                       // コマンド制御バイト
+               SSD1306_Buffer[base + 5] = 0x10 + SSD1306_X_OFFSET_UPPER; // 列アドレス上位
+               SSD1306_Buffer[base + 6] = 0x40;                       // データ開始制御バイト
+       }
 
-		SSD1306_DMA_Busy = 1; // 転送中フラグ設定
+               SSD1306_DMA_Busy = 1; // 転送中フラグ設定
 
-		ssd1306_WriteData_DMA(SSD1306_Buffer, SSD1306_DMA_BUFFER_SIZE); // コマンドと画素データを一括転送
-	}
+               ssd1306_WriteData_DMA(SSD1306_Buffer, SSD1306_DMA_BUFFER_SIZE); // コマンドと画素データを一括転送
+       }
 
 uint8_t ssd1306_IsBusy(void)
 	{

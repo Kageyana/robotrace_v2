@@ -113,9 +113,6 @@ void initSystem(void)
 		if (!ssd1306_IsBusy())       // DMA転送中は更新しない
 		{
 			ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
-			while (ssd1306_IsBusy())    // 表示完了まで待機
-			{
-			}
 		}
 
 		setLED(0, 0, 50, 0); // 初期化 成功 緑点灯
@@ -166,9 +163,6 @@ void initSystem(void)
 	if (!ssd1306_IsBusy())			// DMA転送中は更新しない
 	{
 		ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
-		while (ssd1306_IsBusy())    // 表示完了まで待機
-		{
-		}
 	}
 	}
 	sendLED();
@@ -197,9 +191,6 @@ void initSystem(void)
 	if (!ssd1306_IsBusy())			// DMA転送中は更新しない
 	{
 		ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
-		while (ssd1306_IsBusy())    // 表示完了まで待機
-		{
-		}
 	}
 	}
 	sendLED();
@@ -243,9 +234,6 @@ void initSystem(void)
 	if (!ssd1306_IsBusy())			// DMA転送中は更新しない
 	{
 		ssd1306_UpdateScreen_DMA();	// グラフィック液晶更新
-		while (ssd1306_IsBusy())    // 表示完了まで待機
-		{
-		}
 	}
 	}
 	sendLED();
@@ -263,9 +251,6 @@ void initSystem(void)
 			if (!ssd1306_IsBusy())			// DMA転送中は更新しない
 			{
 				ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新
-				while (ssd1306_IsBusy())    // 表示完了まで待機
-				{
-				}
 			}
 
 			HAL_Delay(1000);
