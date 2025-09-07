@@ -658,5 +658,51 @@ void setShortCutTarget(void)
 
 	dist = sqrt(pow(xe, 2) + pow(ye, 2));
 
-	setTargetDist(dist);
+        setTargetDist(dist);
 }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 processMarkerEvent
+// 処理概要     マーカー通過時の処理をまとめる
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void processMarkerEvent(void) {
+	// カーブマーカー,クロスラインを通過した時の処理
+	if (courseMarker == 0 && beforeCourseMarker > 0) {
+		cntMarker++; // マーカーカウント
+		if (optimalTrace == BOOST_DISTANCE) {
+			if (straightState) {
+				// 距離基準2次走行のとき
+				int32_t i, j, errorDistance = 0;
+				for (i = pathedMarker; i <= numPPAMarry; i++) {
+					// 現在地から一番近いマーカーを探す
+					if (encTotalOptimal - markerPos[i].distance < 0) {
+						for (j = i; j > 0; j--) {
+							if (abs(encTotalOptimal - markerPos[j].distance) < encMM(100)) {
+								errorDistance = encTotalOptimal - DistanceOptimal; // 現在の差を計算
+								encTotalOptimal = markerPos[j].distance;	   // 距離を補正
+								DistanceOptimal = encTotalOptimal - errorDistance; // 補正後の現在距離からの差分
+								optimalIndex = markerPos[j].indexPPAD;		   // インデックス更新
+								if (j - 5 < 0) {
+									pathedMarker = j - 5;
+								} else {
+									pathedMarker = 0;
+								}
+								straightState = false;
+								straightMeter = 0;
+								break;
+							}
+						}
+						if (errorDistance != 0)
+							break;
+					}
+				}
+			}
+		}
+		// マーカーの位置を記録
+		if (courseMarker == 0 && beforeCourseMarker > 0) {
+			writeMarkerPos(encTotalOptimal, beforeCourseMarker);
+		}
+		beforeCourseMarker = courseMarker; // 前回のマーカー状態を更新
+	}
