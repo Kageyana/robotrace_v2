@@ -8,14 +8,15 @@
 //====================================//
 // モード関連
 uint8_t patternTrace = 0;
-bool modeDSP = false;	  // ディスプレイ表示可否			false:消灯		true:表示
-bool modeLOG = false;	  // ログ取得状況			false:ログ停止	true:ログ取得中
-bool initMSD = false;	  // microSD初期化状況	false:初期化失敗	true:初期化成功
-bool initLCD = false;	  // LCD初期化状況		false:初期化失敗	true:初期化成功
-bool initIMU = false;	  // IMU初期化状況		false:初期化失敗	true:初期化成功
-bool initCurrent = false; // 電流センサ初期化状況		false:初期化失敗	true:初期化成功
-uint8_t modeCurve = 0;	  // カーブ判断			0:直線			1:カーブ進入
-uint8_t autoStart = 0;	  // 5走を自動で開始する
+bool modeDSP = false;		// ディスプレイ表示可否	false:消灯		true:表示
+bool modeLOG = false;		// ログ取得状況			false:ログ停止	true:ログ取得中
+bool initMSD = false;		// microSD初期化状況	false:初期化失敗	true:初期化成功
+bool initLCD = false;		// LCD初期化状況		false:初期化失敗	true:初期化成功
+bool initIMU = false;		// IMU初期化状況		false:初期化失敗	true:初期化成功
+bool initCurrent = false;	// 電流センサ初期化状況	false:初期化失敗	true:初期化成功
+static bool softreset = false;		// ソフトウェアリセット	false:リセット未実行	true:リセット実行
+uint8_t modeCurve = 0;		// カーブ判断			0:直線			1:カーブ進入
+uint8_t autoStart = 0;		// 5走を自動で開始する
 
 uint16_t analogVal1[NUM_SENSORS]; // ADC結果格納配列
 uint16_t analogVal2[4];			  // ADC結果格納配列
@@ -67,28 +68,30 @@ void initSystem(void)
 	HAL_StatusTypeDef resultHAL[10] = {};
 	bool statusGPIO = true;
 
-	// ADC
-	resultHAL[0] = HAL_ADC_Start_DMA(&hadc1, analogVal1, NUM_SENSORS);
-	resultHAL[1] = HAL_ADC_Start_DMA(&hadc2, analogVal2, 4);
+	// GPIO初期化 ソフトリセット中の場合は実行しない
+	if(!softreset)
+	{
+		// ADC
+		resultHAL[0] = HAL_ADC_Start_DMA(&hadc1, analogVal1, NUM_SENSORS);
+		resultHAL[1] = HAL_ADC_Start_DMA(&hadc2, analogVal2, 4);
 
-	// Encoder count
-	resultHAL[2] = HAL_TIM_Encoder_Start(&ENC_TIM_HANDLER_R, TIM_CHANNEL_ALL);
-	resultHAL[3] = HAL_TIM_Encoder_Start(&ENC_TIM_HANDLER_L, TIM_CHANNEL_ALL);
+		// Encoder count
+		resultHAL[2] = HAL_TIM_Encoder_Start(&ENC_TIM_HANDLER_R, TIM_CHANNEL_ALL);
+		resultHAL[3] = HAL_TIM_Encoder_Start(&ENC_TIM_HANDLER_L, TIM_CHANNEL_ALL);
 
-	// Motor driver
-	resultHAL[4] = HAL_TIM_PWM_Start(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_L);
-	resultHAL[5] = HAL_TIM_PWM_Start(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_R);
-	resultHAL[6] = HAL_TIM_PWM_Start(&MOTOR_TIM_HANDLER, MOTOR_SUCTION_TIM_CH);
+		// Motor driver
+		resultHAL[4] = HAL_TIM_PWM_Start(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_L);
+		resultHAL[5] = HAL_TIM_PWM_Start(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_R);
+		resultHAL[6] = HAL_TIM_PWM_Start(&MOTOR_TIM_HANDLER, MOTOR_SUCTION_TIM_CH);
 
-	__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_L, 0);
-	__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_R, 0);
-	__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_SUCTION_TIM_CH, 0);
+		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_L, 0);
+		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_R, 0);
+		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_SUCTION_TIM_CH, 0);
+		// line sensor PWM
+		resultHAL[7] = HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_3);
+	}
 	motorPwmOut(0, 0);
 	MotorFanPwmOut(0);
-
-	// line sensor PWM
-	resultHAL[7] = HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_3);
-
 	powerLineSensors(0);
 	powerMarkerSensors(0);
 
@@ -188,47 +191,48 @@ void initSystem(void)
 	}
 	sendLED();
 
-	// Timer interrupt
-	resultHAL[8] = HAL_TIM_Base_Start_IT(&htim6);
-	resultHAL[9] = HAL_TIM_Base_Start_IT(&htim7);
-
-	HAL_Delay(100);
-
-	// 各機能スタート時ののエラーチェック
-	ssd1306_SetCursor(0, 52);
-	uint8_t j = 0;
-	for (uint8_t i = 0; i < 10; i++)
+	//HAL各機能スタート時のエラーチェック
+	if(!softreset)
 	{
-		j += resultHAL[i];
-		if (j > 0)
+		// Timer interrupt
+		resultHAL[8] = HAL_TIM_Base_Start_IT(&htim6);
+		resultHAL[9] = HAL_TIM_Base_Start_IT(&htim7);
+
+		ssd1306_SetCursor(0, 52);
+		uint8_t j = 0;
+		for (uint8_t i = 0; i < 10; i++)
 		{
-			statusGPIO = false;
+			j += resultHAL[i];
+			if (j > 0)
+			{
+				statusGPIO = false;
+			}
 		}
-	}
-	if (statusGPIO)
-	{
-		setLED(3, 0, 50, 0); // 初期化 成功 緑点灯
+		if (statusGPIO)
+		{
+			setLED(3, 0, 50, 0); // 初期化 成功 緑点灯
+			if (modeDSP)
+			{
+				ssd1306_printf(Font_6x8, "GPIO    success");
+			}
+		}
+		else
+		{
+			setLED(3, 50, 0, 0); // 初期化 失敗 赤点灯
+			if (modeDSP)
+			{
+				ssd1306_printf(Font_6x8, "GPIO    failed");
+			}
+			Error_Handler();
+		}
 		if (modeDSP)
 		{
-			ssd1306_printf(Font_6x8, "GPIO    success");
+			SSD1306_DMA_Completed = 0;				// 全ページ送信完了フラグリセット
+			while(!ssd1306_IsTransferCompleted());	// 全ページ送信完了まで待つ
 		}
+		sendLED();
 	}
-	else
-	{
-		setLED(3, 50, 0, 0); // 初期化 失敗 赤点灯
-		if (modeDSP)
-		{
-			ssd1306_printf(Font_6x8, "GPIO    failed");
-		}
-		Error_Handler();
-	}
-	if (modeDSP)
-	{
-		SSD1306_DMA_Completed = 0;				// 全ページ送信完了フラグリセット
-		while(!ssd1306_IsTransferCompleted());	// 全ページ送信完了まで待つ
-	}
-	sendLED();
-
+	
 	HAL_Delay(1000);
 
 	// Sd card未挿入の警告
@@ -520,7 +524,6 @@ void loopSystem(void)
 				patternTrace = 101;
 			}
 		}
-
 		break;
 
         case 101:
@@ -543,11 +546,10 @@ void loopSystem(void)
 			{
 				patternTrace = 102;
 			}
-				
-
 		break;
 
 	case 102:
+		setTargetSpeed(0);
 		motorPwmOutSynth(0, 0, 0, 0);
 
 		ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
@@ -622,14 +624,14 @@ void loopSystem(void)
 				else
 				{
 					ssd1306_SetCursor(0, 25);
-					ssd1306_printf(Font_11x18, "Time %d", optimalTrace);
+					ssd1306_printf(Font_11x18, "Time");
 					ssd1306_SetCursor(0, 45);
 					ssd1306_printf(Font_11x18, "%6.3f[s]", (float)goalTime / 1000);
 				}
 			}
 		}
-		patternTrace = 103;
 
+		patternTrace = 103;
 		break;
 
 	case 103:
@@ -637,6 +639,17 @@ void loopSystem(void)
 		powerLineSensors(0);
 		powerMarkerSensors(0);
 
+		// リセット待ち
+		if(swValTact == SW_PUSH)
+		{
+			while(swValTact == SW_PUSH);	// スイッチが離されるまで待つ
+			softreset = true;				// ソフトウェアリセット実行
+			initSystem();			// 初期化処理実行
+			setupFlags.start= 0;	// スタートフラグクリア
+			autoStart = 0;			// 自動走行フラグクリア
+			SGmarker = 0;			// スタートマーカー通過フラグクリア
+			patternTrace = 0;
+		}
 		break;
 
 	default:
