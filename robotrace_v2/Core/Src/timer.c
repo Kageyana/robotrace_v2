@@ -238,9 +238,6 @@ void Interrupt1ms(void)
 		getMotorCurrent();
 		break;
 	case 2:
-		// if(initIMU) {
-		//     BMI088getTemp();
-		// }
 		break;
 	case 9:
 		break;

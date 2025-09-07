@@ -301,10 +301,8 @@ void loopSystem(void)
 			ssd1306_SetCursor(0, 25);
 			ssd1306_printf(Font_11x18, "Analizing");
 
-			initIMU = false;
 			numPPADarry = readLogDistance(fileNumbers[fileIndexLog]);
 			optimalIndex = 0;
-			initIMU = true;
 
 			countdown = 2000;							  // カウントダウンスタート
 			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
@@ -373,8 +371,6 @@ void loopSystem(void)
 			powerMarkerSensors(1); // マーカーセンサ点灯
 
 			// SDカードに変数保存
-			initIMU = false;
-
 			// PIDゲインを記録
 			if (autoStart == 0)
 			{
@@ -394,8 +390,6 @@ void loopSystem(void)
 			{
 				initLog(); // ログ一時ファイル作成
 			}
-
-			initIMU = true;
 
 			// 変数初期化
 			encRightMarker = encMM(1000);

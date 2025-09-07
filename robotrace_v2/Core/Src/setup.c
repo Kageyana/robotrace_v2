@@ -904,9 +904,7 @@ static void setup_calibration(void)
 
 			if (initMSD)
 			{
-				initIMU = false;
 				writeLinesenval(); // オフセット値をSDカードに書き込み
-				initIMU = true;
 			}
 			pattern.calibration = 1; // 最初の状態に戻る
 		}

@@ -449,7 +449,6 @@ void writeLogPrint(void)
 /////////////////////////////////////////////////////////////////////
 void endLog(void)
 {
-	initIMU = false; // IMUの使用を停止(SPIが競合するため)
 	modeLOG = false; // ログ取得停止
 	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY); // SPIバスが空くまで待つ
 
@@ -579,8 +578,6 @@ void endLog(void)
 #endif
 
 	f_mount(NULL,"",0); // SDカードをアンマウント
-
-	initIMU = true;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getFileNumbers
