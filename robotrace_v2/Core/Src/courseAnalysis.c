@@ -502,7 +502,7 @@ int16_t calcXYcies(int logNumber)
 			degz = degz + (angVelo * dt);			   	// 角度
 			degzR = degz * DEG2RAD;					   	// [rad]に変換
 			velocity = (float)velo / PALSE_MILLIMETER;	// 速度
-			distEnc += velo;
+			distEnc += velo * (time - beforeTime);		// 距離計測
 
 			// 座標計算
 			x = x + (velocity * sin(degzR));
