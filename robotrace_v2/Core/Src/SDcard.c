@@ -617,12 +617,27 @@ void getFileNumbers(void)
 			{
 				// csvファイルのとき
 				tp = strtok(fno.fname, ".");              // 拡張子削除
-				fileNumbers[endFileIndex] = atoi(tp); // 文字列を数値に変換
+				fileNumbers[endFileIndex] = atoi(tp);     // 文字列を数値に変換して保存
 				endFileIndex++;
 			}
 		} while (fno.fname[0] != 0); // ファイルの有無を確認
 
-		endFileIndex--;
+		// ファイル数を保存
+		int16_t fileCount = endFileIndex;
+		// バブルソートでファイル番号を昇順に並べ替え
+		for (int16_t i = 0; i < fileCount - 1; i++)
+		{
+			for (int16_t j = i + 1; j < fileCount; j++)
+			{
+				if (fileNumbers[i] > fileNumbers[j])
+				{
+					int16_t tmp = fileNumbers[i];
+					fileNumbers[i] = fileNumbers[j];
+					fileNumbers[j] = tmp; // 要素を交換
+				}
+			}
+		}
+		endFileIndex = fileCount - 1; // 最終インデックスを更新
 		fileIndexLog = endFileIndex;
 	}
 
