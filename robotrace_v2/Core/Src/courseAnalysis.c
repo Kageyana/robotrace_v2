@@ -558,7 +558,7 @@ int16_t calcXYcies(int logNumber)
 		// plotファイルに初期値記録
 		f_printf(&fil_Plot, "%d,%d,%d\n", (int32_t)(shortCutxycie[0].x * 10000), (int32_t)(shortCutxycie[0].y * 10000), (int32_t)(shortCutxycie[0].w * 10000));
 
-		for (i = 1; i <= indexSC; i++)
+		for (i = 1; i < indexSC; i++) // 配列の範囲外アクセスを防ぐ
 		{
 			xe = shortCutxycie[i].x - shortCutxycie[i - 1].x; // x座標の移動量
 			ye = shortCutxycie[i].y - shortCutxycie[i - 1].y; // y座標の移動量
