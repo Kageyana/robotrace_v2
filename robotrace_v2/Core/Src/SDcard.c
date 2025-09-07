@@ -591,12 +591,12 @@ void endLog(void)
 void getFileNumbers(void)
 {
 	DIR dir;         // Directory
-	FILINFO fno;     // File Info
+	FILINFO fno; // File Info
 	FRESULT fresult;
 	uint8_t fileName[10];
-	uint8_t *tp;
+	uint8_t *tp, i;
 
-	fresult = f_opendir(&dir, "/"); // directory open
+    fresult = f_opendir(&dir, "/"); // directory open
 	if (fresult == FR_OK)
 	{
 		do
@@ -606,34 +606,21 @@ void getFileNumbers(void)
 			{
 				// ディレクトリ読み込みに失敗した場合はループを抜けてフラグを設定
 				getFileNumbersError = true;
-					printf("f_readdir error: %d\r\n", fresult); // エラー内容を出力
+				printf("f_readdir error: %d\r\n", fresult); // エラー内容を出力
 				break;
 			}
 			if (strstr(fno.fname, ".csv") != NULL)
 			{
 				// csvファイルのとき
 				tp = strtok(fno.fname, ".");              // 拡張子削除
-				int16_t number = atoi(tp);                // 文字列を数値に変換
-				bool exists = false;                      // 重複チェック用フラグ
-				for (int16_t i = 0; i < endFileIndex; i++)
-				{
-					if (fileNumbers[i] == number)         // 既存番号と一致するか確認
-					{
-						exists = true;
-						break;
-					}
-				}
-				if (!exists)
-				{
-					fileNumbers[endFileIndex] = number; // 新しい番号を保存
-					endFileIndex++;
-				}
+				fileNumbers[endFileIndex] = atoi(tp);     // 文字列を数値に変換して保存
+				endFileIndex++;
 			}
 		} while (fno.fname[0] != 0); // ファイルの有無を確認
 
 		// ファイル数を保存
 		int16_t fileCount = endFileIndex;
-		// 取得した番号を昇順にソート
+		// バブルソートでファイル番号を昇順に並べ替え
 		for (int16_t i = 0; i < fileCount - 1; i++)
 		{
 			for (int16_t j = i + 1; j < fileCount; j++)
@@ -642,7 +629,7 @@ void getFileNumbers(void)
 				{
 					int16_t tmp = fileNumbers[i];
 					fileNumbers[i] = fileNumbers[j];
-					fileNumbers[j] = tmp;
+					fileNumbers[j] = tmp; // 要素を交換
 				}
 			}
 		}
@@ -652,7 +639,6 @@ void getFileNumbers(void)
 
 	f_closedir(&dir); // directory close
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setLogStr
 // 処理概要     ログCSVファイルのヘッダーとprintfのフォーマット文字列を生成
