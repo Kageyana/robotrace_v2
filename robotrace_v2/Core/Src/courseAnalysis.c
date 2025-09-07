@@ -441,7 +441,7 @@ int16_t readLogTest(int logNumber)
 int16_t calcXYcies(int logNumber)
 {
 	FIL fil_Read, fil_Plot;
-	FRESULT fresult1, fresult2;
+	FRESULT fresult1, fresult2, fresult3;
 	uint8_t fileName[10];
 	int16_t ret = 0;
 
@@ -449,10 +449,23 @@ int16_t calcXYcies(int logNumber)
 	snprintf(fileName, sizeof(fileName), "%d", logNumber);				// 数値を文字列に変換
 	strcat(fileName, ".csv");											// 拡張子を追加
 	fresult1 = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // ログファイルを開く
-	fresult1 = f_unlink("./plot/plot.csv");
-	fresult2 = f_open(&fil_Plot, "./plot/plot.csv", FA_OPEN_ALWAYS | FA_WRITE); // csvファイルを開く
+	if (fresult1 != FR_OK)
+	{
+		// ログファイルのオープンに失敗した場合はエラーを返す
+		ret = -5;       // ログファイルオープンエラー
+		return ret;
+	}
+	fresult2 = f_unlink('./plot/plot.csv');	// 既存プロットファイルを削除
+	fresult3 = f_open(&fil_Plot, './plot/plot.csv', FA_OPEN_ALWAYS | FA_WRITE); // csvファイルを開く
+	if (fresult3 != FR_OK)
+	{
+		// プロットファイルのオープンに失敗した場合はエラーを返す
+		f_close(&fil_Read);
+		ret = -6;       // プロットファイルオープンエラー
+		return ret;
+	}
 
-	if (fresult2 == FR_OK)
+	if (fresult3 == FR_OK)
 	{
 		// ログデータの取得
 		TCHAR log[512];
@@ -564,10 +577,6 @@ int16_t calcXYcies(int logNumber)
 		}
 
 		ret = indexSC;
-	}
-	else
-	{
-		ret = -1;
 	}
 
 	// ファイルクローズ
