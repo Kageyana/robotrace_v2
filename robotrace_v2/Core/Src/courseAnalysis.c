@@ -552,7 +552,7 @@ int16_t calcXYcies(int logNumber)
 
 		// ショートカット座標からyaw軸角度を計算
 		float xe = 0, ye = 0;
-		float theta = 0, thetaBefore = 90, thetae, tanc;
+		float theta = 0, thetaBefore = 90, thetae;
 
 		degz = 0;
 		// plotファイルに初期値記録
