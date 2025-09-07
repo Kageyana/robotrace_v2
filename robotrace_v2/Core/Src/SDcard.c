@@ -303,7 +303,7 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 
 	if (modeLOG)
 	{
-	uint16_t requiredSize = c + (s * sizeof(uint16_t)) + (i * sizeof(uint32_t)) + (f * sizeof(float)); // 引数数に応じたバッファ必要量を算出
+        uint16_t requiredSize = c + (s * sizeof(uint16_t)) + (i * sizeof(uint32_t)) + (f * sizeof(float)); // 引数数に応じたバッファ必要量を算出
 		// 	バッファ配列に保存
 		va_start(args, f);
 		// 8bitデータをバッファへ送る
@@ -360,7 +360,7 @@ void writeLogPuts(void)
 				return;
 			}
 			sendSD = false; // 書き込み完了フラグをクリア
-	}
+        }
     }
 }
 #endif
@@ -376,7 +376,7 @@ void writeLogBufferPrint(void)
 	if (modeLOG)
 	{
 		// バッファ上限チェック
-	if (logValIndex < BUFFER_SIZE_LOG) // 綴りの誤りを修正
+        if (logValIndex < BUFFER_SIZE_LOG) // 綴りの誤りを修正
 		{
 			logVal[logValIndex].time = cntLog;                        // ログ時刻を記録
 			logVal[logValIndex].speed = encCurrentN;                  // 現在速度を記録
@@ -425,7 +425,7 @@ void writeLogPrint(void)
 		}
 
 		// 文字列に変換
-	snprintf((char *)logStr, sizeof(logStr), (char *)formatLog, // バッファサイズを指定して安全に文字列化
+        snprintf((char *)logStr, sizeof(logStr), (char *)formatLog, // バッファサイズを指定して安全に文字列化
 			totalTime,
 			logVal[i].speed,
 			logVal[i].zg,
@@ -547,7 +547,7 @@ void endLog(void)
 		beforeTime = time; // 時間を更新
 
 		// 文字列に変換
-	snprintf((char *)logStr, sizeof(logStr), (char *)formatLog, // バッファサイズを指定して安全に文字列化
+        snprintf((char *)logStr, sizeof(logStr), (char *)formatLog, // バッファサイズを指定して安全に文字列化
 			time,
 			speed,
 			zg,
@@ -591,12 +591,12 @@ void endLog(void)
 void getFileNumbers(void)
 {
 	DIR dir;         // Directory
-	FILINFO fno; // File Info
+	FILINFO fno;     // File Info
 	FRESULT fresult;
 	uint8_t fileName[10];
 	uint8_t *tp;
 
-    fresult = f_opendir(&dir, "/"); // directory open
+	fresult = f_opendir(&dir, "/"); // directory open
 	if (fresult == FR_OK)
 	{
 		do
@@ -606,7 +606,7 @@ void getFileNumbers(void)
 			{
 				// ディレクトリ読み込みに失敗した場合はループを抜けてフラグを設定
 				getFileNumbersError = true;
-				printf("f_readdir error: %d\r\n", fresult); // エラー内容を出力
+					printf("f_readdir error: %d\r\n", fresult); // エラー内容を出力
 				break;
 			}
 			if (strstr(fno.fname, ".csv") != NULL)
@@ -617,7 +617,7 @@ void getFileNumbers(void)
 				bool exists = false;                      // 重複チェック用フラグ
 				for (int16_t i = 0; i < endFileIndex; i++)
 				{
-					if (fileNumbers[i] == number)
+					if (fileNumbers[i] == number)         // 既存番号と一致するか確認
 					{
 						exists = true;
 						break;
@@ -633,10 +633,13 @@ void getFileNumbers(void)
 
 		// ファイル数を保存
 		int16_t fileCount = endFileIndex;
-		// ファイル番号を昇順にソート（単純なバブルソート）
-		for (int16_t i = 0; i < fileCount - 1; i++) {
-			for (int16_t j = i + 1; j < fileCount; j++) {
-				if (fileNumbers[i] > fileNumbers[j]) {
+		// 取得した番号を昇順にソート
+		for (int16_t i = 0; i < fileCount - 1; i++)
+		{
+			for (int16_t j = i + 1; j < fileCount; j++)
+			{
+				if (fileNumbers[i] > fileNumbers[j])
+				{
 					int16_t tmp = fileNumbers[i];
 					fileNumbers[i] = fileNumbers[j];
 					fileNumbers[j] = tmp;
@@ -649,6 +652,7 @@ void getFileNumbers(void)
 
 	f_closedir(&dir); // directory close
 }
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setLogStr
 // 処理概要     ログCSVファイルのヘッダーとprintfのフォーマット文字列を生成
