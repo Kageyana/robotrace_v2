@@ -303,7 +303,7 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 
 	if (modeLOG)
 	{
-        uint16_t requiredSize = c + (s * sizeof(uint16_t)) + (i * sizeof(uint32_t)) + (f * sizeof(float)); // 引数数に応じたバッファ必要量を算出
+	uint16_t requiredSize = c + (s * sizeof(uint16_t)) + (i * sizeof(uint32_t)) + (f * sizeof(float)); // 引数数に応じたバッファ必要量を算出
 		// 	バッファ配列に保存
 		va_start(args, f);
 		// 8bitデータをバッファへ送る
@@ -360,7 +360,7 @@ void writeLogPuts(void)
 				return;
 			}
 			sendSD = false; // 書き込み完了フラグをクリア
-        }
+	}
     }
 }
 #endif
@@ -376,7 +376,7 @@ void writeLogBufferPrint(void)
 	if (modeLOG)
 	{
 		// バッファ上限チェック
-        if (logValIndex < BUFFER_SIZE_LOG) // 綴りの誤りを修正
+	if (logValIndex < BUFFER_SIZE_LOG) // 綴りの誤りを修正
 		{
 			logVal[logValIndex].time = cntLog;                        // ログ時刻を記録
 			logVal[logValIndex].speed = encCurrentN;                  // 現在速度を記録
@@ -425,7 +425,7 @@ void writeLogPrint(void)
 		}
 
 		// 文字列に変換
-        snprintf((char *)logStr, sizeof(logStr), (char *)formatLog, // バッファサイズを指定して安全に文字列化
+	snprintf((char *)logStr, sizeof(logStr), (char *)formatLog, // バッファサイズを指定して安全に文字列化
 			totalTime,
 			logVal[i].speed,
 			logVal[i].zg,
@@ -547,7 +547,7 @@ void endLog(void)
 		beforeTime = time; // 時間を更新
 
 		// 文字列に変換
-        snprintf((char *)logStr, sizeof(logStr), (char *)formatLog, // バッファサイズを指定して安全に文字列化
+	snprintf((char *)logStr, sizeof(logStr), (char *)formatLog, // バッファサイズを指定して安全に文字列化
 			time,
 			speed,
 			zg,
@@ -613,14 +613,27 @@ void getFileNumbers(void)
 			{
 				// csvファイルのとき
 				tp = strtok(fno.fname, ".");              // 拡張子削除
-				fileNumbers[endFileIndex] = atoi(tp); // 文字列を数値に変換
-				endFileIndex++;
+				int16_t number = atoi(tp);                // 文字列を数値に変換
+				bool exists = false;                      // 重複チェック用フラグ
+				for (int16_t i = 0; i < endFileIndex; i++)
+				{
+					if (fileNumbers[i] == number)
+					{
+						exists = true;
+						break;
+					}
+				}
+				if (!exists)
+				{
+					fileNumbers[endFileIndex] = number; // 新しい番号を保存
+					endFileIndex++;
+				}
 			}
 		} while (fno.fname[0] != 0); // ファイルの有無を確認
 
 		// ファイル数を保存
 		int16_t fileCount = endFileIndex;
-		// ファイル番号を昇順にソート
+		// ファイル番号を昇順にソート（単純なバブルソート）
 		for (int16_t i = 0; i < fileCount - 1; i++) {
 			for (int16_t j = i + 1; j < fileCount; j++) {
 				if (fileNumbers[i] > fileNumbers[j]) {
@@ -630,7 +643,7 @@ void getFileNumbers(void)
 				}
 			}
 		}
-		endFileIndex = fileCount - 1;
+		endFileIndex = fileCount - 1; // 最終インデックスを更新
 		fileIndexLog = endFileIndex;
 	}
 
