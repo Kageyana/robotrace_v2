@@ -144,6 +144,7 @@ int16_t readLogDistance(int logNumber)
 		// 構造体配列の初期化
 		memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
 
+		f_gets(log, sizeof(log), &fil_Read); // 1行目はヘッダなので読み飛ばす
 		// ログデータ取得開始
 		while (f_gets(log, sizeof(log), &fil_Read))
 		{
@@ -491,6 +492,8 @@ int16_t calcXYcies(int logNumber)
 
 		// plotファイルのヘッダ書き込み
 		f_printf(&fil_Plot, "xm,ym,degzm\n");
+		
+		f_gets(log, sizeof(log), &fil_Read); // 1行目はヘッダなので読み飛ばす
 
 		// ログデータ取得開始
 		while (f_gets(log, sizeof(log), &fil_Read) != NULL)
