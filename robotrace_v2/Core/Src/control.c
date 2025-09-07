@@ -653,6 +653,7 @@ void loopSystem(void)
 			SGmarker = 0;			// スタートマーカー通過フラグクリア
 			optimalTrace = 0;		// 2次走行モードクリア
 			pattern.display = HEX_START; // 16進表示モードクリア
+			pattern.beforeHex = 255;	// 16進表示モードクリア
 			encClick = 0;			// ホイールクリッククリア
 			patternTrace = 0;
 		}
