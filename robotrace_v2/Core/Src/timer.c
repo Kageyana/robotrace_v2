@@ -159,6 +159,8 @@ void Interrupt1ms(void)
 					cntRun,
 					encCurrentN,
 					optimalIndex,
+					motorpwmL,
+					motorpwmR,
 					(int16_t)(motorCurrentL * 10000),
 					(int16_t)(motorCurrentR * 10000),
 					lineTraceCtrl.pwm,
@@ -166,7 +168,8 @@ void Interrupt1ms(void)
 					// 32bit
 					encTotalOptimal,
 					// float型
-					BMI088val.gyro.z);
+					BMI088val.gyro.z
+				);
 #else
 				writeLogBufferPrint(); // バッファにログを保存
 #endif

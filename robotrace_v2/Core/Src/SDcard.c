@@ -206,6 +206,8 @@ void createLog(void)
 
 	setLogStr("targetSpeed", "%d");
 	setLogStr("optimalIndex", "%d");
+	setLogStr("motorpwmL", "%d");
+	setLogStr("motorpwmR", "%d");
 	setLogStr("CurrentL", "%f");
 	setLogStr("CurrentR", "%f");
 	setLogStr("lineTraceCtrl", "%d");
@@ -551,16 +553,19 @@ void endLog(void)
 			zg,
 			marker,
 			distance,
-			logvalf[1],
+			logvalf[1],		// ROC
 
-			logval8[0],
-			logval16[2],
-			(float)logval16[3] / 10000,
-			(float)logval16[4] / 10000,
-			(int16_t)logval16[5],
-			(int16_t)logval16[6],
-			logvalf[2],
-			logvalf[3]);
+			logval8[0],		// cntlog
+			logval16[2],	// optimalIndex
+			(int16_t)logval16[3],		// motorpwmL
+			(int16_t)logval16[4],		// motorpwmR
+			(float)logval16[5] / 10000,	// CurrentL
+			(float)logval16[6] / 10000,	// CurrentR
+			(int16_t)logval16[7],		// lineTraceCtrl
+			(int16_t)logval16[8],		// veloCtrl
+			logvalf[2],		// x
+			logvalf[3]		// y
+		);
 
 		// 文字列をSDカードに送信
 		f_puts(logStr, &fil_W);
