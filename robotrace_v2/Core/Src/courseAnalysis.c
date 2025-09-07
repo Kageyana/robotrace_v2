@@ -465,139 +465,137 @@ int16_t calcXYcies(int logNumber)
 		return ret;
 	}
 
-	if (fresult2 == FR_OK)
+	// プロットファイルが開けたので解析を開始
+	// ログデータの取得
+	TCHAR log[512];
+	uint8_t plotStr[128];
+	int32_t time, marker, velo, distance;
+	float angVelo;
+	int32_t beforeTime = 0, startEnc = 0, distEnc = 0;
+	float degz = 0, degzR, velocity = 0, dt;
+	float x = 0, y = 0, xm = 0, ym = 0, degzm = 0;
+	float xValues[SHORTCUTWINDOW], yValues[SHORTCUTWINDOW], degzValues[SHORTCUTWINDOW];
+	int16_t i = 0, j = 0;
+
+	// 配列の初期化
+	memset(&xValues, 0, sizeof(float) * SHORTCUTWINDOW);
+	memset(&yValues, 0, sizeof(float) * SHORTCUTWINDOW);
+	memset(&degzValues, 0, sizeof(float) * SHORTCUTWINDOW);
+	indexSC = 0;
+
+	// ショートカット軌跡初期値の設定
+	shortCutxycie[indexSC].x = 0;
+	shortCutxycie[indexSC].y = 0;
+	shortCutxycie[indexSC].w = 0;
+	indexSC++;
+
+	// plotファイルのヘッダ書き込み
+	f_printf(&fil_Plot, "xm,ym,degzm\n");
+	
+	f_gets(log, sizeof(log), &fil_Read); // 1行目はヘッダなので読み飛ばす
+
+	// ログデータ取得開始
+	while (f_gets(log, sizeof(log), &fil_Read) != NULL)
 	{
-		// ログデータの取得
-		TCHAR log[512];
-		uint8_t plotStr[128];
-		int32_t time, marker, velo, distance;
-		float angVelo;
-		int32_t beforeTime = 0, startEnc = 0, distEnc = 0;
-		float degz = 0, degzR, velocity = 0, dt;
-		float x = 0, y = 0, xm = 0, ym = 0, degzm = 0;
-		float xValues[SHORTCUTWINDOW], yValues[SHORTCUTWINDOW], degzValues[SHORTCUTWINDOW];
-		int16_t i = 0, j = 0;
+		sscanf(log, "%d,%d,%f,%d,%d", &time, &velo, &angVelo, &marker, &distance);
 
-		// 配列の初期化
-		memset(&xValues, 0, sizeof(float) * SHORTCUTWINDOW);
-		memset(&yValues, 0, sizeof(float) * SHORTCUTWINDOW);
-		memset(&degzValues, 0, sizeof(float) * SHORTCUTWINDOW);
-		indexSC = 0;
+		dt = (float)(time - beforeTime) / 1000;		// 時間[s]
 
-		// ショートカット軌跡初期値の設定
-		shortCutxycie[indexSC].x = 0;
-		shortCutxycie[indexSC].y = 0;
-		shortCutxycie[indexSC].w = 0;
-		indexSC++;
+		degz = degz + (angVelo * dt);			   	// 角度
+		degzR = degz * DEG2RAD;					   	// [rad]に変換
+		velocity = (float)velo / PALSE_MILLIMETER;	// 速度
+		distEnc += velo * (time - beforeTime);		// 距離計測
 
-		// plotファイルのヘッダ書き込み
-		f_printf(&fil_Plot, "xm,ym,degzm\n");
-		
-		f_gets(log, sizeof(log), &fil_Read); // 1行目はヘッダなので読み飛ばす
+		// 座標計算
+		x = x + (velocity * sin(degzR));
+		y = y + (velocity * cos(degzR));
 
-		// ログデータ取得開始
-		while (f_gets(log, sizeof(log), &fil_Read) != NULL)
+		// リングバッファに座標を保存
+		xValues[i & (SHORTCUTWINDOW - 1)] = x;
+		yValues[i & (SHORTCUTWINDOW - 1)] = y;
+		degzValues[i & (SHORTCUTWINDOW - 1)] = degz;
+
+		// リングバッファの総和計算前に初期化
+		xm = ym = degzm = 0.0f; // 各周回で正しい平均値を得るためリセット
+		// リングバッファの総和を計算
+		for (j = 0; j < SHORTCUTWINDOW; j++)
 		{
-			sscanf(log, "%d,%d,%f,%d,%d", &time, &velo, &angVelo, &marker, &distance);
-
-			dt = (float)(time - beforeTime) / 1000;		// 時間[s]
-
-			degz = degz + (angVelo * dt);			   	// 角度
-			degzR = degz * DEG2RAD;					   	// [rad]に変換
-			velocity = (float)velo / PALSE_MILLIMETER;	// 速度
-			distEnc += velo * (time - beforeTime);		// 距離計測
-
-			// 座標計算
-			x = x + (velocity * sin(degzR));
-			y = y + (velocity * cos(degzR));
-
-			// リングバッファに座標を保存
-			xValues[i & (SHORTCUTWINDOW - 1)] = x;
-			yValues[i & (SHORTCUTWINDOW - 1)] = y;
-			degzValues[i & (SHORTCUTWINDOW - 1)] = degz;
-
-			// リングバッファの総和計算前に初期化
-			xm = ym = degzm = 0.0f; // 各周回で正しい平均値を得るためリセット
-			// リングバッファの総和を計算
-			for (j = 0; j < SHORTCUTWINDOW; j++)
-			{
-				xm += xValues[j];
-				ym += yValues[j];
-				degzm += degzValues[j];
-			}
-
-			// 移動平均を計算(ショートカット座標)
-			xm /= SHORTCUTWINDOW;
-			ym /= SHORTCUTWINDOW;
-			degzm /= SHORTCUTWINDOW;
-			if (distEnc - startEnc >= encMM(CALCDISTANCE_SHORTCUT))
-			{
-				// バッファ上限に達していないか確認
-				if (indexSC < OPT_SHORT_BUFF_SIZE)
-				{
-					shortCutxycie[indexSC].x = xm;
-					shortCutxycie[indexSC].y = ym;
-					startEnc = distEnc; // 距離計測開始位置を更新
-					indexSC++; // バッファの次の位置へ
-				}
-				else
-				{
-					// 上限超過: エラー番号-7を設定しループを終了
-					ret = -7;
-					break;
-				}
-			}
-
-			i++;
-			beforeTime = time;
+			xm += xValues[j];
+			ym += yValues[j];
+			degzm += degzValues[j];
 		}
 
-		// ショートカット座標からyaw軸角度を計算
-		float xe = 0, ye = 0;
-		float theta = 0, thetaBefore = 90, thetae;
-
-		degz = 0;
-		// plotファイルに初期値記録
-		f_printf(&fil_Plot, "%d,%d,%d\n", (int32_t)(shortCutxycie[0].x * 10000), (int32_t)(shortCutxycie[0].y * 10000), (int32_t)(shortCutxycie[0].w * 10000));
-
-		for (i = 1; i < indexSC; i++)
+		// 移動平均を計算(ショートカット座標)
+		xm /= SHORTCUTWINDOW;
+		ym /= SHORTCUTWINDOW;
+		degzm /= SHORTCUTWINDOW;
+		if (distEnc - startEnc >= encMM(CALCDISTANCE_SHORTCUT))
 		{
-			xe = shortCutxycie[i].x - shortCutxycie[i - 1].x; // x座標の移動量
-			ye = shortCutxycie[i].y - shortCutxycie[i - 1].y; // y座標の移動量
-
-			theta = atan2(ye, xe) * RAD2DEG; // [deg]に変換
-
-			// 2直線のなす角を計算
-			thetae = thetaBefore - theta;
-			if (thetae > 180)
+			// バッファ上限に達していないか確認
+			if (indexSC < OPT_SHORT_BUFF_SIZE)
 			{
-				thetae -= 360;
+				shortCutxycie[indexSC].x = xm;
+				shortCutxycie[indexSC].y = ym;
+				startEnc = distEnc; // 距離計測開始位置を更新
+				indexSC++; // バッファの次の位置へ
 			}
-			else if (thetae < -180)
+			else
 			{
-				thetae += 360;
-			}
-			degz += thetae;
-
-			shortCutxycie[i].w = degz; // yaw軸角度
-			// plotファイルに書き込み
-			int snlen = snprintf((char *)plotStr, sizeof(plotStr), "%f,%f,%f\n", shortCutxycie[i].x, shortCutxycie[i].y, shortCutxycie[i].w); // 戻り値で書き込み長を確認
-			if (snlen < 0 || snlen >= sizeof(plotStr))
-			{
-				// snprintfが失敗した場合やバッファが不足した場合はエラー番号-8を設定して処理を中断する
-				ret = -8;
+				// 上限超過: エラー番号-7を設定しループを終了
+				ret = -7;
 				break;
 			}
-			f_puts((TCHAR *)plotStr, &fil_Plot);
-			
-			thetaBefore = theta; // 前回のyaw軸角度を更新
 		}
 
-		if (ret >= 0)
+		i++;
+		beforeTime = time;
+	}
+
+	// ショートカット座標からyaw軸角度を計算
+	float xe = 0, ye = 0;
+	float theta = 0, thetaBefore = 90, thetae;
+
+	degz = 0;
+	// plotファイルに初期値記録
+	f_printf(&fil_Plot, "%d,%d,%d\n", (int32_t)(shortCutxycie[0].x * 10000), (int32_t)(shortCutxycie[0].y * 10000), (int32_t)(shortCutxycie[0].w * 10000));
+
+	for (i = 1; i < indexSC; i++)
+	{
+		xe = shortCutxycie[i].x - shortCutxycie[i - 1].x; // x座標の移動量
+		ye = shortCutxycie[i].y - shortCutxycie[i - 1].y; // y座標の移動量
+
+		theta = atan2(ye, xe) * RAD2DEG; // [deg]に変換
+
+		// 2直線のなす角を計算
+		thetae = thetaBefore - theta;
+		if (thetae > 180)
 		{
-			// ループ内でエラーがなければ解析した要素数を返す
-			ret = indexSC;
+			thetae -= 360;
 		}
+		else if (thetae < -180)
+		{
+			thetae += 360;
+		}
+		degz += thetae;
+
+		shortCutxycie[i].w = degz; // yaw軸角度
+		// plotファイルに書き込み
+		int snlen = snprintf((char *)plotStr, sizeof(plotStr), "%f,%f,%f\n", shortCutxycie[i].x, shortCutxycie[i].y, shortCutxycie[i].w); // 戻り値で書き込み長を確認
+		if (snlen < 0 || snlen >= sizeof(plotStr))
+		{
+			// snprintfが失敗した場合やバッファが不足した場合はエラー番号-8を設定して処理を中断する
+			ret = -8;
+			break;
+		}
+		f_puts((TCHAR *)plotStr, &fil_Plot);
+		
+		thetaBefore = theta; // 前回のyaw軸角度を更新
+	}
+
+	if (ret >= 0)
+	{
+		// ループ内でエラーがなければ解析した要素数を返す
+		ret = indexSC;
 	}
 
 	// ファイルクローズ
