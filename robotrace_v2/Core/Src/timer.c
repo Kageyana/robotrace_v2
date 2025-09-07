@@ -7,6 +7,7 @@
 //====================================//
 int32_t cnt5 = 0;
 int32_t cnt10 = 0;
+int32_t encPulse5ms = 0; // 5ms間のエンコーダパルスを累積
 float bootTime;
 static volatile bool logWriteReq = false;
 /////////////////////////////////////////////////////////////////////
@@ -29,9 +30,10 @@ void Interrupt1ms(void)
 	resetCycleCounter();
 	bootTime = getTimeMs(freqCount);
 
-	// Encoder
-	getEncoder();
-	setEncoderVal();
+       // Encoder
+       getEncoder();
+       setEncoderVal();
+       encPulse5ms += encCurrentN; // 5ms間のエンコーダパルスを累積
 
 	// PID制御処理
 	motorControlTrace();
@@ -178,30 +180,31 @@ void Interrupt1ms(void)
 
 	switch (cnt5)
 	{
-	case 1:
-		// xy座標計算
-		// // ショートカット走行の目標値インデックスを更新
-		if (optimalTrace == BOOST_SHORTCUT && DistanceOptimal > 0)
-		{
-			calcXYcie(encCurrentN, BMI088val.gyro.z, DEFF_TIME);
-			// distLen = (float)encCurrentN * PALSE_MILLIMETER * 0.005; // 現在速度から5ms後の移動距離を計算
-			optimalIndex = (int32_t)(encTotalOptimal / PALSE_MILLIMETER) / CALCDISTANCE_SHORTCUT; // 50mmごとにショートカット配列を作っているので移動距離[mm]を50mmで割った商がインデクス
-			if (optimalIndex + 1 <= numPPADarry)
-			{
-				optimalIndex++;
-			}
+        case 1:
+               // xy座標計算
+               // // ショートカット走行の目標値インデックスを更新
+               if (optimalTrace == BOOST_SHORTCUT && DistanceOptimal > 0)
+               {
+                       calcXYcie(encPulse5ms, BMI088val.gyro.z, DEFF_TIME); // 累積パルスを使用してxy座標計算
+                       // distLen = (float)encCurrentN * PALSE_MILLIMETER * 0.005; // 現在速度から5ms後の移動距離を計算
+                       optimalIndex = (int32_t)(encTotalOptimal / PALSE_MILLIMETER) / CALCDISTANCE_SHORTCUT; // 50mmごとにショートカット配列を作っているので移動距離[mm]を50mmで割った商がインデクス
+                       if (optimalIndex + 1 <= numPPADarry)
+                       {
+                               optimalIndex++;
+                       }
 
-			if (targetDist - encPID < 200)
-			{
-				if (optimalIndex + 1 <= numPPADarry)
-				{
-					optimalIndex++;
-				}
-			}
+                       if (targetDist - encPID < 200)
+                       {
+                               if (optimalIndex + 1 <= numPPADarry)
+                               {
+                                       optimalIndex++;
+                               }
+                       }
 
-			setShortCutTarget(); // 目標値更新
-		}
-		break;
+                       setShortCutTarget(); // 目標値更新
+               }
+               encPulse5ms = 0; // 累積値をリセット
+               break;
 	case 2:
 		if (initIMU)
 		{
