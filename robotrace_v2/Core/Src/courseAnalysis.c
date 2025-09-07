@@ -555,15 +555,24 @@ int16_t calcXYcies(int logNumber)
 			degz += thetae;
 
 			shortCutxycie[i].w = degz; // yaw軸角度
-
-			// plotファイルに書き込み
-			sprintf(plotStr,"%f,%f,%f\n",shortCutxycie[i].x,shortCutxycie[i].y,shortCutxycie[i].w);
-			f_puts(plotStr, &fil_Plot);
+				// plotファイルに書き込み
+				int snlen = snprintf((char *)plotStr, sizeof(plotStr), "%f,%f,%f\n", shortCutxycie[i].x, shortCutxycie[i].y, shortCutxycie[i].w); // 戻り値で書き込み長を確認
+				if (snlen < 0 || snlen >= sizeof(plotStr))
+{
+					// snprintfが失敗した場合やバッファが不足した場合はエラー番号-8を設定して処理を中断する
+					ret = -8;
+					break;
+			}
+				f_puts((TCHAR *)plotStr, &fil_Plot);
 			
 			thetaBefore = theta; // 前回のyaw軸角度を更新
 		}
 
-		ret = indexSC;
+			if (ret >= 0)
+			{
+				// ループ内でエラーがなければ解析した要素数を返す
+				ret = indexSC;
+			}
 	}
 	else
 	{
