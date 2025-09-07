@@ -441,7 +441,7 @@ int16_t readLogTest(int logNumber)
 int16_t calcXYcies(int logNumber)
 {
 	FIL fil_Read, fil_Plot;
-	FRESULT fresult1, fresult2, fresult3;
+	FRESULT fresult1, fresult2;
 	uint8_t fileName[10];
 	int16_t ret = 0;
 
@@ -455,9 +455,8 @@ int16_t calcXYcies(int logNumber)
 		ret = -5;       // ログファイルオープンエラー
 		return ret;
 	}
-	fresult2 = f_unlink('./plot/plot.csv');	// 既存プロットファイルを削除
-	fresult3 = f_open(&fil_Plot, './plot/plot.csv', FA_OPEN_ALWAYS | FA_WRITE); // csvファイルを開く
-	if (fresult3 != FR_OK)
+	fresult2 = f_open(&fil_Plot, "./plot/plot.csv", FA_CREATE_ALWAYS | FA_WRITE); // csvファイルを開く
+	if (fresult2 != FR_OK)
 	{
 		// プロットファイルのオープンに失敗した場合はエラーを返す
 		f_close(&fil_Read);
@@ -465,7 +464,7 @@ int16_t calcXYcies(int logNumber)
 		return ret;
 	}
 
-	if (fresult3 == FR_OK)
+	if (fresult2 == FR_OK)
 	{
 		// ログデータの取得
 		TCHAR log[512];
@@ -558,7 +557,7 @@ int16_t calcXYcies(int logNumber)
 		// plotファイルに初期値記録
 		f_printf(&fil_Plot, "%d,%d,%d\n", (int32_t)(shortCutxycie[0].x * 10000), (int32_t)(shortCutxycie[0].y * 10000), (int32_t)(shortCutxycie[0].w * 10000));
 
-		for (i = 1; i < indexSC; i++) // 配列の範囲外アクセスを防ぐ
+		for (i = 1; i < indexSC; i++)
 		{
 			xe = shortCutxycie[i].x - shortCutxycie[i - 1].x; // x座標の移動量
 			ye = shortCutxycie[i].y - shortCutxycie[i - 1].y; // y座標の移動量
@@ -578,24 +577,24 @@ int16_t calcXYcies(int logNumber)
 			degz += thetae;
 
 			shortCutxycie[i].w = degz; // yaw軸角度
-				// plotファイルに書き込み
-				int snlen = snprintf((char *)plotStr, sizeof(plotStr), "%f,%f,%f\n", shortCutxycie[i].x, shortCutxycie[i].y, shortCutxycie[i].w); // 戻り値で書き込み長を確認
-				if (snlen < 0 || snlen >= sizeof(plotStr))
-{
-					// snprintfが失敗した場合やバッファが不足した場合はエラー番号-8を設定して処理を中断する
-					ret = -8;
-					break;
+			// plotファイルに書き込み
+			int snlen = snprintf((char *)plotStr, sizeof(plotStr), "%f,%f,%f\n", shortCutxycie[i].x, shortCutxycie[i].y, shortCutxycie[i].w); // 戻り値で書き込み長を確認
+			if (snlen < 0 || snlen >= sizeof(plotStr))
+			{
+				// snprintfが失敗した場合やバッファが不足した場合はエラー番号-8を設定して処理を中断する
+				ret = -8;
+				break;
 			}
-				f_puts((TCHAR *)plotStr, &fil_Plot);
+			f_puts((TCHAR *)plotStr, &fil_Plot);
 			
 			thetaBefore = theta; // 前回のyaw軸角度を更新
 		}
 
-			if (ret >= 0)
-			{
-				// ループ内でエラーがなければ解析した要素数を返す
-				ret = indexSC;
-			}
+		if (ret >= 0)
+		{
+			// ループ内でエラーがなければ解析した要素数を返す
+			ret = indexSC;
+		}
 	}
 
 	// ファイルクローズ
