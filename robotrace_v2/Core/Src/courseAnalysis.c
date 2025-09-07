@@ -673,7 +673,8 @@ void processMarkerEvent(void) {
 		cntMarker++; // マーカーカウント
 		if (optimalTrace == BOOST_DISTANCE) {
 			if (straightState) {
-				// 距離基準2次走行のとき
+				// 距離基準2次走行かつストレート区間中のとき
+				
 				int32_t i, j, errorDistance = 0;
 				for (i = pathedMarker; i <= numPPAMarry; i++) {
 					// 現在地から一番近いマーカーを探す
@@ -695,14 +696,22 @@ void processMarkerEvent(void) {
 							}
 						}
 						if (errorDistance != 0)
+						{
 							break;
+						}
 					}
 				}
 			}
+		} else if(optimalTrace == BOOST_SHORTCUT) {
+			// ショートカット基準2次走行のとき
+			
 		}
+
 		// マーカーの位置を記録
 		if (courseMarker == 0 && beforeCourseMarker > 0) {
 			writeMarkerPos(encTotalOptimal, beforeCourseMarker);
 		}
+
 		beforeCourseMarker = courseMarker; // 前回のマーカー状態を更新
 	}
+}
