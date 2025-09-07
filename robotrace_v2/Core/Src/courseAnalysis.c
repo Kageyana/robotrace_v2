@@ -604,12 +604,16 @@ int16_t calcXYcies(int logNumber)
 	f_close(&fil_Read);
 	f_close(&fil_Plot);
 
-	// 解析済みのログ番号を保存
-	saveLogNumber(logNumber);
-	analizedNumber = logNumber;
+	// エラー時にはログ番号保存やフラグ設定をスキップする
+	if (ret >= 0)
+	{
+		// 解析済みのログ番号を保存
+		saveLogNumber(logNumber);
+		analizedNumber = logNumber;
 
-	// 2次走行フラグ 距離基準2次走行
-	optimalTrace = BOOST_SHORTCUT;
+		// 2次走行フラグ 距離基準2次走行
+		optimalTrace = BOOST_SHORTCUT;
+	}
 
 	return ret;
 }
