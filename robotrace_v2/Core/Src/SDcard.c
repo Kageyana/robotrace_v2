@@ -594,7 +594,7 @@ void getFileNumbers(void)
 	FILINFO fno; // File Info
 	FRESULT fresult;
 	uint8_t fileName[10];
-	uint8_t *tp, i;
+	uint8_t *tp;
 
     fresult = f_opendir(&dir, "/"); // directory open
 	if (fresult == FR_OK)
@@ -618,7 +618,19 @@ void getFileNumbers(void)
 			}
 		} while (fno.fname[0] != 0); // ファイルの有無を確認
 
-		endFileIndex--;
+		// ファイル数を保存
+		int16_t fileCount = endFileIndex;
+		// ファイル番号を昇順にソート
+		for (int16_t i = 0; i < fileCount - 1; i++) {
+			for (int16_t j = i + 1; j < fileCount; j++) {
+				if (fileNumbers[i] > fileNumbers[j]) {
+					int16_t tmp = fileNumbers[i];
+					fileNumbers[i] = fileNumbers[j];
+					fileNumbers[j] = tmp;
+				}
+			}
+		}
+		endFileIndex = fileCount - 1;
 		fileIndexLog = endFileIndex;
 	}
 
