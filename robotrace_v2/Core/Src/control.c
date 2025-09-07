@@ -131,7 +131,8 @@ void initSystem(void)
 		initMSD = initMicroSD();
 		if (initMSD)
 		{
-			getLogNumber(); // 前回の解析ログナンバーを取得
+			getFileNumbers();	// 走行ログのファイル番号を取得
+			getLogNumber();		// 前回の解析ログナンバーを取得
 
 			// 前回のPIDゲインを取得
 			readPIDparameters(&lineTraceCtrl);
@@ -255,6 +256,8 @@ void initSystem(void)
 	initCycleCounter();
 	resetCycleCounter();
 	enableCycleCounter(); // カウント開始
+
+	encClick = 0; // ホイールクリッククリア
 
 	printf("hello \n");
 }
@@ -648,6 +651,9 @@ void loopSystem(void)
 			setupFlags.start= 0;	// スタートフラグクリア
 			autoStart = 0;			// 自動走行フラグクリア
 			SGmarker = 0;			// スタートマーカー通過フラグクリア
+			optimalTrace = 0;		// 2次走行モードクリア
+			pattern.display = HEX_START; // 16進表示モードクリア
+			encClick = 0;			// ホイールクリッククリア
 			patternTrace = 0;
 		}
 		break;

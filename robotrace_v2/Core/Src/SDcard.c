@@ -52,7 +52,7 @@ uint16_t markerValIndex = 0;
 bool markerOverflow = false; // マーカーバッファ上限超過フラグ
 
 // ログファイルナンバー
-int16_t fileNumbers[1000];
+int16_t fileNumbers[FILENUMBER_NUM];
 int16_t fileIndexLog = 0; // 現在使用しているログ番号
 int16_t endFileIndex = 0; // ログの最終番号
 
@@ -112,8 +112,6 @@ bool initMicroSD(void)
 		printf("SD_SIZE: \t%lu\r\n", total);
 		free_space = (uint32_t)(fre_clust * pfs->csize * 0.5); // empty capacity
 		printf("SD free space: \t%lu\r\n", free_space);
-
-		getFileNumbers();
 
 		// ディレクトリを作成
 		createDir("setting");
@@ -580,6 +578,8 @@ void endLog(void)
 	f_close(&fil_W);
 #endif
 
+	f_mount(NULL,"",0); // SDカードをアンマウント
+
 	initIMU = true;
 }
 /////////////////////////////////////////////////////////////////////
@@ -595,6 +595,10 @@ void getFileNumbers(void)
 	FRESULT fresult;
 	uint8_t fileName[10];
 	uint8_t *tp, i;
+
+	for(uint16_t j=0;j<FILENUMBER_NUM;j++){
+		fileNumbers[j] = 0; // 配列を初期化
+	}
 
     fresult = f_opendir(&dir, "/"); // directory open
 	if (fresult == FR_OK)

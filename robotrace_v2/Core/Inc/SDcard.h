@@ -21,7 +21,8 @@
 #define BUFFER_SIZE_LOG 5000 // 綴りの誤りを修正
 #endif
 
-#define BUFFER_SIZE_MARKER 500 // 綴りの誤りを修正
+#define BUFFER_SIZE_MARKER 500
+#define FILENUMBER_NUM 1000		// ログファイルナンバーの上限
 
 #define PATH_SETTING "./setting/"
 
