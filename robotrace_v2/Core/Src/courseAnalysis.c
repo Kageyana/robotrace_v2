@@ -530,10 +530,20 @@ int16_t calcXYcies(int logNumber)
 			degzm /= SHORTCUTWINDOW;
 			if (distEnc - startEnc >= encMM(CALCDISTANCE_SHORTCUT))
 			{
-				shortCutxycie[indexSC].x = xm;
-				shortCutxycie[indexSC].y = ym;
-				startEnc = distEnc; // 距離計測開始位置を更新
-				indexSC++;
+				// バッファ上限に達していないか確認
+				if (indexSC < OPT_SHORT_BUFF_SIZE)
+				{
+					shortCutxycie[indexSC].x = xm;
+					shortCutxycie[indexSC].y = ym;
+					startEnc = distEnc; // 距離計測開始位置を更新
+					indexSC++; // バッファの次の位置へ
+				}
+				else
+				{
+					// 上限超過: エラー番号-7を設定しループを終了
+					ret = -7;
+					break;
+				}
 			}
 
 			i++;
