@@ -17,7 +17,7 @@
 #define GYROLSB 16.384F
 #define MAGPLSB 16.0F
 
-#define DEFF_TIME 0.005F
+#define DEFF_TIME 0.001F
 #define COEFF_DPD -1.00F
 #define COEFF_COMPFILTER 0.96F
 #define IMU_TRANSMIT true
@@ -33,6 +33,7 @@
 #define REG_RATE_Z_MSB 0x07
 #define REG_GYRO_BANDWISTH 0x10
 #define REG_GYRO_SOFTRESET 0x14
+#define REG_GYRO_RANGE 0x0F
 
 #define REG_ACC_CHIP_ID 0x00
 #define REG_ACC_X_LSB 0x12
@@ -42,6 +43,8 @@
 #define REG_ACC_SOFTRESET 0x7E
 
 #define REG_TEMP_MSB 0x22
+
+// #define USE_ACCELE	// 加速度センサ使用
 
 /***************************************自動生成関数*************************************/
 #define SPI_Handle_IMU hspi2

@@ -38,7 +38,23 @@ void Interrupt1ms(void)
 	motorControlSpeed();
 	motorControldist();
 
-	
+	// IMU処理
+	if (initIMU)
+	{
+		if (!calibratIMU)
+		{
+			BMI088getGyro();	// 角速度取得
+			calcDegrees();	// コンプリメンタリフィルタで角度算出
+			if (optimalTrace == 0)
+				checkCurve();	   // 1次走行 カーブ検出
+			motorControlYawRate(); // 角速度制御
+			motorControlYaw();	   // 角度制御
+		}
+		else
+		{
+			calibrationIMU();
+		}
+	}
 
 	// 走行中に処理
 	if (patternTrace > 10 && patternTrace < 100)
@@ -210,18 +226,8 @@ void Interrupt1ms(void)
 		{
 			if (!calibratIMU)
 			{
-				BMI088getGyro();	// 角速度取得
 				BMI088getAccele();	// 加速度取得（角度補正に使用）
 				BMI088getTemp(); 	// 温度取得
-				calcDegrees();	// コンプリメンタリフィルタで角度算出
-				if (optimalTrace == 0)
-					checkCurve();	   // 1次走行 カーブ検出
-				motorControlYawRate(); // 角速度制御
-				motorControlYaw();	   // 角度制御
-			}
-			else
-			{
-				calibrationIMU();
 			}
 		}
 		break;

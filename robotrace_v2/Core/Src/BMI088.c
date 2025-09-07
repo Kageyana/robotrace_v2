@@ -109,8 +109,6 @@ bool initBMI088(void)
 	BMI088readByte(ACCELE, REG_ACC_CHIP_ID); // 加速度センサSPIモードに切り替え(SPIダミーリード)
 	HAL_Delay(100);
 	BMI088val.Aid = BMI088readByte(ACCELE, REG_ACC_CHIP_ID); // ノーマルモード移行前にチップIDを読む
-	// BMI088val.Aid = BMI088readByte(ACCELE, REG_ACC_CHIP_ID); // ノーマルモード移行前にチップIDを読む
-
 	BMI088val.Gid = BMI088readByte(GYRO, REG_GYRO_CHIP_ID);
 	
 	if (BMI088val.Gid == 0x0f || BMI088val.Aid == 0x1e)
@@ -126,7 +124,8 @@ bool initBMI088(void)
 		// ジャイロ
 		BMI088writeByte(GYRO, REG_GYRO_SOFTRESET, 0xB6); // ソフトウェアリセット
 		HAL_Delay(100);
-		BMI088writeByte(GYRO, REG_GYRO_BANDWISTH, 0x06); // ODRを200Hz バンドフィルタ64Hzに設定
+		BMI088writeByte(GYRO, REG_GYRO_BANDWISTH, 0x02); // ODRを1kHz バンドフィルタ116Hzに設定
+		BMI088writeByte(GYRO, REG_GYRO_RANGE, 0x00);	// レンジを2000dpsに設定
 
 		BMI088val.Initialized = 1;
 
@@ -171,6 +170,7 @@ void BMI088getGyro(void)
 /////////////////////////////////////////////////////////////////////
 void BMI088getAccele(void)
 {
+#ifdef USE_ACCELE
 	if(!BMI088val.Initialized)
 	{
 		return;
@@ -189,6 +189,7 @@ void BMI088getAccele(void)
 	BMI088val.accele.x = (float)accelVal[0] / ACCELELSB; // x軸加速度[g]
 	BMI088val.accele.y = (float)accelVal[1] / ACCELELSB; // y軸加速度[g]
 	BMI088val.accele.z = (float)accelVal[2] / ACCELELSB; // z軸加速度[g]
+#endif
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 BMI088getTemp
@@ -238,6 +239,7 @@ void calcDegrees(void)
     BMI088val.angle.y += BMI088val.gyro.y * DEFF_TIME;  // roll
     BMI088val.angle.z += BMI088val.gyro.z * DEFF_TIME;  // yaw（補正しない）
 
+#ifdef USE_ACCELE
     // 加速度からのピッチ・ロール角算出 度数法
     volatile float pitchAccele = atan2f(BMI088val.accele.y, BMI088val.accele.z) * 180.0f / M_PI;
     volatile float rollAccele = atan2f(BMI088val.accele.x,sqrtf(BMI088val.accele.y * BMI088val.accele.y +BMI088val.accele.z * BMI088val.accele.z)) * 180.0f / M_PI;
@@ -245,6 +247,7 @@ void calcDegrees(void)
     // 相補フィルタでドリフト補正
     BMI088val.angle.x = COEFF_COMPFILTER * BMI088val.angle.x + (1.0f - COEFF_COMPFILTER) * pitchAccele;
     BMI088val.angle.y = COEFF_COMPFILTER * BMI088val.angle.y + (1.0f - COEFF_COMPFILTER) * rollAccele;
+#endif
     // Z軸（ヨー角）は加速度では補正できないのでそのまま
 }
 /////////////////////////////////////////////////////////////////////
