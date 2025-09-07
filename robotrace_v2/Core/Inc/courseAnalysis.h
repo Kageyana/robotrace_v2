@@ -82,5 +82,6 @@ int16_t calcXYcies(int logNumber);
 void calcXYcie(float encpulse, float angVelo, float dt);
 void clearXYcie(void);
 void setShortCutTarget(void);
+void processMarkerEvent(void);
 
 #endif // COURSEANALYSIS_H_

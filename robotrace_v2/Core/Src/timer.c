@@ -72,61 +72,8 @@ void Interrupt1ms(void)
 			emcStop = STOP_OVERSPEED;
 
 		courseMarker = checkMarker(); // マーカー検知
-		checkGoalMarker();			  // ゴールマーカー処理
-
-		// カーブマーカー,クロスラインを通過した時
-		if (courseMarker == 0 && beforeCourseMarker > 0)
-		{
-			cntMarker++; // マーカーカウント
-			if (optimalTrace == BOOST_DISTANCE)
-			{
-				if (straightState)
-				{
-					// 距離基準2次走行のとき
-					int32_t i, j, errorDistance = 0;
-
-					for (i = pathedMarker; i <= numPPAMarry; i++)
-					{
-						// 現在地から一番近いマーカーを探す
-						if (encTotalOptimal - markerPos[i].distance < 0)
-						{
-							for (j = i; j > 0; j--)
-							{
-								if (abs(encTotalOptimal - markerPos[j].distance) < encMM(100))
-								{
-									errorDistance = encTotalOptimal - DistanceOptimal; // 現在の差を計算
-									encTotalOptimal = markerPos[j].distance;		   // 距離を補正
-									DistanceOptimal = encTotalOptimal - errorDistance; // 補正後の現在距離からの差分
-									optimalIndex = markerPos[j].indexPPAD;			   // インデックス更新
-
-									if (j - 5 < 0)
-									{
-										pathedMarker = j - 5;
-									}
-									else
-									{
-										pathedMarker = 0;
-									}
-									straightState = false;
-									straightMeter = 0;
-									break;
-								}
-							}
-							if (errorDistance != 0)
-								break;
-						}
-					}
-				}
-			}
-		}
-
-		// マーカーの位置を記録
-		if (courseMarker == 0 && beforeCourseMarker > 0)
-		{
-			writeMarkerPos(encTotalOptimal, beforeCourseMarker);
-		}
-
-		beforeCourseMarker = courseMarker;
+		checkGoalMarker();	      // ゴールマーカー処理
+		processMarkerEvent();	      // マーカー関連処理を関数に委譲
 	}
 
 	if (patternTrace < 10 || patternTrace > 100)
