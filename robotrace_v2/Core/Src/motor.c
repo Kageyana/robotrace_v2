@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "motor.h"
+
 //====================================//
 // グローバル変数の宣言
 //====================================//
@@ -19,11 +20,11 @@ float motorCurrentL, motorCurrentR;
 /////////////////////////////////////////////////////////////////////
 void motorPwmOut(int16_t pwmL, int16_t pwmR)
 {
-	// 0除算回避
-	if (pwmL == 0)
-		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_L, 0);
-	if (pwmR == 0)
-		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_R, 0);
+        // PWM が 0 のとき比較レジスタを 0 に設定
+        if (pwmL == 0)
+                __HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_L, 0); // 左モータ出力を停止
+        if (pwmR == 0)
+                __HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_R, 0); // 右モータ出力を停止
 
 	if (pwmL != 0)
 	{
@@ -57,6 +58,8 @@ void motorPwmOut(int16_t pwmL, int16_t pwmR)
 // モジュール名 motorPwmOutSynth
 // 処理概要     トレースと速度制御のPID制御量をPWMとしてモータに出力する
 // 引数         tPwm: トレースのPID制御量 sPwm: 速度のPID制御量
+//              yrPwm: ヨーレートのPID制御量
+//              dPwm : 距離のPID制御量
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
 void motorPwmOutSynth(int16_t tPwm, int16_t sPwm, int16_t yrPwm, int16_t dPwm)
@@ -69,18 +72,32 @@ void motorPwmOutSynth(int16_t tPwm, int16_t sPwm, int16_t yrPwm, int16_t dPwm)
 		overpwm = abs(sPwm) + abs(tPwm) - 1000; // 1000を超えた分の制御量を計算
 
 		// トレースの内輪側から越えた分の制御量を引く 正負はtPwmと同じ
-		if (tPwm > 0)
+		// tPwm が 0 の場合の 0 除算防止
+		if (tPwm != 0)
 		{
-			tracePwm = tPwm - (overpwm * (tPwm / abs(tPwm)));
+			if (tPwm > 0)
+			{
+				tracePwm = tPwm - (overpwm * (tPwm / abs(tPwm)));
+			}
+			else
+			{
+				tracePwm = tPwm + (overpwm * (tPwm / abs(tPwm)));
+			}
 		}
 		else
 		{
-			tracePwm = tPwm + (overpwm * (tPwm / abs(tPwm)));
+			tracePwm = tPwm;
 		}
 	}
 
 	motorpwmR = sPwm - tracePwm - yrPwm + dPwm;
+	// PWMの飽和防止
+	if (motorpwmR > 1000) motorpwmR = 1000;
+	else if (motorpwmR < -1000) motorpwmR = -1000;
 	motorpwmL = sPwm + tracePwm + yrPwm + dPwm;
+	// PWMの飽和防止
+	if (motorpwmL > 1000) motorpwmL = 1000;
+	else if (motorpwmL < -1000) motorpwmL = -1000;
 
 	motorPwmOut(motorpwmL, motorpwmR);
 }
@@ -92,9 +109,11 @@ void motorPwmOutSynth(int16_t tPwm, int16_t sPwm, int16_t yrPwm, int16_t dPwm)
 ///////////////////////////////////////////////////////////////////////////
 void getMotorAD(uint16_t LAD, uint16_t RAD)
 {
-	motorCurrentADLInt[cntMotorAD & (MOTOR_AD_WINDOW - 1)] = LAD;
-	motorCurrentADRInt[cntMotorAD & (MOTOR_AD_WINDOW - 1)] = RAD;
-	cntMotorAD++;
+	// MOTOR_AD_WINDOW は2の冪であることを前提にインデックスをマスク
+	// 値を変更する場合はこの前提が崩れないよう注意する
+	motorCurrentADLInt[cntMotorAD & (MOTOR_AD_WINDOW - 1)] = LAD; // リングバッファに格納
+	motorCurrentADRInt[cntMotorAD & (MOTOR_AD_WINDOW - 1)] = RAD; // リングバッファに格納
+	cntMotorAD++; // 次回の格納位置を更新
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 getMotorCurrent
@@ -133,9 +152,9 @@ void getMotorCurrent(void)
 /////////////////////////////////////////////////////////////////////
 void MotorFanPwmOut(int16_t pwm)
 {
-	// 0除算回避
-	if (pwm == 0)
-		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_SUCTION_TIM_CH, 0);
+        // PWM が 0 のとき比較レジスタを 0 に設定
+        if (pwm == 0)
+                __HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_SUCTION_TIM_CH, 0); // 吸引モータ出力を停止
 
 	if (pwm != 0)
 	{

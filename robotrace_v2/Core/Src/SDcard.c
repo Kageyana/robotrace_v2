@@ -52,7 +52,7 @@ uint16_t markerValIndex = 0;
 bool markerOverflow = false; // マーカーバッファ上限超過フラグ
 
 // ログファイルナンバー
-int16_t fileNumbers[1000];
+int16_t fileNumbers[FILENUMBER_NUM];
 int16_t fileIndexLog = 0; // 現在使用しているログ番号
 int16_t endFileIndex = 0; // ログの最終番号
 
@@ -112,8 +112,6 @@ bool initMicroSD(void)
 		printf("SD_SIZE: \t%lu\r\n", total);
 		free_space = (uint32_t)(fre_clust * pfs->csize * 0.5); // empty capacity
 		printf("SD free space: \t%lu\r\n", free_space);
-
-		getFileNumbers();
 
 		// ディレクトリを作成
 		createDir("setting");
@@ -206,6 +204,8 @@ void createLog(void)
 
 	setLogStr("targetSpeed", "%d");
 	setLogStr("optimalIndex", "%d");
+	setLogStr("motorpwmL", "%d");
+	setLogStr("motorpwmR", "%d");
 	setLogStr("CurrentL", "%f");
 	setLogStr("CurrentR", "%f");
 	setLogStr("lineTraceCtrl", "%d");
@@ -449,7 +449,6 @@ void writeLogPrint(void)
 /////////////////////////////////////////////////////////////////////
 void endLog(void)
 {
-	initIMU = false; // IMUの使用を停止(SPIが競合するため)
 	modeLOG = false; // ログ取得停止
 	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY); // SPIバスが空くまで待つ
 
@@ -551,16 +550,19 @@ void endLog(void)
 			zg,
 			marker,
 			distance,
-			logvalf[1],
+			logvalf[1],		// ROC
 
-			logval8[0],
-			logval16[2],
-			(float)logval16[3] / 10000,
-			(float)logval16[4] / 10000,
-			(int16_t)logval16[5],
-			(int16_t)logval16[6],
-			logvalf[2],
-			logvalf[3]);
+			logval8[0],		// cntlog
+			logval16[2],	// optimalIndex
+			(int16_t)logval16[3],		// motorpwmL
+			(int16_t)logval16[4],		// motorpwmR
+			(float)logval16[5] / 10000,	// CurrentL
+			(float)logval16[6] / 10000,	// CurrentR
+			(int16_t)logval16[7],		// lineTraceCtrl
+			(int16_t)logval16[8],		// veloCtrl
+			logvalf[2],		// x
+			logvalf[3]		// y
+		);
 
 		// 文字列をSDカードに送信
 		f_puts(logStr, &fil_W);
@@ -575,7 +577,7 @@ void endLog(void)
 	f_close(&fil_W);
 #endif
 
-	initIMU = true;
+	f_mount(NULL,"",0); // SDカードをアンマウント
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getFileNumbers
@@ -590,6 +592,10 @@ void getFileNumbers(void)
 	FRESULT fresult;
 	uint8_t fileName[10];
 	uint8_t *tp, i;
+
+	for(uint16_t j=0;j<FILENUMBER_NUM;j++){
+		fileNumbers[j] = 0; // 配列を初期化
+	}
 
     fresult = f_opendir(&dir, "/"); // directory open
 	if (fresult == FR_OK)
@@ -608,12 +614,27 @@ void getFileNumbers(void)
 			{
 				// csvファイルのとき
 				tp = strtok(fno.fname, ".");              // 拡張子削除
-				fileNumbers[endFileIndex] = atoi(tp); // 文字列を数値に変換
+				fileNumbers[endFileIndex] = atoi(tp);     // 文字列を数値に変換して保存
 				endFileIndex++;
 			}
 		} while (fno.fname[0] != 0); // ファイルの有無を確認
 
-		endFileIndex--;
+		// ファイル数を保存
+		int16_t fileCount = endFileIndex;
+		// バブルソートでファイル番号を昇順に並べ替え
+		for (int16_t i = 0; i < fileCount - 1; i++)
+		{
+			for (int16_t j = i + 1; j < fileCount; j++)
+			{
+				if (fileNumbers[i] > fileNumbers[j])
+				{
+					int16_t tmp = fileNumbers[i];
+					fileNumbers[i] = fileNumbers[j];
+					fileNumbers[j] = tmp; // 要素を交換
+				}
+			}
+		}
+		endFileIndex = fileCount - 1; // 最終インデックスを更新
 		fileIndexLog = endFileIndex;
 	}
 

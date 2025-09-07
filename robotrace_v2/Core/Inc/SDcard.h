@@ -13,7 +13,7 @@
 #ifdef LOG_RUNNING_WRITE
 #define BUFFER_SIZE_LOG 512
 #define LOG_NUM_8BIT 2
-#define LOG_NUM_16BIT 7
+#define LOG_NUM_16BIT 9
 #define LOG_NUM_32BIT 1
 #define LOG_NUM_FLOAT 1
 #define LOG_SIZE (LOG_NUM_8BIT * sizeof(uint8_t)) + (LOG_NUM_16BIT * sizeof(uint16_t)) + (LOG_NUM_32BIT * sizeof(uint32_t)) + (LOG_NUM_FLOAT * sizeof(float))
@@ -21,7 +21,8 @@
 #define BUFFER_SIZE_LOG 5000 // 綴りの誤りを修正
 #endif
 
-#define BUFFER_SIZE_MARKER 500 // 綴りの誤りを修正
+#define BUFFER_SIZE_MARKER 500
+#define FILENUMBER_NUM 1000		// ログファイルナンバーの上限
 
 #define PATH_SETTING "./setting/"
 
