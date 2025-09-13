@@ -141,7 +141,7 @@ void initSystem(void)
 			readPIDparameters(&yawCtrl);
 			readPIDparameters(&distCtrl);
 
-			readLinesenval(); // ラインセンサオフセット値を取得
+            readLinesenval(); // ラインセンサの最大値と最小値を取得
 			readTgtspeeds();  // 目標速度を取得
 
 			if (modeDSP)

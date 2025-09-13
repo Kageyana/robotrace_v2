@@ -16,7 +16,8 @@ bool lineSensorState = false;			 // true:ラインセンサ点灯 false:ライ�
 uint16_t lineIndex = 0;
 float angleSensor;
 // キャリブレーション関連
-uint16_t lSensorOffset[NUM_SENSORS] = {0};
+uint16_t lSensorMax[NUM_SENSORS] = {0};	// 各センサの最大値
+uint16_t lSensorMin[NUM_SENSORS] = {[0 ... NUM_SENSORS - 1] = UINT16_MAX};	// 各センサの最小値
 uint8_t modeCalLinesensors = 0;
 /////////////////////////////////////////////////////////////////////
 // モジュール名 powerLineSensors
@@ -58,19 +59,27 @@ void getLineSensor(void)
 		{
 			lSensor[i] = lSensorInt[i] >> 4; // 平均値算出
 			lSensorInt[i] = 0;				 // 積算値リセット
-
-			// キャリブレーション済みの場合
-			if (lSensorOffset[i] > 0 && modeCalLinesensors == 0)
+			// 最大値・最小値を更新
+			if (modeCalLinesensors == 1)
 			{
-				lSensorCari[i] = (uint16_t)(BASEVAL * (float)lSensor[i] / (float)lSensorOffset[i]);
-			}
-			// キャリブレーション中
-			if (lineSensorState && modeCalLinesensors == 1)
-			{
-				if (lSensor[i] > lSensorOffset[i])
+				if (lSensor[i] > lSensorMax[i])
 				{
-					lSensorOffset[i] = lSensor[i];
+					lSensorMax[i] = lSensor[i];	// 最大値更新
 				}
+				if (lSensor[i] < lSensorMin[i])
+				{
+					lSensorMin[i] = lSensor[i];	// 最小値更新
+				}
+			}
+			// 正規化計算
+			uint16_t range = lSensorMax[i] - lSensorMin[i];
+			if (range != 0)
+			{
+				lSensorCari[i] = (uint16_t)((lSensor[i] - lSensorMin[i]) * BASEVAL / range);
+			}
+			else
+			{
+				lSensorCari[i] = 0;	// 分母ゼロ対策
 			}
 		}
 	}
@@ -137,18 +146,21 @@ void getAngleSensor(void)
 void calibrationLinesensor(void)
 {
 	uint8_t i;
-
 	for (i = 0; i < NUM_SENSORS; i++)
 	{
-		if (lSensor[i] > lSensorOffset[i])
+		if (lSensor[i] > lSensorMax[i])
 		{
-			lSensorOffset[i] = lSensor[i];
+			lSensorMax[i] = lSensor[i];	// 最大値更新
+		}
+		if (lSensor[i] < lSensorMin[i])
+		{
+			lSensorMin[i] = lSensor[i];	// 最小値更新
 		}
 	}
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 writeLinesenval
-// 処理概要     ラインセンサの最大値をSDカードに書き込む
+// 処理概要     ラインセンサの最大値と最小値をSDカードに書き込む
 // 引数         なし
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
@@ -166,9 +178,16 @@ void writeLinesenval(void)
 
 	if (fresult == FR_OK)
 	{
+		// 最大値を保存
 		for (i = 0; i < NUM_SENSORS; i++)
 		{
-			sprintf(str, "%04d,", lSensorOffset[i]);
+			sprintf(str, "%04d,", lSensorMax[i]);
+			f_puts(str, &fil);
+		}
+		// 最小値を保存
+		for (i = 0; i < NUM_SENSORS; i++)
+		{
+			sprintf(str, "%04d,", lSensorMin[i]);
 			f_puts(str, &fil);
 		}
 	}
@@ -177,7 +196,7 @@ void writeLinesenval(void)
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 readLinesenval
-// 処理概要     ラインセンサの最大値をSDカードから読み取る
+// 処理概要     ラインセンサの最大値と最小値をSDカードから読み取る
 // 引数         なし
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
@@ -196,10 +215,17 @@ void readLinesenval(void)
 
 	if (fresult == FR_OK)
 	{
+		// 最大値を読み込む
 		for (i = 0; i < NUM_SENSORS; i++)
 		{
-			f_gets(str, 6, &fil);				   // 文字列取得 カンマ含む
-			sscanf(str, "%d,", &lSensorOffset[i]); // 文字列→数値
+			f_gets(str, 6, &fil);
+			sscanf(str, "%hu,", &lSensorMax[i]);
+		}
+		// 最小値を読み込む
+		for (i = 0; i < NUM_SENSORS; i++)
+		{
+			f_gets(str, 6, &fil);
+			sscanf(str, "%hu,", &lSensorMin[i]);
 		}
 	}
 

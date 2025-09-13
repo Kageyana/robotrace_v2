@@ -394,54 +394,27 @@ static void test_linesensor(void)
 		testFlags.motor_test = 0;
 	}
 
-	if (lSensorOffset[0] > 0 && modeCalLinesensors == 0)
-	{
-		ssd1306_SetCursor(37, 22);
-		ssd1306_printf(Font_6x8, "%4d", lSensorCari[4]);
-		ssd1306_SetCursor(31, 30);
-		ssd1306_printf(Font_6x8, "%4d", lSensorCari[3]);
-		ssd1306_SetCursor(22, 38);
-		ssd1306_printf(Font_6x8, "%4d", lSensorCari[2]);
-		ssd1306_SetCursor(13, 46);
-		ssd1306_printf(Font_6x8, "%4d", lSensorCari[1]);
-		ssd1306_SetCursor(6, 54);
-		ssd1306_printf(Font_6x8, "%4d", lSensorCari[0]);
+	ssd1306_SetCursor(37, 22);
+	ssd1306_printf(Font_6x8, "%4d", lSensorCari[4]);
+	ssd1306_SetCursor(31, 30);
+	ssd1306_printf(Font_6x8, "%4d", lSensorCari[3]);
+	ssd1306_SetCursor(22, 38);
+	ssd1306_printf(Font_6x8, "%4d", lSensorCari[2]);
+	ssd1306_SetCursor(13, 46);
+	ssd1306_printf(Font_6x8, "%4d", lSensorCari[1]);
+	ssd1306_SetCursor(6, 54);
+	ssd1306_printf(Font_6x8, "%4d", lSensorCari[0]);
 
-		ssd1306_SetCursor(65, 22);
-		ssd1306_printf(Font_6x8, "%4d", lSensorCari[5]);
-		ssd1306_SetCursor(71, 30);
-		ssd1306_printf(Font_6x8, "%4d", lSensorCari[6]);
-		ssd1306_SetCursor(80, 38);
-		ssd1306_printf(Font_6x8, "%4d", lSensorCari[7]);
-		ssd1306_SetCursor(89, 46);
-		ssd1306_printf(Font_6x8, "%4d", lSensorCari[8]);
-		ssd1306_SetCursor(95, 54);
-		ssd1306_printf(Font_6x8, "%4d", lSensorCari[9]);
-	}
-	else
-	{
-		ssd1306_SetCursor(37, 22);
-		ssd1306_printf(Font_6x8, "%4d", lSensor[4]);
-		ssd1306_SetCursor(31, 30);
-		ssd1306_printf(Font_6x8, "%4d", lSensor[3]);
-		ssd1306_SetCursor(22, 38);
-		ssd1306_printf(Font_6x8, "%4d", lSensor[2]);
-		ssd1306_SetCursor(13, 46);
-		ssd1306_printf(Font_6x8, "%4d", lSensor[1]);
-		ssd1306_SetCursor(6, 54);
-		ssd1306_printf(Font_6x8, "%4d", lSensor[0]);
-
-		ssd1306_SetCursor(65, 22);
-		ssd1306_printf(Font_6x8, "%4d", lSensor[5]);
-		ssd1306_SetCursor(71, 30);
-		ssd1306_printf(Font_6x8, "%4d", lSensor[6]);
-		ssd1306_SetCursor(80, 38);
-		ssd1306_printf(Font_6x8, "%4d", lSensor[7]);
-		ssd1306_SetCursor(89, 46);
-		ssd1306_printf(Font_6x8, "%4d", lSensor[8]);
-		ssd1306_SetCursor(95, 54);
-		ssd1306_printf(Font_6x8, "%4d", lSensor[9]);
-	}
+	ssd1306_SetCursor(65, 22);
+	ssd1306_printf(Font_6x8, "%4d", lSensorCari[5]);
+	ssd1306_SetCursor(71, 30);
+	ssd1306_printf(Font_6x8, "%4d", lSensorCari[6]);
+	ssd1306_SetCursor(80, 38);
+	ssd1306_printf(Font_6x8, "%4d", lSensorCari[7]);
+	ssd1306_SetCursor(89, 46);
+	ssd1306_printf(Font_6x8, "%4d", lSensorCari[8]);
+	ssd1306_SetCursor(95, 54);
+	ssd1306_printf(Font_6x8, "%4d", lSensorCari[9]);
 
 	data_select(&testFlags.motor_test, SW_PUSH);
 	if (testFlags.motor_test == 1)
@@ -859,7 +832,7 @@ static void setup_calibration(void)
 	{
 		setTargetSpeed(0); // 速度をゼロに設定
 		ssd1306_SetCursor(65, 22);
-		ssd1306_printf(Font_6x8, "%4d", lSensorOffset[0]);
+	ssd1306_printf(Font_6x8, "%4d", lSensorCari[0]);
 
 		data_select(&testFlags.trace_test, SW_PUSH); // SW_PUSH入力を監視
 		if (testFlags.trace_test)
@@ -873,6 +846,7 @@ static void setup_calibration(void)
 	{
 		if (setupTimer.cntSetup1 > 1000) // 一定時間待機
 		{
+			uint8_t i;
 			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 			ssd1306_SetCursor(22, 28);
 			ssd1306_printf(Font_7x10, "Calibration");
@@ -881,7 +855,11 @@ static void setup_calibration(void)
 			ssd1306_UpdateScreen(); // グラフィック液晶更新
 
 			// 配列初期化
-			memset(&lSensorOffset, 0, sizeof(uint16_t) * NUM_SENSORS);
+			for (i = 0; i < NUM_SENSORS; i++)
+			{
+				lSensorMax[i] = 0;            // 最大値初期化
+				lSensorMin[i] = UINT16_MAX;   // 最小値初期化
+			}
 
 			powerLineSensors(1);    // ラインセンサ点灯
 			modeCalLinesensors = 1; // キャリブレーション開始
@@ -891,7 +869,7 @@ static void setup_calibration(void)
 			pattern.calibration = 3; // 次のステップへ
 		}
 		break;
-	}
+    }
 	case 3: // スイッチ押下で終了
 	{
 		data_select(&testFlags.trace_test, SW_PUSH); // SW_PUSH入力を監視
@@ -1145,7 +1123,7 @@ static void setup_start(void)
 
 		if (swValTact == SW_PUSH)
 		{
-			if (lSensorOffset[0] > 0)
+			if (lSensorMax[0] > lSensorMin[0])
 			{
 				// キャリブレーション実施済み
 				setupFlags.start = 1;
@@ -1158,7 +1136,7 @@ static void setup_start(void)
 		else if (swValTact == SW_RIGHT)
 		{
 			// オートスタート
-			if (lSensorOffset[0] > 0)
+			if (lSensorMax[0] > lSensorMin[0])
 			{
 				// キャリブレーション実施済み
 				autoStart = 1;
@@ -1669,7 +1647,7 @@ void setupNonDisp(void)
 				mode = START_OPTIMAL;
 			}
 			veloCtrl.Int = 0; // I成分リセット
-			if (lSensorOffset[0] > 0)
+            if (lSensorMax[0] > lSensorMin[0])
 			{
 				// キャリブレーション実施済み
 				setupFlags.start = 1;
