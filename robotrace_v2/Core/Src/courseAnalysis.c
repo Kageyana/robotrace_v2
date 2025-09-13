@@ -677,33 +677,35 @@ void processMarkerEvent(void) {
 			if (straightState) {
 				// 距離基準2次走行かつストレート区間中のとき
 				
-				int32_t i, j, errorDistance = 0;
-				for (i = pathedMarker; i <= numPPAMarry; i++) {
-					// 現在地から一番近いマーカーを探す
-					if (encTotalOptimal - markerPos[i].distance < 0) {
-						for (j = i; j > 0; j--) {
-							if (abs(encTotalOptimal - markerPos[j].distance) < encMM(100)) {
-								errorDistance = encTotalOptimal - DistanceOptimal; // 現在の差を計算
-								encTotalOptimal = markerPos[j].distance;	   // 距離を補正
-								DistanceOptimal = encTotalOptimal - errorDistance; // 補正後の現在距離からの差分
-								optimalIndex = markerPos[j].indexPPAD;		   // インデックス更新
-								if (j - 5 < 0) {
-									pathedMarker = j - 5;
-								} else {
-									pathedMarker = 0;
-								}
-								straightState = false;
-								straightMeter = 0;
-								break;
-							}
-						}
-						if (errorDistance != 0)
-						{
-							break;
-						}
+				int32_t low = pathedMarker, high = numPPAMarry, mid;
+				int32_t j, errorDistance = 0;
+				// 二分探索で現在位置に最も近いマーカーを高速に検索
+				while (low < high) {
+					mid = (low + high) / 2;
+					if (markerPos[mid].distance < encTotalOptimal) {
+						low = mid + 1;
+					} else {
+						high = mid;
 					}
 				}
-			}
+				j = low;
+				if (j > 0 && abs(encTotalOptimal - markerPos[j].distance) >= abs(encTotalOptimal - markerPos[j - 1].distance)) {
+					j--;
+				}
+				if (abs(encTotalOptimal - markerPos[j].distance) < encMM(100)) {
+					errorDistance = encTotalOptimal - DistanceOptimal; // 現在の差を計算
+					encTotalOptimal = markerPos[j].distance;           // 距離を補正
+					DistanceOptimal = encTotalOptimal - errorDistance; // 補正後の現在距離からの差分
+					optimalIndex = markerPos[j].indexPPAD;             // インデックス更新
+					if (j - 5 < 0) {
+						pathedMarker = j - 5;
+					} else {
+						pathedMarker = 0;
+					}
+					straightState = false;
+					straightMeter = 0;
+				}
+				}
 		} else if(optimalTrace == BOOST_SHORTCUT) {
 			// ショートカット基準2次走行のとき
 			
