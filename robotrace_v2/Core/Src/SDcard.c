@@ -203,11 +203,12 @@ void createLog(void)
 	setLogStr("ROC", "%f");
 
 	setLogStr("targetSpeed", "%d");
+	setLogStr("modeCurve", "%d");
 	setLogStr("optimalIndex", "%d");
-	setLogStr("motorpwmL", "%d");
-	setLogStr("motorpwmR", "%d");
-	setLogStr("CurrentL", "%f");
-	setLogStr("CurrentR", "%f");
+	// setLogStr("motorpwmL", "%d");
+	// setLogStr("motorpwmR", "%d");
+	// setLogStr("CurrentL", "%f");
+	// setLogStr("CurrentR", "%f");
 	setLogStr("lineTraceCtrl", "%d");
 	setLogStr("veloCtrl", "%d");
 
@@ -552,14 +553,15 @@ void endLog(void)
 			distance,
 			logvalf[1],		// ROC
 
-			logval8[0],		// cntlog
+			logval8[0],		// targetSpeed
+			logval8[2],		// modeCurve
 			logval16[2],	// optimalIndex
-			(int16_t)logval16[3],		// motorpwmL
-			(int16_t)logval16[4],		// motorpwmR
-			(float)logval16[5] / 10000,	// CurrentL
-			(float)logval16[6] / 10000,	// CurrentR
-			(int16_t)logval16[7],		// lineTraceCtrl
-			(int16_t)logval16[8],		// veloCtrl
+			// (int16_t)logval16[3],		// motorpwmL
+			// (int16_t)logval16[4],		// motorpwmR
+			// (float)logval16[5] / 10000,	// CurrentL
+			// (float)logval16[6] / 10000,	// CurrentR
+			(int16_t)logval16[3],		// lineTraceCtrl
+			(int16_t)logval16[4],		// veloCtrl
 			logvalf[2],		// x
 			logvalf[3]		// y
 		);

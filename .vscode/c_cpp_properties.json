@@ -4,9 +4,9 @@
             "name": "Win32",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/robotrace_v1/Core/Inc",
-                "C:\\ST\\STM32CubeIDE_1.11.0\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.13.3.rel1.win32_1.0.0.202411081344\\tools\\arm-none-eabi\\include",
-                "C:\\ST\\STM32CubeIDE_1.11.0\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.13.3.rel1.win32_1.0.0.202411081344\\tools\\lib\\gcc\\arm-none-eabi\\13.3.1\\include"
+                "${workspaceFolder}/robotrace_v2/Core/Inc",
+                "C:\\ST\\STM32CubeIDE_1.11.0\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.win32_1.1.100.202309141235\\tools\\arm-none-eabi\\include",
+                "C:\\ST\\STM32CubeIDE_1.10.1\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.win32_1.1.100.202309141235\\tools\\lib\\gcc\\arm-none-eabi\\11.3.1\\inclu"
             ],
             "defines": [
                 "STM32F446xx",
@@ -15,7 +15,6 @@
                 "UNICODE",
                 "_UNICODE"
             ],
-            "compilerPath": "C:\\MinGW\\bin\\gcc.exe",
             "cStandard": "gnu17",
             "cppStandard": "gnu++14",
             "intelliSenseMode": "windows-gcc-x86"

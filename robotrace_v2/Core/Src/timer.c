@@ -120,14 +120,15 @@ void Interrupt1ms(void)
 					// 8bit
 					targetSpeed,
 					courseMarker,
+					modeCurve,
 					// 16bit
 					cntRun,
 					encCurrentN,
 					optimalIndex,
-					motorpwmL,
-					motorpwmR,
-					(int16_t)(motorCurrentL * 10000),
-					(int16_t)(motorCurrentR * 10000),
+					// motorpwmL,
+					// motorpwmR,
+					// (int16_t)(motorCurrentL * 10000),
+					// (int16_t)(motorCurrentR * 10000),
 					lineTraceCtrl.pwm,
 					veloCtrl.pwm,
 					// 32bit

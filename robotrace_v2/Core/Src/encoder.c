@@ -35,8 +35,8 @@ void getEncoder(void)
 	encRawL = ENC_TIM_L->CNT;
 
 	// 正常に1ms割り込みしたとき更新
-	// if ((uint16_t)(bootTime * 100) > 90 && (uint16_t)(bootTime * 100) < 110)
-	// {
+	if ((uint16_t)(bootTime * 100) > 90 && (uint16_t)(bootTime * 100) < 110)
+	{
 		// 1msあたりのカウント
 		encCurrentR = encRawR - encBufR;
 		encCurrentL = encBufL - encRawL;
@@ -45,7 +45,7 @@ void getEncoder(void)
 		encTotalR += encCurrentR;
 		encTotalL += encCurrentL;
 		encTotalN += encCurrentN;
-	// }
+	}
 	// 前回値を更新
 	encBufR = encRawR;
 	encBufL = encRawL;
