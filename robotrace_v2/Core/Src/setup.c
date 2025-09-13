@@ -844,32 +844,32 @@ static void setup_calibration(void)
 	}
 	case 2: // 開始準備
 	{
-               if (setupTimer.cntSetup1 > 1000) // 一定時間待機
-               {
-                       uint8_t i;
-	ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-	ssd1306_SetCursor(22, 28);
-	ssd1306_printf(Font_7x10, "Calibration");
-	ssd1306_SetCursor(53, 42);
-	ssd1306_printf(Font_7x10, "Now");
-	ssd1306_UpdateScreen(); // グラフィック液晶更新
+		if (setupTimer.cntSetup1 > 1000) // 一定時間待機
+		{
+			uint8_t i;
+			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+			ssd1306_SetCursor(22, 28);
+			ssd1306_printf(Font_7x10, "Calibration");
+			ssd1306_SetCursor(53, 42);
+			ssd1306_printf(Font_7x10, "Now");
+			ssd1306_UpdateScreen(); // グラフィック液晶更新
 
-                       // 配列初期化
-                       for (i = 0; i < NUM_SENSORS; i++)
-                       {
-                               lSensorMax[i] = 0;            // 最大値初期化
-                               lSensorMin[i] = UINT16_MAX;   // 最小値初期化
-                       }
+			// 配列初期化
+			for (i = 0; i < NUM_SENSORS; i++)
+			{
+				lSensorMax[i] = 0;            // 最大値初期化
+				lSensorMin[i] = UINT16_MAX;   // 最小値初期化
+			}
 
-                       powerLineSensors(1);    // ラインセンサ点灯
-                       modeCalLinesensors = 1; // キャリブレーション開始
+			powerLineSensors(1);    // ラインセンサ点灯
+			modeCalLinesensors = 1; // キャリブレーション開始
 
-                       // 手動で機体を動かしキャリブレーションする
+			// 手動で機体を動かしキャリブレーションする
 
-                       pattern.calibration = 3; // 次のステップへ
-               }
-               break;
-       }
+			pattern.calibration = 3; // 次のステップへ
+		}
+		break;
+    }
 	case 3: // スイッチ押下で終了
 	{
 		data_select(&testFlags.trace_test, SW_PUSH); // SW_PUSH入力を監視
@@ -1121,31 +1121,31 @@ static void setup_start(void)
 		// 停止状態を維持
 		setTargetSpeed(0);
 
-                if (swValTact == SW_PUSH)
-                {
-                        if (lSensorMax[0] > lSensorMin[0])
-                        {
-                                // キャリブレーション実施済み
-                                setupFlags.start = 1;
-                        }
-                        else
-                        {
-                                pattern.calibration = 2;
-                        }
-                }
-                else if (swValTact == SW_RIGHT)
-                {
-                        // オートスタート
-                        if (lSensorMax[0] > lSensorMin[0])
-                        {
-                                // キャリブレーション実施済み
-                                autoStart = 1;
-                        }
-                        else
-                        {
-                                pattern.calibration = 2;
-                        }
-                }
+		if (swValTact == SW_PUSH)
+		{
+			if (lSensorMax[0] > lSensorMin[0])
+			{
+				// キャリブレーション実施済み
+				setupFlags.start = 1;
+			}
+			else
+			{
+				pattern.calibration = 2;
+			}
+		}
+		else if (swValTact == SW_RIGHT)
+		{
+			// オートスタート
+			if (lSensorMax[0] > lSensorMin[0])
+			{
+				// キャリブレーション実施済み
+				autoStart = 1;
+			}
+			else
+			{
+				pattern.calibration = 2;
+			}
+		}
 		break;
 	}
 	case 2: // キャリブレーション未実施
@@ -1647,7 +1647,7 @@ void setupNonDisp(void)
 				mode = START_OPTIMAL;
 			}
 			veloCtrl.Int = 0; // I成分リセット
-                  if (lSensorMax[0] > lSensorMin[0])
+            if (lSensorMax[0] > lSensorMin[0])
 			{
 				// キャリブレーション実施済み
 				setupFlags.start = 1;

@@ -178,18 +178,17 @@ void writeLinesenval(void)
 
 	if (fresult == FR_OK)
 	{
-			// 最大値を保存
-			for (i = 0; i < NUM_SENSORS; i++)
-			{
-				sprintf(str, "%04d,", lSensorMax[i]);
-				f_puts(str, &fil);
-			}
-			// 最小値を保存
-			for (i = 0; i < NUM_SENSORS; i++)
-			{
-				sprintf(str, "%04d,", lSensorMin[i]);
-				f_puts(str, &fil);
-			}
+		// 最大値を保存
+		for (i = 0; i < NUM_SENSORS; i++)
+		{
+			sprintf(str, "%04d,", lSensorMax[i]);
+			f_puts(str, &fil);
+		}
+		// 最小値を保存
+		for (i = 0; i < NUM_SENSORS; i++)
+		{
+			sprintf(str, "%04d,", lSensorMin[i]);
+			f_puts(str, &fil);
 		}
 	}
 
@@ -216,18 +215,17 @@ void readLinesenval(void)
 
 	if (fresult == FR_OK)
 	{
-			// 最大値を読み込む
-			for (i = 0; i < NUM_SENSORS; i++)
-			{
-				f_gets(str, 6, &fil);
-				sscanf(str, "%hu,", &lSensorMax[i]);
-			}
-			// 最小値を読み込む
-			for (i = 0; i < NUM_SENSORS; i++)
-			{
-				f_gets(str, 6, &fil);
-				sscanf(str, "%hu,", &lSensorMin[i]);
-			}
+		// 最大値を読み込む
+		for (i = 0; i < NUM_SENSORS; i++)
+		{
+			f_gets(str, 6, &fil);
+			sscanf(str, "%hu,", &lSensorMax[i]);
+		}
+		// 最小値を読み込む
+		for (i = 0; i < NUM_SENSORS; i++)
+		{
+			f_gets(str, 6, &fil);
+			sscanf(str, "%hu,", &lSensorMin[i]);
 		}
 	}
 
