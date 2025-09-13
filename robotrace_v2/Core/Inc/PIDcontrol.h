@@ -46,6 +46,7 @@ extern uint8_t	targetSpeed;	// 目標速度
 extern float 	targetAngle;    // 目標角度
 extern float    targetAngularVelocity;  // 目標角速度
 extern int16_t  targetDist;		        // 目標X座標
+extern int16_t	 traceDev;			// ライントレース偏差(SDログ用)
 
 extern pidParam lineTraceCtrl;
 extern pidParam veloCtrl;
