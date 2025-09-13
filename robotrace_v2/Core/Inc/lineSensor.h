@@ -25,7 +25,8 @@ extern float angleSensor;
 extern bool lineSensorState;
 
 extern uint16_t lSensorCari[NUM_SENSORS];
-extern uint16_t lSensorOffset[NUM_SENSORS];
+extern uint16_t lSensorMax[NUM_SENSORS];	// 各センサの最大値
+extern uint16_t lSensorMin[NUM_SENSORS];	// 各センサの最小値
 extern uint8_t modeCalLinesensors;
 
 //====================================//
