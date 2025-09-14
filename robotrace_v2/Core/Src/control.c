@@ -392,7 +392,7 @@ void loopSystem(void)
 			}
 
 			// 変数初期化
-			encRightMarker = encMM(1000);
+			encRightMarker = 0;
 			veloCtrl.Int = 0.0;
 			yawRateCtrl.Int = 0.0;
 
