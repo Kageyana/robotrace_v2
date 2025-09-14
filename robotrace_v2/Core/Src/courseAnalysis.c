@@ -705,7 +705,7 @@ void processMarkerEvent(void) {
 					straightState = false;
 					straightMeter = 0;
 				}
-				}
+			}
 		} else if(optimalTrace == BOOST_SHORTCUT) {
 			// ショートカット基準2次走行のとき
 			
@@ -715,7 +715,6 @@ void processMarkerEvent(void) {
 		if (courseMarker == 0 && beforeCourseMarker > 0) {
 			writeMarkerPos(encTotalOptimal, beforeCourseMarker);
 		}
-
-		beforeCourseMarker = courseMarker; // 前回のマーカー状態を更新
 	}
+	beforeCourseMarker = courseMarker; // 前回のマーカー状態を更新
 }

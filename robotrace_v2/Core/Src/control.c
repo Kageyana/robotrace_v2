@@ -49,7 +49,7 @@ int16_t countdown;
 // マーカー関連
 uint8_t courseMarker;
 uint8_t beforeCourseMarker;
-uint32_t cntMarker = 0;
+uint16_t cntMarker = 0;
 uint8_t courseMarkerLog;
 int32_t straightMeter = 0;
 bool straightState = false;
