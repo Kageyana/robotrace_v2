@@ -75,14 +75,7 @@ void motorPwmOutSynth(int16_t tPwm, int16_t sPwm, int16_t yrPwm, int16_t dPwm)
 		// tPwm が 0 の場合の 0 除算防止
 		if (tPwm != 0)
 		{
-			if (tPwm > 0)
-			{
-				tracePwm = tPwm - (overpwm * (tPwm / abs(tPwm)));
-			}
-			else
-			{
-				tracePwm = tPwm + (overpwm * (tPwm / abs(tPwm)));
-			}
+			tracePwm = tPwm - (overpwm * (tPwm / abs(tPwm)));
 		}
 		else
 		{

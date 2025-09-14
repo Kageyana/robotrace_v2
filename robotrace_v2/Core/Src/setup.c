@@ -157,7 +157,7 @@ static void setup_speed_param(void)
 		{
 			dataTuningUDF(speedParamTable[i].value, speedParamTable[i].step, speedParamTable[i].min, speedParamTable[i].max);
 			ssd1306_SetCursor(0, 24);
-			ssd1306_printf(Font_6x8, "%s:%3gm/%s", speedParamTable[i].label, *speedParamTable[i].value, speedParamTable[i].unit);
+			ssd1306_printf(Font_6x8, "%s:%3g%s", speedParamTable[i].label, *speedParamTable[i].value, speedParamTable[i].unit);
 			break;
 		}
 	}
