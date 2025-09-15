@@ -75,18 +75,18 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_ADC1_Init(void);
-static void MX_ADC2_Init(void);
-static void MX_TIM1_Init(void);
-static void MX_TIM2_Init(void);
-static void MX_I2C3_Init(void);
-static void MX_TIM3_Init(void);
-static void MX_TIM4_Init(void);
 static void MX_TIM6_Init(void);
-static void MX_TIM7_Init(void);
+static void MX_SPI3_Init(void);
+static void MX_TIM3_Init(void);
+static void MX_TIM2_Init(void);
 static void MX_TIM8_Init(void);
 static void MX_TIM13_Init(void);
+static void MX_TIM7_Init(void);
+static void MX_ADC2_Init(void);
 static void MX_SPI2_Init(void);
-static void MX_SPI3_Init(void);
+static void MX_TIM1_Init(void);
+static void MX_TIM4_Init(void);
+static void MX_I2C3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -126,19 +126,19 @@ int main(void)
   MX_GPIO_Init();
   MX_DMA_Init();
   MX_ADC1_Init();
-  MX_ADC2_Init();
-  MX_TIM1_Init();
-  MX_TIM2_Init();
-  MX_I2C3_Init();
-  MX_TIM3_Init();
-  MX_TIM4_Init();
   MX_TIM6_Init();
-  MX_TIM7_Init();
+  MX_SPI3_Init();
+  MX_TIM3_Init();
+  MX_TIM2_Init();
   MX_TIM8_Init();
   MX_TIM13_Init();
-  MX_SPI2_Init();
-  MX_SPI3_Init();
+  MX_TIM7_Init();
+  MX_ADC2_Init();
   MX_FATFS_Init();
+  MX_SPI2_Init();
+  MX_TIM1_Init();
+  MX_TIM4_Init();
+  MX_I2C3_Init();
   /* USER CODE BEGIN 2 */
 	initSystem();
   /* USER CODE END 2 */
@@ -616,7 +616,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 11;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 4294967295;
+  htim2.Init.Period = 74;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
@@ -673,7 +673,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 11;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 65535;
+  htim3.Init.Period = 374;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
