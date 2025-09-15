@@ -93,9 +93,9 @@
 /* ^^^ SPI config ^^^ */
 
 #if defined(SSD1306_USE_I2C)
-extern I2C_HandleTypeDef hi2c1;
+extern I2C_HandleTypeDef SSD1306_I2C_PORT;
 #elif defined(SSD1306_USE_SPI)
-extern SPI_HandleTypeDef hspi2;
+extern SPI_HandleTypeDef SSD1306_SPI_PORT;
 #else
 #error "You should define SSD1306_USE_SPI or SSD1306_USE_I2C macro!"
 #endif
