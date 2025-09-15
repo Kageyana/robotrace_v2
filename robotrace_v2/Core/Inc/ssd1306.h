@@ -9,10 +9,8 @@
 #define __SSD1306_H__
 
 #include <stddef.h>
-#include <_ansi.h>
 #include <stdarg.h>
 
-_BEGIN_STD_C
 
 #include "ssd1306_conf.h"
 
@@ -95,9 +93,9 @@ _BEGIN_STD_C
 /* ^^^ SPI config ^^^ */
 
 #if defined(SSD1306_USE_I2C)
-extern I2C_HandleTypeDef SSD1306_I2C_PORT;
+extern I2C_HandleTypeDef hi2c1;
 #elif defined(SSD1306_USE_SPI)
-extern SPI_HandleTypeDef SSD1306_SPI_PORT;
+extern SPI_HandleTypeDef hspi2;
 #else
 #error "You should define SSD1306_USE_SPI or SSD1306_USE_I2C macro!"
 #endif
@@ -194,7 +192,5 @@ void ssd1306_Reset(void);
 void ssd1306_WriteCommand(uint8_t byte);
 void ssd1306_WriteData(uint8_t* buffer, size_t buff_size);
 SSD1306_Error_t ssd1306_FillBuffer(uint8_t* buf, uint32_t len);
-
-_END_STD_C
 
 #endif // __SSD1306_H__
