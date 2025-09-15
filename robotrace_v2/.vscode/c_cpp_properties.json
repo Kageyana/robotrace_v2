@@ -1,0 +1,26 @@
+{
+    "version": 4,
+    "configurations": [
+        {
+            /** 
+             * ms-vscode.cmake-tools plugin should be installed.
+             * 
+             * It provides data for C/C++ plugin,
+             * such as include paths, browse paths, defines, etc.
+             */
+            "name": "STM32",
+            "configurationProvider": "ms-vscode.cmake-tools",
+            "intelliSenseMode": "${default}",
+			"includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [
+                "STM32F446xx",
+                "USE_HAL_DRIVER",
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+        }
+    ]
+}
