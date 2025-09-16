@@ -54,6 +54,10 @@ extern float 	targetAngle;    // 目標角度
 extern float    targetAngularVelocity;  // 目標角速度
 extern int16_t  targetDist;		        // 目標X座標
 
+extern int16_t	lineTraceSenL;	// ログ用ラインセンサ合成値(左)
+extern int16_t	lineTraceSenR;	// ログ用ラインセンサ合成値(右)
+extern int16_t	lineTraceDev;	// ログ用ラインセンサ偏差
+
 extern pidParam lineTraceCtrl;
 extern pidParam veloCtrl;
 extern pidParam yawRateCtrl;

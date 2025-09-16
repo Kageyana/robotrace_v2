@@ -211,6 +211,10 @@ void createLog(void)
 	// setLogStr("CurrentR", "%f");
 	setLogStr("lineTraceCtrl", "%d");
 	setLogStr("veloCtrl", "%d");
+	// ライントレースセンサの合成値をログに追加
+	setLogStr("senL", "%d");
+	setLogStr("senR", "%d");
+	setLogStr("Dev", "%d");
 
 	setLogStr("x", "%f");
 	setLogStr("y", "%f");
@@ -463,6 +467,7 @@ void endLog(void)
 	uint16_t marker, time, beforeTime = 0, speed, beforeSpeed = 0;
 	uint32_t distance;
 	float dt, zg;
+	int16_t logSenL = 0, logSenR = 0, logDev = 0;
 	static union
 	{
 		float f;
@@ -526,6 +531,10 @@ void endLog(void)
 		speed = logval16[1];
 		distance = logval32[0];
 		zg = logvalf[0];
+		// ログ復元時のラインセンサ値を取得
+		logSenL = (int16_t)logval16[5];
+		logSenR = (int16_t)logval16[6];
+		logDev = (int16_t)logval16[7];
 
 		if (abs(speed - beforeSpeed) > 500)
 		{
@@ -562,6 +571,9 @@ void endLog(void)
 			// (float)logval16[6] / 10000,	// CurrentR
 			(int16_t)logval16[3],		// lineTraceCtrl
 			(int16_t)logval16[4],		// veloCtrl
+			logSenL,		// senL
+			logSenR,		// senR
+			logDev,		// Dev
 			logvalf[2],		// x
 			logvalf[3]		// y
 		);

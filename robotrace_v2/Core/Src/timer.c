@@ -131,6 +131,10 @@ void Interrupt1ms(void)
 					// (int16_t)(motorCurrentR * 10000),
 					lineTraceCtrl.pwm,
 					veloCtrl.pwm,
+					// ライントレースセンサ値
+					lineTraceSenL,
+					lineTraceSenR,
+					lineTraceDev,
 					// 32bit
 					encTotalOptimal,
 					// float型
