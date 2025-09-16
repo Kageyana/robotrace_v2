@@ -1239,14 +1239,14 @@ void setup(void)
 	// 左ホイールをロータリスイッチ代わりに使用する
 	if (!testFlags.trace_test && !testFlags.motor_test)
 	{
-		if (abs(encClick) > 400)
+		if (abs(encClick) > WHEEL_CLICK)
 		{
-			if (encClick > 400)
+			if (encClick > WHEEL_CLICK)
 			{
 				pattern.display++;
 				setupFlags.clickStart = 1;
 			}
-			else if (encClick < -400)
+			else if (encClick < -WHEEL_CLICK)
 			{
 				pattern.display--;
 				setupFlags.clickStart = -1;
