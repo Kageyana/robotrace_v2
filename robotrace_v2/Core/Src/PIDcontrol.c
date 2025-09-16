@@ -73,8 +73,9 @@ void motorControlTrace(void)
 	// サーボモータ用PWM値計算
 	if (lSensorMax[0] > lSensorMin[0])
 	{
-		senL = (lSensorCari[4]) + (lSensorCari[3] * 0.9) + (lSensorCari[2] * 0.8) + (lSensorCari[1] * 0.7) + (lSensorCari[0] * 0.5);
-		senR = (lSensorCari[5]) + (lSensorCari[6] * 0.9) + (lSensorCari[7] * 0.8) + (lSensorCari[8] * 0.7) + (lSensorCari[9] * 0.5);
+		// マクロで設定した重みを掛け合わせてセンサ値を合成
+		senL = (lSensorCari[4] * TRACE_WEIGHT_CENTER) + (lSensorCari[3] * TRACE_WEIGHT_INNER) + (lSensorCari[2] * TRACE_WEIGHT_MIDDLE) + (lSensorCari[1] * TRACE_WEIGHT_OUTER) + (lSensorCari[0] * TRACE_WEIGHT_FAR);
+		senR = (lSensorCari[5] * TRACE_WEIGHT_CENTER) + (lSensorCari[6] * TRACE_WEIGHT_INNER) + (lSensorCari[7] * TRACE_WEIGHT_MIDDLE) + (lSensorCari[8] * TRACE_WEIGHT_OUTER) + (lSensorCari[9] * TRACE_WEIGHT_FAR);
 	}
 	else
 	{
