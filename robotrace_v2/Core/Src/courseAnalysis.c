@@ -6,6 +6,8 @@
 //====================================//
 // グローバル変数の宣
 //====================================//
+static const float invPulseConst = 10.0F / PALSE_MILLIMETER;	// エンコーダパルスをミリメートル換算する係数
+static const float angFactor = DEG2RAD;			// 角速度[deg/s]をラジアン換算する係数
 uint8_t optimalTrace = 0;
 uint16_t optimalIndex;
 int16_t numPPADarry; // path palanning analysis distance (PPAD)
@@ -33,10 +35,8 @@ float calcROC(int16_t velo, float angvelo, float dt)
 {
 	float dl, drad, ret;
 
-	const float invPulseConst = 10.0F / PALSE_MILLIMETER; // パルス→距離変換係数
-	const float angFactor = DEG2RAD * dt; // 角速度→ラジアン変換係数
 	dl = (float)velo * invPulseConst; // [palse] → [mm]
-	drad = angvelo * angFactor; // [deg/s] → [rad]
+	drad = angvelo * angFactor * dt; // 定義済み係数を利用して[deg/s]を[rad]に変換
 
 	// 角速度が極小の場合は直線とみなして即座に返す
 	if (fabsf(drad) < 1e-6F)
