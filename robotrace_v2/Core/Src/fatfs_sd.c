@@ -26,7 +26,6 @@ static void SELECT(void)
 {
 	HAL_GPIO_WritePin(SD_CS_GPIO_Port, SD_CS_Pin, GPIO_PIN_RESET);
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 DESELECT
 // 処理概要     SDカードのチップセレクトを解除
@@ -37,7 +36,6 @@ static void DESELECT(void)
 {
 	HAL_GPIO_WritePin(SD_CS_GPIO_Port, SD_CS_Pin, GPIO_PIN_SET);
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SPI_TxByte
 // 処理概要     1バイトをSPIで送信
@@ -46,11 +44,9 @@ static void DESELECT(void)
 /////////////////////////////////////////////////////////////////////
 static void SPI_TxByte(BYTE data)
 {
-	while (HAL_SPI_GetState(&SPI_Handle) != HAL_SPI_STATE_READY)
-		;
+	while (HAL_SPI_GetState(&SPI_Handle) != HAL_SPI_STATE_READY);
 	HAL_SPI_Transmit(&SPI_Handle, &data, 1, SPI_TIMEOUT);
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SPI_RxByte
 // 処理概要     SPIで1バイト送受信し結果を返す
@@ -63,13 +59,11 @@ static uint8_t SPI_RxByte(void)
 	dummy = 0xFF;
 	data = 0;
 
-	while ((HAL_SPI_GetState(&SPI_Handle) != HAL_SPI_STATE_READY))
-		;
+	while ((HAL_SPI_GetState(&SPI_Handle) != HAL_SPI_STATE_READY));
 	HAL_SPI_TransmitReceive(&SPI_Handle, &dummy, &data, 1, SPI_TIMEOUT);
 
 	return data;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SPI_RxBytePtr
 // 処理概要     SPIで1バイト受信しバッファへ格納
@@ -80,7 +74,6 @@ static void SPI_RxBytePtr(uint8_t *buff)
 {
 	*buff = SPI_RxByte();
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 HAL_SPI_TxCpltCallback
 // 処理概要     DMA送信完了割り込みで応答確認とビジー解除を行う
@@ -105,7 +98,6 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 		spiTxBusy = false;
 	}
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SD_ReadyWait
 // 処理概要     SDカードがビジー解除されるまで待機
@@ -133,7 +125,6 @@ static uint8_t SD_ReadyWait(void)
 /*====================================*
  *  DMA を利用した非同期書き込み API
  *====================================*/
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SD_TxDataBlockAsync
 // 処理概要     DMAで512バイトのデータブロックを非同期送信
@@ -155,7 +146,6 @@ bool SD_TxDataBlockAsync(const BYTE *buff, BYTE token)
 	HAL_SPI_Transmit_DMA(&SPI_Handle, sdTxBuf, sizeof(sdTxBuf));
 	return true;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SD_IsBusy
 // 処理概要     DMA送信中かどうかを返す
@@ -166,7 +156,6 @@ bool SD_IsBusy(void)
 {
 	return spiTxBusy;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SD_PowerOn
 // 処理概要     SDカードを初期化しSPIモードへ移行
@@ -213,7 +202,6 @@ static void SD_PowerOn(void)
 
 	PowerFlag = 1;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SD_PowerOff
 // 処理概要     SDカードの電源フラグをクリア
@@ -224,7 +212,6 @@ static void SD_PowerOff(void)
 {
 	PowerFlag = 0;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SD_CheckPower
 // 処理概要     SDカードの電源状態を取得
@@ -235,7 +222,6 @@ static uint8_t SD_CheckPower(void)
 {
 	return PowerFlag;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SD_RxDataBlock
 // 処理概要     SDカードからデータパケットを受信
@@ -271,7 +257,6 @@ static bool SD_RxDataBlock(BYTE *buff, UINT btr)
 
 	return TRUE;
 }
-
 /* データ転送パケット */
 #if _READONLY == 0
 /////////////////////////////////////////////////////////////////////
@@ -330,7 +315,6 @@ static bool SD_TxDataBlock(const BYTE *buff, BYTE token)
 		return FALSE;
 }
 #endif /* _READONLY */
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SD_SendCmd
 // 処理概要     SDカードへコマンドパケットを送信
@@ -376,12 +360,10 @@ static BYTE SD_SendCmd(BYTE cmd, DWORD arg)
 
 	return res;
 }
-
 /*-----------------------------------------------------------------------
   fatfsで使用されるグローバル関数
   user_diskio.cファイルで使用される.
  -----------------------------------------------------------------------*/
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SD_disk_initialize
 // 処理概要     SDカードの初期化を行う
@@ -491,7 +473,6 @@ DSTATUS SD_disk_initialize(BYTE drv)
 
 	return Stat;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SD_disk_status
 // 処理概要     SDカードの状態を取得
@@ -505,7 +486,6 @@ DSTATUS SD_disk_status(BYTE drv)
 
 	return Stat;
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SD_disk_read
 // 処理概要     セクタ単位でデータを読み出す
@@ -554,7 +534,6 @@ DRESULT SD_disk_read(BYTE pdrv, BYTE *buff, DWORD sector, UINT count)
 
 	return count ? RES_ERROR : RES_OK;
 }
-
 /* セクターを書く */
 #if _READONLY == 0
 /////////////////////////////////////////////////////////////////////
@@ -633,7 +612,6 @@ DRESULT SD_disk_write(BYTE pdrv, const BYTE *buff, DWORD sector, UINT count)
 	return count ? RES_ERROR : RES_OK;
 }
 #endif /* _READONLY */
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SD_disk_ioctl
 // 処理概要     SDカードに制御コマンドを送る

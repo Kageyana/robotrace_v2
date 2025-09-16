@@ -132,7 +132,7 @@ void motorControlSpeed(void)
 	iI = veloCtrl.ki * veloCtrl.Int; // 積分
 	iD = veloCtrl.kd * Dif;			 // 微分
 	iRet = iP + iI + iD;
-	iRet = iRet >> 1;
+	iRet = iRet;
 
 	// PWMの上限の設定
 	if (iRet > 900)
