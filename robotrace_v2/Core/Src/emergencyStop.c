@@ -78,7 +78,7 @@ bool cntEmcStopEncStop(void)
 	static uint16_t cntEncStop;
 
 	// 緊急停止条件
-	if (abs(encCurrentN) < 10)
+	if (abs(encCurrentN) < 20)
 	{
 		cntEncStop++;
 	}
