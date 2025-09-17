@@ -294,15 +294,9 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 {
 	va_list args;
 	uint8_t cnt = 0;
-	static union
-	{
-		float f;
-		uint32_t i;
-	} ftoi;
-
 	if (modeLOG)
 	{
-        uint16_t requiredSize = c + (s * sizeof(uint16_t)) + (i * sizeof(uint32_t)) + (f * sizeof(float)); // 引数数に応じたバッファ必要量を算出
+		uint16_t requiredSize = c + (s * sizeof(uint16_t)) + (i * sizeof(uint32_t)) + (f * sizeof(float)); // 引数数に応じたバッファ必要量を算出
 		// 	バッファ配列に保存
 		va_start(args, f);
 		// 8bitデータをバッファへ送る
@@ -317,8 +311,11 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 		// floatデータをバッファへ送る
 		for (cnt = 0; cnt < f; cnt++)
 		{
-			ftoi.f = va_arg(args, double); // 共用体を使用してfloat型のビット操作をできるようにする
-			send32bit(ftoi.i);
+			float floatValue = (float)va_arg(args, double);
+			uint32_t floatBits;
+			// ループ内の一時変数へmemcpyしてfloatのビット列を取り出す
+			memcpy(&floatBits, &floatValue, sizeof(floatBits));
+			send32bit(floatBits);
 		}
 		va_end(args);
 		cntSend++; // 書き込み回数をカウント
