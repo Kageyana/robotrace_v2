@@ -302,8 +302,20 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 
 	if (modeLOG)
 	{
-        uint16_t requiredSize = c + (s * sizeof(uint16_t)) + (i * sizeof(uint32_t)) + (f * sizeof(float)); // 引数数に応じたバッファ必要量を算出
-		// 	バッファ配列に保存
+		uint16_t requiredSize = c + (s * sizeof(uint16_t)) + (i * sizeof(uint32_t)) + (f * sizeof(float)); // 引数数に応じたバッファ必要量を算出
+
+		// 追記するデータ量でバッファがあふれる場合は事前に入れ替えを行う
+		if (logBuffIndex + requiredSize > BUFFER_SIZE_LOG && !sendSD)
+		{
+			logBuffSendIndex = logBuffIndex; // 書き込み待ちバッファのサイズを記録
+			uint8_t *tmp = flushBuf; // flushBufのポインタを退避
+			flushBuf = activeBuf; // 現在のバッファをflushBufに切り替え
+			activeBuf = tmp; // 退避したバッファを新たなactiveに
+			logBuffIndex = 0; // 新バッファの書込位置をリセット
+			sendSD = true; // SD書き込みを要求
+		}
+
+		// バッファ配列に保存
 		va_start(args, f);
 		// 8bitデータをバッファへ送る
 		for (cnt = 0; cnt < c; cnt++)
@@ -322,19 +334,9 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 		}
 		va_end(args);
 		cntSend++; // 書き込み回数をカウント
-
-		// バッファが512バイト付近まで溜まったら確認
-		if (logBuffIndex + requiredSize > BUFFER_SIZE_LOG && !sendSD)
-		{
-			logBuffSendIndex = logBuffIndex;         // 書き込み待ちバッファのサイズを記録
-			uint8_t *tmp = flushBuf;                 // flushBufのポインタを退避
-			flushBuf = activeBuf;                    // 現在のバッファをflushBufに切り替え
-			activeBuf = tmp;                         // 退避したバッファを新たなactiveに
-			logBuffIndex = 0;                        // 新バッファの書込位置をリセット
-			sendSD = true;                           // SD書き込みを要求
-		}
 	}
 }
+
 #endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogPuts
