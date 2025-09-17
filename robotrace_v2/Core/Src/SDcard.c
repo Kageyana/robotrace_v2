@@ -294,32 +294,39 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 {
 	va_list args;
 	uint8_t cnt = 0;
-	static union
-	{
-		float f;
-		uint32_t i;
-	} ftoi;
 
 	if (modeLOG)
 	{
-        uint16_t requiredSize = c + (s * sizeof(uint16_t)) + (i * sizeof(uint32_t)) + (f * sizeof(float)); // 引数数に応じたバッファ必要量を算出
-		// 	バッファ配列に保存
+		uint16_t requiredSize = c + (s * sizeof(uint16_t)) + (i * sizeof(uint32_t)) + (f * sizeof(float)); // 引数数に応じたバッファ必要量を算出
+		//      バッファ配列に保存
 		va_start(args, f);
+		// 連続領域にまとめて書き込むためにポインタで格納位置を管理する
+		uint8_t *dst = activeBuf + logBuffIndex;
 		// 8bitデータをバッファへ送る
 		for (cnt = 0; cnt < c; cnt++)
-			send8bit(va_arg(args, unsigned int)); // 可変長引数の型昇格に合わせる
+			*dst++ = (uint8_t)va_arg(args, unsigned int); // 可変長引数の型昇格に合わせる
 		// 16bitデータをバッファへ送る
 		for (cnt = 0; cnt < s; cnt++)
-			send16bit(va_arg(args, unsigned int)); // 可変長引数の型昇格に合わせる
+		{
+			uint16_t value16 = (uint16_t)va_arg(args, unsigned int); // 可変長引数の型昇格に合わせる
+			memcpy(dst, &value16, sizeof(uint16_t));
+			dst += sizeof(uint16_t);
+		}
 		// 32bitデータをバッファへ送る
 		for (cnt = 0; cnt < i; cnt++)
-			send32bit(va_arg(args, uint32_t));
+		{
+			uint32_t value32 = va_arg(args, uint32_t);
+			memcpy(dst, &value32, sizeof(uint32_t));
+			dst += sizeof(uint32_t);
+		}
 		// floatデータをバッファへ送る
 		for (cnt = 0; cnt < f; cnt++)
 		{
-			ftoi.f = va_arg(args, double); // 共用体を使用してfloat型のビット操作をできるようにする
-			send32bit(ftoi.i);
+			float valueFloat = (float)va_arg(args, double);
+			memcpy(dst, &valueFloat, sizeof(float));
+			dst += sizeof(float);
 		}
+		logBuffIndex = dst - activeBuf;
 		va_end(args);
 		cntSend++; // 書き込み回数をカウント
 
