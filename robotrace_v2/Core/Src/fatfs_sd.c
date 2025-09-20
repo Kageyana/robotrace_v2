@@ -14,6 +14,7 @@ static uint8_t CardType;				   /* SD type 0:MMC, 1:SDC, 2:Block addressing */
 static uint8_t PowerFlag = 0; /* Power condition Flag */
 static volatile bool spiTxBusy = false; /* DMA 転送中フラグ */
 static volatile bool sdTxSuccess = false; /* 転送完了ステータス */
+static volatile uint8_t sdTxResp = 0xFF; /* 最終レスポンスバイト */
 static uint8_t sdTxBuf[515]; /* トークン+512byte+CRC */
 
 /////////////////////////////////////////////////////////////////////
@@ -76,7 +77,7 @@ static void SPI_RxBytePtr(uint8_t *buff)
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 HAL_SPI_TxCpltCallback
-// 処理概要     DMA送信完了割り込みで応答確認とビジー解除を行う
+// 処理概要     DMA送信完了割り込みでレスポンスを回収しフラグ更新
 // 引数         hspi: コールバック元ハンドラ
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
@@ -84,17 +85,9 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 {
 	if (hspi == &SPI_Handle)
 	{
-		uint8_t resp = SPI_RxByte();
-		if ((resp & 0x1F) == 0x05)
-		{
-			while (SPI_RxByte() == 0)
-				;
-			sdTxSuccess = true;
-		}
-		else
-		{
-			sdTxSuccess = false;
-		}
+		/* DMA 送信結果を読み出し、応答と完了状態だけを記録 */
+		sdTxResp = SPI_RxByte();
+		sdTxSuccess = ((sdTxResp & 0x1F) == 0x05);
 		spiTxBusy = false;
 	}
 }
@@ -142,6 +135,7 @@ bool SD_TxDataBlockAsync(const BYTE *buff, BYTE token)
 	sdTxBuf[514] = 0xFF;
 
 	sdTxSuccess = false;
+	sdTxResp = 0xFF;
 	spiTxBusy = true;
 	HAL_SPI_Transmit_DMA(&SPI_Handle, sdTxBuf, sizeof(sdTxBuf));
 	return true;
@@ -155,6 +149,32 @@ bool SD_TxDataBlockAsync(const BYTE *buff, BYTE token)
 bool SD_IsBusy(void)
 {
 	return spiTxBusy;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 SD_WaitDmaTransfer
+// 処理概要     DMA完了とSDカードのビジー解除を待機
+// 引数         なし
+// 戻り値       bool: 成功=true タイムアウト/エラー=false
+/////////////////////////////////////////////////////////////////////
+static bool SD_WaitDmaTransfer(void)
+{
+	/* DMA 完了待ち (最大500ms) */
+	Timer2 = 50;
+	while (SD_IsBusy() && Timer2)
+		;
+	if (SD_IsBusy())
+		return false;
+
+	/* 応答トークンがエラーなら終了 */
+	if (!sdTxSuccess || ((sdTxResp & 0x1F) != 0x05))
+		return false;
+
+	/* 応答後のビジー解除を待機 */
+	if (SD_ReadyWait() != 0xFF)
+		return false;
+
+	return true;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SD_PowerOn
@@ -563,12 +583,8 @@ DRESULT SD_disk_write(BYTE pdrv, const BYTE *buff, DWORD sector, UINT count)
 		/* シングルブロック書き込み */
 		if ((SD_SendCmd(CMD24, sector) == 0) && SD_TxDataBlockAsync(buff, 0xFE))
 		{
-			while (SD_IsBusy())
-			{
-				/* 他処理を実行可能 */
-			}
-
-			if (sdTxSuccess)
+			/* DMA 完了とカード応答を待機 */
+			if (SD_WaitDmaTransfer())
 				count = 0;
 		}
 	}
@@ -588,12 +604,8 @@ DRESULT SD_disk_write(BYTE pdrv, const BYTE *buff, DWORD sector, UINT count)
 				if (!SD_TxDataBlockAsync(buff, 0xFC))
 					break;
 
-				while (SD_IsBusy())
-				{
-					/* 他処理を実行可能 */
-				}
-
-				if (!sdTxSuccess)
+				/* 各ブロックごとにDMA完了とビジー解除を確認 */
+				if (!SD_WaitDmaTransfer())
 					break;
 
 				buff += 512;
