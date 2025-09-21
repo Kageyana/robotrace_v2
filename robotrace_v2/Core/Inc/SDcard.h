@@ -42,7 +42,7 @@ extern bool getFileNumbersError; // getFileNumbersでエラーが発生した際
 // MicroSD
 bool insertSD(void);
 bool initMicroSD(void);
-void createLog(void);
+bool createLog(void);
 void endLog(void);
 void writeMarkerPos(uint32_t distance, uint8_t marker);
 void initLog(void);

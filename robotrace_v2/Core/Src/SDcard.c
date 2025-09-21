@@ -129,9 +129,9 @@ bool initMicroSD(void)
 // モジュール名 createLog
 // 処理概要     ログファイルを作成する
 // 引数         なし
-// 戻り値       なし
+// 戻り値       true:生成成功 false:生成失敗
 /////////////////////////////////////////////////////////////////////
-void createLog(void)
+bool createLog(void)
 {
 	FRESULT fresult;
 	DIR dir;         // Directory
@@ -142,9 +142,9 @@ void createLog(void)
 	fresult = f_opendir(&dir, "/"); // directory open
 	if (fresult != FR_OK)
 	{
-		printf("failed to open root directory: %d\r\n", fresult);
-		// SDカードが未接続などでディレクトリを開けないため、ログ作成を中断する
-		return;
+	        printf("failed to open root directory: %d\r\n", fresult);
+	        // SDカードが未接続などでディレクトリを開けないため、falseで失敗を知らせる
+		return false;
 	}
 
 	do
@@ -186,8 +186,8 @@ void createLog(void)
 	fresult = f_open(&fil_W, fileName, FA_OPEN_ALWAYS | FA_WRITE); // create file
 	if (fresult != FR_OK)
 	{
-		// ファイルオープンに失敗した場合はログ作成を中止する
-		return; // エラーが発生したため処理を終了
+	        // ファイルオープンに失敗した場合はfalseを返して呼び出し元へ通知する
+		return false; // エラーが発生したため処理を終了
 	}
 
 	columnTitle[0] = 0; // バッファを安全に初期化
@@ -229,6 +229,8 @@ void createLog(void)
     strncat((char *)columnTitle, "\n", sizeof(columnTitle) - strlen((char *)columnTitle) - 1); // バッファサイズを指定して安全に改行を追加
     strncat((char *)formatLog, "\n", sizeof(formatLog) - strlen((char *)formatLog) - 1);       // バッファサイズを指定して安全に改行を追加
 	f_printf(&fil_W, columnTitle);
+	// ここまで到達できたらヘッダ生成が完了したのでtrueを返す
+	return true;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 initLog
@@ -497,14 +499,19 @@ void endLog(void)
 	}
 	f_close(&fil_W); // 一時ファイルを閉じる
 
-	createLog(); // ログファイル(csv)を作成
-
 	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ); // 一時ファイルファイルを開く
 	if (fresult != FR_OK)
 	{
 		printf("f_open error in endLog\r\n"); // エラー通知
-		f_close(&fil_W); // 作成したログファイルを閉じる
 		return; // 一時ファイルが読めないと変換できないため中断
+	}
+
+	if (!createLog())
+	{
+		// CSVファイルを開けなかったため変換処理を諦める
+		f_close(&fil); // 変換用に開いた一時ファイルを確実に閉じる
+		cntSend = 0; // 連続走行時の残カウンタをリセットして状態を戻す
+		return; // ヘッダ生成ができないので早期に復帰する
 	}
 
 	clearXYcie(); // xy座標クリア
@@ -590,7 +597,11 @@ void endLog(void)
 	cntSend = 0;
 
 #else
-	createLog();	 // ログファイル作成
+	if (!createLog())
+	{
+		// CSVファイル生成に失敗した場合はログ出力をスキップする
+		return; // ファイルが無い状態での書き込みを防ぐため早期復帰
+	}
 	writeLogPrint(); // ログ書き込み
 	f_close(&fil_W);
 #endif
