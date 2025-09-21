@@ -261,6 +261,8 @@ void initLog(void)
 {
     FRESULT fresult;
 #ifdef LOG_RUNNING_WRITE
+	// CSV変換ループの実行回数を走行ごとに正しく制御するため送信カウンタをリセット
+	cntSend = 0;
 	fresult = f_open(&fil_W, "temp", FA_OPEN_ALWAYS | FA_WRITE); // create file
 	if (fresult != FR_OK)
 	{
@@ -574,6 +576,8 @@ void endLog(void)
 	f_close(&fil);	 // 一時ファイル
 
 	sd_unmount(); // SDカードをアンマウント
+	// 連続走行時にCSV変換ループが累積しないよう送信カウンタをリセット
+	cntSend = 0;
 
 #else
 	createLog();	 // ログファイル作成
