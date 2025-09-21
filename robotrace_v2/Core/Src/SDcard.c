@@ -275,6 +275,7 @@ void initLog(void)
 	flushBuf = logBuffer[1];			// フラッシュバッファを初期化
 	logBuffSendIndex = logBuffIndex;	// バッファのバイト数を記録
 	sendSD = false;						// 書き込み要求をリセット
+	logOverflow = false;				// ログバッファ状態フラグをリセット
 #else
     // 構造体配列の初期化
     memset(&logVal, 0, sizeof(logData) * BUFFER_SIZE_LOG);     // 綴りの誤りを修正
@@ -305,8 +306,17 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 		uint16_t requiredSize = c + (s * sizeof(uint16_t)) + (i * sizeof(uint32_t)) + (f * sizeof(float)); // 引数数に応じたバッファ必要量を算出
 
 		// 追記するデータ量でバッファがあふれる場合は事前に入れ替えを行う
-		if (logBuffIndex + requiredSize > BUFFER_SIZE_LOG && !sendSD)
+		if (logBuffIndex + requiredSize > BUFFER_SIZE_LOG)
 		{
+			if (sendSD)
+			{
+				writeLogPuts();			// flushBufが書き込み中なら即時書き込みを促して空きを確保する
+				if (sendSD)
+				{
+					logOverflow = true;		// 空き確保に失敗したことを記録して後段で検知する
+					return;				// 空きができるまで追記を保留し、バッファ破壊を防ぐ
+				}
+			}
 			logBuffSendIndex = logBuffIndex; // 書き込み待ちバッファのサイズを記録
 			uint8_t *tmp = flushBuf; // flushBufのポインタを退避
 			flushBuf = activeBuf; // 現在のバッファをflushBufに切り替え
