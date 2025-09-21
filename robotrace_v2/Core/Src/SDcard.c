@@ -360,19 +360,21 @@ void writeLogPuts(void)
 	FRESULT fresult;		// f_writeの戻り値
 	UINT writtenlog = 0;	// 実際に書き込んだサイズ
 
-	if (modeLOG)
+	if (!modeLOG && !sendSD)
 	{
-		if (sendSD) // 書き込み要求がある場合
+		return; // ログ停止中で書き込み要求が無い場合は処理不要
+	}
+
+	if (sendSD) // 書き込み要求がある場合
+	{
+		fresult = f_write(&fil_W, flushBuf, logBuffSendIndex, &writtenlog); // flushBufをSDへ書き出す
+		if (fresult != FR_OK || writtenlog != logBuffSendIndex)
 		{
-			fresult = f_write(&fil_W, flushBuf, logBuffSendIndex, &writtenlog); // flushBufをSDへ書き出す
-			if (fresult != FR_OK || writtenlog != logBuffSendIndex)
-			{
-				sendSD = false; // エラー時は要求を解除
-				return;
-			}
-			sendSD = false; // 書き込み完了フラグをクリア
-        }
-    }
+			sendSD = false; // エラー時は要求を解除
+			return;
+		}
+		sendSD = false; // 書き込み完了フラグをクリア
+	}
 }
 #endif
 ////////////////////////////////////////////////////////////////////
