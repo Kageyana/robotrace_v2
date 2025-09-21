@@ -36,6 +36,10 @@ extern int32_t encLog;
 extern bool logOverflow;     // ログバッファ上限超過フラグ
 extern bool markerOverflow;  // マーカーバッファ上限超過フラグ
 extern bool getFileNumbersError; // getFileNumbersでエラーが発生した際のフラグ
+#ifdef LOG_RUNNING_WRITE
+extern volatile bool sendSD; // flushBufをSDに送る要求フラグ(割込み共有)
+extern volatile bool logWritePriorityReq; // 割込み外での優先書き込み要求フラグ
+#endif
 //====================================//
 // プロトタイプ宣言
 //====================================//

@@ -224,11 +224,19 @@ void Interrupt100us(void)
 void logWriteTask(void)
 {
 #ifdef LOG_RUNNING_WRITE
-        if (logWriteReq)
-        {
-                writeLogPuts();        // 割り込み外でSD書き込みを実行する
-                logWriteReq = false;
-        }
+		if (logWritePriorityReq)
+		{
+			writeLogPuts();	// 優先要求に応じて即時にSDへ書き込む
+			if (!sendSD)
+			{
+				logWritePriorityReq = false;	// 書き込みが完了したので優先要求を解除
+			}
+		}
+		else if (logWriteReq)
+		{
+			writeLogPuts();	// 割り込み外でSD書き込みを実行する
+			logWriteReq = false;
+		}
 #endif
 }
 /////////////////////////////////////////////////////////////////////

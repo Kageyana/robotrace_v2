@@ -22,6 +22,7 @@ uint8_t *flushBuf = logBuffer[1];		// SD書き込み待ちバッファ
 int16_t logBuffIndex = 0;				// 一時記録バッファ書込アドレス
 uint32_t logBuffSendIndex = 0;			// flushBufに溜まったバイト数
 volatile bool sendSD = false;			// flushBufをSDへ送るフラグ(割込み共有)
+volatile bool logWritePriorityReq = false;	// 優先的にSD書き込みを要求するフラグ
 uint16_t cntSend = 0;
 uint8_t *logaddress;
 #else
@@ -275,6 +276,7 @@ void initLog(void)
 	flushBuf = logBuffer[1];			// フラッシュバッファを初期化
 	logBuffSendIndex = logBuffIndex;	// バッファのバイト数を記録
 	sendSD = false;						// 書き込み要求をリセット
+	logWritePriorityReq = false;	// 優先書き込み要求をリセット
 #else
     // 構造体配列の初期化
     memset(&logVal, 0, sizeof(logData) * BUFFER_SIZE_LOG);     // 綴りの誤りを修正
@@ -313,6 +315,7 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 			activeBuf = tmp; // 退避したバッファを新たなactiveに
 			logBuffIndex = 0; // 新バッファの書込位置をリセット
 			sendSD = true; // SD書き込みを要求
+			logWritePriorityReq = true; // 割込み外で即時に書き込みを行うよう要求
 		}
 
 		// バッファ配列に保存
