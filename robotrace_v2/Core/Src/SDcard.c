@@ -302,15 +302,29 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 	{
 		uint16_t requiredSize = c + (s * sizeof(uint16_t)) + (i * sizeof(uint32_t)) + (f * sizeof(float)); // 引数数に応じたバッファ必要量を算出
 
+		if (requiredSize > BUFFER_SIZE_LOG)
+		{
+			//	1回分のログがバッファに収まらない場合は強制的に破棄し、以降の処理でのメモリ破壊を防ぐ
+			logOverflow = true;
+			return;
+		}
+
 		// 追記するデータ量でバッファがあふれる場合は事前に入れ替えを行う
 		if (logBuffIndex + requiredSize > BUFFER_SIZE_LOG && !sendSD)
 		{
+			//	SD書き込み中でない場合はflush用バッファへ入れ替え、送信要求を出して領域を確保する
 			logBuffSendIndex = logBuffIndex; // 書き込み待ちバッファのサイズを記録
 			uint8_t *tmp = flushBuf; // flushBufのポインタを退避
 			flushBuf = activeBuf; // 現在のバッファをflushBufに切り替え
 			activeBuf = tmp; // 退避したバッファを新たなactiveに
 			logBuffIndex = 0; // 新バッファの書込位置をリセット
 			sendSD = true; // SD書き込みを要求
+		}
+		else if (logBuffIndex + requiredSize > BUFFER_SIZE_LOG && sendSD)
+		{
+			//	SD書き込み待ち中は追記先が確保できないため今回のログを破棄して安全側に倒す
+			logOverflow = true;
+			return;
 		}
 
 		// バッファ配列に保存
@@ -729,9 +743,17 @@ void createDir(uint8_t *dirName)
 #ifdef LOG_RUNNING_WRITE
 void send8bit(uint8_t data)
 {
+	if (logBuffIndex < 0 || logBuffIndex >= BUFFER_SIZE_LOG)
+	{
+		//	アクティブバッファ末尾に達した場合はこれ以上書き込まずオーバーフローを通知
+		logOverflow = true;
+		return;
+	}
+
 	// アクティブバッファに値を格納し、書き込み位置を進める
 	activeBuf[logBuffIndex++] = data;
 }
+
 #endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 send16bit
@@ -742,9 +764,17 @@ void send8bit(uint8_t data)
 #ifdef LOG_RUNNING_WRITE
 void send16bit(uint16_t data)
 {
+	if (logBuffIndex < 0 || (logBuffIndex + 1) >= BUFFER_SIZE_LOG)
+	{
+		//	2バイト分の空きが確保できないときは書き込みを抑止してログ破損を防ぐ
+		logOverflow = true;
+		return;
+	}
+
 	activeBuf[logBuffIndex++] = (data >> 8); // 上位バイトをバッファに格納
 	activeBuf[logBuffIndex++] = data;        // 下位バイトをバッファに格納
 }
+
 #endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 send32bit
@@ -755,11 +785,19 @@ void send16bit(uint16_t data)
 #ifdef LOG_RUNNING_WRITE
 void send32bit(uint32_t data)
 {
+	if (logBuffIndex < 0 || (logBuffIndex + 3) >= BUFFER_SIZE_LOG)
+	{
+		//	4バイトを確保できない場合は書き込みをスキップしてメモリ保護を優先
+		logOverflow = true;
+		return;
+	}
+
 	activeBuf[logBuffIndex++] = (data >> 24); // 最上位バイトをバッファに格納
 	activeBuf[logBuffIndex++] = (data >> 16); // 上位から2番目のバイトをバッファに格納
 	activeBuf[logBuffIndex++] = (data >> 8);  // 上位から3番目のバイトをバッファに格納
 	activeBuf[logBuffIndex++] = data;         // 最下位バイトをバッファに格納
 }
+
 #endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logPut8bit
