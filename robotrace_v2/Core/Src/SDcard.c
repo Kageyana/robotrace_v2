@@ -495,6 +495,15 @@ void endLog(void)
 	{
 		printf("f_write error in endLog\r\n"); // エラー通知
 	}
+	else if (writtenlog != logBuffSendIndex)
+	{
+		//	未書き込みが発生した場合はCSV変換を中断して不整合を防止する
+		printf("f_write size mismatch in endLog\r\n"); // エラー通知
+		f_close(&fil_W); // 一時ファイルを閉じる
+		sd_unmount(); // SDカードをアンマウント
+		cntSend = 0; // 未送信データが残らないようにリセット
+		return; // 不完全なログからのCSV変換を中止
+	}
 	f_close(&fil_W); // 一時ファイルを閉じる
 
 	createLog(); // ログファイル(csv)を作成
@@ -517,6 +526,16 @@ void endLog(void)
 			f_close(&fil_W); // CSVファイルを閉じる
 			f_close(&fil); // 一時ファイルを閉じる
 			return; // データが読めないと解析不能なため中断
+		}
+		else if (readByte != sizeof(log))
+		{
+			//	読み出し不足が起きた場合は旧データ混入を防ぐため安全側で終了する
+			printf("f_read size mismatch in endLog\r\n"); // エラー通知
+			f_close(&fil_W); // CSVファイルを閉じる
+			f_close(&fil); // 一時ファイルを閉じる
+			sd_unmount(); // SDカードをアンマウント
+			cntSend = 0; // 次回以降の変換ループに影響しないようにリセット
+			return; // 不完全なログからのCSV変換を中止
 		}
 		logaddress = log; // 読み込んだ配列の先頭アドレスを取得
 
