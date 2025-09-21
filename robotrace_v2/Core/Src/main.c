@@ -22,9 +22,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
-/* SSD1306制御用ヘッダ */
-#include "ssd1306.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -88,7 +85,8 @@ static void MX_TIM1_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_I2C3_Init(void);
 /* USER CODE BEGIN PFP */
-
+uint8_t bufr[80];
+UINT br;
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -134,7 +132,6 @@ int main(void)
   MX_TIM13_Init();
   MX_TIM7_Init();
   MX_ADC2_Init();
-  MX_FATFS_Init();
   MX_SPI2_Init();
   MX_TIM1_Init();
   MX_TIM4_Init();

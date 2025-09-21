@@ -2,14 +2,12 @@
 // インクルード
 //====================================//
 #include "SDcard.h"
-#include "fatfs.h"
-#include <string.h>
-#include <stdio.h>
+#include "sd_functions.h"
+#include "stdio.h"
 //====================================//
 // グローバル変数の宣
 //====================================//
 // MicroSD
-FATFS fs;
 FIL fil_W;
 FIL fil_R;
 
@@ -92,7 +90,7 @@ bool initMicroSD(void)
 	uint32_t total, free_space;
 
 	// SDcardをマウント
-	fresult = f_mount(&fs, "", 0);
+	fresult = sd_mount();
 	if (fresult == FR_OK)
 	{
 		// マウント成功
@@ -575,6 +573,8 @@ void endLog(void)
 	f_close(&fil_W); // ログファイル(csv)
 	f_close(&fil);	 // 一時ファイル
 
+	sd_unmount(); // SDカードをアンマウント
+
 #else
 	createLog();	 // ログファイル作成
 	writeLogPrint(); // ログ書き込み
@@ -679,7 +679,7 @@ void SDtest(void)
 	uint32_t start = HAL_GetTick(); // SPI待ちにタイムアウトを設定
 	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY)
 	{
-		if (HAL_GetTick() - start > SPI_TIMEOUT)
+		if (HAL_GetTick() - start > 1000)
 		{
 			break;
 		}

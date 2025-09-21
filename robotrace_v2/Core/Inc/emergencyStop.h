@@ -14,7 +14,7 @@
 #define STOP_LINESENSOR         4
 #define STOP_OVERSPEED          5
 
-#define STOP_COUNT_ENCODER_STOP	200		// エンコーダ停止
+#define STOP_COUNT_ENCODER_STOP	100		// エンコーダ停止
 #define STOP_COUNT_ANGLE_X	    100		// X方向の角速度変化
 #define STOP_COUNT_ANGLE_Y	    100		// Y方向の角速度変化
 #define STOP_COUNT_TIME		    1000	// 時間停止
