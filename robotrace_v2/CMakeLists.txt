@@ -52,7 +52,10 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 	${CMAKE_SOURCE_DIR}/Core/Src/DWT.c
 	${CMAKE_SOURCE_DIR}/Core/Src/emergencyStop.c
 	${CMAKE_SOURCE_DIR}/Core/Src/encoder.c
-	${CMAKE_SOURCE_DIR}/Core/Src/fatfs_sd.c
+	${CMAKE_SOURCE_DIR}/Core/Src/sd_benchmark.c
+	${CMAKE_SOURCE_DIR}/Core/Src/sd_diskio_spi.c
+	${CMAKE_SOURCE_DIR}/Core/Src/sd_functions.c
+	${CMAKE_SOURCE_DIR}/Core/Src/sd_spi.c
 	${CMAKE_SOURCE_DIR}/Core/Src/lineSensor.c
 	${CMAKE_SOURCE_DIR}/Core/Src/main.c
 	${CMAKE_SOURCE_DIR}/Core/Src/markerSensor.c

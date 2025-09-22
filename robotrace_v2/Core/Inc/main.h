@@ -115,24 +115,24 @@ void Error_Handler(void);
 #define ButtonL_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
-	extern ADC_HandleTypeDef hadc1;
-	extern ADC_HandleTypeDef hadc2;
-	extern DMA_HandleTypeDef hdma_adc1;
+extern ADC_HandleTypeDef hadc1;
+extern ADC_HandleTypeDef hadc2;
+extern DMA_HandleTypeDef hdma_adc1;
 
-	extern I2C_HandleTypeDef hi2c1;
+extern I2C_HandleTypeDef hi2c1;
 
-	extern SPI_HandleTypeDef hspi2;
-	extern SPI_HandleTypeDef hspi3;
+extern SPI_HandleTypeDef hspi2;
+extern SPI_HandleTypeDef hspi3;
 
-	extern TIM_HandleTypeDef htim1;
-	extern TIM_HandleTypeDef htim2;
-	extern TIM_HandleTypeDef htim3;
-	extern TIM_HandleTypeDef htim4;
-	extern TIM_HandleTypeDef htim6;
-	extern TIM_HandleTypeDef htim7;
-	extern TIM_HandleTypeDef htim8;
-	extern TIM_HandleTypeDef htim10;
-	extern TIM_HandleTypeDef htim13;
+extern TIM_HandleTypeDef htim1;
+extern TIM_HandleTypeDef htim2;
+extern TIM_HandleTypeDef htim3;
+extern TIM_HandleTypeDef htim4;
+extern TIM_HandleTypeDef htim6;
+extern TIM_HandleTypeDef htim7;
+extern TIM_HandleTypeDef htim8;
+extern TIM_HandleTypeDef htim10;
+extern TIM_HandleTypeDef htim13;
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

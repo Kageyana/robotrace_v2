@@ -1184,7 +1184,7 @@ static void setup_start(void)
 	{
 		setTargetAngularVelocity(CALIBRATIONSPEED);
 		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-		if (BMI088val.angle.z < -320.0)
+		if (BMI088val.angle.z < -340.0)
 		{
 			pattern.calibration = 5;
 		}
@@ -1252,10 +1252,10 @@ void setup(void)
 				setupFlags.clickStart = -1;
 			}
 
-			if (pattern.display > 0x9)
+			if (pattern.display > HEX_PID_DIST)
 				pattern.display = 0;
 			else if (pattern.display < 0)
-				pattern.display = 0x9;
+				pattern.display = HEX_PID_DIST;
 			encClick = 0;
 		}
 	}
