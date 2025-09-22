@@ -16,6 +16,7 @@ uint8_t targetSpeed;		 // 目標速度
 float targetAngle;			 // 目標角速度
 float targetAngularVelocity; // 目標角度
 int16_t targetDist;			 // 目標X座標
+	int16_t traceDev;			// ライントレース偏差(SDログ用)
 
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 setTargetSpeed
@@ -85,6 +86,7 @@ void motorControlTrace(void)
 		senR = (lSensor[6]);
 	}
 	Dev = senL - senR;
+	traceDev = (int16_t)Dev;	// SDログ用に偏差を保持
 
 	// I成分積算
 	lineTraceCtrl.Int += (float)Dev * 0.001;

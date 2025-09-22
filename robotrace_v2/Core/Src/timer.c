@@ -131,6 +131,7 @@ void Interrupt1ms(void)
 					// (int16_t)(motorCurrentR * 10000),
 					lineTraceCtrl.pwm,
 					veloCtrl.pwm,
+					traceDev,		// Dev偏差
 					// 32bit
 					encTotalOptimal,
 					// float型
