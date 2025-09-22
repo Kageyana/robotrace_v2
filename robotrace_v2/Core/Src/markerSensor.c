@@ -96,7 +96,7 @@ uint8_t checkMarker(void)
 	distR = nowEncTotalN - encMarkerR;
 
 	// ゴールマーカーを検出してから40~50mm走行後かつカーブマーカーを140mm検出していないとき
-	if (distR > encMM(50) && distR <= encMM(60) && distL > encMM(140))
+	if (distR > encMM(50) && distR <= encMM(60) && distL > encMM(100))
 	{
 		ret = RIGHTMARKER;
 	}

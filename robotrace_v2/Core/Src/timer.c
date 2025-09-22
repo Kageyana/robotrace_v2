@@ -139,9 +139,9 @@ void Interrupt1ms(void)
 				);
 #else
 				writeLogBufferPrint(); // バッファにログを保存
-#endif
 				cntLog = 0;
-				encLog = 0;
+#endif
+				encLog = 0;	// ログ用エンコーダパルスをリセット
 			}
 		}
 	}

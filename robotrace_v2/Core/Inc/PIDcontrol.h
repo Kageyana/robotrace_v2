@@ -10,9 +10,16 @@
 //====================================//
 // シンボル定義
 //====================================//
-#define KP1		22
+#define KP1		20
 #define KI1		0
-#define KD1		100
+#define KD1		220
+
+// ライントレース用センサ重み係数（中央から外側に向かって適用）
+#define TRACE_WEIGHT_CENTER		0.99f
+#define TRACE_WEIGHT_INNER		0.99f
+#define TRACE_WEIGHT_MIDDLE		1.0f
+#define TRACE_WEIGHT_OUTER		1.0f
+#define TRACE_WEIGHT_FAR		1.0f
 
 #define KP2		15
 #define KI2		100

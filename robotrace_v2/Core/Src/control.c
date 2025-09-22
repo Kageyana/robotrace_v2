@@ -49,7 +49,7 @@ int16_t countdown;
 // マーカー関連
 uint8_t courseMarker;
 uint8_t beforeCourseMarker;
-uint32_t cntMarker = 0;
+uint16_t cntMarker = 0;
 uint8_t courseMarkerLog;
 int32_t straightMeter = 0;
 bool straightState = false;
@@ -392,7 +392,7 @@ void loopSystem(void)
 			}
 
 			// 変数初期化
-			encRightMarker = encMM(1000);
+			encRightMarker = 0;
 			veloCtrl.Int = 0.0;
 			yawRateCtrl.Int = 0.0;
 
@@ -431,8 +431,10 @@ void loopSystem(void)
 			clearXYcie(); // 座標計算変数初期化
 
 			if (initMSD)
+			{
 				modeLOG = true; // log start
-
+			}
+			
 			patternTrace = 12;
 		}
 		break;
@@ -523,26 +525,26 @@ void loopSystem(void)
 		}
 		break;
 
-        case 101:
-			if (modeDSP && !ssd1306_IsDMARunning())
-			{
-				ssd1306_UpdateScreen_DMA();        // 停止していた画面更新を再開
-			}
-			// 停止速度まで減速
-			if (enc1 >= encMM(200))
-			{
-				setTargetSpeed(0);
-			}
-			else
-			{
-				setTargetSpeed(tgtParam.stop);
-			}
-			motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+	case 101:
+		if (modeDSP && !ssd1306_IsDMARunning())
+		{
+			ssd1306_UpdateScreen_DMA();        // 停止していた画面更新を再開
+		}
+		// 停止速度まで減速
+		if (enc1 >= encMM(200))
+		{
+			setTargetSpeed(0);
+		}
+		else
+		{
+			setTargetSpeed(tgtParam.stop);
+		}
+		motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 
-			if (encCurrentN == 0)
-			{
-				patternTrace = 102;
-			}
+		if (encCurrentN == 0)
+		{
+			patternTrace = 102;
+		}
 		break;
 
 	case 102:
@@ -668,15 +670,27 @@ void emargencyStop(void)
 
 	motorPwmOutSynth(0, 0, 0, 0);
 
+	if (!ssd1306_IsDMARunning())
+	{
+		ssd1306_UpdateScreen_DMA();        // 停止していた画面更新を再開
+	}
+
 	if (modeLOG)
+	{
+		if (modeDSP)
+		{
+			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+			ssd1306_SetCursor(0, 25);
+			ssd1306_printf(Font_11x18, "log");
+			ssd1306_SetCursor(0, 45);
+			ssd1306_printf(Font_11x18, "Writing");
+		}
+
 		endLog(); // ログ保存終了
+	}
 
 	if (modeDSP)
 	{
-		if (!ssd1306_IsDMARunning())
-		{
-			ssd1306_UpdateScreen_DMA();        // 停止していた画面更新を再開
-		}
 		ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 
 		ssd1306_SetCursor(36, 25);

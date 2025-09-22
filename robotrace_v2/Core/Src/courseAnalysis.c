@@ -6,6 +6,8 @@
 //====================================//
 // グローバル変数の宣
 //====================================//
+static const float invPulseConst = 10.0F / PALSE_MILLIMETER;	// エンコーダパルスをミリメートル換算する係数
+static const float angFactor = DEG2RAD;			// 角速度[deg/s]をラジアン換算する係数
 uint8_t optimalTrace = 0;
 uint16_t optimalIndex;
 int16_t numPPADarry; // path palanning analysis distance (PPAD)
@@ -33,20 +35,22 @@ float calcROC(int16_t velo, float angvelo, float dt)
 {
 	float dl, drad, ret;
 
-	const float invPulseConst = 10.0F / PALSE_MILLIMETER; // パルス→距離変換係数
-	const float angFactor = DEG2RAD * dt; // 角速度→ラジアン変換係数
 	dl = (float)velo * invPulseConst; // [palse] → [mm]
-	drad = angvelo * angFactor; // [deg/s] → [rad]
+	drad = angvelo * angFactor * dt; // 定義済み係数を利用して[deg/s]を[rad]に変換
 
+	// fabsfの代わりに符号で絶対値を判定する（負の値なら反転）
+	float absDrad = (drad < 0.0F) ? -drad : drad;
 	// 角速度が極小の場合は直線とみなして即座に返す
-	if (fabsf(drad) < 1e-6F)
+	if (absDrad < 1e-6F)
 	{
 		return 2000.0F;
 	}
 
 	ret = dl / drad; // 曲率半径を計算
+	// fabsfの代わりに符号で絶対値を判定する（負の値なら反転）
+	float absRet = (ret < 0.0F) ? -ret : ret;
 	// 曲率半径が大きい＝直線の場合は極大にする
-	if (fabsf(ret) > 1500.0F)
+	if (absRet > 1500.0F)
 	{
 		ret = 2000.0F;
 	}
@@ -677,31 +681,33 @@ void processMarkerEvent(void) {
 			if (straightState) {
 				// 距離基準2次走行かつストレート区間中のとき
 				
-				int32_t i, j, errorDistance = 0;
-				for (i = pathedMarker; i <= numPPAMarry; i++) {
-					// 現在地から一番近いマーカーを探す
-					if (encTotalOptimal - markerPos[i].distance < 0) {
-						for (j = i; j > 0; j--) {
-							if (abs(encTotalOptimal - markerPos[j].distance) < encMM(100)) {
-								errorDistance = encTotalOptimal - DistanceOptimal; // 現在の差を計算
-								encTotalOptimal = markerPos[j].distance;	   // 距離を補正
-								DistanceOptimal = encTotalOptimal - errorDistance; // 補正後の現在距離からの差分
-								optimalIndex = markerPos[j].indexPPAD;		   // インデックス更新
-								if (j - 5 < 0) {
-									pathedMarker = j - 5;
-								} else {
-									pathedMarker = 0;
-								}
-								straightState = false;
-								straightMeter = 0;
-								break;
-							}
-						}
-						if (errorDistance != 0)
-						{
-							break;
-						}
+				int32_t low = pathedMarker, high = numPPAMarry, mid;
+				int32_t j, errorDistance = 0;
+				// 二分探索で現在位置に最も近いマーカーを高速に検索
+				while (low < high) {
+					mid = (low + high) / 2;
+					if (markerPos[mid].distance < encTotalOptimal) {
+						low = mid + 1;
+					} else {
+						high = mid;
 					}
+				}
+				j = low;
+				if (j > 0 && abs(encTotalOptimal - markerPos[j].distance) >= abs(encTotalOptimal - markerPos[j - 1].distance)) {
+					j--;
+				}
+				if (abs(encTotalOptimal - markerPos[j].distance) < encMM(100)) {
+					errorDistance = encTotalOptimal - DistanceOptimal; // 現在の差を計算
+					encTotalOptimal = markerPos[j].distance;           // 距離を補正
+					DistanceOptimal = encTotalOptimal - errorDistance; // 補正後の現在距離からの差分
+					optimalIndex = markerPos[j].indexPPAD;             // インデックス更新
+					if (j - 5 < 0) {
+						pathedMarker = j - 5;
+					} else {
+						pathedMarker = 0;
+					}
+					straightState = false;
+					straightMeter = 0;
 				}
 			}
 		} else if(optimalTrace == BOOST_SHORTCUT) {
@@ -713,7 +719,6 @@ void processMarkerEvent(void) {
 		if (courseMarker == 0 && beforeCourseMarker > 0) {
 			writeMarkerPos(encTotalOptimal, beforeCourseMarker);
 		}
-
-		beforeCourseMarker = courseMarker; // 前回のマーカー状態を更新
 	}
+	beforeCourseMarker = courseMarker; // 前回のマーカー状態を更新
 }

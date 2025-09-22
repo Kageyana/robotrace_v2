@@ -2,14 +2,12 @@
 // インクルード
 //====================================//
 #include "SDcard.h"
-#include "fatfs.h"
-#include <string.h>
-#include <stdio.h>
+#include "sd_functions.h"
+#include "stdio.h"
 //====================================//
 // グローバル変数の宣
 //====================================//
 // MicroSD
-FATFS fs;
 FIL fil_W;
 FIL fil_R;
 
@@ -92,7 +90,7 @@ bool initMicroSD(void)
 	uint32_t total, free_space;
 
 	// SDcardをマウント
-	fresult = f_mount(&fs, "", 0);
+	fresult = sd_mount();
 	if (fresult == FR_OK)
 	{
 		// マウント成功
@@ -264,6 +262,8 @@ void initLog(void)
 {
     FRESULT fresult;
 #ifdef LOG_RUNNING_WRITE
+	// CSV変換ループの実行回数を走行ごとに正しく制御するため送信カウンタをリセット
+	cntSend = 0;
 	fresult = f_open(&fil_W, "temp", FA_OPEN_ALWAYS | FA_WRITE); // create file
 	if (fresult != FR_OK)
 	{
@@ -276,6 +276,7 @@ void initLog(void)
 	flushBuf = logBuffer[1];			// フラッシュバッファを初期化
 	logBuffSendIndex = logBuffIndex;	// バッファのバイト数を記録
 	sendSD = false;						// 書き込み要求をリセット
+	logOverflow = false;				// ログバッファ状態フラグをリセット
 #else
     // 構造体配列の初期化
     memset(&logVal, 0, sizeof(logData) * BUFFER_SIZE_LOG);     // 綴りの誤りを修正
@@ -303,8 +304,29 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 
 	if (modeLOG)
 	{
-        uint16_t requiredSize = c + (s * sizeof(uint16_t)) + (i * sizeof(uint32_t)) + (f * sizeof(float)); // 引数数に応じたバッファ必要量を算出
-		// 	バッファ配列に保存
+		uint16_t requiredSize = c + (s * sizeof(uint16_t)) + (i * sizeof(uint32_t)) + (f * sizeof(float)); // 引数数に応じたバッファ必要量を算出
+
+		// 追記するデータ量でバッファがあふれる場合は事前に入れ替えを行う
+		if (logBuffIndex + requiredSize > BUFFER_SIZE_LOG)
+		{
+			if (sendSD)
+			{
+				writeLogPuts();			// flushBufが書き込み中なら即時書き込みを促して空きを確保する
+				if (sendSD)
+				{
+					logOverflow = true;		// 空き確保に失敗したことを記録して後段で検知する
+					return;				// 空きができるまで追記を保留し、バッファ破壊を防ぐ
+				}
+			}
+			logBuffSendIndex = logBuffIndex; // 書き込み待ちバッファのサイズを記録
+			uint8_t *tmp = flushBuf; // flushBufのポインタを退避
+			flushBuf = activeBuf; // 現在のバッファをflushBufに切り替え
+			activeBuf = tmp; // 退避したバッファを新たなactiveに
+			logBuffIndex = 0; // 新バッファの書込位置をリセット
+			sendSD = true; // SD書き込みを要求
+		}
+
+		// バッファ配列に保存
 		va_start(args, f);
 		// 8bitデータをバッファへ送る
 		for (cnt = 0; cnt < c; cnt++)
@@ -323,19 +345,9 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 		}
 		va_end(args);
 		cntSend++; // 書き込み回数をカウント
-
-		// バッファが512バイト付近まで溜まったら確認
-		if (logBuffIndex + requiredSize > BUFFER_SIZE_LOG && !sendSD)
-		{
-			logBuffSendIndex = logBuffIndex;         // 書き込み待ちバッファのサイズを記録
-			uint8_t *tmp = flushBuf;                 // flushBufのポインタを退避
-			flushBuf = activeBuf;                    // 現在のバッファをflushBufに切り替え
-			activeBuf = tmp;                         // 退避したバッファを新たなactiveに
-			logBuffIndex = 0;                        // 新バッファの書込位置をリセット
-			sendSD = true;                           // SD書き込みを要求
-		}
 	}
 }
+
 #endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogPuts
@@ -349,19 +361,21 @@ void writeLogPuts(void)
 	FRESULT fresult;		// f_writeの戻り値
 	UINT writtenlog = 0;	// 実際に書き込んだサイズ
 
-	if (modeLOG)
+	if (!modeLOG && !sendSD)
 	{
-		if (sendSD) // 書き込み要求がある場合
+		return; // ログ停止中で書き込み要求が無い場合は処理不要
+	}
+
+	if (sendSD) // 書き込み要求がある場合
+	{
+		fresult = f_write(&fil_W, flushBuf, logBuffSendIndex, &writtenlog); // flushBufをSDへ書き出す
+		if (fresult != FR_OK || writtenlog != logBuffSendIndex)
 		{
-			fresult = f_write(&fil_W, flushBuf, logBuffSendIndex, &writtenlog); // flushBufをSDへ書き出す
-			if (fresult != FR_OK || writtenlog != logBuffSendIndex)
-			{
-				sendSD = false; // エラー時は要求を解除
-				return;
-			}
-			sendSD = false; // 書き込み完了フラグをクリア
-        }
-    }
+			sendSD = false; // エラー時は要求を解除
+			return;
+		}
+		sendSD = false; // 書き込み完了フラグをクリア
+	}
 }
 #endif
 ////////////////////////////////////////////////////////////////////
@@ -575,6 +589,12 @@ void endLog(void)
 	f_close(&fil_W); // ログファイル(csv)
 	f_close(&fil);	 // 一時ファイル
 
+	f_unlink("temp"); // 一時ファイルを削除
+
+	sd_unmount(); // SDカードをアンマウント
+	// 連続走行時にCSV変換ループが累積しないよう送信カウンタをリセット
+	cntSend = 0;
+
 #else
 	createLog();	 // ログファイル作成
 	writeLogPrint(); // ログ書き込み
@@ -679,7 +699,7 @@ void SDtest(void)
 	uint32_t start = HAL_GetTick(); // SPI待ちにタイムアウトを設定
 	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY)
 	{
-		if (HAL_GetTick() - start > SPI_TIMEOUT)
+		if (HAL_GetTick() - start > 1000)
 		{
 			break;
 		}

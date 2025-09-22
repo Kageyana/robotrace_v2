@@ -1,10 +1,11 @@
 .metadata/
 build/
+.cache/
 
-robotrace_v2/Debug/
-robotrace_v2/.settings/
+Debug/
+.settings/
 *launch
-robotrace_v2/build/
+build/
 
 #cmake
 CMakeLists.txt.user

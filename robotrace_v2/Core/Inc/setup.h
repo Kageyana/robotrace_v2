@@ -13,6 +13,7 @@
 #define TYPE_FLOAT 1 // float型
 
 #define PUSHTIME 5 // 長押し判定時間[x50ms]
+#define WHEEL_CLICK 800 // ホイールクリックのパルス数
 
 #define CALIBRATIONSPEED -1500.0F // ラインセンサのキャリブレーション時の角速度[rad/s]
 

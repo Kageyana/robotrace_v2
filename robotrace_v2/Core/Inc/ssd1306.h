@@ -9,10 +9,8 @@
 #define __SSD1306_H__
 
 #include <stddef.h>
-#include <_ansi.h>
 #include <stdarg.h>
 
-_BEGIN_STD_C
 
 #include "ssd1306_conf.h"
 
@@ -194,7 +192,5 @@ void ssd1306_Reset(void);
 void ssd1306_WriteCommand(uint8_t byte);
 void ssd1306_WriteData(uint8_t* buffer, size_t buff_size);
 SSD1306_Error_t ssd1306_FillBuffer(uint8_t* buf, uint32_t len);
-
-_END_STD_C
 
 #endif // __SSD1306_H__
