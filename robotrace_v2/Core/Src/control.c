@@ -17,7 +17,7 @@ bool initCurrent = false;	// 電流センサ初期化状況	false:初期化失�
 static bool softreset = false;		// ソフトウェアリセット	false:リセット未実行	true:リセット実行
 uint8_t modeCurve = 0;		// カーブ判断			0:直線			1:カーブ進入
 uint8_t autoStart = 0;		// 5走を自動で開始する
-uint16_t autoStartAnalize = 0; // 自動走行で使用するログの解析番号
+int16_t autoStartAnalize = 0; // 自動走行で使用するログの解析番号
 
 uint16_t analogVal1[NUM_SENSORS]; // ADC結果格納配列
 uint16_t analogVal2[4];			  // ADC結果格納配列
@@ -270,6 +270,8 @@ void initSystem(void)
 ///////////////////////////////////////////////////////////////////////////
 void loopSystem(void)
 {
+	int16_t ret = 0;
+
 	if (patternTrace > 10 && patternTrace < 100)        // 走行中のみ処理
 	{
 		logWriteTask();        // 割り込み外でSD書き込みを実行する
@@ -291,7 +293,8 @@ void loopSystem(void)
 			motorPwmOut(0, 0);
 			// 初期化
 			SGmarker = 0;	// スタートマーカー通過フラグクリア
-			
+			resetEmcStop();	// 緊急停止フラグクリア
+
 			// 目標速度調整
 
 			// コース解析
@@ -299,15 +302,34 @@ void loopSystem(void)
 			ssd1306_SetCursor(0, 25);
 			ssd1306_printf(Font_11x18, "Analizing");
 
-			numPPADarry = readLogDistance(autoStartAnalize);	// 1次走行のログ番号を使用してコース解析
-			optimalIndex = 0;
+			ret = readLogDistance(autoStartAnalize);	// 1次走行のログ番号を使用してコース解析
+			if(ret > 0)
+			{
+				// コース解析成功
+				optimalIndex = 0;
 
-			countdown = 2000;							  // カウントダウンスタート
-			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-			ssd1306_SetCursor(56, 28);
-			ssd1306_printf(Font_16x26, "2");
+				countdown = 2000;							  // カウントダウンスタート
+				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+				ssd1306_SetCursor(56, 28);
+				ssd1306_printf(Font_16x26, "2");
 
-			patternTrace = 1;
+				patternTrace = 1;
+			}
+			else
+			{
+				// コース解析失敗
+				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+				ssd1306_SetCursor(30, 25);
+				ssd1306_printf(Font_11x18, "Failed");
+				ssd1306_SetCursor(20, 50);
+				ssd1306_printf(Font_6x8, "Error %d", ret);
+
+				HAL_Delay(1000);
+
+				patternTrace = 0;
+				autoStart = 0;
+				autoStartAnalize = 0;
+			}
 		}
 		else
 		{
@@ -596,6 +618,7 @@ void loopSystem(void)
 				ssd1306_printf(Font_11x18, "Auto run");
 				ssd1306_SetCursor(0, 45);
 				ssd1306_printf(Font_11x18, "Finish!");
+
 				patternTrace = 103;
 				break;
 			}
@@ -641,6 +664,11 @@ void loopSystem(void)
 		powerLineSensors(0);
 		powerMarkerSensors(0);
 
+		if(initMSD)
+		{
+			sd_unmount();	// SDカードマウント解除
+		}
+		
 		// リセット待ち
 		if(swValTact == SW_PUSH)
 		{

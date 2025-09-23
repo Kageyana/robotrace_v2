@@ -555,8 +555,7 @@ void endLog(void)
 	f_close(&fil);	 // 一時ファイル
 
 	f_unlink("temp"); // 一時ファイルを削除
-
-	sd_unmount(); // SDカードをアンマウント
+	
 	// 連続走行時にCSV変換ループが累積しないよう送信カウンタをリセット
 	cntSend = 0;
 
@@ -565,8 +564,6 @@ void endLog(void)
 	writeLogPrint(); // ログ書き込み
 	f_close(&fil_W);
 #endif
-
-	f_mount(NULL,"",0); // SDカードをアンマウント
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getFileNumbers
