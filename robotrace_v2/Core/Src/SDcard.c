@@ -134,20 +134,20 @@ bool initMicroSD(void)
 void createLog(void)
 {
 	FRESULT fresult;
-	DIR dir;         // Directory
-	FILINFO fno; // File Info
-	uint8_t *tp, fileName[10];
-	uint16_t fileNumber = 0;
+	uint8_t fileName[10];
+	static uint16_t fileNumber = 0;
 
-	fresult = f_opendir(&dir, "/"); // directory open
-	if (fresult != FR_OK)
+	if(fileNumber == 0)
 	{
-		printf("failed to open root directory: %d\r\n", fresult);
-		// SDカードが未接続などでディレクトリを開けないため、ログ作成を中断する
-		return;
+		fileNumber = fileNumbers[endFileIndex]+1; // 最新ログ番号+1に設定
 	}
+	else
+	{
+		fileNumber++; // 次のログ番号に更新
+	}
+
 	// 最新ログ番号+1にして絵尾久ファイル名を生成 (バッファサイズを指定して安全に文字列化)
-	snprintf((char *)fileName, sizeof(fileName), "%d", fileNumbers[endFileIndex]+1);
+	snprintf((char *)fileName, sizeof(fileName), "%d", fileNumber);
 	// バッファサイズを指定して安全に拡張子を追加
 	strncat((char *)fileName, ".csv", sizeof(fileName) - strlen((char *)fileName) - 1);
 	fresult = f_open(&fil_W, fileName, FA_OPEN_ALWAYS | FA_WRITE); // create file

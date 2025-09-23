@@ -17,6 +17,7 @@ bool initCurrent = false;	// 電流センサ初期化状況	false:初期化失�
 static bool softreset = false;		// ソフトウェアリセット	false:リセット未実行	true:リセット実行
 uint8_t modeCurve = 0;		// カーブ判断			0:直線			1:カーブ進入
 uint8_t autoStart = 0;		// 5走を自動で開始する
+uint16_t autoStartAnalize = 0; // 自動走行で使用するログの解析番号
 
 uint16_t analogVal1[NUM_SENSORS]; // ADC結果格納配列
 uint16_t analogVal2[4];			  // ADC結果格納配列
@@ -289,11 +290,8 @@ void loopSystem(void)
 			// 2次走行
 			motorPwmOut(0, 0);
 			// 初期化
-			if (autoStart == 2)
-			{
-				getFileNumbers(); // 1次走行のログ番号取得
-			}
-			SGmarker = 0;
+			SGmarker = 0;	// スタートマーカー通過フラグクリア
+			
 			// 目標速度調整
 
 			// コース解析
@@ -301,7 +299,7 @@ void loopSystem(void)
 			ssd1306_SetCursor(0, 25);
 			ssd1306_printf(Font_11x18, "Analizing");
 
-			numPPADarry = readLogDistance(fileNumbers[fileIndexLog]);
+			numPPADarry = readLogDistance(autoStartAnalize);	// 1次走行のログ番号を使用してコース解析
 			optimalIndex = 0;
 
 			countdown = 2000;							  // カウントダウンスタート
@@ -555,7 +553,7 @@ void loopSystem(void)
 		{
 			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 			ssd1306_SetCursor(0, 25);
-			ssd1306_printf(Font_11x18, "log %d",fileNumbers[fileIndexLog]);
+			ssd1306_printf(Font_11x18, "log %d",fileNumbers[endFileIndex]+1);
 			ssd1306_SetCursor(0, 45);
 			ssd1306_printf(Font_11x18, "Writing");
 
@@ -569,7 +567,11 @@ void loopSystem(void)
 		{
 			// 自動走行モードのときは再度走行準備へ
 			autoStart++;
-			if (autoStart >= 3)
+			if(autoStart == 2)
+			{
+				autoStartAnalize = fileNumbers[endFileIndex]+1; // 1次走行のログ番号を保存
+			}
+			else if (autoStart >= 3)
 			{
 				// 3走目以降は速度を上げる
 				tgtParam.bstStraight *= PARAM_UP_STEP;
@@ -599,11 +601,9 @@ void loopSystem(void)
 			}
 			else
 			{
+				// 走行準備へ
 				powerLineSensors(0);
 				powerMarkerSensors(0);
-
-				SGmarker = 0;	// スタートマーカー通過フラグクリア
-				resetEmcStop();	// 緊急停止フラグクリア
 
 				patternTrace = 0;
 				break;
@@ -697,8 +697,8 @@ void emargencyStop(void)
 	{
 		ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 
-		ssd1306_SetCursor(36, 25);
-		ssd1306_printf(Font_11x18, "EMS!! %d", optimalTrace);
+		ssd1306_SetCursor(0, 25);
+		ssd1306_printf(Font_11x18, "EMS!! %d", autoStartAnalize);
 
 		ssd1306_SetCursor(0, 45);
 		switch (emcStop)
