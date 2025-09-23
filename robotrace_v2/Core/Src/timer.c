@@ -155,16 +155,16 @@ void Interrupt1ms(void)
 			calcXYcie(encPulse5ms, BMI088val.gyro.z, DEFF_TIME); // 累積パルスを使用してxy座標計算
 			// distLen = (float)encCurrentN * PALSE_MILLIMETER * 0.005; // 現在速度から5ms後の移動距離を計算
 			optimalIndex = (int32_t)(encTotalOptimal / PALSE_MILLIMETER) / CALCDISTANCE_SHORTCUT; // 50mmごとにショートカット配列を作っているので移動距離[mm]を50mmで割った商がインデクス
-			if (optimalIndex + 1 <= numPPADarry)
+			if (optimalIndex + 1 < numPPADarry)
 			{
 				optimalIndex++;
 			}
 
 			if (targetDist - encPID < 200)
 			{
-				if (optimalIndex + 1 <= numPPADarry)
+				if (optimalIndex + 1 < numPPADarry)
 				{
-						optimalIndex++;
+					optimalIndex++;
 				}
 			}
 

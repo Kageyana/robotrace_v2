@@ -490,7 +490,7 @@ void loopSystem(void)
 				{
 					boostSpeed = PPAD[optimalIndex].boostSpeed; // 目標速度を更新
 					DistanceOptimal = encTotalOptimal;			// 距離計測位置を更新
-					if (optimalIndex + 1 <= numPPADarry)
+					if (optimalIndex + 1 < numPPADarry)
 					{
 						// 配列要素数を超えない範囲でインデックスを更新する
 						optimalIndex++;
@@ -536,7 +536,7 @@ void loopSystem(void)
 		}
 		else
 		{
-			if (optimalIndex >= numPPADarry)
+			if (numPPADarry > 0 && optimalIndex >= numPPADarry - 1)
 			{
 				goalTime = cntRun;
 				enc1 = 0;
