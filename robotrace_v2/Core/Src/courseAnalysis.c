@@ -129,6 +129,8 @@ int16_t readLogDistance(int logNumber)
 	uint8_t fileName[10];
 	int16_t ret = 0;
 	uint32_t i;
+	bool fileOpened = false; // f_closeの要否を判断するためのフラグ
+	bool errorDetected = false; // 解析途中のエラー発生を検知するフラグ
 
 	snprintf(fileName, sizeof(fileName), "%d", logNumber);			   // 数値を文字列に変換
 	strcat(fileName, ".csv");										   // 拡張子を追加
@@ -136,6 +138,7 @@ int16_t readLogDistance(int logNumber)
 
 	if (fresult == FR_OK)
 	{
+		fileOpened = true; // 正常に開けた場合のみクローズ処理を有効化
 		// ログデータの取得
 		TCHAR log[512];
 		int32_t time, marker, velo, distance, roc, i = 0;
@@ -182,6 +185,7 @@ int16_t readLogDistance(int logNumber)
 				if (!sortROC) { // メモリ確保失敗時の処理
 					printf("sortROC memory allocation error\n"); // エラーメッセージ表示
 					ret = -2;            // エラーコード設定
+					errorDetected = true; // エラー発生を記録して後続処理を抑止
 					break;               // 未確保のため解放不要、ループを抜ける
 				}
 				memcpy(sortROC, ROCbuff, sizeof(int16_t) * cntCurR);    // 作成した配列に曲率半径をコピーする
@@ -215,7 +219,11 @@ int16_t readLogDistance(int logNumber)
 				cntCurR = 0; // 曲率半径用配列のカウントクリア
 				numD++;		 // 距離解析インデックス更新
 				if (numD >= OPT_BUFF_SIZE)
-					return -1; // 解析用配列のサイズを超えたら強制終了
+				{
+					ret = -1; // 解析用配列のサイズ超過を検出したらエラー扱いとする
+					errorDetected = true; // エラーフラグを立てて共通クリーンアップへ遷移
+					break; // 即時returnせずループを抜ける
+				}
 			}
 			// 曲率半径の計算
 			ROCbuff[cntCurR] = roc;
@@ -240,79 +248,98 @@ int16_t readLogDistance(int logNumber)
 			i++;
 		}
 
-		// インデックスが1多くなるので調整
-		if (numM > 0)
+		if (!errorDetected)
 		{
-			numM--;        // 0件時はマーカー数を負にしない
-		}
-		int32_t numDCount = 0;
-		if (numD > 0)
-		{
-			numD--;        // 0件時は距離要素数を負にしない
-			numDCount = numD + 1;        // 要素数に戻して加減速調整で使用
+			// インデックスが1多くなるので調整
+			if (numM > 0)
+			{
+				numM--;        // 0件時はマーカー数を負にしない
+			}
+			int32_t numDCount = 0;
+			if (numD > 0)
+			{
+				numD--;        // 0件時は距離要素数を負にしない
+				numDCount = numD + 1;        // 要素数に戻して加減速調整で使用
+			}
+			else
+			{
+				numDCount = numD;        // 要素数0の場合はそのまま利用
+			}
+			numD = numDCount;
+
+			// 目標速度配列の整形 加減速が間に合うように距離を調整する
+			float acceleration, elapsedTime, dv, dl;
+
+			// 最初の要素は調整しない
+			dl = (float)CALCDISTANCE / 1000;
+
+			// numDを件数として扱うため、以下のループでも境界外アクセスは発生しない
+
+			// 加速 インデックス2から開始
+			for (i = 2; i < numD; i++)
+			{
+				dv = (PPAD[i].boostSpeed - PPAD[i - 1].boostSpeed);	// 区間速度
+				elapsedTime = fabs(dl / dv);		// 区間時間
+				acceleration = dv / elapsedTime;	// 加速度
+				if (acceleration > MACHINEACCELE)
+				{
+					// 加速度が大きすぎる場合は補正	
+					PPAD[i].boostSpeed = PPAD[i - 1].boostSpeed + (MACHINEACCELE * dl);
+				}
+			}
+
+			// 減速 インデックス末尾から開始
+			for (i = numD - 2; i >= 1; i--)
+			{
+				dv = (PPAD[i].boostSpeed - PPAD[i + 1].boostSpeed);
+				elapsedTime = fabs(dl / dv);
+				acceleration = dv / elapsedTime;
+				if (acceleration > MACHINEDECREACE)
+				{
+					PPAD[i].boostSpeed = PPAD[i + 1].boostSpeed + (MACHINEDECREACE * dl);
+				}
+			}
+
+			// for (i = 0; i < numD; i++)
+			// {
+			// 	printf("%f\n", PPAD[i].boostSpeed);
+			// }
+
+			numPPAMarry = numM;
+			numPPADarry = numD;
+			ret = numD;
 		}
 		else
 		{
-			numDCount = numD;        // 要素数0の場合はそのまま利用
+			// エラー発生時は整形処理を行わず解析結果を破棄
 		}
-		numD = numDCount;
-
-		// 目標速度配列の整形 加減速が間に合うように距離を調整する
-		float acceleration, elapsedTime, dv, dl;
-
-		// 最初の要素は調整しない
-		dl = (float)CALCDISTANCE / 1000;
-
-		// numDを件数として扱うため、以下のループでも境界外アクセスは発生しない
-
-		// 加速 インデックス2から開始
-		for (i = 2; i < numD; i++)
-		{
-			dv = (PPAD[i].boostSpeed - PPAD[i - 1].boostSpeed);	// 区間速度
-			elapsedTime = fabs(dl / dv);		// 区間時間
-			acceleration = dv / elapsedTime;	// 加速度
-			if (acceleration > MACHINEACCELE)
-			{
-				// 加速度が大きすぎる場合は補正	
-				PPAD[i].boostSpeed = PPAD[i - 1].boostSpeed + (MACHINEACCELE * dl);
-			}
-		}
-
-		// 減速 インデックス末尾から開始
-		for (i = numD - 2; i >= 1; i--)
-		{
-			dv = (PPAD[i].boostSpeed - PPAD[i + 1].boostSpeed);
-			elapsedTime = fabs(dl / dv);
-			acceleration = dv / elapsedTime;
-			if (acceleration > MACHINEDECREACE)
-			{
-				PPAD[i].boostSpeed = PPAD[i + 1].boostSpeed + (MACHINEDECREACE * dl);
-			}
-		}
-
-		// for (i = 0; i < numD; i++)
-		// {
-		// 	printf("%f\n", PPAD[i].boostSpeed);
-		// }
-
-		numPPAMarry = numM;
-		numPPADarry = numD;
-		ret = numD;
 	}
 	else
 	{
 		ret = -4;
+		errorDetected = true; // ファイルオープン失敗時もエラー状態として扱う
 	}
-	f_close(&fil_Read);
+
+	if (fileOpened)
+	{
+		f_close(&fil_Read); // オープン成功時のみクローズを実施
+	}
 
 	// printf("Analysis distance end\n");
 
-	// 解析済みのログ番号を保存
-	saveLogNumber(logNumber);
-	analizedNumber = logNumber;
+	if (ret >= 0)
+	{
+		// 正常終了時のみ解析済み情報を更新
+		saveLogNumber(logNumber);
+		analizedNumber = logNumber;
 
-	// 2次走行フラグ 距離基準2次走行
-	optimalTrace = BOOST_DISTANCE;
+		// 2次走行フラグ 距離基準2次走行
+		optimalTrace = BOOST_DISTANCE;
+	}
+	else
+	{
+		// エラー発生時は状態更新を行わず呼び出し元に返却
+	}
 
 	return ret;
 }
