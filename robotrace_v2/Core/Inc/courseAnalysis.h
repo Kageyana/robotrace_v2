@@ -9,7 +9,7 @@
 //====================================//
 // シンボル定義
 //====================================//
-#define OPT_BUFF_SIZE 800
+#define OPT_BUFF_SIZE 1000
 #define OPT_SHORT_BUFF_SIZE 1000
 #define DELTATIME 0.01F			 // ログ保存周期[s]
 #define CALCDISTANCE 50			 // 距離解析ステップ[mm]
