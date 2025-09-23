@@ -240,9 +240,22 @@ int16_t readLogDistance(int logNumber)
 			i++;
 		}
 
-		// インデックスが1多くなるので調整
-		numM--;
-		numD--;
+                // インデックスが1多くなるので調整
+                if (numM > 0)
+                {
+                        numM--;        // 0件時はマーカー数を負にしない
+                }
+                int32_t numDCount = 0;
+                if (numD > 0)
+                {
+                        numD--;        // 0件時は距離要素数を負にしない
+                        numDCount = numD + 1;        // 要素数に戻して加減速調整で使用
+                }
+                else
+                {
+                        numDCount = numD;        // 要素数0の場合はそのまま利用
+                }
+                numD = numDCount;
 
 		// 目標速度配列の整形 加減速が間に合うように距離を調整する
 		float acceleration, elapsedTime, dv, dl;
@@ -250,8 +263,10 @@ int16_t readLogDistance(int logNumber)
 		// 最初の要素は調整しない
 		dl = (float)CALCDISTANCE / 1000;
 
-		// 加速 インデックス2から開始
-		for (i = 2; i <= numD; i++)
+                // numDを件数として扱うため、以下のループでも境界外アクセスは発生しない
+
+                // 加速 インデックス2から開始
+                for (i = 2; i < numD; i++)
 		{
 			dv = (PPAD[i].boostSpeed - PPAD[i - 1].boostSpeed);
 			elapsedTime = fabs(dl / dv);
@@ -262,8 +277,8 @@ int16_t readLogDistance(int logNumber)
 			}
 		}
 
-		// 減速 インデックス末尾から開始
-		for (i = numD - 1; i >= 1; i--)
+                // 減速 インデックス末尾から開始
+                for (i = numD - 2; i >= 1; i--)
 		{
 			dv = (PPAD[i].boostSpeed - PPAD[i + 1].boostSpeed);
 			elapsedTime = fabs(dl / dv);
@@ -274,7 +289,7 @@ int16_t readLogDistance(int logNumber)
 			}
 		}
 
-		for (i = 0; i <= numD; i++)
+                for (i = 0; i < numD; i++)
 		{
 			printf("%f\n", PPAD[i].boostSpeed);
 		}
