@@ -76,7 +76,6 @@ void getLogNumber(void);
 int16_t readLogDistance(int logNumber);
 float asignVelocity(int16_t ROC);
 int cmpfloat(const void *n1, const void *n2);
-int cmpint16_t(const void *n1, const void *n2);
 int16_t readLogTest(int logNumber);
 int16_t calcXYcies(int logNumber);
 void calcXYcie(float encpulse, float angVelo, float dt);

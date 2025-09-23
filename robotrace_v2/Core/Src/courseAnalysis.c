@@ -113,12 +113,36 @@ void getLogNumber(void)
 	}
 }
 /////////////////////////////////////////////////////////////////////
+// ローカル関数 sortInt16Ascending
+// 処理概要     最大5要素のint16_t配列を挿入ソートすることでqsort呼び出しを削減
+// 引数         values: ソート対象の配列, length: 要素数
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void sortInt16Ascending(int16_t *values, uint16_t length)
+{
+	if (length <= 1)
+	{
+		return; // 要素数1以下は並べ替え不要
+	}
+
+	for (uint16_t index = 1; index < length; index++)
+	{
+		int16_t key = values[index];
+		uint16_t insertPos = index;
+		while (insertPos > 0 && values[insertPos - 1] > key)
+		{
+			values[insertPos] = values[insertPos - 1];
+			insertPos--;
+		}
+		values[insertPos] = key;
+	}
+}
+/////////////////////////////////////////////////////////////////////
 // モジュール名 readLogDistance
 // 処理概要     距離基準2次走行の解析
 // 引数         ログ番号(ファイル名)
 // 戻り値       最適速度配列の最大要素数
 //              -1: 解析用配列のサイズを超過
-//              -2: メモリ確保失敗
 //              -4: ログファイルのオープン失敗
 /////////////////////////////////////////////////////////////////////
 int16_t readLogDistance(int logNumber)
@@ -145,7 +169,7 @@ int16_t readLogDistance(int logNumber)
 		float angVelo;
 		int32_t numD = 0, numM = 0, cntCurR = 0, numStraight = 0;
 		static int16_t ROCbuff[600] = {0};
-		static int16_t *sortROC;
+		int16_t sortROC[CALCDISTANCE / 10];	// sortROCの最大要素数はCALCDISTANCE/10(=5)。動的確保とデバッグprintfを排除するため自動配列を利用
 		int32_t straightMeter = 0;
 		bool straightState = false;
 
@@ -180,29 +204,28 @@ int16_t readLogDistance(int logNumber)
 			// 一定距離ごとに処理
 			if (i > 0 && i % (CALCDISTANCE / 10) == 0) // i==0では処理しない
 			{
-				sortROC = (int16_t *)malloc(sizeof(int16_t) * cntCurR); // 計算した曲率半径カウント分の配列を作成
-				// メモリ確保の結果をチェックし、失敗時はエラー処理
-				if (!sortROC) { // メモリ確保失敗時の処理
-					printf("sortROC memory allocation error\n"); // エラーメッセージ表示
-					ret = -2;            // エラーコード設定
-					errorDetected = true; // エラー発生を記録して後続処理を抑止
-					break;               // 未確保のため解放不要、ループを抜ける
+				int32_t copyCount = cntCurR;	    // 今回ソートする要素数を退避
+				if (copyCount > (CALCDISTANCE / 10))
+				{
+					copyCount = (CALCDISTANCE / 10); // 理論上到達しないが、安全のため上限を適用
 				}
-				memcpy(sortROC, ROCbuff, sizeof(int16_t) * cntCurR);    // 作成した配列に曲率半径をコピーする
-				qsort(sortROC, cntCurR, sizeof(int16_t), cmpint16_t);   // ソート
+				for (int32_t sortIndex = 0; sortIndex < copyCount; sortIndex++)
+				{
+					sortROC[sortIndex] = ROCbuff[sortIndex]; // 必要な要素のみを手動コピーして中央値算出用に退避
+				}
+				sortInt16Ascending(sortROC, (uint16_t)copyCount); // 小配列は単純ソートで十分なためqsort呼び出しを削減
 
 				// 曲率半径を記録する
-				if (cntCurR % 2 == 0)
+				if (copyCount % 2 == 0)
 				{
 					// 中央値を記録(配列要素数が偶数のとき) 中央2つの平均値
-					PPAD[numD].ROC = (sortROC[cntCurR / 2] + sortROC[cntCurR / 2 - 1]) / 2;
+					PPAD[numD].ROC = (sortROC[copyCount / 2] + sortROC[copyCount / 2 - 1]) / 2;
 				}
 				else
 				{
 					// 中央値を記録(配列要素数が奇数のとき)
-					PPAD[numD].ROC = sortROC[cntCurR / 2];
+					PPAD[numD].ROC = sortROC[copyCount / 2];
 				}
-				free(sortROC); // mallocで確保したメモリを開放
 
 				PPAD[numD].boostSpeed = asignVelocity(PPAD[numD].ROC); // 曲率半径ごとの速度を計算する
 
@@ -393,21 +416,6 @@ int cmpfloat(const void *n1, const void *n2)
 	if (*(float *)n1 > *(float *)n2)
 		return 1;
 	else if (*(float *)n1 < *(float *)n2)
-		return -1;
-	else
-		return 0;
-}
-/////////////////////////////////////////////////////////////////////
-// モジュール名 cmpint16_t
-// 処理概要     int16_t型の比較
-// 引数
-// 戻り値       なし
-/////////////////////////////////////////////////////////////////////
-int cmpint16_t(const void *n1, const void *n2)
-{
-	if (*(int16_t *)n1 > *(int16_t *)n2)
-		return 1;
-	else if (*(int16_t *)n1 < *(int16_t *)n2)
 		return -1;
 	else
 		return 0;
