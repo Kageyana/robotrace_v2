@@ -6,7 +6,11 @@
 // グローバル変数の宣言
 //====================================//
 uint8_t emcStop = 0;
-
+static uint16_t cntAngleX = 0;
+static uint16_t cntAngleY = 0;
+static uint16_t cntEncStop = 0;
+static uint16_t cntLineSensor = 0;
+static uint16_t cntOverSpeed = 0;
 /////////////////////////////////////////////////////////////////////
 // モジュール名 cntEmcStopAngleX
 // 処理概要     緊急停止要因のカウント x軸角速度異常
@@ -15,8 +19,6 @@ uint8_t emcStop = 0;
 /////////////////////////////////////////////////////////////////////
 bool cntEmcStopAngleX(void)
 {
-	static uint16_t cntAngleX;
-
 	// 緊急停止条件
 	if (fabs(BMI088val.gyro.x) > 2.0f)
 	{
@@ -45,8 +47,6 @@ bool cntEmcStopAngleX(void)
 /////////////////////////////////////////////////////////////////////
 bool cntEmcStopAngleY(void)
 {
-	static uint16_t cntAngleY;
-
 	// 緊急停止条件
 	if (fabs(BMI088val.gyro.y) > 2.0f)
 	{
@@ -75,8 +75,6 @@ bool cntEmcStopAngleY(void)
 /////////////////////////////////////////////////////////////////////
 bool cntEmcStopEncStop(void)
 {
-	static uint16_t cntEncStop;
-
 	// 緊急停止条件
 	if (abs(encCurrentN) < 20)
 	{
@@ -105,8 +103,6 @@ bool cntEmcStopEncStop(void)
 /////////////////////////////////////////////////////////////////////
 bool cntEmcStopLineSensor(void)
 {
-	static uint16_t cntLineSensor = 0;
-
 	// 緊急停止条件
 	if (lSensor[3] + lSensor[4] + lSensor[5] + lSensor[6] > 12000)
 	{
@@ -135,8 +131,6 @@ bool cntEmcStopLineSensor(void)
 /////////////////////////////////////////////////////////////////////
 bool judgeOverSpeed(void)
 {
-	static uint16_t cntOverSpeed = 0;
-
 	// 緊急停止条件
 	if (encCurrentN > (uint32_t)(targetSpeed * 2))
 	{
@@ -156,4 +150,19 @@ bool judgeOverSpeed(void)
 	{
 		return false;
 	}
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 resetEmcStop
+// 処理概要     緊急停止要因のカウントリセット
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void resetEmcStop(void)
+{
+	emcStop = 0;
+	cntAngleX = 0;
+	cntAngleY = 0;
+	cntEncStop = 0;
+	cntLineSensor = 0;
+	cntOverSpeed = 0;
 }

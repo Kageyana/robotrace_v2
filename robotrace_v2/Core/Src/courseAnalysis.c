@@ -96,13 +96,15 @@ void getLogNumber(void)
 	fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_READ); // csvファイルを開く
 	if (fresult == FR_OK)
 	{
+		// 解析済みのログ番号を取得
 		f_gets(log, sizeof(log), &fil);
-		sscanf(log, "%d", &analizedNumber);
+		sscanf(log, "%d", &analizedNumber);	
 		f_close(&fil);
 	}
 
 	for (int16_t i = 0; i <= endFileIndex; i++)
 	{
+		// 解析済みのログ番号に一致するインデックスを保存
 		if (analizedNumber == fileNumbers[i])
 		{
 			fileIndexLog = i;

@@ -551,21 +551,20 @@ void loopSystem(void)
 		setTargetSpeed(0);
 		motorPwmOutSynth(0, 0, 0, 0);
 
-		ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-		ssd1306_SetCursor(0, 25);
-		ssd1306_printf(Font_11x18, "log");
-		ssd1306_SetCursor(0, 45);
-		ssd1306_printf(Font_11x18, "Writing");
-
 		if (modeLOG)
 		{
-			endLog(); // ログ保存終了
-		}
-		
-		ssd1306_SetCursor(0, 45);
-		ssd1306_printf(Font_11x18, "Written");
+			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+			ssd1306_SetCursor(0, 25);
+			ssd1306_printf(Font_11x18, "log %d",fileNumbers[fileIndexLog]);
+			ssd1306_SetCursor(0, 45);
+			ssd1306_printf(Font_11x18, "Writing");
 
-		
+			endLog(); // ログ保存終了
+
+			ssd1306_SetCursor(0, 45);
+			ssd1306_printf(Font_11x18, "Written");
+		}
+
 		if (autoStart > 0)
 		{
 			// 自動走行モードのときは再度走行準備へ
@@ -595,13 +594,17 @@ void loopSystem(void)
 				ssd1306_printf(Font_11x18, "Auto run");
 				ssd1306_SetCursor(0, 45);
 				ssd1306_printf(Font_11x18, "Finish!");
-				patternTrace = 102;
+				patternTrace = 103;
 				break;
 			}
 			else
 			{
 				powerLineSensors(0);
 				powerMarkerSensors(0);
+
+				SGmarker = 0;	// スタートマーカー通過フラグクリア
+				resetEmcStop();	// 緊急停止フラグクリア
+
 				patternTrace = 0;
 				break;
 			}
@@ -644,6 +647,7 @@ void loopSystem(void)
 			while(swValTact == SW_PUSH);	// スイッチが離されるまで待つ
 			softreset = true;				// ソフトウェアリセット実行
 			initSystem();			// 初期化処理実行
+			resetEmcStop();		// 緊急停止フラグクリア
 			setupFlags.start= 0;	// スタートフラグクリア
 			autoStart = 0;			// 自動走行フラグクリア
 			SGmarker = 0;			// スタートマーカー通過フラグクリア

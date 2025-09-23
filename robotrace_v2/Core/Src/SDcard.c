@@ -146,43 +146,10 @@ void createLog(void)
 		// SDカードが未接続などでディレクトリを開けないため、ログ作成を中断する
 		return;
 	}
-
-	do
-	{
-		fresult = f_readdir(&dir, &fno);
-		if (fresult != FR_OK)
-		{
-			// エラーが発生した場合はループを抜けてファイル探索を中断
-			break;
-		}
-		if (fno.fname[0] == 0)
-		{
-			// ファイル名が空の場合はループを終了
-			break;
-		}
-		tp = strtok(fno.fname, ".");	// 拡張子削除
-		if (tp != NULL && atoi(tp) > fileNumber)
-		{								// 番号比較
-			fileNumber = atoi(tp);		// 文字列を数値に変換
-		}
-	} while (fno.fname[0] != 0);		// ファイルの有無を確認
-
-	f_closedir(&dir); // directory close
-
-	// ファイルナンバー作成
-	if (fileNumber == 0)
-	{
-		// ファイルが無いとき
-		fileNumber = 1;
-	}
-	else
-	{
-		// ファイルが有るとき
-		fileNumber++; // index pulus
-	}
-
-	snprintf((char *)fileName, sizeof(fileName), "%d", fileNumber); // バッファサイズを指定して安全に文字列化
-	strncat((char *)fileName, ".csv", sizeof(fileName) - strlen((char *)fileName) - 1); // バッファサイズを指定して安全に拡張子を追加
+	// 最新ログ番号+1にして絵尾久ファイル名を生成 (バッファサイズを指定して安全に文字列化)
+	snprintf((char *)fileName, sizeof(fileName), "%d", fileNumbers[endFileIndex]+1);
+	// バッファサイズを指定して安全に拡張子を追加
+	strncat((char *)fileName, ".csv", sizeof(fileName) - strlen((char *)fileName) - 1);
 	fresult = f_open(&fil_W, fileName, FA_OPEN_ALWAYS | FA_WRITE); // create file
 	if (fresult != FR_OK)
 	{

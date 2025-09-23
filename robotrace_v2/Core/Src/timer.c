@@ -71,9 +71,9 @@ void Interrupt1ms(void)
 		if (judgeOverSpeed())
 			emcStop = STOP_OVERSPEED;
 
-		courseMarker = checkMarker(); // マーカー検知
-		checkGoalMarker();	      // ゴールマーカー処理
-		processMarkerEvent();	      // マーカー関連処理を関数に委譲
+		courseMarker = checkMarker();	// マーカー検知
+		checkGoalMarker();				// ゴールマーカー処理
+		processMarkerEvent();	      	// マーカー関連処理を関数に委譲
 	}
 
 	if (patternTrace < 10 || patternTrace > 100)
