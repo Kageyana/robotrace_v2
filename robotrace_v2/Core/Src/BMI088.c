@@ -234,10 +234,18 @@ void calcDegrees(void)
 	{
 		return;
 	}
+	float deltaTime = DEFF_TIME;
+
+	// 割り込み周期の実測値を秒換算して積分係数を補正
+	if (bootTime > 0.0F)
+	{
+		deltaTime = bootTime * 0.001F; // ms → s
+	}
+
 	// ジャイロ積分による角度更新 度数法
-    BMI088val.angle.x += BMI088val.gyro.x * DEFF_TIME;  // pitch
-    BMI088val.angle.y += BMI088val.gyro.y * DEFF_TIME;  // roll
-    BMI088val.angle.z += BMI088val.gyro.z * DEFF_TIME;  // yaw（補正しない）
+	BMI088val.angle.x += BMI088val.gyro.x * deltaTime;  // pitch
+	BMI088val.angle.y += BMI088val.gyro.y * deltaTime;  // roll
+	BMI088val.angle.z += BMI088val.gyro.z * deltaTime;  // yaw（補正しない）
 
 #ifdef USE_ACCELE
     // 加速度からのピッチ・ロール角算出 度数法
