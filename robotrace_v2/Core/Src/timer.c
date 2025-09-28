@@ -74,6 +74,7 @@ void Interrupt1ms(void)
 		courseMarker = checkMarker();	// マーカー検知
 		checkStartGoalMarker();				// ゴールマーカー処理
 		processMarkerEvent();	      	// マーカー関連処理を関数に委譲
+		courseMarkerLog = courseMarker; // ログ用にマーカー状態を保存
 	}
 
 	if (patternTrace < 10 || patternTrace > 100)
@@ -119,7 +120,7 @@ void Interrupt1ms(void)
 					LOG_NUM_FLOAT,
 					// 8bit
 					targetSpeed,
-					courseMarker,
+					courseMarkerLog,
 					modeCurve,
 					// 16bit
 					cntRun,
@@ -140,6 +141,7 @@ void Interrupt1ms(void)
 				writeLogBufferPrint(); // バッファにログを保存
 				cntLog = 0;
 #endif
+				courseMarkerLog = 0; // ログ用マーカー状態をリセット
 				encLog = 0;	// ログ用エンコーダパルスをリセット
 			}
 		}

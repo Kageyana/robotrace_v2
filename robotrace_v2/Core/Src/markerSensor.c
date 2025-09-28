@@ -61,7 +61,7 @@ uint8_t checkMarker(void)
 				existMarker = 0;
 				checkStart = 0;
 			}
-			if (nowMarker != existMarker)
+			if (nowMarker != existMarker && nowMarker > 0)
 			{
 				existMarker = nowMarker;
 			}
