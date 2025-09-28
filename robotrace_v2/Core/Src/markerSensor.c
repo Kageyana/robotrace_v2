@@ -44,12 +44,12 @@ uint8_t checkMarker(void)
 	static int32_t encMarkerL = 0, encMarkerR = 1, encMarkerN, nowEncTotalN;
 	static int32_t distL, distR, distN;
 
-		nowMarker = getMarkerSensor(); // マーカーセンサ値を取得
-		nowEncTotalN = encTotalN;
+	nowMarker = getMarkerSensor(); // マーカーセンサ値を取得
+	nowEncTotalN = encTotalN;
 
-		// ログ: 現在のセンサ状態と位置情報を記録
-		markerCheckLog.nowMarker = nowMarker;
-		markerCheckLog.nowEncTotalN = nowEncTotalN;
+	// ログ: 現在のセンサ状態と位置情報を記録
+	markerCheckLog.nowMarker = nowMarker;
+	markerCheckLog.nowEncTotalN = nowEncTotalN;
 
 	// 反応があればマーカー幅計測開始
 	if (nowMarker > 0 && checkStart == 0)

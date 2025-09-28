@@ -513,16 +513,13 @@ void endLog(void)
 		speed = logval16[1];
 		distance = logval32[0];
 		zg = logvalf[0];
-		uint8_t markerCheckStart = logval8[3];
-		uint8_t markerNow = logval8[4];
-		uint8_t markerExist = logval8[5];
-		uint8_t markerResult = logval8[6];
+		uint8_t markerNow = logval8[3];
+		uint8_t markerResult = logval8[4];
 		int32_t encMarkerL = (int32_t)logval32[1];
 		int32_t encMarkerR = (int32_t)logval32[2];
-		int32_t encMarkerN = (int32_t)logval32[3];
-		int32_t markerEncTotal = (int32_t)logval32[4];
-		int32_t markerDistL = (int32_t)logval32[5];
-		int32_t markerDistR = (int32_t)logval32[6];
+		int32_t markerEncTotal = (int32_t)logval32[3];
+		int32_t markerDistL = (int32_t)logval32[4];
+		int32_t markerDistR = (int32_t)logval32[5];
 
 		if (abs(speed - beforeSpeed) > 500)
 		{
@@ -554,16 +551,13 @@ void endLog(void)
 			logval16[2],	// optimalIndex
 			(int16_t)logval16[3],		// lineTraceCtrl
 			(int16_t)logval16[4],		// veloCtrl
-			markerCheckStart,
-			markerNow,
-			markerExist,
-			markerResult,
-			encMarkerL,
-			encMarkerR,
-			encMarkerN,
-			markerEncTotal,
-			markerDistL,
-			markerDistR,
+                        markerNow,
+                        markerResult,
+                        encMarkerL,
+                        encMarkerR,
+                        markerEncTotal,
+                        markerDistL,
+                        markerDistR,
 			logvalf[2],		// x
 			logvalf[3]		// y
 		);

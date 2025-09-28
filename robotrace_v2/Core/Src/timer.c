@@ -10,7 +10,6 @@ int32_t cnt10 = 0;
 int32_t encPulse5ms = 0; // 5ms間のエンコーダパルスを累積
 float bootTime;
 static volatile bool logWriteReq = false;
-static float straightDistanceAcc = 0.0F; // 直線距離加算用の一時変数
 /////////////////////////////////////////////////////////////////////
 // モジュール名 Interrupt1ms
 // 処理概要     タイマー割り込み(1ms)
@@ -89,71 +88,61 @@ void Interrupt1ms(void)
 	else
 	{
 		// 走行中に処理
-		if (cntLog >= 1)
+		if (modeLOG)
 		{
-			// 1ms周期での直線判定とログ保存処理
+			// 1ms周期でマーカー検知情報と走行状態を記録
+#ifdef LOG_RUNNING_WRITE
+			writeLogBufferPuts(
+				LOG_NUM_8BIT,
+				LOG_NUM_16BIT,
+				LOG_NUM_32BIT,
+				LOG_NUM_FLOAT,
+				// 8bit
+				targetSpeed,
+				courseMarker,
+				modeCurve,
+				markerCheckLog.nowMarker,
+				markerCheckLog.result,
+				// 16bit
+				cntRun,
+				encCurrentN,
+				optimalIndex,
+				lineTraceCtrl.pwm,
+				veloCtrl.pwm,
+				// 32bit
+				(uint32_t)encTotalOptimal,
+				(uint32_t)markerCheckLog.encMarkerL,
+				(uint32_t)markerCheckLog.encMarkerR,
+				(uint32_t)markerCheckLog.nowEncTotalN,
+				(uint32_t)markerCheckLog.distL,
+				(uint32_t)markerCheckLog.distR,
+				// float型
+				BMI088val.gyro.z
+			);
+#else
+			writeLogBufferPrint(); // バッファにログを保存
+#endif
+		}
+
+		if (encLog >= encMM(CALCDISTANCE_SHORTCUT))
+		{
+			// 一定距離ごとに直線判定を実施
 			static float rocCorrection = 0.0F;
-			float deltaDistanceMm = 0.0F;
-			int32_t addDistanceMm = 0;
 
 			// ROC(曲率半径)計算
-			rocCorrection = calcROC(encCurrentN, BMI088val.gyro.z, (float)cntLog / 1000.0F);
-			if (fabsf(rocCorrection) >= 700.0F) // 直線判断
+			rocCorrection = calcROC(encCurrentN, BMI088val.gyro.z, (float)cntLog / 1000);
+			if (fabs(rocCorrection) >= 700.0F) // 直線判断
 			{
-				deltaDistanceMm = fabsf((float)encCurrentN) / PALSE_MILLIMETER;
-				straightDistanceAcc += deltaDistanceMm;
-				addDistanceMm = (int32_t)straightDistanceAcc;
-				if (addDistanceMm > 0)
-				{
-					straightMeter += addDistanceMm;
-					straightDistanceAcc -= (float)addDistanceMm;
-				}
+				straightMeter += CALCDISTANCE_SHORTCUT; // 距離積算
 			}
 			else
 			{
 				straightMeter = 0;
-				straightDistanceAcc = 0.0F;
 			}
 
 			if (straightMeter >= 100) // 直線が100mm以上のとき
 			{
 				straightState = true;
-			}
-
-			if (modeLOG)
-			{
-				// 1ms周期でログを保存
-#ifdef LOG_RUNNING_WRITE
-				writeLogBufferPuts(
-					LOG_NUM_8BIT,
-					LOG_NUM_16BIT,
-					LOG_NUM_32BIT,
-					LOG_NUM_FLOAT,
-					// 8bit
-					targetSpeed,
-					courseMarker,
-					modeCurve,
-					markerCheckLog.nowMarker,
-					markerCheckLog.result,
-					// 16bit
-					cntRun,
-					encCurrentN,
-					optimalIndex,
-					lineTraceCtrl.pwm,
-					veloCtrl.pwm,
-					// 32bit
-					(uint32_t)encTotalOptimal,
-					(uint32_t)markerCheckLog.encMarkerL,
-					(uint32_t)markerCheckLog.encMarkerR,
-					(uint32_t)markerCheckLog.nowEncTotalN,
-					(uint32_t)markerCheckLog.distL,
-					(uint32_t)markerCheckLog.distR,
-					// float型
-					BMI088val.gyro.z
-				);
-#else
-				writeLogBufferPrint(); // バッファにログを保存
-#endif
 			}
 
 			cntLog = 0;
