@@ -176,13 +176,10 @@ void createLog(void)
 	// setLogStr("CurrentR", "%f");
 	setLogStr("lineTraceCtrl", "%d");
 	setLogStr("veloCtrl", "%d");
-	setLogStr("markerCheckStart", "%d");
 	setLogStr("markerNow", "%d");
-	setLogStr("markerExist", "%d");
 	setLogStr("markerResult", "%d");
 	setLogStr("encMarkerL", "%d");
 	setLogStr("encMarkerR", "%d");
-	setLogStr("encMarkerN", "%d");
 	setLogStr("markerEncTotal", "%d");
 	setLogStr("markerDistL", "%d");
 	setLogStr("markerDistR", "%d");

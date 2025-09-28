@@ -13,9 +13,9 @@
 
 #ifdef LOG_RUNNING_WRITE
 #define BUFFER_SIZE_LOG 512
-#define LOG_NUM_8BIT 7
+#define LOG_NUM_8BIT 5
 #define LOG_NUM_16BIT 5
-#define LOG_NUM_32BIT 7
+#define LOG_NUM_32BIT 6
 #define LOG_NUM_FLOAT 1
 #define LOG_SIZE (LOG_NUM_8BIT * sizeof(uint8_t)) + (LOG_NUM_16BIT * sizeof(uint16_t)) + (LOG_NUM_32BIT * sizeof(uint32_t)) + (LOG_NUM_FLOAT * sizeof(float))
 #else

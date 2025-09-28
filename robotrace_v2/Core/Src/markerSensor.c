@@ -47,7 +47,7 @@ uint8_t checkMarker(void)
 		nowMarker = getMarkerSensor(); // マーカーセンサ値を取得
 		nowEncTotalN = encTotalN;
 
-		// ログ用データに現在の読み値を保存
+		// ログ: 現在のセンサ状態と位置情報を記録
 		markerCheckLog.nowMarker = nowMarker;
 		markerCheckLog.nowEncTotalN = nowEncTotalN;
 
@@ -118,12 +118,9 @@ uint8_t checkMarker(void)
 		ret = CROSSLINE;
 	}
 
-		// ログ用データに検知状態を保存
-		markerCheckLog.checkStart = checkStart;
-		markerCheckLog.existMarker = existMarker;
+		// ログ: 判定結果と各種距離情報を保存
 		markerCheckLog.encMarkerL = encMarkerL;
 		markerCheckLog.encMarkerR = encMarkerR;
-		markerCheckLog.encMarkerN = encMarkerN;
 		markerCheckLog.distL = distL;
 		markerCheckLog.distR = distR;
 		markerCheckLog.result = ret;

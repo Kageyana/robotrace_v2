@@ -133,9 +133,7 @@ void Interrupt1ms(void)
 					targetSpeed,
 					courseMarker,
 					modeCurve,
-					markerCheckLog.checkStart,
 					markerCheckLog.nowMarker,
-					markerCheckLog.existMarker,
 					markerCheckLog.result,
 					// 16bit
 					cntRun,
@@ -147,7 +145,6 @@ void Interrupt1ms(void)
 					(uint32_t)encTotalOptimal,
 					(uint32_t)markerCheckLog.encMarkerL,
 					(uint32_t)markerCheckLog.encMarkerR,
-					(uint32_t)markerCheckLog.encMarkerN,
 					(uint32_t)markerCheckLog.nowEncTotalN,
 					(uint32_t)markerCheckLog.distL,
 					(uint32_t)markerCheckLog.distR,
