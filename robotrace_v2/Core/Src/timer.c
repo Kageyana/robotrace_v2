@@ -10,6 +10,7 @@ int32_t cnt10 = 0;
 int32_t encPulse5ms = 0; // 5ms間のエンコーダパルスを累積
 float bootTime;
 static volatile bool logWriteReq = false;
+static float straightDistanceAcc = 0.0F; // 直線距離加算用の一時変数
 /////////////////////////////////////////////////////////////////////
 // モジュール名 Interrupt1ms
 // 処理概要     タイマー割り込み(1ms)
@@ -88,19 +89,30 @@ void Interrupt1ms(void)
 	else
 	{
 		// 走行中に処理
-		if (encLog >= encMM(CALCDISTANCE_SHORTCUT))
+		if (cntLog >= 1)
 		{
-			// 一定距離ごとに処理
-			static float rocCorrection = 0;
+			// 1ms周期での直線判定とログ保存処理
+			static float rocCorrection = 0.0F;
+			float deltaDistanceMm = 0.0F;
+			int32_t addDistanceMm = 0;
+
 			// ROC(曲率半径)計算
-			rocCorrection = calcROC(encCurrentN, BMI088val.gyro.z, (float)cntLog / 1000);
-			if (fabs(rocCorrection) >= 700.0F) // 直線判断
+			rocCorrection = calcROC(encCurrentN, BMI088val.gyro.z, (float)cntLog / 1000.0F);
+			if (fabsf(rocCorrection) >= 700.0F) // 直線判断
 			{
-				straightMeter += CALCDISTANCE_SHORTCUT; // 距離積算
+				deltaDistanceMm = fabsf((float)encCurrentN) / PALSE_MILLIMETER;
+				straightDistanceAcc += deltaDistanceMm;
+				addDistanceMm = (int32_t)straightDistanceAcc;
+				if (addDistanceMm > 0)
+				{
+					straightMeter += addDistanceMm;
+					straightDistanceAcc -= (float)addDistanceMm;
+				}
 			}
 			else
 			{
 				straightMeter = 0;
+				straightDistanceAcc = 0.0F;
 			}
 
 			if (straightMeter >= 100) // 直線が100mm以上のとき
@@ -110,7 +122,7 @@ void Interrupt1ms(void)
 
 			if (modeLOG)
 			{
-				// CALCDISTANCEごとにログを保存
+				// 1ms周期でログを保存
 #ifdef LOG_RUNNING_WRITE
 				writeLogBufferPuts(
 					LOG_NUM_8BIT,
@@ -121,27 +133,34 @@ void Interrupt1ms(void)
 					targetSpeed,
 					courseMarker,
 					modeCurve,
+					markerCheckLog.checkStart,
+					markerCheckLog.nowMarker,
+					markerCheckLog.existMarker,
+					markerCheckLog.result,
 					// 16bit
 					cntRun,
 					encCurrentN,
 					optimalIndex,
-					// motorpwmL,
-					// motorpwmR,
-					// (int16_t)(motorCurrentL * 10000),
-					// (int16_t)(motorCurrentR * 10000),
 					lineTraceCtrl.pwm,
 					veloCtrl.pwm,
 					// 32bit
-					encTotalOptimal,
+					(uint32_t)encTotalOptimal,
+					(uint32_t)markerCheckLog.encMarkerL,
+					(uint32_t)markerCheckLog.encMarkerR,
+					(uint32_t)markerCheckLog.encMarkerN,
+					(uint32_t)markerCheckLog.nowEncTotalN,
+					(uint32_t)markerCheckLog.distL,
+					(uint32_t)markerCheckLog.distR,
 					// float型
 					BMI088val.gyro.z
 				);
 #else
 				writeLogBufferPrint(); // バッファにログを保存
-				cntLog = 0;
 #endif
-				encLog = 0;	// ログ用エンコーダパルスをリセット
 			}
+
+			cntLog = 0;
+			encLog = 0; // ログ用エンコーダパルスをリセット
 		}
 	}
 

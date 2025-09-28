@@ -22,6 +22,23 @@
 //====================================//
 extern uint8_t  SGmarker;
 extern uint8_t  crossLine;
+
+// ログ保存用のマーカー検知情報
+typedef struct
+{
+	uint8_t	checkStart;
+	uint8_t	nowMarker;
+	uint8_t	existMarker;
+	uint8_t	result;
+	int32_t	encMarkerL;
+	int32_t	encMarkerR;
+	int32_t	encMarkerN;
+	int32_t	nowEncTotalN;
+	int32_t	distL;
+	int32_t	distR;
+} MarkerCheckLog;
+
+extern volatile MarkerCheckLog markerCheckLog;
 //====================================//
 // プロトタイプ宣言
 //====================================//

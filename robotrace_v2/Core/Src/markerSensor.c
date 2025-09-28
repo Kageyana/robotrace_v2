@@ -8,6 +8,9 @@
 uint8_t SGmarker = 0;
 uint8_t crossLine = 0;
 
+// ログ保存用のマーカー検知情報を保持
+volatile MarkerCheckLog markerCheckLog = {0};
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getMarksensor
 // 処理概要     マーカーセンサの値を取得
@@ -41,8 +44,12 @@ uint8_t checkMarker(void)
 	static int32_t encMarkerL = 0, encMarkerR = 1, encMarkerN, nowEncTotalN;
 	static int32_t distL, distR, distN;
 
-	nowMarker = getMarkerSensor(); // マーカーセンサ値を取得
-	nowEncTotalN = encTotalN;
+		nowMarker = getMarkerSensor(); // マーカーセンサ値を取得
+		nowEncTotalN = encTotalN;
+
+		// ログ用データに現在の読み値を保存
+		markerCheckLog.nowMarker = nowMarker;
+		markerCheckLog.nowEncTotalN = nowEncTotalN;
 
 	// 反応があればマーカー幅計測開始
 	if (nowMarker > 0 && checkStart == 0)
@@ -111,7 +118,17 @@ uint8_t checkMarker(void)
 		ret = CROSSLINE;
 	}
 
-	return ret;
+		// ログ用データに検知状態を保存
+		markerCheckLog.checkStart = checkStart;
+		markerCheckLog.existMarker = existMarker;
+		markerCheckLog.encMarkerL = encMarkerL;
+		markerCheckLog.encMarkerR = encMarkerR;
+		markerCheckLog.encMarkerN = encMarkerN;
+		markerCheckLog.distL = distL;
+		markerCheckLog.distR = distR;
+		markerCheckLog.result = ret;
+
+        return ret;
 }
 /////////////////////////////////////////////////////////////
 // モジュール名 checkCrossLine
