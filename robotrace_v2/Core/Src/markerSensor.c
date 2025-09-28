@@ -40,9 +40,31 @@ uint8_t checkMarker(void)
 	static uint8_t checkStart, nowMarker, existMarker;
 	static int32_t encMarkerL = 0, encMarkerR = 1, encMarkerN, nowEncTotalN;
 	static int32_t distL, distR, distN;
+	static int32_t prevEncTotalN; // 前回のエンコーダ総カウントを保持してリセットを検知する
 
 	nowMarker = getMarkerSensor(); // マーカーセンサ値を取得
 	nowEncTotalN = encTotalN;
+	int32_t delta = nowEncTotalN - prevEncTotalN;
+	if (delta < 0)
+	{
+		// エンコーダ総カウントが減少した場合はリセットが発生したと判断する
+		encMarkerR += delta;
+		if (encMarkerR < 0)
+		{
+			encMarkerR = 0;
+		}
+		encMarkerL += delta;
+		if (encMarkerL < 0)
+		{
+			encMarkerL = 0;
+		}
+		encMarkerN += delta;
+		if (encMarkerN < 0)
+		{
+			encMarkerN = 0;
+		}
+		checkStart = 0;
+	}
 
 	// 反応があればマーカー幅計測開始
 	if (nowMarker > 0 && checkStart == 0)
@@ -111,6 +133,7 @@ uint8_t checkMarker(void)
 		ret = CROSSLINE;
 	}
 
+	prevEncTotalN = nowEncTotalN; // 次回比較用にエンコーダ総カウントを更新
 	return ret;
 }
 /////////////////////////////////////////////////////////////
