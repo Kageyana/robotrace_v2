@@ -27,7 +27,7 @@ extern uint8_t  crossLine;
 //====================================//
 uint8_t getMarkerSensor ( void );
 uint8_t checkMarker( void );
-void checkGoalMarker(void);
+void checkStartGoalMarker(void);
 bool checkCrossLine(void);
 void powerMarkerSensors(uint8_t onoff);
 #endif // MARKERSENSOR_H_

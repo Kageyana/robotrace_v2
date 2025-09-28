@@ -73,10 +73,6 @@ uint8_t checkMarker(void)
 			if (existMarker == 0x1)
 			{
 				encMarkerR = nowEncTotalN;
-				if (SGmarker == 0)
-				{
-					SGmarker++;
-				}
 			}
 			else if (existMarker == 0x2)
 			{
@@ -134,20 +130,24 @@ bool checkCrossLine(void)
 	return ret;
 }
 /////////////////////////////////////////////////////////////
-// モジュール名 checkGoalMarker
-// 処理概要     クロスラインの読み飛ばし処理を含むマーカー検知
+// モジュール名 checkStartGoalMarker
+// 処理概要     スートマーカーとゴールマーカーの検出
 // 引数         なし
 // 戻り値       0:マーカなし 0x1:右 0x2:左 0x3:クロスライン
 /////////////////////////////////////////////////////////////
-void checkGoalMarker(void)
+void checkStartGoalMarker(void)
 {
 	if (courseMarker == RIGHTMARKER && SGmarker > 0)
 	{
 		if (encRightMarker > encMM(1000))
-		{ // 2回目以降
+		{ // 1000mm以上離れたらゴールマーカー検出可能
 			SGmarker++;
 			encRightMarker = 0;
 		}
+	} else if(courseMarker == RIGHTMARKER && SGmarker == 0) {
+		// スタートマーカー検出
+		SGmarker++;
+		encRightMarker = 0;
 	}
 }
 /////////////////////////////////////////////////////////////////////

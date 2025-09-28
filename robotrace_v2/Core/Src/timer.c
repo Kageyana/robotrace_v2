@@ -72,7 +72,7 @@ void Interrupt1ms(void)
 			emcStop = STOP_OVERSPEED;
 
 		courseMarker = checkMarker();	// マーカー検知
-		checkGoalMarker();				// ゴールマーカー処理
+		checkStartGoalMarker();				// ゴールマーカー処理
 		processMarkerEvent();	      	// マーカー関連処理を関数に委譲
 	}
 
