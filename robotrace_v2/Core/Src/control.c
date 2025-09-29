@@ -52,8 +52,6 @@ uint8_t courseMarker;
 uint8_t beforeCourseMarker;
 uint16_t cntMarker = 0;
 uint8_t courseMarkerLog = 0;
-int32_t straightMeter = 0;
-bool straightState = false;
 
 // ログ関連
 uint32_t goalTime = 0;
@@ -445,8 +443,7 @@ void loopSystem(void)
 			BMI088val.angle.z = 0.0F;
 			yawCtrl.Int = 0.0;
 			distCtrl.Int = 0.0;
-			straightMeter = 0;
-			straightState = false;
+			modeCurve = 0;
 
 			clearXYcie(); // 座標計算変数初期化
 

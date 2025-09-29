@@ -727,11 +727,18 @@ void setShortCutTarget(void)
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void processMarkerEvent(void) {
-	// カーブマーカー,クロスラインを通過した時の処理
-	if (courseMarker == 0 && beforeCourseMarker > 0) {
+	static uint8_t beforeModeCurve = 0; // 前回のカーブモード
+	bool checkDistance = false;	 // 距離補正状態
+
+	if (modeCurve == 0 && beforeModeCurve > 0) {
+		// カーブモードからストレートモードに変化したとき
+		checkDistance = false;	 // 距離補正状態をクリア
+	}
+	// カーブマーカー,クロスラインを検出した時の処理
+	if (courseMarker > 0 && beforeCourseMarker == 0) {
 		cntMarker++; // マーカーカウント
 		if (optimalTrace == BOOST_DISTANCE) {
-			if (straightState) {
+			if (modeCurve == 0 && !checkDistance) {
 				// 距離基準2次走行かつストレート区間中のとき
 				
 				int32_t low = pathedMarker, high = numPPAMarry, mid;
@@ -759,8 +766,7 @@ void processMarkerEvent(void) {
 					} else {
 						pathedMarker = 0;
 					}
-					straightState = false;
-					straightMeter = 0;
+					checkDistance = true;	 // 距離補正状態をセット
 				}
 			}
 		} else if(optimalTrace == BOOST_SHORTCUT) {
@@ -774,4 +780,5 @@ void processMarkerEvent(void) {
 		}
 	}
 	beforeCourseMarker = courseMarker; // 前回のマーカー状態を更新
+	beforeModeCurve = modeCurve;	   // 前回のカーブモードを更新
 }

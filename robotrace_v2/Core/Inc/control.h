@@ -86,8 +86,6 @@ extern uint8_t courseMarker;
 extern uint8_t beforeCourseMarker;
 extern uint16_t cntMarker;
 extern uint8_t courseMarkerLog;
-extern int32_t straightMeter;
-extern bool straightState;
 
 // タイマ関連
 extern uint32_t cntRun;

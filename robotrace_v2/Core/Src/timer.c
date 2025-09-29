@@ -45,12 +45,10 @@ void Interrupt1ms(void)
 	{
 		if (!calibratIMU)
 		{
-			BMI088getGyro();	// 角速度取得
-			calcDegrees();	// コンプリメンタリフィルタで角度算出
-			if (optimalTrace == 0)
-				checkCurve();	   // 1次走行 カーブ検出
-			motorControlYawRate(); // 角速度制御
-			motorControlYaw();	   // 角度制御
+			BMI088getGyro();		// 角速度取得
+			calcDegrees();			// コンプリメンタリフィルタで角度算出
+			motorControlYawRate();	// 角速度制御
+			motorControlYaw();		// 角度制御
 		}
 		else
 		{
@@ -71,6 +69,8 @@ void Interrupt1ms(void)
 		if (judgeOverSpeed())
 			emcStop = STOP_OVERSPEED;
 
+		checkCurve();	// カーブ検出
+
 		courseMarker = checkMarker();	// マーカー検知
 		checkStartGoalMarker();			// ゴールマーカー処理
 		processMarkerEvent();	      	// マーカー関連処理を関数に委譲
@@ -80,23 +80,6 @@ void Interrupt1ms(void)
 		// 一定距離ごとに処理
 		if (encLog >= encMM(CALCDISTANCE_SHORTCUT))
 		{
-			static float rocCorrection = 0;
-			// ROC(曲率半径)計算
-			rocCorrection = calcROC(encCurrentN, BMI088val.gyro.z, (float)cntLog / 1000);
-			if (fabs(rocCorrection) >= 700.0F) // 直線判断
-			{
-				straightMeter += CALCDISTANCE_SHORTCUT; // 距離積算
-			}
-			else
-			{
-				straightMeter = 0;
-			}
-
-			if (straightMeter >= 100) // 直線が100mm以上のとき
-			{
-				straightState = true;
-			}
-
 			if (modeLOG)
 			{
 				// CALCDISTANCEごとにログを保存
