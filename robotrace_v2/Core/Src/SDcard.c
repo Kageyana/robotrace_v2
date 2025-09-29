@@ -38,7 +38,7 @@ logData logVal[BUFFER_SIZE_LOG]; // 綴りの誤りを修正
 #endif
 uint16_t logValIndex = 0;
 bool logOverflow = false; // ログバッファ上限超過フラグ
-
+#ifndef LOG_RUNNING_WRITE
 typedef struct
 {
 	uint16_t index;
@@ -47,6 +47,7 @@ typedef struct
 } markerData;
 markerData markerVal[BUFFER_SIZE_MARKER]; // 綴りの誤りを修正
 uint16_t markerValIndex = 0;
+#endif
 bool markerOverflow = false; // マーカーバッファ上限超過フラグ
 
 // ログファイルナンバー
@@ -203,6 +204,7 @@ void createLog(void)
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
+#ifndef LOG_RUNNING_WRITE
 void writeMarkerPos(uint32_t distance, uint8_t marker)
 {
 	// バッファ上限チェック
@@ -218,6 +220,7 @@ void writeMarkerPos(uint32_t distance, uint8_t marker)
 		markerOverflow = true; // 上限超過を記録
 	}
 }
+#endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 initLog
 // 処理概要     バイナリ保存用のファイルを作成
