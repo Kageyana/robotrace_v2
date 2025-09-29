@@ -61,7 +61,8 @@ uint8_t checkMarker(void)
 				existMarker = 0;
 				checkStart = 0;
 			}
-			if (nowMarker != existMarker && nowMarker > 0)
+			// クロスラインを検出したら上書き
+			if (nowMarker > existMarker)
 			{
 				existMarker = nowMarker;
 			}

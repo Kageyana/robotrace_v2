@@ -58,9 +58,9 @@ void Interrupt1ms(void)
 		}
 	}
 
-	// 走行中に処理
 	if (patternTrace > 10 && patternTrace < 100)
 	{
+		// 走行中に処理
 		// 緊急停止処理
 		// if (cntEmcStopAngleX()) emcStop = STOP_ANGLE_X;
 		// if (cntEmcStopAngleY()) emcStop = STOP_ANGLE_Y;
@@ -72,26 +72,14 @@ void Interrupt1ms(void)
 			emcStop = STOP_OVERSPEED;
 
 		courseMarker = checkMarker();	// マーカー検知
-		checkStartGoalMarker();				// ゴールマーカー処理
+		checkStartGoalMarker();			// ゴールマーカー処理
 		processMarkerEvent();	      	// マーカー関連処理を関数に委譲
-		courseMarkerLog = courseMarker; // ログ用にマーカー状態を保存
-	}
+		if(courseMarker != 0)
+			courseMarkerLog = courseMarker; // ログ用にマーカー状態を保存
 
-	if (patternTrace < 10 || patternTrace > 100)
-	{
-		// 走行前に処理
-		getSwitches(); // スイッチの入力を取得
-		countDown();
-		setupCount(); // セットアップ用タイマを更新
-
-		wheelClick();
-	}
-	else
-	{
-		// 走行中に処理
+		// 一定距離ごとに処理
 		if (encLog >= encMM(CALCDISTANCE_SHORTCUT))
 		{
-			// 一定距離ごとに処理
 			static float rocCorrection = 0;
 			// ROC(曲率半径)計算
 			rocCorrection = calcROC(encCurrentN, BMI088val.gyro.z, (float)cntLog / 1000);
@@ -145,6 +133,14 @@ void Interrupt1ms(void)
 				encLog = 0;	// ログ用エンコーダパルスをリセット
 			}
 		}
+	}
+	else
+	{
+		// 走行前に処理
+		getSwitches();	// スイッチの入力を取得
+		countDown();	// カウントダウン処理
+		setupCount();	// セットアップ用タイマを更新
+		wheelClick();	// セットアップ用ホイールクリック処理
 	}
 
 	switch (cnt5)
