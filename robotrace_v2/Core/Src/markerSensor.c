@@ -53,10 +53,10 @@ uint8_t checkMarker(void)
 	}
 	if (checkStart == 1)
 	{
-		if (nowEncTotalN - encMarkerN <= encMM(10))
+		if (nowEncTotalN - encMarkerN <= encMM(20))
 		{
 			// 10mm以内で反応が消えたら誤検出判定
-			if (nowMarker == 0)
+			if (nowMarker == 0 && nowEncTotalN - encMarkerN <= encMM(10))
 			{
 				existMarker = 0;
 				checkStart = 0;
@@ -67,9 +67,9 @@ uint8_t checkMarker(void)
 				existMarker = nowMarker;
 			}
 		}
-		else if (nowEncTotalN - encMarkerN > encMM(10))
+		else if (nowEncTotalN - encMarkerN > encMM(20))
 		{
-			// 10mm以上センサが反応し続けたらマーカーと判定
+			// 20mm以上センサが反応し続けたらマーカーと判定
 			// マーカー位置を記録
 			if (existMarker == 0x1)
 			{
@@ -92,13 +92,13 @@ uint8_t checkMarker(void)
 	distL = nowEncTotalN - encMarkerL;
 	distR = nowEncTotalN - encMarkerR;
 
-	// ゴールマーカーを検出してから40~50mm走行後かつカーブマーカーを140mm検出していないとき
+	// ゴールマーカーを検出してから40~50mm走行後かつカーブマーカーを100mm検出していないとき
 	if (distR > encMM(50) && distR <= encMM(60) && distL > encMM(100))
 	{
 		ret = RIGHTMARKER;
 	}
 	// カーブマーカーを検出してから20~30mm走行後かつゴールマーカーを40mm検出していないとき
-	if (distL > encMM(10) && distL <= encMM(20) && distR > encMM(40))
+	if (distL > encMM(5) && distL <= encMM(10) && distR > encMM(80))
 	{
 		ret = LEFTMARKER;
 	}
