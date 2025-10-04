@@ -25,6 +25,7 @@
 #define RAD2DEG 180.0F / M_PI	 // rad→deg
 #define SHORTCUTWINDOW 4		 // ショートカットコース生成時の移動平均サンプル数
 #define STRAIGHTTH 1500.0F		 // 直線とみなす曲率半径の閾値[mm]
+#define STRAIGHT_STATE_MM_THRESHOLD 70	 // 直線成立に必要な連続距離[mm]
 
 // ファイル名
 #define FILENAME_ANALIZENUMBER "analize"

@@ -17,6 +17,12 @@ float targetAngle;			 // 目標角速度
 float targetAngularVelocity; // 目標角度
 int16_t targetDist;			 // 目標X座標
 
+// PIDリセット用の履歴変数
+static int16_t speedTargetBefore = 0;
+static int16_t speedEncoderBefore = 0;
+static int32_t distDevBefore = 0;
+static int32_t distTargetBefore = 0;
+
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 setTargetSpeed
 // 処理概要     目標速度の設定
@@ -58,6 +64,31 @@ void setTargetDist(float dist)
 	targetDist = (int16_t)(dist * PALSE_MILLIMETER);
 	;
 	encPID = 0;
+}
+
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 resetSpeedPID
+// 処理概要     速度制御PIDの内部状態をリセットする
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void resetSpeedPID(void)
+{
+	veloCtrl.Int = 0;
+	speedEncoderBefore = 0;
+	speedTargetBefore = targetSpeed;
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 resetDistPID
+// 処理概要     距離制御PIDの内部状態をリセットする
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void resetDistPID(void)
+{
+	distCtrl.Int = 0;
+	distDevBefore = 0;
+	distTargetBefore = targetDist;
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 motorControlTrace
@@ -118,16 +149,15 @@ void motorControlTrace(void)
 void motorControlSpeed(void)
 {
 	int32_t iP, iI, iD, iRet, Dev, Dif;
-	static int16_t targetSpeedBefore, encoderBefore;
 
 	// 駆動モーター用PWM値計算
 	Dev = (int16_t)targetSpeed - encCurrentN; // 偏差
 	// 目標値を変更したらI成分リセット
-	if (targetSpeed != targetSpeedBefore)
+	if (targetSpeed != speedTargetBefore)
 		veloCtrl.Int = 0;
 
 	veloCtrl.Int += (float)Dev * 0.001; // 時間積分
-	Dif = Dev - encoderBefore;			// 微分　dゲイン1/1000倍
+	Dif = Dev - speedEncoderBefore;			// 微分　dゲイン1/1000倍
 
 	iP = veloCtrl.kp * Dev;			 // 比例
 	iI = veloCtrl.ki * veloCtrl.Int; // 積分
@@ -142,8 +172,8 @@ void motorControlSpeed(void)
 		iRet = -900;
 
 	veloCtrl.pwm = iRet;
-	encoderBefore = Dev;			 // 次回はこの値が1ms前の値となる
-	targetSpeedBefore = targetSpeed; // 前回の目標値を記録
+	speedEncoderBefore = Dev;			 // 次回はこの値が1ms前の値となる
+	speedTargetBefore = targetSpeed; // 前回の目標値を記録
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 motorControlYaw
@@ -227,14 +257,13 @@ void motorControlYaw(void)
 void motorControldist(void)
 {
 	int32_t iP, iI, iD, Dev, Dif, iRet;
-	static int32_t distBefore, targetDistBefore;
 
 	Dev = (targetDist - encPID) * 1; // 目標値-現在値
 	// I成分積算
 	distCtrl.Int += Dev * 0.001;
 	// 目標値を変更したらI成分リセット
-	// if ( targetDist != targetDistBefore ) distCtrl.Int = 0;
-	Dif = (Dev - distBefore) * 1; // dゲイン1/1000倍
+	// if ( targetDist != distTargetBefore ) distCtrl.Int = 0;
+	Dif = (Dev - distDevBefore) * 1; // dゲイン1/1000倍
 
 	iP = distCtrl.kp * Dev;			 // 比例
 	iI = distCtrl.ki * distCtrl.Int; // 積分
@@ -249,8 +278,8 @@ void motorControldist(void)
 		iRet = -900;
 
 	distCtrl.pwm = iRet;
-	distBefore = Dev;			   // 次回はこの値が1ms前の値となる
-	targetDistBefore = targetDist; // 前回の目標値を記録
+	distDevBefore = Dev;			   // 次回はこの値が1ms前の値となる
+	distTargetBefore = targetDist; // 前回の目標値を記録
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 writePIDparameters
