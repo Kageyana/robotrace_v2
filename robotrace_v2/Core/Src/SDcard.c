@@ -169,7 +169,7 @@ void createLog(void)
 	setLogStr("ROC", "%f");
 
 	setLogStr("targetSpeed", "%d");
-	setLogStr("modeCurve", "%d");
+	setLogStr("straightState", "%d");
 	setLogStr("optimalIndex", "%d");
 	// setLogStr("motorpwmL", "%d");
 	// setLogStr("motorpwmR", "%d");
