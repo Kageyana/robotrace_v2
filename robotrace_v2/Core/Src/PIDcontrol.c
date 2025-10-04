@@ -58,7 +58,6 @@ void setTargetAngle(float angle)
 void setTargetDist(float dist)
 {
 	targetDist = (int16_t)(dist * PALSE_MILLIMETER);
-	;
 	encPID = 0;
 }
 ///////////////////////////////////////////////////////////////////////////
