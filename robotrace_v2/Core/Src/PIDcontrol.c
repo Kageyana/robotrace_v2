@@ -16,6 +16,8 @@ uint8_t targetSpeed;		 // 目標速度
 float targetAngle;			 // 目標角速度
 float targetAngularVelocity; // 目標角度
 int16_t targetDist;			 // 目標X座標
+static int16_t speedTargetBefore = 0;	// 速度PID用の前回目標値
+static int16_t speedEncoderBefore = 0;	// 速度PID用の前回偏差
 
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 setTargetSpeed
@@ -58,6 +60,20 @@ void setTargetDist(float dist)
 	targetDist = (int16_t)(dist * PALSE_MILLIMETER);
 	;
 	encPID = 0;
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 resetSpeedPID
+// 処理概要	 速度・距離PIDの内部状態をリセットする
+// 引数	 なし
+// 戻り値	 なし
+///////////////////////////////////////////////////////////////////////////
+void resetSpeedPID(void)
+{
+	// 速度・距離PIDの積分項と差分項をクリア
+	veloCtrl.Int = 0.0f;
+	distCtrl.Int = 0.0f;
+	speedTargetBefore = targetSpeed;	// 現在の目標値を基準として保持
+	speedEncoderBefore = 0;	// 偏差履歴をリセット
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 motorControlTrace
@@ -118,16 +134,15 @@ void motorControlTrace(void)
 void motorControlSpeed(void)
 {
 	int32_t iP, iI, iD, iRet, Dev, Dif;
-	static int16_t targetSpeedBefore, encoderBefore;
 
 	// 駆動モーター用PWM値計算
 	Dev = (int16_t)targetSpeed - encCurrentN; // 偏差
 	// 目標値を変更したらI成分リセット
-	if (targetSpeed != targetSpeedBefore)
+	if (targetSpeed != speedTargetBefore)
 		veloCtrl.Int = 0;
 
 	veloCtrl.Int += (float)Dev * 0.001; // 時間積分
-	Dif = Dev - encoderBefore;			// 微分　dゲイン1/1000倍
+	Dif = Dev - speedEncoderBefore;			// 微分　dゲイン1/1000倍
 
 	iP = veloCtrl.kp * Dev;			 // 比例
 	iI = veloCtrl.ki * veloCtrl.Int; // 積分
@@ -142,8 +157,8 @@ void motorControlSpeed(void)
 		iRet = -900;
 
 	veloCtrl.pwm = iRet;
-	encoderBefore = Dev;			 // 次回はこの値が1ms前の値となる
-	targetSpeedBefore = targetSpeed; // 前回の目標値を記録
+	speedEncoderBefore = Dev;			 // 次回はこの値が1ms前の値となる
+	speedTargetBefore = targetSpeed; // 前回の目標値を記録
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 motorControlYaw
