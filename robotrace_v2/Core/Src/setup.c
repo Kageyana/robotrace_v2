@@ -368,9 +368,12 @@ static void test_battery(void)
 		init_sensor_test("Battery", Font_7x10, 32); // 画面クリアとタイトル表示
 	}
 	ssd1306_SetCursor(0, 30);
-	ssd1306_printf(Font_7x10, "batteryADAD:%d", batteryAD);
+	ssd1306_printf(Font_7x10, "batteryAD:%d", batteryAD);
 
 	ssd1306_SetCursor(0, 42);
+	ssd1306_printf(Font_7x10, "batteryAD:%4.2f", AD2VOLTAGE(batteryAD));
+
+	ssd1306_SetCursor(0, 54);
 	ssd1306_printf(Font_7x10, "BatteryLv:%d", batteryLevel);
 }
 
