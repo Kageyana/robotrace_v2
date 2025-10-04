@@ -66,6 +66,8 @@ void setTargetSpeed (float speed);
 void setTargetAngularVelocity (float angularVelocity);
 void setTargetAngle (float angle);
 void setTargetDist (float dist);
+void resetSpeedPID (void);
+void resetDistPID (void);
 void writePIDparameters(pidParam *pid);
 void readPIDparameters(pidParam *pid);
 void motorControlTrace(void);

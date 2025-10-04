@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "timer.h"
+#include "courseAnalysis.h"
 //====================================//
 // グローバル変数の宣
 //====================================//
@@ -90,7 +91,7 @@ void Interrupt1ms(void)
 				straightMeter = 0;
 			}
 
-			if (straightMeter >= 100) // 直線が100mm以上のとき
+			if (straightMeter >= STRAIGHT_STATE_MM_THRESHOLD) // 直線がしきい値以上のとき
 			{
 				straightState = true;
 			}

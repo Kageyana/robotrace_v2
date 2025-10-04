@@ -3,6 +3,36 @@
 //====================================//
 #include "courseAnalysis.h"
 #include "fatfs.h"
+#include "PIDcontrol.h"
+#include "encoder.h"
+#include "BMI088.h"
+#include "markerSensor.h"
+#ifdef DEBUG_CORR
+#include <stdio.h>
+#endif
+//====================================//
+// 定数定義
+//====================================//
+#define STRAIGHT_WINDOW_MM 150	// 直前距離の評価窓[mm]
+#define STRAIGHT_RATIO_THRESHOLD 0.80f	// 直線らしさ判定の割合しきい値
+#define CORR_THRESH_MIN_MM 120	// 補正許可しきい値の最小値[mm]
+#define CORR_THRESH_MAX_MM 400	// 補正許可しきい値の最大値[mm]
+#define CORR_STEP_MAX_MM 200	// 1回の補正量上限[mm]
+#define FAILSAFE_MISS_MAX 2	// 連続取りこぼし許容回数
+#define FAILSAFE_SPEED_SCALE 0.85f	// フェイルセーフ時の速度係数
+#define MARKER_SEARCH_HALF_RANGE 4	// マーカー探索範囲(±件数)
+
+//====================================//
+// ローカル変数・関数宣言
+//====================================//
+static int16_t lastCorrectedMarkerIndex = 0;
+static int16_t missedCorrections = 0;
+static bool failSafeActive = false;
+
+static bool isStraightBeforeMarker(int32_t encNow, int window_mm, float ratio_threshold);
+static int16_t findNearestMarkerIndex(int32_t encNow, int16_t baseIndex, int16_t range);
+static inline int32_t computeDynamicThresholdPulse(int32_t currentTargetSpeed, float angVelo);
+
 //====================================//
 // グローバル変数の宣
 //====================================//
@@ -26,6 +56,98 @@ AnalysisData PPAD[OPT_BUFF_SIZE];
 EventPos markerPos[OPT_BUFF_SIZE];
 Courseplot xycie;							   // xy座標値(走行中計算、ログ保存用)
 Courseplot shortCutxycie[OPT_SHORT_BUFF_SIZE]; // xy座標値(目標値、ログ保存用)
+
+
+
+/////////////////////////////////////////////////////////////////////
+// ローカル関数 isStraightBeforeMarker
+// 処理概要     マーカー直前の直線率を簡易的に判定する
+// 引数         encNow: 現在の走行距離[パルス] (未使用) window_mm: 評価窓[mm] ratio_threshold: 直線率しきい値
+// 戻り値       直線率がしきい値以上ならtrue
+/////////////////////////////////////////////////////////////////////
+static bool isStraightBeforeMarker(int32_t encNow, int window_mm, float ratio_threshold)
+{
+	(void)encNow; // 未使用引数を明示的に無効化
+	int32_t straightMm = straightMeter;
+	if (straightMm >= window_mm) {
+		return true;
+	}
+	int32_t scaledStraight = straightMm * 1000;
+	int32_t scaledThreshold = (int32_t)((float)window_mm * ratio_threshold * 1000.0f);
+	return (scaledStraight >= scaledThreshold);
+}
+/////////////////////////////////////////////////////////////////////
+// ローカル関数 computeDynamicThresholdPulse
+// 処理概要     補正許可の動的しきい値を計算する
+// 引数         currentTargetSpeed: 現在の目標速度[パルス] angVelo: 角速度[deg/s]
+// 戻り値       補正許可のしきい値[パルス]
+/////////////////////////////////////////////////////////////////////
+static inline int32_t computeDynamicThresholdPulse(int32_t currentTargetSpeed, float angVelo)
+{
+	float speedMmPerSec = (float)currentTargetSpeed / PALSE_MILLIMETER;
+	float absSpeed = (speedMmPerSec < 0.0f) ? -speedMmPerSec : speedMmPerSec;
+	float absAng = (angVelo < 0.0f) ? -angVelo : angVelo;
+	float thresholdMm = 100.0f + (0.02f * absSpeed) + (0.5f * absAng);
+	if (thresholdMm < (float)CORR_THRESH_MIN_MM) {
+		thresholdMm = (float)CORR_THRESH_MIN_MM;
+	} else if (thresholdMm > (float)CORR_THRESH_MAX_MM) {
+		thresholdMm = (float)CORR_THRESH_MAX_MM;
+	}
+	return encMM((int16_t)thresholdMm);
+}
+/////////////////////////////////////////////////////////////////////
+// ローカル関数 findNearestMarkerIndex
+// 処理概要     補正対象に最適なマーカーインデックスを探索する
+// 引数         encNow: 現在の走行距離[パルス] baseIndex: 基準インデックス range: 探索範囲(±件数)
+// 戻り値       最も近いマーカーインデックス
+/////////////////////////////////////////////////////////////////////
+static int16_t findNearestMarkerIndex(int32_t encNow, int16_t baseIndex, int16_t range)
+{
+	if (numPPAMarry <= 0) {
+		return 0;
+	}
+	if (baseIndex < 0 || baseIndex >= numPPAMarry) {
+		baseIndex = 0;
+	}
+	int16_t low = (int16_t)(baseIndex - range);
+	if (low < 0) {
+		low = 0;
+	}
+	int16_t high = (int16_t)(baseIndex + range);
+	if (high >= numPPAMarry) {
+		high = (int16_t)(numPPAMarry - 1);
+	}
+	int16_t left = low;
+	int16_t right = high;
+	while (left < right) {
+		int16_t mid = (int16_t)((left + right) / 2);
+		if (markerPos[mid].distance < encNow) {
+			left = (int16_t)(mid + 1);
+		} else {
+			right = mid;
+		}
+	}
+	int16_t idx = left;
+	if (idx > high) {
+		idx = high;
+	} else if (idx < low) {
+		idx = low;
+	}
+	if (idx > low) {
+		int32_t diffCurr = encNow - markerPos[idx].distance;
+		if (diffCurr < 0) {
+			diffCurr = -diffCurr;
+		}
+		int32_t diffPrev = encNow - markerPos[idx - 1].distance;
+		if (diffPrev < 0) {
+			diffPrev = -diffPrev;
+		}
+		if (diffPrev <= diffCurr) {
+			idx--;
+		}
+	}
+	return idx;
+}
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 calcROC
@@ -258,9 +380,9 @@ int16_t readLogDistance(int logNumber)
 				straightMeter = 0;
 			}
 
-			// 直線区間が100mm以上続いたら直線走行中と判定し、
-			// 次に検出する左マーカーをカーブ開始とするためのフラグを立てる
-			if (straightMeter >= 100)
+// 直線区間がしきい値以上続いたら直線走行中と判定し、
+// 次に検出する左マーカーをカーブ開始とするためのフラグを立てる
+if (straightMeter >= STRAIGHT_STATE_MM_THRESHOLD)
 			{
 				straightState = true;
 			}
@@ -724,52 +846,102 @@ void setShortCutTarget(void)
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void processMarkerEvent(void) {
+void processMarkerEvent(void)
+{
 	static uint8_t beforeModeCurve = 0; // 前回のカーブモード
-	bool checkDistance = false;	 // 距離補正状態
+	bool checkDistance = false;	// 距離補正状態
 
 	if (modeCurve == 0 && beforeModeCurve > 0) {
-		// カーブモードからストレートモードに変化したとき
-		checkDistance = false;	 // 距離補正状態をクリア
+		checkDistance = false;	// カーブ解除時は補正状態をクリア
 	}
-	// カーブマーカー,クロスラインを検出した時の処理
+
 	if (courseMarker > 0 && beforeCourseMarker == 0) {
 		cntMarker++; // マーカーカウント
 		if (optimalTrace == BOOST_DISTANCE) {
-			if (straightState) {
-				// 距離基準2次走行かつストレート区間中のとき
-				
-				int32_t low = pathedMarker, high = numPPAMarry, mid;
-				int32_t j, errorDistance = 0;
-				// 二分探索で現在位置に最も近いマーカーを高速に検索
-				while (low < high) {
-					mid = (low + high) / 2;
-					if (markerPos[mid].distance < encTotalOptimal) {
-						low = mid + 1;
-					} else {
-						high = mid;
+			bool isCrossMarker = (courseMarker == CROSSLINE);
+			bool straightLike = straightState || isStraightBeforeMarker(encTotalOptimal, STRAIGHT_WINDOW_MM, STRAIGHT_RATIO_THRESHOLD);
+
+			if ((straightLike || isCrossMarker) && numPPAMarry > 0) {
+				if (pathedMarker < 0) {
+					pathedMarker = 0;
+				} else if (pathedMarker >= numPPAMarry) {
+					pathedMarker = (int16_t)(numPPAMarry - 1);
+				}
+
+				int16_t baseIndex = lastCorrectedMarkerIndex;
+				if (baseIndex < 0 || baseIndex >= numPPAMarry) {
+					baseIndex = pathedMarker;
+				}
+
+				int16_t markerIndex = findNearestMarkerIndex(encTotalOptimal, baseIndex, MARKER_SEARCH_HALF_RANGE);
+				int32_t diff = encTotalOptimal - markerPos[markerIndex].distance; // [pulse]
+				int32_t absDiff = (diff < 0) ? -diff : diff;
+				int32_t allow = computeDynamicThresholdPulse((int32_t)targetSpeed, BMI088val.gyro.z);
+				bool enableCorrection = isCrossMarker || (absDiff <= allow);
+
+				if (enableCorrection) {
+					int32_t stepLimit = encMM((int16_t)CORR_STEP_MAX_MM);
+					if (diff > stepLimit) {
+						diff = stepLimit;
+					} else if (diff < -stepLimit) {
+						diff = -stepLimit;
 					}
-				}
-				j = low;
-				if (j > 0 && abs(encTotalOptimal - markerPos[j].distance) >= abs(encTotalOptimal - markerPos[j - 1].distance)) {
-					j--;
-				}
-				if (abs(encTotalOptimal - markerPos[j].distance) < encMM(100)) {
-					errorDistance = encTotalOptimal - DistanceOptimal; // 現在の差を計算
-					encTotalOptimal = markerPos[j].distance;           // 距離を補正
-					DistanceOptimal = encTotalOptimal - errorDistance; // 補正後の現在距離からの差分
-					optimalIndex = markerPos[j].indexPPAD;             // インデックス更新
-					if (j > 5) {
-						pathedMarker = j-5;
+
+					int32_t errorDistance = encTotalOptimal - DistanceOptimal; // 現在保持している誤差を保存
+					encTotalOptimal -= diff; // 走行距離を段階的に補正
+					DistanceOptimal = encTotalOptimal - errorDistance; // 誤差が変化しないよう再計算
+
+					uint16_t nextIndex = (uint16_t)markerPos[markerIndex].indexPPAD;
+					if (numPPADarry > 0) {
+						if (nextIndex >= (uint16_t)numPPADarry) {
+							nextIndex = (uint16_t)(numPPADarry - 1);
+						}
 					} else {
+						nextIndex = 0;
+					}
+					optimalIndex = nextIndex; // インデックスを同期
+
+					if (numPPADarry > 0) {
+						setTargetSpeed(PPAD[optimalIndex].boostSpeed); // 目標速度を即時反映
+					}
+					resetSpeedPID(); // 速度PIDをリセット
+					resetDistPID(); // 距離PIDをリセット
+
+					pathedMarker = (int16_t)(markerIndex - 2); // 探索開始位置を手前に戻す
+					if (pathedMarker < 0) {
 						pathedMarker = 0;
+					} else if (pathedMarker >= numPPAMarry) {
+						pathedMarker = (int16_t)(numPPAMarry - 1);
 					}
-					straightState = false;	 // 距離補正状態をセット
+
+					lastCorrectedMarkerIndex = markerIndex; // 最新補正位置を記録
+					missedCorrections = 0; // 取りこぼしカウンタをリセット
+					failSafeActive = false; // フェイルセーフ解除
+					straightState = false; // 多重補正防止
+					checkDistance = true; // 補正成功を記録
+#ifdef DEBUG_CORR
+					printf("CORR OK idx=%d diff=%ld allow=%ld tgt=%u\n", markerIndex, (long)diff, (long)allow, (unsigned int)optimalIndex);
+#endif
+				} else {
+					if (missedCorrections < 32767) {
+						missedCorrections++;
+					}
+#ifdef DEBUG_CORR
+					printf("CORR MISS idx=%d diff=%ld allow=%ld miss=%d\n", markerIndex, (long)diff, (long)allow, missedCorrections);
+#endif
+					if (missedCorrections >= FAILSAFE_MISS_MAX && !failSafeActive) {
+						float currentSpeed = (float)targetSpeed / PALSE_MILLIMETER;
+						float limitedSpeed = currentSpeed * FAILSAFE_SPEED_SCALE;
+						setTargetSpeed(limitedSpeed); // 補正が入るまで安全側に減速
+						failSafeActive = true;
+#ifdef DEBUG_CORR
+						printf("CORR FAILSAFE speed=%.3f\n", limitedSpeed);
+#endif
+					}
 				}
 			}
-		} else if(optimalTrace == BOOST_SHORTCUT) {
+		} else if (optimalTrace == BOOST_SHORTCUT) {
 			// ショートカット基準2次走行のとき
-			
 		}
 #ifndef LOG_RUNNING_WRITE
 		// マーカーの位置を記録
@@ -779,5 +951,5 @@ void processMarkerEvent(void) {
 #endif
 	}
 	beforeCourseMarker = courseMarker; // 前回のマーカー状態を更新
-	beforeModeCurve = modeCurve;	   // 前回のカーブモードを更新
+	beforeModeCurve = modeCurve; // 前回のカーブモードを更新
 }
