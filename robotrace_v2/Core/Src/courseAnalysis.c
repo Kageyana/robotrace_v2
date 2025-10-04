@@ -7,9 +7,6 @@
 #include "encoder.h"
 #include "BMI088.h"
 #include "markerSensor.h"
-#ifdef DEBUG_CORR
-#include <stdio.h>
-#endif
 //====================================//
 // 定数定義
 //====================================//
@@ -919,24 +916,15 @@ void processMarkerEvent(void)
 					failSafeActive = false; // フェイルセーフ解除
 					straightState = false; // 多重補正防止
 					checkDistance = true; // 補正成功を記録
-#ifdef DEBUG_CORR
-					printf("CORR OK idx=%d diff=%ld allow=%ld tgt=%u\n", markerIndex, (long)diff, (long)allow, (unsigned int)optimalIndex);
-#endif
 				} else {
 					if (missedCorrections < 32767) {
 						missedCorrections++;
 					}
-#ifdef DEBUG_CORR
-					printf("CORR MISS idx=%d diff=%ld allow=%ld miss=%d\n", markerIndex, (long)diff, (long)allow, missedCorrections);
-#endif
 					if (missedCorrections >= FAILSAFE_MISS_MAX && !failSafeActive) {
 						float currentSpeed = (float)targetSpeed / PALSE_MILLIMETER;
 						float limitedSpeed = currentSpeed * FAILSAFE_SPEED_SCALE;
 						setTargetSpeed(limitedSpeed); // 補正が入るまで安全側に減速
 						failSafeActive = true;
-#ifdef DEBUG_CORR
-						printf("CORR FAILSAFE speed=%.3f\n", limitedSpeed);
-#endif
 					}
 				}
 			}
