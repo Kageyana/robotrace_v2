@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "timer.h"
+#define STRAIGHT_STATE_THRESHOLD_MM	70	// 直線判定の距離閾値[mm]
 //====================================//
 // グローバル変数の宣
 //====================================//
@@ -90,7 +91,7 @@ void Interrupt1ms(void)
 				straightMeter = 0;
 			}
 
-			if (straightMeter >= 100) // 直線が100mm以上のとき
+			if (straightMeter >= STRAIGHT_STATE_THRESHOLD_MM) // 直線が閾値以上のとき
 			{
 				straightState = true;
 			}
