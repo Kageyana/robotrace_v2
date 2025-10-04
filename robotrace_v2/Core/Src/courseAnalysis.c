@@ -6,9 +6,6 @@
 #include "PIDcontrol.h"
 #include "markerSensor.h"
 #include "BMI088.h"
-#ifdef DEBUG_CORR
-#include <stdio.h>
-#endif
 //====================================//
 // グローバル変数の宣
 //====================================//
@@ -860,9 +857,6 @@ static void activateFailSafe(void)
 	setTargetSpeed(limitedSpeed);	// 速度指令を更新
 	boostSpeed = limitedSpeed;	// 参照速度も同期
 	failSafeActive = true;
-#ifdef DEBUG_CORR
-	printf("[CORR] failsafe speed=%.3f\n", (double)limitedSpeed);
-#endif
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 processMarkerEvent
@@ -921,23 +915,14 @@ void processMarkerEvent(void) {
 						straightState = false;	// 多重補正防止
 						missedCorrections = 0;	// 失敗カウンタをリセット
 						failSafeActive = false;	// フェイルセーフ解除
-#ifdef DEBUG_CORR
-						printf("[CORR] idx=%d raw=%ld step=%ld enc=%ld speed=%.3f\n", nearestIdx, (long)rawDiff, (long)diff, (long)encTotalOptimal, (double)boostSpeed);
-#endif
 					} else {
 						missedCorrections++;	// 補正失敗をカウント
-#ifdef DEBUG_CORR
-						printf("[CORR] miss idx=%d diff=%ld allow=%ld miss=%u\n", nearestIdx, (long)rawDiff, (long)allowDiff, (unsigned)missedCorrections);
-#endif
 						if (missedCorrections >= FAILSAFE_MISS_MAX) {
 							activateFailSafe();
 						}
 					}
 				} else {
 					missedCorrections++;	// 直線条件不成立でも失敗扱い
-#ifdef DEBUG_CORR
-					printf("[CORR] skip miss=%u\n", (unsigned)missedCorrections);
-#endif
 					if (missedCorrections >= FAILSAFE_MISS_MAX) {
 						activateFailSafe();
 					}
