@@ -80,6 +80,21 @@ void Interrupt1ms(void)
 		// 一定距離ごとに処理
 		if (encLog >= encMM(CALCDISTANCE_SHORTCUT))
 		{
+			// ROC(曲率半径)計算
+			if (calcROC(encCurrentN, BMI088val.gyro.z, (float)cntLog / 1000) >= 700.0F) // 直線判断
+			{
+				straightMeter += CALCDISTANCE_SHORTCUT; // 距離積算
+			}
+			else
+			{
+				straightMeter = 0;
+			}
+
+			if (straightMeter >= 100) // 直線が100mm以上のとき
+			{
+				straightState = true;
+			}
+
 			if (modeLOG)
 			{
 				// CALCDISTANCEごとにログを保存
@@ -92,7 +107,7 @@ void Interrupt1ms(void)
 					// 8bit
 					targetSpeed,
 					courseMarkerLog,
-					modeCurve,
+					straightState,
 					// 16bit
 					cntRun,
 					encCurrentN,
@@ -110,10 +125,10 @@ void Interrupt1ms(void)
 				);
 #else
 				writeLogBufferPrint(); // バッファにログを保存
-				cntLog = 0;
 #endif
 				courseMarkerLog = 0; // ログ用マーカー状態をリセット
 				encLog = 0;	// ログ用エンコーダパルスをリセット
+				cntLog = 0;
 			}
 		}
 	}

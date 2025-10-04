@@ -7,7 +7,6 @@
 // グローバル変数の宣
 //====================================//
 static const float invPulseConst = 10.0F / PALSE_MILLIMETER;	// エンコーダパルスをミリメートル換算する係数
-static const float angFactor = DEG2RAD;			// 角速度[deg/s]をラジアン換算する係数
 uint8_t optimalTrace = 0;
 uint16_t optimalIndex;
 int16_t numPPADarry; // path palanning analysis distance (PPAD)
@@ -20,11 +19,14 @@ int16_t analizedNumber = 0;	 // 前回解析したログ番号
 int32_t encTotalOptimal = 0; // 2次走行用の距離変数(距離補正をする)
 int32_t encPID = 0;			 // 距離制御用の距離変数
 float xydegz = 0;
+int32_t straightMeter;
+bool straightState;
 
 AnalysisData PPAD[OPT_BUFF_SIZE];
 EventPos markerPos[OPT_BUFF_SIZE];
 Courseplot xycie;							   // xy座標値(走行中計算、ログ保存用)
 Courseplot shortCutxycie[OPT_SHORT_BUFF_SIZE]; // xy座標値(目標値、ログ保存用)
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 calcROC
 // 処理概要     曲率半径の計算
@@ -33,29 +35,25 @@ Courseplot shortCutxycie[OPT_SHORT_BUFF_SIZE]; // xy座標値(目標値、ログ
 /////////////////////////////////////////////////////////////////////
 float calcROC(int16_t velo, float angvelo, float dt)
 {
-	float dl, drad, ret;
+	// 移動距離 [pulse] → [mm]
+    float dl = (float)velo * invPulseConst;  // [mm]
+    // 角度変化量 [rad] = ω[deg/s] → rad/s × dt[s]
+    float drad = angvelo * DEG2RAD * dt;
 
-	dl = (float)velo * invPulseConst; // [palse] → [mm]
-	drad = angvelo * angFactor * dt; // 定義済み係数を利用して[deg/s]を[rad]に変換
+    // 絶対値を符号で取る fabs() より高速
+    float absDrad = (drad < 0.0f) ? -drad : drad;
+    float absDl   = (dl   < 0.0f) ? -dl   : dl;
 
-	// fabsfの代わりに符号で絶対値を判定する（負の値なら反転）
-	float absDrad = (drad < 0.0F) ? -drad : drad;
-	// 角速度が極小の場合は直線とみなして即座に返す
-	if (absDrad < 1e-6F)
-	{
-		return 2000.0F;
-	}
+    // 直線判定：|dl/drad| > STRAIGHTTH ⇔ STRAIGHTTH * |drad| < |dl|
+    // → 除算せずに比較できる
+    if (absDrad < 1e-6f || STRAIGHTTH * absDrad < absDl) {
+        return 2000.0f; // 直線とみなす
+    }
 
-	ret = dl / drad; // 曲率半径を計算
-	// fabsfの代わりに符号で絶対値を判定する（負の値なら反転）
-	float absRet = (ret < 0.0F) ? -ret : ret;
-	// 曲率半径が大きい＝直線の場合は極大にする
-	if (absRet > 1500.0F)
-	{
-		ret = 2000.0F;
-	}
-
-	return ret;
+    // カーブの場合のみ除算実行
+    float R = dl / drad;
+    float absR = (R < 0.0f) ? -R : R;
+    return (absR > STRAIGHTTH) ? 2000.0f : R;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 saveLogNumber
@@ -738,7 +736,7 @@ void processMarkerEvent(void) {
 	if (courseMarker > 0 && beforeCourseMarker == 0) {
 		cntMarker++; // マーカーカウント
 		if (optimalTrace == BOOST_DISTANCE) {
-			if (modeCurve == 0 && !checkDistance) {
+			if (straightState) {
 				// 距離基準2次走行かつストレート区間中のとき
 				
 				int32_t low = pathedMarker, high = numPPAMarry, mid;
@@ -761,12 +759,12 @@ void processMarkerEvent(void) {
 					encTotalOptimal = markerPos[j].distance;           // 距離を補正
 					DistanceOptimal = encTotalOptimal - errorDistance; // 補正後の現在距離からの差分
 					optimalIndex = markerPos[j].indexPPAD;             // インデックス更新
-					if (j - 5 < 0) {
-						pathedMarker = j - 5;
+					if (j > 5) {
+						pathedMarker = j-5;
 					} else {
 						pathedMarker = 0;
 					}
-					checkDistance = true;	 // 距離補正状態をセット
+					straightState = false;	 // 距離補正状態をセット
 				}
 			}
 		} else if(optimalTrace == BOOST_SHORTCUT) {

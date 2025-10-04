@@ -24,6 +24,7 @@
 #define DEG2RAD M_PI / 180.0F	 // deg→rad
 #define RAD2DEG 180.0F / M_PI	 // rad→deg
 #define SHORTCUTWINDOW 4		 // ショートカットコース生成時の移動平均サンプル数
+#define STRAIGHTTH 1500.0F		 // 直線とみなす曲率半径の閾値[mm]
 
 // ファイル名
 #define FILENAME_ANALIZENUMBER "analize"
@@ -61,6 +62,8 @@ extern int32_t DistanceOptimal;
 extern int16_t analizedNumber;
 extern int32_t encTotalOptimal;
 extern int32_t encPID;
+extern int32_t straightMeter;
+extern bool straightState;
 
 // 解析関係
 extern AnalysisData PPAD[OPT_BUFF_SIZE];
