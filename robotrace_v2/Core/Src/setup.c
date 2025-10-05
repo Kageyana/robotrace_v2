@@ -747,13 +747,13 @@ static void setup_pid_speed(void)
 		ssd1306_printf(Font_6x8, "Speed PID");
 
 		ssd1306_SetCursor(0, 18);
-		ssd1306_printf(Font_7x10, "kp:");
-		ssd1306_SetCursor(0, 32);
-		ssd1306_printf(Font_7x10, "ki:");
-		ssd1306_SetCursor(0, 44);
-		ssd1306_printf(Font_7x10, "kd:");
-		ssd1306_SetCursor(0, 56);
-		ssd1306_printf(Font_7x10, "ff:");	// フィードフォワード係数の表示欄
+		ssd1306_printf(Font_6x8, "kp:");
+		ssd1306_SetCursor(0, 30);
+		ssd1306_printf(Font_6x8, "ki:");
+		ssd1306_SetCursor(0, 42);
+		ssd1306_printf(Font_6x8, "kd:");
+		ssd1306_SetCursor(0, 54);
+		ssd1306_printf(Font_6x8, "ff:");	// フィードフォワード係数の表示欄
 		ssd1306_SetCursor(60, 30);
 		ssd1306_printf(Font_7x10, "pwm:");
 	}
@@ -780,27 +780,27 @@ static void setup_pid_speed(void)
 	{
 		ssd1306_SetCursor(21, 18);
 		if (pattern.gain == 1)
-			ssd1306_printfB(Font_7x10, "%3d", veloCtrl.kp);
+			ssd1306_printfB(Font_6x8, "%3d", veloCtrl.kp);
 		else
-			ssd1306_printf(Font_7x10, "%3d", veloCtrl.kp);
+			ssd1306_printf(Font_6x8, "%3d", veloCtrl.kp);
 
-		ssd1306_SetCursor(21, 32);
+		ssd1306_SetCursor(21, 30);
 		if (pattern.gain == 2)
-			ssd1306_printfB(Font_7x10, "%3d", veloCtrl.ki);
+			ssd1306_printfB(Font_6x8, "%3d", veloCtrl.ki);
 		else
-			ssd1306_printf(Font_7x10, "%3d", veloCtrl.ki);
+			ssd1306_printf(Font_6x8, "%3d", veloCtrl.ki);
 
-		ssd1306_SetCursor(21, 44);
+		ssd1306_SetCursor(21, 42);
 		if (pattern.gain == 3)
-			ssd1306_printfB(Font_7x10, "%3d", veloCtrl.kd);
+			ssd1306_printfB(Font_6x8, "%3d", veloCtrl.kd);
 		else
-			ssd1306_printf(Font_7x10, "%3d", veloCtrl.kd);
+			ssd1306_printf(Font_6x8, "%3d", veloCtrl.kd);
 
-		ssd1306_SetCursor(21, 56);
+		ssd1306_SetCursor(21, 54);
 		if (pattern.gain == 4)
-			ssd1306_printfB(Font_7x10, "%3d", speedFeedForwardGain);
+			ssd1306_printfB(Font_6x8, "%3d", speedFeedForwardGain);
 		else
-			ssd1306_printf(Font_7x10, "%3d", speedFeedForwardGain);
+			ssd1306_printf(Font_6x8, "%3d", speedFeedForwardGain);
 
 		// 制御量表示
 		ssd1306_SetCursor(88, 30);
