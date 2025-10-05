@@ -3,6 +3,7 @@
 //====================================//
 #include "control.h"
 #include "fatfs.h"
+#include "battery.h"
 //====================================//
 // グローバル変数の宣言
 //====================================//
@@ -21,6 +22,7 @@ int16_t autoStartAnalize = 0; // 自動走行で使用するログの解析番�
 
 uint16_t analogVal1[NUM_SENSORS]; // ADC結果格納配列
 uint16_t analogVal2[4];			  // ADC結果格納配列
+float batteryVoltage_V = 0.0f;	// DWT初期化後に取得したバッテリ電圧[V]を保持
 
 // 速度パラメータ関連
 speedParam tgtParam = {
@@ -256,6 +258,8 @@ void initSystem(void)
 	initCycleCounter();
 	resetCycleCounter();
 	enableCycleCounter(); // カウント開始
+
+	batteryVoltage_V = AD2VOLTAGE(batteryAD); // バッテリ電圧を計算
 
 	encClick = 0; // ホイールクリッククリア
 
