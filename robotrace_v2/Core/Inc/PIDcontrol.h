@@ -50,6 +50,7 @@ typedef struct {
 // グローバル変数の宣言
 //====================================//
 extern uint8_t	targetSpeed;	// 目標速度
+extern float	targetSpeedCommand_m_s;	// setTargetSpeedで指定した速度指令値[m/s]
 extern float 	targetAngle;    // 目標角度
 extern float    targetAngularVelocity;  // 目標角速度
 extern int16_t  targetDist;		        // 目標X座標
@@ -60,6 +61,21 @@ extern pidParam yawRateCtrl;
 extern pidParam yawCtrl;
 extern pidParam distCtrl;
 extern int16_t speedFeedForwardGain;
+
+//====================================//
+// 速度フィードフォワード関連定義
+//====================================//
+#define SPEED_FEEDFORWARD_GAIN_DEFAULT          20      // Crr×1000 の初期値(例:0.020)
+#define SPEED_FEEDFORWARD_GEAR_RATIO            2.0f    // ギア比 G
+#define SPEED_FEEDFORWARD_EFFICIENCY            0.90f   // ギア効率 η
+#define SPEED_FEEDFORWARD_KV_RPM_PER_V          2710.0f // Kv[rpm/V]
+#define SPEED_FEEDFORWARD_S_RPM_PER_MNM         2240.0f // S[rpm/mNm]
+#define SPEED_FEEDFORWARD_WHEEL_DIAMETER_MM     24.0f   // ホイール径 D[mm]
+#define SPEED_FEEDFORWARD_MASS_KG               0.123f  // 車体質量 m[kg]
+#define SPEED_FEEDFORWARD_GRAVITY               9.80665f        // 重力加速度 g[m/s^2]
+#define SPEED_FEEDFORWARD_SIGN_DEADBAND_MM_S    0.001f  // sgn(v) 判定のデッドバンド[mm/s]
+#define SPEED_FEEDFORWARD_PWM_MAX_DEFAULT       1000    // PWM_MAX のデフォルト値
+#define SPEED_FEEDFORWARD_CRR_SCALE             0.001f  // speedFeedForwardGain→Crr 変換係数
 //====================================//
 // プロトタイプ宣言
 //====================================//

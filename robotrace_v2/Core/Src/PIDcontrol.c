@@ -12,38 +12,68 @@ pidParam yawRateCtrl = {"yawRate", KP3, KI3, KD3, 0, 0};
 pidParam yawCtrl = {"yaw", KP4, KI4, KD4, 0, 0};
 pidParam distCtrl = {"dist", KP5, KI5, KD5, 0, 0};
 
-// 速度フィードフォワード係数のデフォルト値(実機で調整することを想定)
-#define SPEED_FEEDFORWARD_GAIN_DEFAULT 4
-// 速度フィードフォワード係数(セットアップ画面から変更可能)
+// 速度フィードフォワード係数(セットアップ画面から変更可能: Crr×1000)
 int16_t speedFeedForwardGain = SPEED_FEEDFORWARD_GAIN_DEFAULT;
 
 uint8_t targetSpeed;		 // 目標速度
+float targetSpeedCommand_m_s;	// setTargetSpeedで指定した速度指令値[m/s]
 float targetAngle;			 // 目標角速度
 float targetAngularVelocity; // 目標角度
 int16_t targetDist;			 // 目標X座標
 static int16_t speedTargetBefore = 0;	// 速度PID用の前回目標値
 static int16_t speedEncoderBefore = 0;	// 速度PID用の前回偏差
+extern float batteryVoltage_V;	// control.cで保持したバッテリ電圧[V]
 
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 calcSpeedFeedForward
 // 処理概要     目標速度からフィードフォワード項を算出
-// 引数         targetPulse:目標速度(パルス換算)
+// 引数         targetSpeed_mm_s:目標速度[mm/s], batteryVoltage:バッテリ電圧[V]
+//              pwm_max:PWM最大値, crr:転がり抵抗係数Crr
 // 戻り値       フィードフォワードPWM値
 ///////////////////////////////////////////////////////////////////////////
-static int16_t calcSpeedFeedForward(int16_t targetPulse)
+static int16_t calcSpeedFeedForward(float targetSpeed_mm_s, float batteryVoltage, int16_t pwm_max, float crr)
 {
-	int32_t feedForward;
+	float sign;
+	float kv_ff;              // [V/(mm/s)]
+	float wheelDiameter_m;    // [m]
+	float tau_wheel_per_mNm;  // [mNm]
+	float v_bias;             // [V]
+	float voltageRequest;     // [V]
+	float pwm;
 
-	// 目標速度と係数から整数演算でフィードフォワード補償量を算出
-	feedForward = (int32_t)targetPulse * speedFeedForwardGain;
+	/* sgn(v) をデッドバンド付きで算出 */
+	if (targetSpeed_mm_s > SPEED_FEEDFORWARD_SIGN_DEADBAND_MM_S)
+		sign = 1.0f;
+	else if (targetSpeed_mm_s < -SPEED_FEEDFORWARD_SIGN_DEADBAND_MM_S)
+		sign = -1.0f;
+	else
+		sign = 0.0f;
 
-	/* フィードフォワードで加算するPWM値を安全範囲に制限 */
-	if (feedForward > 1000)
-		feedForward = 1000;
-	else if (feedForward < -1000)
-		feedForward = -1000;
+	/* Kv_ff(G) = G*60/(π D Kv) [V/(mm/s)] */
+	kv_ff = SPEED_FEEDFORWARD_GEAR_RATIO * 60.0f /
+		((float)M_PI * SPEED_FEEDFORWARD_WHEEL_DIAMETER_MM * SPEED_FEEDFORWARD_KV_RPM_PER_V);
+	/* τ_wheel_per[mNm] = (Crr*m*g*(D/2)/2)*1000 */
+	wheelDiameter_m = SPEED_FEEDFORWARD_WHEEL_DIAMETER_MM * 0.001f;
+	tau_wheel_per_mNm = (crr * SPEED_FEEDFORWARD_MASS_KG * SPEED_FEEDFORWARD_GRAVITY * (wheelDiameter_m / 2.0f) / 2.0f) * 1000.0f;
+	/* V_bias(G,η) = (S/Kv) * τ_wheel_per / (η*G) */
+	v_bias = (SPEED_FEEDFORWARD_S_RPM_PER_MNM / SPEED_FEEDFORWARD_KV_RPM_PER_V) *
+	         tau_wheel_per_mNm / (SPEED_FEEDFORWARD_EFFICIENCY * SPEED_FEEDFORWARD_GEAR_RATIO);
+	/* Vreq = Kv_ff*v + sgn(v)*V_bias */
+	voltageRequest = (kv_ff * targetSpeed_mm_s) + (sign * v_bias);
+	/* PWM = Vreq / Vbat * PWM_MAX （バッテリ電圧0V時は0とする）*/
+	if (batteryVoltage > 0.0f)
+		pwm = voltageRequest / batteryVoltage * (float)pwm_max;
+	else
+		pwm = 0.0f;
 
-	return (int16_t)feedForward;
+	/* PWM の上限をクリップ */
+	if (pwm > (float)pwm_max)
+		pwm = (float)pwm_max;
+	else if (pwm < -(float)pwm_max)
+		pwm = -(float)pwm_max;
+
+	/* 例: Crr=0.02, η=0.90, Vbat=4.5V, PWM_MAX=1000, v=1000mm/s → PWM≈145 */
+	return (int16_t)pwm;
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -54,7 +84,8 @@ static int16_t calcSpeedFeedForward(int16_t targetPulse)
 ///////////////////////////////////////////////////////////////////////////
 void setTargetSpeed(float speed)
 {
-	targetSpeed = (int16_t)(speed * PALSE_MILLIMETER);
+	targetSpeedCommand_m_s = speed;	// フィードフォワード計算へ引き渡す速度指令値[m/s]を保存
+	targetSpeed = (int16_t)(speed * PALSE_MILLIMETER);	// 速度指令値[m/s]をエンコーダ換算値へ変換
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 setTargetAngularVelocity
@@ -161,6 +192,8 @@ void motorControlSpeed(void)
 {
 	int32_t iP, iI, iD, iRet, Dev, Dif;
 	int16_t feedForward;
+	float targetSpeed_mm_s;
+	float crr;
 
 	// 駆動モーター用PWM値計算
 	Dev = (int16_t)targetSpeed - encCurrentN; // 偏差
@@ -174,7 +207,12 @@ void motorControlSpeed(void)
 	iP = veloCtrl.kp * Dev;		         // 比例
 	iI = veloCtrl.ki * veloCtrl.Int; // 積分
 	iD = veloCtrl.kd * Dif;		         // 微分
-	feedForward = calcSpeedFeedForward((int16_t)targetSpeed); // フィードフォワード項
+	// 物理パラメータを用いてフィードフォワード電圧を算出
+	targetSpeed_mm_s = targetSpeedCommand_m_s * 1000.0f;	// setTargetSpeedで保持した[m/s]を[mm/s]へ換算
+	/* control.cで計測済みのバッテリ電圧[V]を使用 */
+	crr = (float)speedFeedForwardGain * SPEED_FEEDFORWARD_CRR_SCALE; // 転がり抵抗係数Crr
+	feedForward = calcSpeedFeedForward(targetSpeed_mm_s, batteryVoltage_V,
+			SPEED_FEEDFORWARD_PWM_MAX_DEFAULT, crr); // フィードフォワード項
 	// PID制御出力にフィードフォワード補償を加えて応答を改善
 	iRet = iP + iI + iD + feedForward;
 	iRet = iRet;
