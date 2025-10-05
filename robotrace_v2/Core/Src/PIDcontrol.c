@@ -15,7 +15,7 @@ pidParam distCtrl = {"dist", KP5, KI5, KD5, 0, 0};
 // 速度フィードフォワード係数(セットアップ画面から変更可能: Crr×1000)
 int16_t speedFeedForwardGain = SPEED_FEEDFORWARD_GAIN_DEFAULT;
 
-uint8_t targetSpeed;		 // 目標速度
+uint8_t targetSpeed = 0;		 // 目標速度（初期値0）
 float targetSpeedCommand_m_s;	// setTargetSpeedで指定した速度指令値[m/s]
 float targetAngle;			 // 目標角速度
 float targetAngularVelocity; // 目標角度
@@ -192,24 +192,21 @@ void motorControlSpeed(void)
 {
 	int32_t iP, iI, iD, iRet, Dev, Dif;
 	static int16_t feedForwardPwm = 0;	/* フィードフォワードPWM値を保持して再利用 */
-	static uint8_t feedForwardInitialized = 0;	/* 初回実行でフィードフォワードを計算したかのフラグ */
 	float targetSpeed_mm_s;
 	float crr;
 
 	// 駆動モーター用PWM値計算
 	Dev = (int16_t)targetSpeed - encCurrentN; // 偏差
 	// 目標値を変更したタイミングで積分項リセットとフィードフォワード更新を同時に実施
-	if ((targetSpeed != speedTargetBefore) || !feedForwardInitialized)
+	if (targetSpeed != speedTargetBefore)
 	{
-		if (targetSpeed != speedTargetBefore)
-			veloCtrl.Int = 0;	/* 目標値変更時に積分項をリセット */
+		veloCtrl.Int = 0;	/* 目標値変更時に積分項をリセット */
 		// 物理パラメータを用いてフィードフォワード電圧を算出
 		targetSpeed_mm_s = targetSpeedCommand_m_s * 1000.0f;	// setTargetSpeedで保持した[m/s]を[mm/s]へ換算
 		/* control.cで計測済みのバッテリ電圧[V]を使用 */
 		crr = (float)speedFeedForwardGain * SPEED_FEEDFORWARD_CRR_SCALE;	// 転がり抵抗係数Crr
 		feedForwardPwm = calcSpeedFeedForward(targetSpeed_mm_s, batteryVoltage_V,
 				SPEED_FEEDFORWARD_PWM_MAX_DEFAULT, crr);	// フィードフォワード項
-		feedForwardInitialized = 1;	/* 更新済みを記録 */
 	}
 
 	veloCtrl.Int += (float)Dev * 0.001;	// 時間積分
