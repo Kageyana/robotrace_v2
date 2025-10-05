@@ -259,8 +259,7 @@ void initSystem(void)
 	resetCycleCounter();
 	enableCycleCounter(); // カウント開始
 
-	/* DWT初期化直後にバッテリ電圧[V]を取得して以後の処理で共有 */
-	batteryVoltage_V = AD2VOLTAGE(batteryAD);
+	batteryVoltage_V = AD2VOLTAGE(batteryAD); // バッテリ電圧を計算
 
 	encClick = 0; // ホイールクリッククリア
 
