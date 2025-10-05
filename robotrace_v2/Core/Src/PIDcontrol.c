@@ -191,7 +191,8 @@ void motorControlTrace(void)
 void motorControlSpeed(void)
 {
 	int32_t iP, iI, iD, iRet, Dev, Dif;
-	int16_t feedForward;
+	static int16_t feedForwardPwm = 0;	/* フィードフォワードPWM値を保持して再利用 */
+	static uint8_t feedForwardInitialized = 0;	/* 初回実行でフィードフォワードを計算したかのフラグ */
 	float targetSpeed_mm_s;
 	float crr;
 
@@ -202,19 +203,24 @@ void motorControlSpeed(void)
 		veloCtrl.Int = 0;
 
 	veloCtrl.Int += (float)Dev * 0.001; // 時間積分
-	Dif = Dev - speedEncoderBefore;		         // 微分　dゲイン1/1000倍
+	Dif = Dev - speedEncoderBefore;		  // 微分　dゲイン1/1000倍
 
-	iP = veloCtrl.kp * Dev;		         // 比例
+	iP = veloCtrl.kp * Dev;		  // 比例
 	iI = veloCtrl.ki * veloCtrl.Int; // 積分
-	iD = veloCtrl.kd * Dif;		         // 微分
-	// 物理パラメータを用いてフィードフォワード電圧を算出
-	targetSpeed_mm_s = targetSpeedCommand_m_s * 1000.0f;	// setTargetSpeedで保持した[m/s]を[mm/s]へ換算
-	/* control.cで計測済みのバッテリ電圧[V]を使用 */
-	crr = (float)speedFeedForwardGain * SPEED_FEEDFORWARD_CRR_SCALE; // 転がり抵抗係数Crr
-	feedForward = calcSpeedFeedForward(targetSpeed_mm_s, batteryVoltage_V,
-			SPEED_FEEDFORWARD_PWM_MAX_DEFAULT, crr); // フィードフォワード項
+	iD = veloCtrl.kd * Dif;		  // 微分
+	// 目標値が変化したタイミングのみフィードフォワード値を更新
+	if ((targetSpeed != speedTargetBefore) || !feedForwardInitialized)
+	{
+		// 物理パラメータを用いてフィードフォワード電圧を算出
+		targetSpeed_mm_s = targetSpeedCommand_m_s * 1000.0f;	// setTargetSpeedで保持した[m/s]を[mm/s]へ換算
+		/* control.cで計測済みのバッテリ電圧[V]を使用 */
+		crr = (float)speedFeedForwardGain * SPEED_FEEDFORWARD_CRR_SCALE;	// 転がり抵抗係数Crr
+		feedForwardPwm = calcSpeedFeedForward(targetSpeed_mm_s, batteryVoltage_V,
+				SPEED_FEEDFORWARD_PWM_MAX_DEFAULT, crr);	// フィードフォワード項
+		feedForwardInitialized = 1; /* 更新済みを記録 */
+	}
 	// PID制御出力にフィードフォワード補償を加えて応答を改善
-	iRet = iP + iI + iD + feedForward;
+	iRet = iP + iI + iD + feedForwardPwm;
 	iRet = iRet;
 
 	// PWMの上限の設定
@@ -224,7 +230,7 @@ void motorControlSpeed(void)
 		iRet = -900;
 
 	veloCtrl.pwm = iRet;
-	speedEncoderBefore = Dev;		       // 次回はこの値が1ms前の値となる
+	speedEncoderBefore = Dev;		      // 次回はこの値が1ms前の値となる
 	speedTargetBefore = targetSpeed; // 前回の目標値を記録
 }
 ///////////////////////////////////////////////////////////////////////////
