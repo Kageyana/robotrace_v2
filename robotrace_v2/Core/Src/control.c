@@ -136,6 +136,7 @@ void initSystem(void)
 			// 前回のPIDゲインを取得
 			readPIDparameters(&lineTraceCtrl);
 			readPIDparameters(&veloCtrl);
+			readSpeedFeedForwardGain(&speedFeedForwardGain);	// 速度フィードフォワード係数も読み出す
 			readPIDparameters(&yawRateCtrl);
 			readPIDparameters(&yawCtrl);
 			readPIDparameters(&distCtrl);
@@ -394,6 +395,7 @@ void loopSystem(void)
 			{
 				writePIDparameters(&lineTraceCtrl);
 				writePIDparameters(&veloCtrl);
+				writeSpeedFeedForwardGain(speedFeedForwardGain);	// 速度フィードフォワード係数も保存
 				writePIDparameters(&yawRateCtrl);
 				writePIDparameters(&yawCtrl);
 				writePIDparameters(&distCtrl);
