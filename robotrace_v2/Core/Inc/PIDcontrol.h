@@ -38,12 +38,12 @@
 #define KD5		5
 
 typedef struct {
-    uint8_t *name;
-    int16_t kp;
-    int16_t ki;
-    int16_t kd;
-    float   Int;
-    int16_t pwm;
+	uint8_t *name;
+	int16_t kp;
+	int16_t ki;
+	int16_t kd;
+	float	Int;
+	int16_t pwm;
 } pidParam;
 
 //====================================//
@@ -59,6 +59,7 @@ extern pidParam veloCtrl;
 extern pidParam yawRateCtrl;
 extern pidParam yawCtrl;
 extern pidParam distCtrl;
+extern int16_t speedFeedForwardGain;
 //====================================//
 // プロトタイプ宣言
 //====================================//
@@ -69,6 +70,8 @@ void setTargetDist (float dist);
 void resetSpeedPID (void);
 void writePIDparameters(pidParam *pid);
 void readPIDparameters(pidParam *pid);
+void writeSpeedFeedForwardGain(int16_t gain);
+void readSpeedFeedForwardGain(int16_t *gain);
 void motorControlTrace(void);
 void motorControlSpeed(void);
 void motorControlYawRate(void);

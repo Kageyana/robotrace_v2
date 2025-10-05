@@ -12,12 +12,39 @@ pidParam yawRateCtrl = {"yawRate", KP3, KI3, KD3, 0, 0};
 pidParam yawCtrl = {"yaw", KP4, KI4, KD4, 0, 0};
 pidParam distCtrl = {"dist", KP5, KI5, KD5, 0, 0};
 
+// 速度フィードフォワード係数のデフォルト値(実機で調整することを想定)
+#define SPEED_FEEDFORWARD_GAIN_DEFAULT 4
+// 速度フィードフォワード係数(セットアップ画面から変更可能)
+int16_t speedFeedForwardGain = SPEED_FEEDFORWARD_GAIN_DEFAULT;
+
 uint8_t targetSpeed;		 // 目標速度
 float targetAngle;			 // 目標角速度
 float targetAngularVelocity; // 目標角度
 int16_t targetDist;			 // 目標X座標
 static int16_t speedTargetBefore = 0;	// 速度PID用の前回目標値
 static int16_t speedEncoderBefore = 0;	// 速度PID用の前回偏差
+
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 calcSpeedFeedForward
+// 処理概要     目標速度からフィードフォワード項を算出
+// 引数         targetPulse:目標速度(パルス換算)
+// 戻り値       フィードフォワードPWM値
+///////////////////////////////////////////////////////////////////////////
+static int16_t calcSpeedFeedForward(int16_t targetPulse)
+{
+	int32_t feedForward;
+
+	// 目標速度と係数から整数演算でフィードフォワード補償量を算出
+	feedForward = (int32_t)targetPulse * speedFeedForwardGain;
+
+	/* フィードフォワードで加算するPWM値を安全範囲に制限 */
+	if (feedForward > 1000)
+		feedForward = 1000;
+	else if (feedForward < -1000)
+		feedForward = -1000;
+
+	return (int16_t)feedForward;
+}
 
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 setTargetSpeed
@@ -133,6 +160,7 @@ void motorControlTrace(void)
 void motorControlSpeed(void)
 {
 	int32_t iP, iI, iD, iRet, Dev, Dif;
+	int16_t feedForward;
 
 	// 駆動モーター用PWM値計算
 	Dev = (int16_t)targetSpeed - encCurrentN; // 偏差
@@ -141,12 +169,14 @@ void motorControlSpeed(void)
 		veloCtrl.Int = 0;
 
 	veloCtrl.Int += (float)Dev * 0.001; // 時間積分
-	Dif = Dev - speedEncoderBefore;			// 微分　dゲイン1/1000倍
+	Dif = Dev - speedEncoderBefore;		         // 微分　dゲイン1/1000倍
 
-	iP = veloCtrl.kp * Dev;			 // 比例
+	iP = veloCtrl.kp * Dev;		         // 比例
 	iI = veloCtrl.ki * veloCtrl.Int; // 積分
-	iD = veloCtrl.kd * Dif;			 // 微分
-	iRet = iP + iI + iD;
+	iD = veloCtrl.kd * Dif;		         // 微分
+	feedForward = calcSpeedFeedForward((int16_t)targetSpeed); // フィードフォワード項
+	// PID制御出力にフィードフォワード補償を加えて応答を改善
+	iRet = iP + iI + iD + feedForward;
 	iRet = iRet;
 
 	// PWMの上限の設定
@@ -156,7 +186,7 @@ void motorControlSpeed(void)
 		iRet = -900;
 
 	veloCtrl.pwm = iRet;
-	speedEncoderBefore = Dev;			 // 次回はこの値が1ms前の値となる
+	speedEncoderBefore = Dev;		       // 次回はこの値が1ms前の値となる
 	speedTargetBefore = targetSpeed; // 前回の目標値を記録
 }
 ///////////////////////////////////////////////////////////////////////////
@@ -317,4 +347,58 @@ void readPIDparameters(pidParam *pid)
 	}
 
 	f_close(&fil);
+}
+
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 writeSpeedFeedForwardGain
+// 処理概要     速度フィードフォワード係数をSDカードへ保存
+// 引数         gain:保存する係数
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void writeSpeedFeedForwardGain(int16_t gain)
+{
+	FIL fil;
+	FRESULT fresult;
+	uint8_t fileName[20] = PATH_SETTING;
+
+	// ファイル名を生成して係数を書き込み
+	strcat(fileName, "speed_ff.txt");
+	fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_WRITE);
+	if (fresult == FR_OK)
+	{
+		f_lseek(&fil, 0);	// 既存内容を先頭から上書き
+		f_truncate(&fil);
+		f_printf(&fil, "%03d", gain);
+	}
+
+	f_close(&fil);
+}
+
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 readSpeedFeedForwardGain
+// 処理概要     速度フィードフォワード係数をSDカードから読み込む
+// 引数         gain:読み込んだ係数の格納先
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void readSpeedFeedForwardGain(int16_t *gain)
+{
+	FIL fil;
+	FRESULT fresult;
+	uint8_t fileName[20] = PATH_SETTING;
+	TCHAR gainStr[10];
+	int16_t readGain = *gain;
+
+	// ファイル名を生成して係数を読み込み
+	strcat(fileName, "speed_ff.txt");
+	fresult = f_open(&fil, fileName, FA_OPEN_EXISTING | FA_READ);
+	if (fresult == FR_OK)
+	{
+		if (f_gets(gainStr, sizeof(gainStr), &fil) != NULL)
+		{
+			sscanf(gainStr, "%hd", &readGain);
+		}
+	}
+
+	f_close(&fil);
+	*gain = readGain;
 }
