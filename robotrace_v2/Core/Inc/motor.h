@@ -34,7 +34,8 @@ extern float motorCurrentL, motorCurrentR;
 // プロトタイプ宣言
 //====================================//
 void motorPwmOut(int16_t pwmL, int16_t pwmR);
-void motorPwmOutSynth(int16_t tPwm, int16_t sPwm, int16_t yrPwm, int16_t dPwm);
+void motorPwmOutSynth(float dutyL, float dutyR);
+void motorPwmOutCompose(int16_t tPwm, int16_t sPwm, int16_t yrPwm, int16_t dPwm);
 void getMotorAD(uint16_t LAD, uint16_t RAD);
 void getMotorCurrent(void);
 void MotorFanPwmOut(int16_t pwm);

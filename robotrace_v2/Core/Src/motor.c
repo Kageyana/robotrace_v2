@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "motor.h"
+#include <math.h>
 
 //====================================//
 // グローバル変数の宣言
@@ -56,23 +57,60 @@ void motorPwmOut(int16_t pwmL, int16_t pwmR)
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 motorPwmOutSynth
-// 処理概要     トレースと速度制御のPID制御量をPWMとしてモータに出力する
-// 引数         tPwm: トレースのPID制御量 sPwm: 速度のPID制御量
-//              yrPwm: ヨーレートのPID制御量
-//              dPwm : 距離のPID制御量
+// 処理概要     正規化DutyからPWM値を合成してモータに出力する
+// 引数         dutyL: 左モータのDuty[-1.0〜1.0]
+//              dutyR: 右モータのDuty[-1.0〜1.0]
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
-void motorPwmOutSynth(int16_t tPwm, int16_t sPwm, int16_t yrPwm, int16_t dPwm)
+void motorPwmOutSynth(float dutyL, float dutyR)
+{
+	// 入力がNaNになった場合は安全側で停止させる
+	if (!isfinite(dutyL)) {
+		dutyL = 0.0f;
+	}
+	if (!isfinite(dutyR)) {
+		dutyR = 0.0f;
+	}
+	if (dutyL > 1.0f) {
+		dutyL = 1.0f;
+	} else if (dutyL < -1.0f) {
+		dutyL = -1.0f;
+	}
+	if (dutyR > 1.0f) {
+		dutyR = 1.0f;
+	} else if (dutyR < -1.0f) {
+		dutyR = -1.0f;
+	}
+	motorpwmL = (int16_t)(dutyL * 1000.0f);
+	motorpwmR = (int16_t)(dutyR * 1000.0f);
+	if (motorpwmL > 1000) {
+		motorpwmL = 1000;
+	} else if (motorpwmL < -1000) {
+		motorpwmL = -1000;
+	}
+	if (motorpwmR > 1000) {
+		motorpwmR = 1000;
+	} else if (motorpwmR < -1000) {
+		motorpwmR = -1000;
+	}
+	motorPwmOut(motorpwmL, motorpwmR);
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 motorPwmOutCompose
+// 処理概要     トレースと速度制御などの制御量を合成してPWMを算出する
+// 引数         tPwm: トレースのPID制御量 sPwm: 速度のPID制御量
+//              yrPwm: ヨーレートのPID制御量 dPwm : 距離のPID制御量
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void motorPwmOutCompose(int16_t tPwm, int16_t sPwm, int16_t yrPwm, int16_t dPwm)
 {
 	int16_t overpwm, tracePwm = tPwm;
 
 	if (abs(sPwm + tPwm) > 1000 || abs(sPwm - tPwm) > 1000)
 	{
 		// ライントレースと速度制御の合計制御量が1000を超えたとき
-		overpwm = abs(sPwm) + abs(tPwm) - 1000; // 1000を超えた分の制御量を計算
-
+		overpwm = abs(sPwm) + abs(tPwm) - 1000;
 		// トレースの内輪側から越えた分の制御量を引く 正負はtPwmと同じ
-		// tPwm が 0 の場合の 0 除算防止
 		if (tPwm != 0)
 		{
 			tracePwm = tPwm - (overpwm * (tPwm / abs(tPwm)));
@@ -84,15 +122,17 @@ void motorPwmOutSynth(int16_t tPwm, int16_t sPwm, int16_t yrPwm, int16_t dPwm)
 	}
 
 	motorpwmR = sPwm - tracePwm - yrPwm + dPwm;
-	// PWMの飽和防止
-	if (motorpwmR > 1000) motorpwmR = 1000;
-	else if (motorpwmR < -1000) motorpwmR = -1000;
+	if (motorpwmR > 1000)
+		motorpwmR = 1000;
+	else if (motorpwmR < -1000)
+		motorpwmR = -1000;
 	motorpwmL = sPwm + tracePwm + yrPwm + dPwm;
-	// PWMの飽和防止
-	if (motorpwmL > 1000) motorpwmL = 1000;
-	else if (motorpwmL < -1000) motorpwmL = -1000;
+	if (motorpwmL > 1000)
+		motorpwmL = 1000;
+	else if (motorpwmL < -1000)
+		motorpwmL = -1000;
 
-	motorPwmOut(motorpwmL, motorpwmR);
+	motorPwmOutSynth((float)motorpwmL / 1000.0f, (float)motorpwmR / 1000.0f);
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 getMotorAD

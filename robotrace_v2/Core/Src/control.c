@@ -432,7 +432,7 @@ void loopSystem(void)
 		// スタートマーカー通過までの走行
 		setTargetSpeed(tgtParam.straight); // 目標速度
 		// ライントレース
-		motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+		motorPwmOutCompose(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 
 		// スタートマーカーを通過したら本走行に移行
 		if (SGmarker > 0)
@@ -476,7 +476,7 @@ void loopSystem(void)
 				setTargetSpeed(tgtParam.curve);
 			}
 			// ライントレース
-			motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+			motorPwmOutCompose(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 		}
 		else if (optimalTrace == BOOST_DISTANCE)
 		{
@@ -507,7 +507,7 @@ void loopSystem(void)
 			// 目標速度に設定
 			setTargetSpeed(boostSpeed);
 			// ライントレース
-			motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+			motorPwmOutCompose(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 		}
 		else if (optimalTrace == BOOST_SHORTCUT)
 		{
@@ -524,7 +524,7 @@ void loopSystem(void)
 			// 目標速度に設定
 			setTargetSpeed(boostSpeed);
 			// ライントレース
-			motorPwmOutSynth(0, veloCtrl.pwm, yawCtrl.pwm, distCtrl.pwm);
+			motorPwmOutCompose(0, veloCtrl.pwm, yawCtrl.pwm, distCtrl.pwm);
 		}
 
 		// ゴール判定
@@ -562,7 +562,7 @@ void loopSystem(void)
 		{
 			setTargetSpeed(tgtParam.stop);
 		}
-		motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+		motorPwmOutCompose(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 
 		if (encCurrentN == 0)
 		{
@@ -572,7 +572,7 @@ void loopSystem(void)
 
 	case 102:
 		setTargetSpeed(0);
-		motorPwmOutSynth(0, 0, 0, 0);
+		motorPwmOutCompose(0, 0, 0, 0);
 
 		if (modeLOG)
 		{
@@ -663,7 +663,7 @@ void loopSystem(void)
 		break;
 
 	case 103:
-		motorPwmOutSynth(0, 0, 0, 0);
+		motorPwmOutCompose(0, 0, 0, 0);
 		powerLineSensors(0);
 		powerMarkerSensors(0);
 
@@ -703,7 +703,7 @@ void loopSystem(void)
 void emargencyStop(void)
 {
 
-	motorPwmOutSynth(0, 0, 0, 0);
+	motorPwmOutCompose(0, 0, 0, 0);
 
 	if (!ssd1306_IsDMARunning())
 	{

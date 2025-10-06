@@ -7,6 +7,11 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "control_params.h"
+
+#define USE_CASCADE_TRACE		1
+#define CASCADE_DT_INNER_DEFAULT	0.001f
+#define CASCADE_DT_OUTER_DEFAULT	0.005f
 //====================================//
 // シンボル定義
 //====================================//
@@ -59,6 +64,11 @@ typedef struct {
 	int16_t pwm;
 } pidParam;
 
+typedef enum {
+	MOTOR_SIDE_LEFT = 0,
+	MOTOR_SIDE_RIGHT
+} motor_side_t;
+
 //====================================//
 // グローバル変数の宣言
 //====================================//
@@ -87,9 +97,15 @@ void writePIDparameters(pidParam *pid);
 void readPIDparameters(pidParam *pid);
 void writeSpeedFeedForwardGain(int16_t gain);
 void readSpeedFeedForwardGain(int16_t *gain);
+#if USE_CASCADE_TRACE
+void motorControlTrace(float dt_outer, float dt_inner);
+float motorControlSpeed(motor_side_t motor, float v_ref, float v_meas, float dt);
+float motorControlYawRate(float yaw_error, float dt);
+#else
 void motorControlTrace(void);
 void motorControlSpeed(void);
 void motorControlYawRate(void);
+#endif
 void motorControlYaw(void);
 void motorControldist(void);
 

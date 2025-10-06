@@ -36,10 +36,15 @@ void Interrupt1ms(void)
 	setEncoderVal();
 	encPulse5ms += encCurrentN; // 5ms間のエンコーダパルスを累積
 
-	// PID制御処理
-	motorControlTrace();
-	motorControlSpeed();
-	motorControldist();
+#if USE_CASCADE_TRACE
+// PID制御処理（カスケード構成）
+motorControlTrace(CASCADE_DT_OUTER_DEFAULT, CASCADE_DT_INNER_DEFAULT);
+#else
+// PID制御処理（従来構成）
+motorControlTrace();
+motorControlSpeed();
+#endif
+motorControldist();
 
 	// IMU処理
 	if (initIMU)
