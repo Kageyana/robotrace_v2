@@ -28,26 +28,26 @@ const CascadeControlParams cascadeControlParamsDefault = {
 		.i_limit = 0.5f,
 		.d_lpf = 0.02f,
 		.ref_limit = 6.0f
-	},
+},
 	.yaw = {
 		.kp = 2.0f,
 		.ki = 0.5f,
 		.kd = 0.02f,
-		.i_limit = 1.0f,
-		.out_limit = 6.0f
-	},
+.i_limit = 1.0f,
+.out_limit = 6.0f
+},
 	.speed_l = {
 		.kp = 8.0f,
 		.ki = 40.0f,
 		.kd = 0.1f,
 		.i_limit = 2.0f
-	},
+},
 	.speed_r = {
 		.kp = 8.0f,
 		.ki = 40.0f,
 		.kd = 0.1f,
 		.i_limit = 2.0f
-	},
+},
 	.duty_limit = 1.0f,
 	.tread_half = 0.045f,
 	.v_limit = 3.0f
@@ -61,40 +61,42 @@ CascadeControlParams cascadeControlParams = {
 		.i_limit = 0.5f,
 		.d_lpf = 0.02f,
 		.ref_limit = 6.0f
-	},
+},
 	.yaw = {
 		.kp = 2.0f,
 		.ki = 0.5f,
 		.kd = 0.02f,
-		.i_limit = 1.0f,
-		.out_limit = 6.0f
-	},
+.i_limit = 1.0f,
+.out_limit = 6.0f
+},
 	.speed_l = {
 		.kp = 8.0f,
 		.ki = 40.0f,
 		.kd = 0.1f,
 		.i_limit = 2.0f
-	},
+},
 	.speed_r = {
 		.kp = 8.0f,
 		.ki = 40.0f,
 		.kd = 0.1f,
 		.i_limit = 2.0f
-	},
+},
 	.duty_limit = 1.0f,
 	.tread_half = 0.045f,
 	.v_limit = 3.0f
 };
 
-/**
- * @brief カスケード制御パラメータを既定値に戻す。
- * @param[out] params リセット対象の構造体
- */
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 CascadeControlParamsResetDefaults
+// 処理概要     カスケード制御パラメータを既定値へ戻す
+// 引数         params: リセット対象の構造体ポインタ
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
 void CascadeControlParamsResetDefaults(CascadeControlParams *params)
 {
 	if (params == NULL) {
-		return;
-	}
+	return;
+}
 	*params = cascadeControlParamsDefault;
 }
 
@@ -133,9 +135,12 @@ static YawCascadeState yawCascadeState;
 static SpeedCascadeState speedCascadeState[2];
 static float outerLoopElapsed = 0.0f;
 
-/**
- * @brief 値を指定範囲へ収める簡易クリッピング関数。
- */
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 clampf
+// 処理概要     値を指定範囲へ収める簡易クリッピング
+// 引数         value: 入力値 min: 下限値 max: 上限値
+// 戻り値       クリップ後の値
+///////////////////////////////////////////////////////////////////////////
 static float clampf(float value, float min, float max)
 {
 	if (!isfinite(value)) {
@@ -149,9 +154,12 @@ static float clampf(float value, float min, float max)
 	return value;
 }
 
-/**
- * @brief 1次遅れローパスフィルタを適用する。
- */
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 apply_lowpass
+// 処理概要     1次遅れローパスフィルタを適用する
+// 引数         input: 現在値 prev: 前回値 dt: サンプリング周期 tau: 時定数
+// 戻り値       フィルタ後の値
+///////////////////////////////////////////////////////////////////////////
 static float apply_lowpass(float input, float prev, float dt, float tau)
 {
 	if (!isfinite(input)) {
@@ -164,9 +172,12 @@ static float apply_lowpass(float input, float prev, float dt, float tau)
 	return prev + alpha * (input - prev);
 }
 
-/**
- * @brief ラインセンサ値を左右5本ずつ取得する。
- */
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 read_line_sensor_pairs
+// 処理概要     ラインセンサ値を左右5本ずつ読み取る
+// 引数         left: 左センサ値格納配列 right: 右センサ値格納配列
+// 戻り値       true: 有効値 false: 無効値
+///////////////////////////////////////////////////////////////////////////
 static bool read_line_sensor_pairs(uint16_t left[5], uint16_t right[5])
 {
 	bool calibrated = (lSensorMax[0] > lSensorMin[0]);
@@ -201,31 +212,37 @@ static bool read_line_sensor_pairs(uint16_t left[5], uint16_t right[5])
 	return (sum > 0U);
 }
 
-/**
- * @brief 左右センサの差を正規化してライン誤差を算出する。
- */
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 compute_line_error
+// 処理概要     左右センサ差からライン誤差を算出する
+// 引数         left: 左センサ値 right: 右センサ値
+// 戻り値       正規化したライン誤差
+///////////////////////////////////////////////////////////////////////////
 static float compute_line_error(const uint16_t left[5], const uint16_t right[5])
 {
 	static const float weights[5] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
-	float sum_left = 0.0f;
-	float sum_right = 0.0f;
-	for (uint32_t i = 0U; i < 5U; i++) {
-		sum_left += (float)left[i] * weights[i];
-		sum_right += (float)right[i] * weights[i];
-	}
-	float diff = sum_left - sum_right;
-	float total = sum_left + sum_right;
-	if (total > 1.0e-6f) {
-		diff /= total;
-	} else {
-		diff = 0.0f;
-	}
-	return diff;
+float sum_left = 0.0f;
+float sum_right = 0.0f;
+for (uint32_t i = 0U; i < 5U; i++) {
+	sum_left += (float)left[i] * weights[i];
+	sum_right += (float)right[i] * weights[i];
+}
+float diff = sum_left - sum_right;
+float total = sum_left + sum_right;
+if (total > 1.0e-6f) {
+	diff /= total;
+		} else {
+	diff = 0.0f;
+}
+return diff;
 }
 
-/**
- * @brief 旧来のログ変数へ最新状態を反映するヘルパー。
- */
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 update_legacy_logs
+// 処理概要     旧来のログ変数へ最新状態を反映する
+// 引数         duty_left: 左Duty duty_right: 右Duty yaw_cmd: 角速度指令 omega_ref: 目標角速度
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
 static void update_legacy_logs(float duty_left, float duty_right, float yaw_cmd, float omega_ref)
 {
 	const float duty_avg = (duty_left + duty_right) * 0.5f;
@@ -237,12 +254,12 @@ static void update_legacy_logs(float duty_left, float duty_right, float yaw_cmd,
 	yawRateCtrl.Int = yawCascadeState.integral;
 }
 
-/**
- * @brief 角速度誤差に対するPID制御を実行する。
- * @param yaw_error 角速度誤差[rad/s]
- * @param dt 角速度ループの周期[s]
- * @return 角速度制御出力[rad/s相当]
- */
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 motorControlYawRate
+// 処理概要     角速度誤差に対するPID制御を実行する
+// 引数         yaw_error: 角速度誤差[rad/s] dt: 外側ループ周期[s]
+// 戻り値       角速度制御出力[rad/s相当]
+///////////////////////////////////////////////////////////////////////////
 float motorControlYawRate(float yaw_error, float dt)
 {
 	if (!isfinite(dt) || dt <= 0.0f) {
@@ -256,14 +273,14 @@ float motorControlYawRate(float yaw_error, float dt)
 		derivative = (yaw_error - yawCascadeState.prev_error) / dt;
 	}
 	float integral_candidate = clampf(yawCascadeState.integral + yaw_error * dt,
-		- cascadeControlParams.yaw.i_limit,
-		  cascadeControlParams.yaw.i_limit);
+	- cascadeControlParams.yaw.i_limit,
+	cascadeControlParams.yaw.i_limit);
 	float output_unsat = (cascadeControlParams.yaw.kp * yaw_error) +
-		(cascadeControlParams.yaw.ki * integral_candidate) +
-		(cascadeControlParams.yaw.kd * derivative);
+	(cascadeControlParams.yaw.ki * integral_candidate) +
+	(cascadeControlParams.yaw.kd * derivative);
 	float output = clampf(output_unsat,
-		- cascadeControlParams.yaw.out_limit,
-		  cascadeControlParams.yaw.out_limit);
+	- cascadeControlParams.yaw.out_limit,
+	cascadeControlParams.yaw.out_limit);
 	if ((output != output_unsat) && (yaw_error * output > 0.0f)) {
 		integral_candidate = yawCascadeState.integral;
 		output_unsat = (cascadeControlParams.yaw.kp * yaw_error) +
@@ -271,7 +288,7 @@ float motorControlYawRate(float yaw_error, float dt)
 		(cascadeControlParams.yaw.kd * derivative);
 		output = clampf(output_unsat,
 		- cascadeControlParams.yaw.out_limit,
-		  cascadeControlParams.yaw.out_limit);
+		cascadeControlParams.yaw.out_limit);
 	}
 	yawCascadeState.integral = integral_candidate;
 	yawCascadeState.prev_error = yaw_error;
@@ -279,14 +296,12 @@ float motorControlYawRate(float yaw_error, float dt)
 	return output;
 }
 
-/**
- * @brief 左右ホイールの速度PIDを1ステップ更新する。
- * @param motor 制御対象のモータID
- * @param v_ref 目標速度[m/s]
- * @param v_meas 実測速度[m/s]
- * @param dt サンプリング周期[s]
- * @return PWMデューティ（-1.0〜1.0）
- */
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 motorControlSpeed
+// 処理概要     左右ホイールの速度PIDを1ステップ更新する
+// 引数         motor: 対象モータ v_ref: 目標速度 v_meas: 実測速度 dt: サンプリング周期
+// 戻り値       PWMデューティ（-1.0〜1.0）
+///////////////////////////////////////////////////////////////////////////
 float motorControlSpeed(motor_side_t motor, float v_ref, float v_meas, float dt)
 {
 	if (motor >= MOTOR_SIDE_RIGHT + 1) {
@@ -302,7 +317,7 @@ float motorControlSpeed(motor_side_t motor, float v_ref, float v_meas, float dt)
 		v_meas = 0.0f;
 	}
 	const SpeedPidParams *param = (motor == MOTOR_SIDE_LEFT) ?
-		&cascadeControlParams.speed_l : &cascadeControlParams.speed_r;
+	&cascadeControlParams.speed_l : &cascadeControlParams.speed_r;
 	SpeedCascadeState *state = &speedCascadeState[motor];
 	float error = v_ref - v_meas;
 	float derivative = 0.0f;
@@ -310,14 +325,14 @@ float motorControlSpeed(motor_side_t motor, float v_ref, float v_meas, float dt)
 		derivative = (error - state->prev_error) / dt;
 	}
 	float integral_candidate = clampf(state->integral + error * dt,
-		- param->i_limit,
-		  param->i_limit);
+	- param->i_limit,
+	param->i_limit);
 	float output_unsat = (param->kp * error) +
-		(param->ki * integral_candidate) +
-		(param->kd * derivative);
+	(param->ki * integral_candidate) +
+	(param->kd * derivative);
 	float output = clampf(output_unsat,
-		- cascadeControlParams.duty_limit,
-		  cascadeControlParams.duty_limit);
+	- cascadeControlParams.duty_limit,
+	cascadeControlParams.duty_limit);
 	if ((output != output_unsat) && (error * output > 0.0f)) {
 		integral_candidate = state->integral;
 		output_unsat = (param->kp * error) +
@@ -325,7 +340,7 @@ float motorControlSpeed(motor_side_t motor, float v_ref, float v_meas, float dt)
 		(param->kd * derivative);
 		output = clampf(output_unsat,
 		- cascadeControlParams.duty_limit,
-		  cascadeControlParams.duty_limit);
+		cascadeControlParams.duty_limit);
 	}
 	state->integral = integral_candidate;
 	state->prev_error = error;
@@ -333,11 +348,12 @@ float motorControlSpeed(motor_side_t motor, float v_ref, float v_meas, float dt)
 	return output;
 }
 
-/**
- * @brief カスケード制御の外側ループを実行する。
- * @param dt_outer 外側ループの周期[s]
- * @param dt_inner 内側ループの周期[s]
- */
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 motorControlTrace
+// 処理概要     カスケード制御の外側ループを実行する
+// 引数         dt_outer: 外側ループ周期[s] dt_inner: 内側ループ周期[s]
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
 void motorControlTrace(float dt_outer, float dt_inner)
 {
 	if (!isfinite(dt_inner) || dt_inner <= 0.0f) {
@@ -348,13 +364,20 @@ void motorControlTrace(float dt_outer, float dt_inner)
 	}
 	outerLoopElapsed += dt_inner;
 
+	bool running = (patternTrace > 10U) && (patternTrace < 100U);
+	if (!running) {
+		// 走行中以外はモータを駆動せず状態のみ保持する
+		motorPwmOutSynth(0.0f, 0.0f);
+		return;
+	}
+
 	float v_target = targetSpeedCommand_m_s;
 	if (!isfinite(v_target)) {
 		v_target = (float)targetSpeed / PALSE_MILLIMETER;
 	}
 	v_target = clampf(v_target,
-		- cascadeControlParams.v_limit,
-		  cascadeControlParams.v_limit);
+			- cascadeControlParams.v_limit,
+			  cascadeControlParams.v_limit);
 
 	bool update_outer = false;
 	float applied_dt_outer = dt_inner;
@@ -374,33 +397,38 @@ void motorControlTrace(float dt_outer, float dt_inner)
 		float e_line = valid ? compute_line_error(left, right) : 0.0f;
 
 		if (!valid) {
+			// センサが無効なときは積分値をリセットする
 			lineCascadeState.integral = 0.0f;
 			lineCascadeState.prev_error = 0.0f;
 			lineCascadeState.d_lpf_state = 0.0f;
 		}
 
 		if (valid) {
+			// 有効時は積分値を更新しつつ飽和を適用
 			lineCascadeState.integral = clampf(lineCascadeState.integral + e_line * applied_dt_outer,
-			- cascadeControlParams.line.i_limit,
-			  cascadeControlParams.line.i_limit);
+					- cascadeControlParams.line.i_limit,
+					  cascadeControlParams.line.i_limit);
 		} else {
 			lineCascadeState.integral = 0.0f;
 		}
+
 		float derivative = 0.0f;
 		if (applied_dt_outer > 1.0e-6f) {
 			derivative = (e_line - lineCascadeState.prev_error) / applied_dt_outer;
 		}
+		// 微分値にはローパスフィルタを通してノイズを抑制
 		derivative = apply_lowpass(derivative, lineCascadeState.d_lpf_state, applied_dt_outer,
-		cascadeControlParams.line.d_lpf);
+				cascadeControlParams.line.d_lpf);
 		lineCascadeState.d_lpf_state = derivative;
 		lineCascadeState.prev_error = e_line;
 
+		// ライン偏差から角速度指令を算出
 		omega_ref = (cascadeControlParams.line.kp * e_line) +
-		(cascadeControlParams.line.ki * lineCascadeState.integral) +
-		(cascadeControlParams.line.kd * derivative);
+				(cascadeControlParams.line.ki * lineCascadeState.integral) +
+				(cascadeControlParams.line.kd * derivative);
 		omega_ref = clampf(omega_ref,
-		- cascadeControlParams.line.ref_limit,
-		  cascadeControlParams.line.ref_limit);
+				- cascadeControlParams.line.ref_limit,
+				  cascadeControlParams.line.ref_limit);
 		lineCascadeState.omega_ref = omega_ref;
 
 		float omega_meas = 0.0f;
@@ -408,19 +436,23 @@ void motorControlTrace(float dt_outer, float dt_inner)
 			omega_meas = BMI088val.gyro.z * ((float)M_PI / 180.0f);
 		}
 		float yaw_error = omega_ref - omega_meas;
+		// 角速度PIDで左右速度差コマンドを生成
 		yaw_cmd = motorControlYawRate(yaw_error, applied_dt_outer);
 	}
 
+	// 角速度指令を左右目標速度へ変換
 	float v_left_ref = clampf(v_target - cascadeControlParams.tread_half * yaw_cmd,
-		- cascadeControlParams.v_limit,
-		  cascadeControlParams.v_limit);
+			- cascadeControlParams.v_limit,
+			  cascadeControlParams.v_limit);
 	float v_right_ref = clampf(v_target + cascadeControlParams.tread_half * yaw_cmd,
-		- cascadeControlParams.v_limit,
-		  cascadeControlParams.v_limit);
+			- cascadeControlParams.v_limit,
+			  cascadeControlParams.v_limit);
 
+	// エンコーダ値を速度[mm/s]へ換算
 	float v_left_meas = (float)encCurrentL / PALSE_MILLIMETER;
 	float v_right_meas = (float)encCurrentR / PALSE_MILLIMETER;
 
+	// 左右速度PIDを実行
 	float duty_left = motorControlSpeed(MOTOR_SIDE_LEFT, v_left_ref, v_left_meas, dt_inner);
 	float duty_right = motorControlSpeed(MOTOR_SIDE_RIGHT, v_right_ref, v_right_meas, dt_inner);
 
@@ -431,6 +463,7 @@ void motorControlTrace(float dt_outer, float dt_inner)
 	motorPwmOutSynth(duty_left_cmd, duty_right_cmd);
 	update_legacy_logs(duty_left_cmd, duty_right_cmd, yaw_cmd, omega_ref);
 }
+
 
 #else
 ///////////////////////////////////////////////////////////////////////////
@@ -515,9 +548,9 @@ void motorControlTrace(void)
 	// I成分積算
 	lineTraceCtrl.Int += (float)Dev * 0.001;
 	if (lineTraceCtrl.Int > 10000.0)
-		lineTraceCtrl.Int = 10000.0; // I成分リミット
+	lineTraceCtrl.Int = 10000.0; // I成分リミット
 	else if (lineTraceCtrl.Int < -10000.0)
-		lineTraceCtrl.Int = -10000.0;
+	lineTraceCtrl.Int = -10000.0;
 	Dif = (Dev - traceBefore) * 1; // dゲイン1/1000倍
 
 	iP = lineTraceCtrl.kp * Dev;			   // 比例
@@ -553,7 +586,7 @@ void motorControlSpeed(void)
 	// 目標値を変更したタイミングで積分項リセットとフィードフォワード更新を同時に実施
 	if (targetSpeed != speedTargetBefore)
 	{
-		veloCtrl.Int = 0;	/* 目標値変更時に積分項をリセット */
+	veloCtrl.Int = 0;	/* 目標値変更時に積分項をリセット */
 		// 物理パラメータを用いてフィードフォワード電圧を算出
 		targetSpeed_mm_s = targetSpeedCommand_m_s * 1000.0f;	// setTargetSpeedで保持した[m/s]を[mm/s]へ換算
 		/* control.cで計測済みのバッテリ電圧[V]を使用 */
@@ -594,7 +627,7 @@ void motorControlYawRate(void)
 	yawRateCtrl.Int += Dev * 0.005;
 	// 目標値を変更したらI成分リセット
 	if (targetAngularVelocity != targetAngularVelocityBefore)
-		yawRateCtrl.Int = 0;
+	yawRateCtrl.Int = 0;
 	Dif = (Dev - angularVelocityBefore) * 2; // dゲイン1/500倍
 
 	iP = yawRateCtrl.kp * Dev;			   // 比例
