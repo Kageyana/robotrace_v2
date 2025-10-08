@@ -80,6 +80,7 @@ extern int16_t speedFeedForwardGain;
 //====================================//
 void setTargetSpeed (float speed);
 void setTargetAngularVelocity (float angularVelocity);
+void setLineTraceCascadeEnabled (bool enable);
 void setTargetAngle (float angle);
 void setTargetDist (float dist);
 void resetSpeedPID (void);

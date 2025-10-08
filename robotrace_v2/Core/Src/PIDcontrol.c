@@ -15,6 +15,8 @@ pidParam distCtrl = {"dist", KP5, KI5, KD5, 0, 0};
 // 速度フィードフォワード係数(セットアップ画面から変更可能: Crr×1000)
 int16_t speedFeedForwardGain = SPEED_FEEDFORWARD_GAIN_DEFAULT;
 
+static bool lineTraceCascadeEnabled = false;
+
 uint8_t targetSpeed = 0;		 // 目標速度（初期値0）
 float targetSpeedCommand_m_s;	// setTargetSpeedで指定した速度指令値[m/s]
 float targetAngle;			 // 目標角速度
@@ -95,7 +97,17 @@ void setTargetSpeed(float speed)
 ///////////////////////////////////////////////////////////////////////////
 void setTargetAngularVelocity(float angularVelocity)
 {
-	targetAngularVelocity = angularVelocity;
+        targetAngularVelocity = angularVelocity;
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 setLineTraceCascadeEnabled
+// 処理概要     ライントレース由来の角速度目標設定を有効/無効化
+// 引数         enable:trueで有効
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void setLineTraceCascadeEnabled(bool enable)
+{
+        lineTraceCascadeEnabled = enable;
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 setTargetAngle
@@ -181,6 +193,11 @@ void motorControlTrace(void)
 
 	lineTraceCtrl.pwm = iRet;
 	traceBefore = Dev; // 次回はこの値が1ms前の値となる
+	if (lineTraceCascadeEnabled)
+	{
+		// ラインセンサ偏差に基づき角速度目標を更新しカスケード制御の外側ループを構成
+		setTargetAngularVelocity((float)lineTraceCtrl.pwm);
+	}
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 motorControlSpeed

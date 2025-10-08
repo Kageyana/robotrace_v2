@@ -430,9 +430,10 @@ void loopSystem(void)
 
 	case 11:
 		// スタートマーカー通過までの走行
+		setLineTraceCascadeEnabled(true); // カスケード制御でライン偏差から角速度を生成
 		setTargetSpeed(tgtParam.straight); // 目標速度
 		// ライントレース
-		motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 
 		// スタートマーカーを通過したら本走行に移行
 		if (SGmarker > 0)
@@ -457,13 +458,14 @@ void loopSystem(void)
 			{
 				modeLOG = true; // log start
 			}
-			
+
 			patternTrace = 12;
 		}
 		break;
 
 	case 12:
 		// 目標速度設定
+		setLineTraceCascadeEnabled(true); // 角速度外側ループを継続
 		if (optimalTrace == BOOST_NONE)
 		{
 			// 探索走行のとき
@@ -476,7 +478,7 @@ void loopSystem(void)
 				setTargetSpeed(tgtParam.curve);
 			}
 			// ライントレース
-			motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+			motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 		}
 		else if (optimalTrace == BOOST_DISTANCE)
 		{
@@ -492,7 +494,7 @@ void loopSystem(void)
 				if (encTotalOptimal - DistanceOptimal >= encMM(CALCDISTANCE))
 				{
 					boostSpeed = PPAD[optimalIndex].boostSpeed; // 目標速度を更新
-					DistanceOptimal = encTotalOptimal;			// 距離計測位置を更新
+					DistanceOptimal = encTotalOptimal;                      // 距離計測位置を更新
 					if (optimalIndex + 1 < numPPADarry)
 					{
 						// 配列要素数を超えない範囲でインデックスを更新する
@@ -507,7 +509,7 @@ void loopSystem(void)
 			// 目標速度に設定
 			setTargetSpeed(boostSpeed);
 			// ライントレース
-			motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+			motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 		}
 		else if (optimalTrace == BOOST_SHORTCUT)
 		{
@@ -547,11 +549,10 @@ void loopSystem(void)
 			}
 		}
 		break;
-
 	case 101:
 		if (modeDSP && !ssd1306_IsDMARunning())
 		{
-			ssd1306_UpdateScreen_DMA();        // 停止していた画面更新を再開
+			ssd1306_UpdateScreen_DMA();	// 停止していた画面更新を再開
 		}
 		// 停止速度まで減速
 		if (enc1 >= encMM(200))
@@ -562,16 +563,16 @@ void loopSystem(void)
 		{
 			setTargetSpeed(tgtParam.stop);
 		}
-		motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 
 		if (encCurrentN == 0)
 		{
 			patternTrace = 102;
 		}
 		break;
-
 	case 102:
 		setTargetSpeed(0);
+		setLineTraceCascadeEnabled(false); // 走行終了時はライン由来の角速度指令を停止
 		motorPwmOutSynth(0, 0, 0, 0);
 
 		if (modeLOG)
@@ -607,10 +608,10 @@ void loopSystem(void)
 				tgtParam.bst700 *= PARAM_UP_STEP;
 				tgtParam.bst600 *= PARAM_UP_STEP;
 				tgtParam.bst500 *= PARAM_UP_STEP;
-				// tgtParam.bst400			*= PARAM_UP_STEP;
-				// tgtParam.bst300			*= PARAM_UP_STEP;
-				// tgtParam.bst200			*= PARAM_UP_STEP;
-				// tgtParam.bst100			*= PARAM_UP_STEP;
+				// tgtParam.bst400                      *= PARAM_UP_STEP;
+				// tgtParam.bst300                      *= PARAM_UP_STEP;
+				// tgtParam.bst200                      *= PARAM_UP_STEP;
+				// tgtParam.bst100                      *= PARAM_UP_STEP;
 			}
 
 			if (autoStart > 5)
@@ -644,9 +645,9 @@ void loopSystem(void)
 				if (logOverflow || markerOverflow)
 				{
 					// バッファ上限エラー表示
-					ssd1306_SetCursor(0, 25);						// 1行目の表示位置
+					ssd1306_SetCursor(0, 25);						 // 1行目の表示位置
 					ssd1306_printf(Font_11x18, "buff overflow");	// エラーメッセージ1行目
-					ssd1306_SetCursor(0, 45);						// 2行目の表示位置
+					ssd1306_SetCursor(0, 45);						 // 2行目の表示位置
 					ssd1306_printf(Font_11x18, "error");			// エラーメッセージ2行目
 				}
 				else
@@ -661,7 +662,6 @@ void loopSystem(void)
 
 		patternTrace = 103;
 		break;
-
 	case 103:
 		motorPwmOutSynth(0, 0, 0, 0);
 		powerLineSensors(0);
