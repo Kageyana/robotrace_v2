@@ -14,7 +14,7 @@ uint16_t lSensorCari[NUM_SENSORS] = {0}; // 正規化したラインセンサの
 bool lineSensorState = false;			 // true:ラインセンサ点灯 false:ラインセンサ消灯
 // 仮想センサステア関連
 uint16_t lineIndex = 0;
-float angleSensor;
+float angleSensor = 0.0F;
 // キャリブレーション関連
 uint16_t lSensorMax[NUM_SENSORS] = {0};	// 各センサの最大値
 uint16_t lSensorMin[NUM_SENSORS] = {[0 ... NUM_SENSORS - 1] = UINT16_MAX};	// 各センサの最小値
@@ -92,7 +92,7 @@ void getLineSensor(void)
 // 引数     	なし
 // 戻り値    	なし
 /////////////////////////////////////////////////////////////////////
-void getAngleSensor(void)
+float getAngleSensor(void)
 {
 	uint16_t index, sen1, sen2, i, min;
 	const uint16_t *sensorValues;
@@ -158,7 +158,12 @@ void getAngleSensor(void)
 			angleSensor = -(((4.0F - (float)index + 0.5F) * thitaRad) + dthita);
 		}
 		angleSensor = angleSensor * degPerRad; // 弧度法に変換
+
+		return angleSensor;
 	}
+	
+	angleSensor = 0.0F;
+	return 0.0F; // 両端センサで検出した場合は0を返す
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 calibrationLinesensor

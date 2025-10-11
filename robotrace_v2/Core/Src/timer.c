@@ -37,9 +37,11 @@ void Interrupt1ms(void)
 	encPulse5ms += encCurrentN; // 5ms間のエンコーダパルスを累積
 
 	// PID制御処理
-	motorControlTrace();
+	motorControlTraceSub();
 	motorControlSpeed();
 	motorControldist();
+
+	// getAngleSensor(); // ラインセンサからステア角計算
 
 	// IMU処理
 	if (initIMU)
@@ -49,7 +51,7 @@ void Interrupt1ms(void)
 			BMI088getGyro();		// 角速度取得
 			calcDegrees();			// コンプリメンタリフィルタで角度算出
 			motorControlYawRate();	// 角速度制御
-			motorControlYaw();		// 角度制御
+			// motorControlYaw();		// 角度制御
 		}
 		else
 		{
@@ -113,12 +115,12 @@ void Interrupt1ms(void)
 					cntRun,
 					encCurrentN,
 					optimalIndex,
+					lineTraceCtrl.pwm,
+					lineTraceCtrlSub.pwm,
 					// motorpwmL,
 					// motorpwmR,
 					// (int16_t)(motorCurrentL * 10000),
 					// (int16_t)(motorCurrentR * 10000),
-					lineTraceCtrl.pwm,
-					veloCtrl.pwm,
 					// 32bit
 					encTotalOptimal,
 					// float型
@@ -180,7 +182,7 @@ void Interrupt1ms(void)
 		}
 		break;
 	case 3:
-		getAngleSensor(); // ラインセンサからステア角計算
+		motorControlTrace();
 		break;
 	case 5:
 		cnt5 = 0;

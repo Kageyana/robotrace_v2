@@ -14,6 +14,10 @@
 #define KI1		0
 #define KD1		220
 
+#define KP12	20
+#define KI12	0
+#define KD12	0
+
 // ライントレース用センサ重み係数（中央から外側に向かって適用）
 #define TRACE_WEIGHT_CENTER		1.0f
 #define TRACE_WEIGHT_INNER		1.01f
@@ -69,6 +73,7 @@ extern float    targetAngularVelocity;  // 目標角速度
 extern int16_t  targetDist;		        // 目標X座標
 
 extern pidParam lineTraceCtrl;
+extern pidParam lineTraceCtrlSub;
 extern pidParam veloCtrl;
 extern pidParam yawRateCtrl;
 extern pidParam yawCtrl;
@@ -88,6 +93,7 @@ void readPIDparameters(pidParam *pid);
 void writeSpeedFeedForwardGain(int16_t gain);
 void readSpeedFeedForwardGain(int16_t *gain);
 void motorControlTrace(void);
+void motorControlTraceSub(void);
 void motorControlSpeed(void);
 void motorControlYawRate(void);
 void motorControlYaw(void);

@@ -137,6 +137,7 @@ void initSystem(void)
 
 			// 前回のPIDゲインを取得
 			readPIDparameters(&lineTraceCtrl);
+			readPIDparameters(&lineTraceCtrlSub);
 			readPIDparameters(&veloCtrl);
 			readSpeedFeedForwardGain(&speedFeedForwardGain);	// 速度フィードフォワード係数も読み出す
 			readPIDparameters(&yawRateCtrl);
@@ -398,6 +399,7 @@ void loopSystem(void)
 			if (autoStart == 0)
 			{
 				writePIDparameters(&lineTraceCtrl);
+				writePIDparameters(&lineTraceCtrlSub);
 				writePIDparameters(&veloCtrl);
 				writeSpeedFeedForwardGain(speedFeedForwardGain);	// 速度フィードフォワード係数も保存
 				writePIDparameters(&yawRateCtrl);
@@ -432,7 +434,7 @@ void loopSystem(void)
 		// スタートマーカー通過までの走行
 		setTargetSpeed(tgtParam.straight); // 目標速度
 		// ライントレース
-		motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+		motorPwmOutSynth(lineTraceCtrlSub.pwm, veloCtrl.pwm, 0, 0);
 
 		// スタートマーカーを通過したら本走行に移行
 		if (SGmarker > 0)
@@ -476,7 +478,7 @@ void loopSystem(void)
 				setTargetSpeed(tgtParam.curve);
 			}
 			// ライントレース
-			motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+			motorPwmOutSynth(lineTraceCtrlSub.pwm, veloCtrl.pwm, 0, 0);
 		}
 		else if (optimalTrace == BOOST_DISTANCE)
 		{
@@ -507,7 +509,7 @@ void loopSystem(void)
 			// 目標速度に設定
 			setTargetSpeed(boostSpeed);
 			// ライントレース
-			motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+			motorPwmOutSynth(lineTraceCtrlSub.pwm, veloCtrl.pwm, 0, 0);
 		}
 		else if (optimalTrace == BOOST_SHORTCUT)
 		{

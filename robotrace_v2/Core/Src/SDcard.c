@@ -176,7 +176,7 @@ void createLog(void)
 	// setLogStr("CurrentL", "%f");
 	// setLogStr("CurrentR", "%f");
 	setLogStr("lineTraceCtrl", "%d");
-	setLogStr("veloCtrl", "%d");
+	setLogStr("lineTraceCtrlSub", "%d");
 
 	setLogStr("x", "%f");
 	setLogStr("y", "%f");
@@ -540,12 +540,12 @@ void endLog(void)
 			logval8[0],		// targetSpeed
 			logval8[2],		// modeCurve
 			logval16[2],	// optimalIndex
+			logval16[3],	// lineTraceCtrl
+			logval16[4],	// lineTraceCtrlSub
 			// (int16_t)logval16[3],		// motorpwmL
 			// (int16_t)logval16[4],		// motorpwmR
 			// (float)logval16[5] / 10000,	// CurrentL
 			// (float)logval16[6] / 10000,	// CurrentR
-			(int16_t)logval16[3],		// lineTraceCtrl
-			(int16_t)logval16[4],		// veloCtrl
 			logvalf[2],		// x
 			logvalf[3]		// y
 		);

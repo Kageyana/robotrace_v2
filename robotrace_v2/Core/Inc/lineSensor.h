@@ -10,6 +10,7 @@
 //====================================//
 #define NUM_SENSORS 10
 #define THITA_SENSOR 11.0F // ラインセンサの間隔(角度)
+#define LENGTHSENSORBAR 40.0F // ラインセンサ円弧中心からトレッド軸までの長さ[mm]
 #define BASEVAL 4095.0F
 #define LS_COUNTERPERIOD htim3.Init.Period
 #define LS_TIMER htim3
@@ -34,7 +35,7 @@ extern uint8_t modeCalLinesensors;
 //====================================//
 void powerLineSensors(uint8_t onoff);
 void getLineSensor(void);
-void getAngleSensor(void);
+float getAngleSensor(void);
 void calibrationLinesensor(void);
 void writeLinesenval(void);
 void readLinesenval(void);

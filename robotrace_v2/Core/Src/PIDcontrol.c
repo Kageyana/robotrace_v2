@@ -7,6 +7,7 @@
 // グローバル変数の宣言
 //====================================//
 pidParam lineTraceCtrl = {"line", KP1, KI1, KD1, 0, 0};
+pidParam lineTraceCtrlSub = {"lineSub", KP12, KI12, KD12, 0, 0};
 pidParam veloCtrl = {"speed", KP2, KI2, KD2, 0, 0};
 pidParam yawRateCtrl = {"yawRate", KP3, KI3, KD3, 0, 0};
 pidParam yawCtrl = {"yaw", KP4, KI4, KD4, 0, 0};
@@ -140,38 +141,77 @@ void resetSpeedPID(void)
 ///////////////////////////////////////////////////////////////////////////
 void motorControlTrace(void)
 {
-	int32_t iP, iI, iD, iRet, Dev, Dif, senL, senR;
-	static int32_t traceBefore;
+	float iP, iI, iD, Dev, Dif;
+	int32_t iRet;
+	static float traceBefore;
+	float r, v, omega;
 
 	// サーボモータ用PWM値計算
-	if (lSensorMax[0] > lSensorMin[0])
-	{
-		// マクロで設定した重みを掛け合わせてセンサ値を合成
-		senL = (lSensorCari[4] * TRACE_WEIGHT_CENTER) + (lSensorCari[3] * TRACE_WEIGHT_INNER) + (lSensorCari[2] * TRACE_WEIGHT_MIDDLE) + (lSensorCari[1] * TRACE_WEIGHT_OUTER) + (lSensorCari[0] * TRACE_WEIGHT_FAR);
-		senR = (lSensorCari[5] * TRACE_WEIGHT_CENTER) + (lSensorCari[6] * TRACE_WEIGHT_INNER) + (lSensorCari[7] * TRACE_WEIGHT_MIDDLE) + (lSensorCari[8] * TRACE_WEIGHT_OUTER) + (lSensorCari[9] * TRACE_WEIGHT_FAR);
-	}
-	else
-	{
-		// senL = (lSensor[4]) + (lSensor[3]*0.8) + (lSensor[2]*0.7) + (lSensor[1]*0.5) + (lSensor[0]*0.3);
-		// senR = (lSensor[5]) + (lSensor[6]*0.8) + (lSensor[7]*0.7) + (lSensor[8]*0.5) + (lSensor[9]*0.3);
-		senL = (lSensor[5]);
-		senR = (lSensor[6]);
-	}
-	Dev = senL - senR;
+	// if (lSensorMax[0] > lSensorMin[0])
+	// {
+	// 	// マクロで設定した重みを掛け合わせてセンサ値を合成
+	// 	senL = (lSensorCari[4] * TRACE_WEIGHT_CENTER) + (lSensorCari[3] * TRACE_WEIGHT_INNER) + (lSensorCari[2] * TRACE_WEIGHT_MIDDLE) + (lSensorCari[1] * TRACE_WEIGHT_OUTER) + (lSensorCari[0] * TRACE_WEIGHT_FAR);
+	// 	senR = (lSensorCari[5] * TRACE_WEIGHT_CENTER) + (lSensorCari[6] * TRACE_WEIGHT_INNER) + (lSensorCari[7] * TRACE_WEIGHT_MIDDLE) + (lSensorCari[8] * TRACE_WEIGHT_OUTER) + (lSensorCari[9] * TRACE_WEIGHT_FAR);
+	// }
+	// else
+	// {
+	// 	// senL = (lSensor[4]) + (lSensor[3]*0.8) + (lSensor[2]*0.7) + (lSensor[1]*0.5) + (lSensor[0]*0.3);
+	// 	// senR = (lSensor[5]) + (lSensor[6]*0.8) + (lSensor[7]*0.7) + (lSensor[8]*0.5) + (lSensor[9]*0.3);
+	// 	senL = (lSensor[5]);
+	// 	senR = (lSensor[6]);
+	// }
+	// Dev = senL - senR;
+
+	
+	
+	// iRet = iRet >> 8; // PWMを0～1000近傍に収める
+
+	// // PWMの上限の設定
+	// if (iRet > 900)
+	// 	iRet = 900;
+	// if (iRet < -900)
+	// 	iRet = -900;
+
+	r = tanf(getAngleSensor())/LENGTHSENSORBAR; // 曲率半径を計算
+	v = encV(encCurrentN); // 現在速度[m/s]に変換
+	omega = v * r * 57.3f; // 角速度[deg/s]に変換 目標値
+	Dev = omega - BMI088val.gyro.z; // 目標値-現在値
 
 	// I成分積算
-	lineTraceCtrl.Int += (float)Dev * 0.001;
+	lineTraceCtrl.Int += (float)Dev * 0.005;
 	if (lineTraceCtrl.Int > 10000.0)
 		lineTraceCtrl.Int = 10000.0; // I成分リミット
 	else if (lineTraceCtrl.Int < -10000.0)
 		lineTraceCtrl.Int = -10000.0;
-	Dif = (Dev - traceBefore) * 1; // dゲイン1/1000倍
+	Dif = Dev - traceBefore; // dゲイン1/200倍
 
-	iP = lineTraceCtrl.kp * Dev;			   // 比例
-	iI = lineTraceCtrl.ki * lineTraceCtrl.Int; // 積分
-	iD = lineTraceCtrl.kd * Dif;			   // 微分
-	iRet = iP + iI + iD;
-	iRet = iRet >> 8; // PWMを0～1000近傍に収める
+	iP = (float)lineTraceCtrl.kp * Dev;			   // 比例
+	iI = (float)lineTraceCtrl.ki * lineTraceCtrl.Int; // 積分
+	iD = (float)lineTraceCtrl.kd * Dif;			   // 微分
+	iRet = (int32_t)(iP + iD);
+	// iRet = iRet >> 10; // PWMを0～1000近傍に収める
+
+	lineTraceCtrl.pwm = (int16_t)iRet;
+	traceBefore = Dev; // 次回はこの値が1ms前の値となる
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 motorControlTraceSub
+// 処理概要     ライントレース時のサブ制御量の計算
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void motorControlTraceSub(void)
+{
+	int32_t iP, iD, iRet, Dev, Dif;
+	static float speedEncoderBefore;
+
+	Dev = lineTraceCtrl.pwm - encCurrentN; // 偏差
+	Dif = Dev - speedEncoderBefore;		// 微分　dゲイン1/1000倍
+
+	iP = lineTraceCtrlSub.kp * Dev;		// 比例
+	iD = lineTraceCtrlSub.kd * Dif;		// 微分
+	iRet = iP + iD;
+	// iRet = iRet >> 10; // PWMを0～1000近傍に収める
 
 	// PWMの上限の設定
 	if (iRet > 900)
@@ -179,8 +219,9 @@ void motorControlTrace(void)
 	if (iRet < -900)
 		iRet = -900;
 
-	lineTraceCtrl.pwm = iRet;
-	traceBefore = Dev; // 次回はこの値が1ms前の値となる
+	lineTraceCtrlSub.pwm = (int16_t)iRet;
+
+	speedEncoderBefore = Dev;		// 次回はこの値が1ms前の値となる
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 motorControlSpeed
