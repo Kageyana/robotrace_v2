@@ -96,7 +96,7 @@ void getAngleSensor(void)
 {
 	uint16_t index, sen1, sen2, i, min;
 	const uint16_t *sensorValues;
-	float nsen1, nsen2, phi, dthita;
+	float nsen1, nsen2, phi, dthita,test;
 	static const float thitaRad = THITA_SENSOR * (float)M_PI / 180.0f; // 角度をラジアンへ変換する係数を事前計算
 	static const float degPerRad = 180.0f / (float)M_PI; // ラジアン→度変換係数を事前計算
 	static const float thitaScale = THITA_SENSOR / 90.0f; // 微小角度の換算係数を事前計算して乗算回数を削減
@@ -111,8 +111,8 @@ void getAngleSensor(void)
 		sensorValues = lSensor;
 	}
 
-	index = 0; // 最小値探索用インデックス初期化
-	min = UINT16_MAX; // 最小値初期化
+	index = NUM_SENSORS; // 最小値探索用インデックス初期化
+	min = 1000; // 最小値初期化
 	for (i = 0; i < NUM_SENSORS; i++)
 	{
 		uint16_t current = sensorValues[i]; // 配列アクセスを一時変数に保持して再利用
@@ -149,11 +149,13 @@ void getAngleSensor(void)
 		// センサ角度と微小角度を足す
 		if (index >= NUM_SENSORS / 2)
 		{
-			angleSensor = ((index - 5.5f) * thitaRad) + dthita;
+			test = ((float)index - 5.0F + 0.5F) * thitaRad;
+			angleSensor = (((float)index - 5.0F + 0.5F) * thitaRad) + dthita;
 		}
 		else
 		{
-			angleSensor = -(((5.5f - index) * thitaRad) + dthita);
+			test = ((4.0F - (float)index + 0.5F) * thitaRad);
+			angleSensor = -(((4.0F - (float)index + 0.5F) * thitaRad) + dthita);
 		}
 		angleSensor = angleSensor * degPerRad; // 弧度法に変換
 	}

@@ -419,8 +419,8 @@ static void test_linesensor(void)
 	ssd1306_SetCursor(95, 54);
 	ssd1306_printf(Font_6x8, "%4d", lSensorCari[9]);
 
-	ssd1306_SetCursor(55, 56);
-	ssd1306_printf(Font_6x8, "%3.0f", angleSensor);
+	ssd1306_SetCursor(43, 54);
+	ssd1306_printf(Font_7x10, "%3.0fdeg", angleSensor);
 
 	data_select(&testFlags.motor_test, SW_PUSH);
 	if (testFlags.motor_test == 1)
