@@ -95,46 +95,67 @@ void getLineSensor(void)
 void getAngleSensor(void)
 {
 	uint16_t index, sen1, sen2, i, min;
+	const uint16_t *sensorValues;
 	float nsen1, nsen2, phi, dthita;
+	static const float thitaRad = THITA_SENSOR * (float)M_PI / 180.0f; // 角度をラジアンへ変換する係数を事前計算
+	static const float degPerRad = 180.0f / (float)M_PI; // ラジアン→度変換係数を事前計算
+	static const float thitaScale = THITA_SENSOR / 90.0f; // 微小角度の換算係数を事前計算して乗算回数を削減
 
-	min = 1000;
+	// キャリブレーション済みなら正規化済みの値を使用する
+	if (lSensorMax[0] > lSensorMin[0])
+	{
+		sensorValues = lSensorCari;
+	}
+	else
+	{
+		sensorValues = lSensor;
+	}
+
+	index = 0; // 最小値探索用インデックス初期化
+	min = UINT16_MAX; // 最小値初期化
 	for (i = 0; i < NUM_SENSORS; i++)
 	{
-		if (lSensor[i] < min)
+		uint16_t current = sensorValues[i]; // 配列アクセスを一時変数に保持して再利用
+		if (current < min)
 		{
-			min = lSensor[i];
+			min = current;
 			index = i;
 		}
 	}
-
-	if (index >= 0 && index <= NUM_SENSORS - 1)
-	{ // 両端のセンサが白線の上にあるときは無視
-		// 白線に一番近いセンサの両隣のセンサ値を取得
-		sen1 = lSensor[index - 1];
-		sen2 = lSensor[index + 1];
+	if (index > 0 && index < NUM_SENSORS - 1)
+	{
+		// 両端での配列アクセスを避ける
+		sen1 = sensorValues[index - 1];
+		sen2 = sensorValues[index + 1];
+		uint32_t sum = (uint32_t)sen1 + (uint32_t)sen2; // 隣接値合計を32bitで確保し加算回数を削減
+		if (sum == 0U)
+		{
+			return; // 分母ゼロ時は計算を行わない
+		}
+		float invSum = 1.0f / (float)sum; // 逆数を保持して除算回数を削減
 		// 正規化
-		nsen1 = (float)sen1 / (sen1 + sen2);
-		nsen2 = (float)sen2 / (sen1 + sen2);
+		nsen1 = sen1 * invSum;
+		nsen2 = sen2 * invSum;
 		if (index >= NUM_SENSORS / 2)
 		{
-			phi = atan((nsen1 - nsen2) / 1); // 偏角φ計算
+			phi = atanf(nsen1 - nsen2); // 偏角φ計算
 		}
 		else
 		{
-			phi = atan((nsen2 - nsen1) / 1); // 偏角φ計算
+			phi = atanf(nsen2 - nsen1); // 偏角φ計算
 		}
-		dthita = (phi * THITA_SENSOR * (M_PI / 180.0) / 2) / (M_PI / 4); // 微小角度dθ計算
+		dthita = phi * thitaScale; // 微小角度dθ計算（定数計算を簡略化）
 
 		// センサ角度と微小角度を足す
 		if (index >= NUM_SENSORS / 2)
 		{
-			angleSensor = ((index - 5.5) * THITA_SENSOR * (M_PI / 180.0)) + dthita;
+			angleSensor = ((index - 5.5f) * thitaRad) + dthita;
 		}
 		else
 		{
-			angleSensor = -(((5.5 - index) * THITA_SENSOR * (M_PI / 180.0)) + dthita);
+			angleSensor = -(((5.5f - index) * thitaRad) + dthita);
 		}
-		angleSensor = angleSensor * (180.0 / M_PI); // 弧度法に変換
+		angleSensor = angleSensor * degPerRad; // 弧度法に変換
 	}
 }
 /////////////////////////////////////////////////////////////////////
