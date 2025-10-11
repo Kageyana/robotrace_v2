@@ -180,6 +180,7 @@ void Interrupt1ms(void)
 		}
 		break;
 	case 3:
+		getAngleSensor(); // ラインセンサからステア角計算
 		break;
 	case 5:
 		cnt5 = 0;
