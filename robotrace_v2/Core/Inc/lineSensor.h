@@ -9,10 +9,10 @@
 // シンボル定義
 //====================================//
 #define NUM_SENSORS 10
-#define THITA_SENSOR 11.0F // ラインセンサの間隔(角度)
-#define LENGTHSENSORBAR 40.0F // ラインセンサ円弧中心からトレッド軸までの長さ[mm]
+#define THITA_SENSOR 10.15F // ラインセンサの間隔(角度)
+#define LENGTHSENSORBAR 0.04F // ラインセンサ円弧中心からトレッド軸までの長さ[m]
 #define BASEVAL 4095.0F
-#define LS_COUNTERPERIOD htim3.Init.Period
+#define LS_COUNTERPERIOD htim3.Init.Period * 0.8
 #define LS_TIMER htim3
 #define LS_CHANNEL TIM_CHANNEL_3
 

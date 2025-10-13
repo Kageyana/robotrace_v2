@@ -421,7 +421,7 @@ static void test_linesensor(void)
 	ssd1306_printf(Font_6x8, "%4d", lSensorCari[9]);
 
 	ssd1306_SetCursor(43, 54);
-	ssd1306_printf(Font_7x10, "%3.0fdeg", angleSensor);
+	ssd1306_printf(Font_7x10, "%5.1f", angleSensor * 180.0F / (float)M_PI);
 
 	data_select(&testFlags.motor_test, SW_PUSH);
 	if (testFlags.motor_test == 1)
@@ -591,7 +591,8 @@ static void setup_pid_trace(void)
 	// PUSHでトレースON/OFF
 	if (testFlags.trace_test == 1)
 	{
-		motorPwmOutSynth(yawCtrl.pwm, 0, 0, 0); // モータを指定PWMで駆動
+		// encCurrentN = 60;
+		motorPwmOutSynth(lineTraceCtrlSub.pwm, 0, 0, 0); // モータを指定PWMで駆動
 		powerLineSensors(1);                          // ラインセンサを有効化
 	}
 	else
@@ -611,8 +612,8 @@ static void setup_pid_trace(void)
 
 	// ゲイン表示
 	dataTuningUD(&pattern.gain, 1, 3, 1);
-	if (testFlags.trace_test == 0)
-	{
+	// if (testFlags.trace_test == 0)
+	// {
 		ssd1306_SetCursor(21, 18);
 		if (pattern.gain == 1)
 			ssd1306_printfB(Font_7x10, "%3d", lineTraceCtrl.kp);
@@ -648,7 +649,7 @@ static void setup_pid_trace(void)
 			dataTuningLR(&lineTraceCtrl.kd, 1, 0, 255);
 			break;
 		}
-	}
+	// }
 }
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_pid_trace

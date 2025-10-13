@@ -19,7 +19,7 @@ static volatile bool logWriteReq = false;
 /////////////////////////////////////////////////////////////////////
 void Interrupt1ms(void)
 {
-
+	static uint32_t cntPID = 0;
 	// Interrupt 1ms
 	cntRun++;
 	cnt5++;
@@ -37,11 +37,14 @@ void Interrupt1ms(void)
 	encPulse5ms += encCurrentN; // 5ms間のエンコーダパルスを累積
 
 	// PID制御処理
+	if(cntPID++ >= 2)
+	{
+		motorControlTrace();
+		cntPID = 0;
+	}
 	motorControlTraceSub();
 	motorControlSpeed();
 	motorControldist();
-
-	// getAngleSensor(); // ラインセンサからステア角計算
 
 	// IMU処理
 	if (initIMU)
@@ -67,8 +70,8 @@ void Interrupt1ms(void)
 		// if (cntEmcStopAngleY()) emcStop = STOP_ANGLE_Y;
 		if (cntEmcStopEncStop())
 			emcStop = STOP_ENCODER_STOP;
-		// if (cntEmcStopLineSensor() && optimalTrace != BOOST_SHORTCUT)
-		// 	emcStop = STOP_LINESENSOR;
+		if (cntEmcStopLineSensor() && optimalTrace != BOOST_SHORTCUT)
+			emcStop = STOP_LINESENSOR;
 		if (judgeOverSpeed())
 			emcStop = STOP_OVERSPEED;
 
@@ -124,7 +127,8 @@ void Interrupt1ms(void)
 					// 32bit
 					encTotalOptimal,
 					// float型
-					BMI088val.gyro.z
+					BMI088val.gyro.z,
+					angleSensor
 				);
 #else
 				writeLogBufferPrint(); // バッファにログを保存
@@ -182,7 +186,6 @@ void Interrupt1ms(void)
 		}
 		break;
 	case 3:
-		motorControlTrace();
 		break;
 	case 5:
 		cnt5 = 0;

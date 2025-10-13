@@ -145,6 +145,7 @@ void motorControlTrace(void)
 	int32_t iRet;
 	static float traceBefore;
 	float r, v, omega;
+	const float rad2deg = 180.0F / (float)M_PI;
 
 	// サーボモータ用PWM値計算
 	// if (lSensorMax[0] > lSensorMin[0])
@@ -172,24 +173,24 @@ void motorControlTrace(void)
 	// if (iRet < -900)
 	// 	iRet = -900;
 
-	r = tanf(getAngleSensor())/LENGTHSENSORBAR; // 曲率半径を計算
+	r = LENGTHSENSORBAR / tanf(getAngleSensor()); // 曲率半径を計算
 	v = encV(encCurrentN); // 現在速度[m/s]に変換
-	omega = v * r * 57.3f; // 角速度[deg/s]に変換 目標値
+	omega = v / r * rad2deg; // 角速度[deg/s]に変換 目標値
 	Dev = omega - BMI088val.gyro.z; // 目標値-現在値
 
 	// I成分積算
-	lineTraceCtrl.Int += (float)Dev * 0.005;
+	lineTraceCtrl.Int += (float)Dev * 0.002;
 	if (lineTraceCtrl.Int > 10000.0)
 		lineTraceCtrl.Int = 10000.0; // I成分リミット
 	else if (lineTraceCtrl.Int < -10000.0)
 		lineTraceCtrl.Int = -10000.0;
-	Dif = Dev - traceBefore; // dゲイン1/200倍
+	Dif = Dev - traceBefore; // dゲイン1/500倍
 
 	iP = (float)lineTraceCtrl.kp * Dev;			   // 比例
 	iI = (float)lineTraceCtrl.ki * lineTraceCtrl.Int; // 積分
 	iD = (float)lineTraceCtrl.kd * Dif;			   // 微分
 	iRet = (int32_t)(iP + iD);
-	// iRet = iRet >> 10; // PWMを0～1000近傍に収める
+	iRet = iRet >> 4; // PWMを0～1000近傍に収める
 
 	lineTraceCtrl.pwm = (int16_t)iRet;
 	traceBefore = Dev; // 次回はこの値が1ms前の値となる

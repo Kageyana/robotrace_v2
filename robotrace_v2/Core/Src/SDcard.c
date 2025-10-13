@@ -177,6 +177,7 @@ void createLog(void)
 	// setLogStr("CurrentR", "%f");
 	setLogStr("lineTraceCtrl", "%d");
 	setLogStr("lineTraceCtrlSub", "%d");
+	setLogStr("angleSensor", "%f");
 
 	setLogStr("x", "%f");
 	setLogStr("y", "%f");
@@ -535,19 +536,20 @@ void endLog(void)
 			zg,
 			marker,
 			distance,
-			logvalf[1],		// ROC
+			logvalf[2],		// ROC
 
 			logval8[0],		// targetSpeed
 			logval8[2],		// modeCurve
 			logval16[2],	// optimalIndex
-			logval16[3],	// lineTraceCtrl
-			logval16[4],	// lineTraceCtrlSub
+			(int16_t)logval16[3],	// lineTraceCtrl
+			(int16_t)logval16[4],	// lineTraceCtrlSub
 			// (int16_t)logval16[3],		// motorpwmL
 			// (int16_t)logval16[4],		// motorpwmR
 			// (float)logval16[5] / 10000,	// CurrentL
 			// (float)logval16[6] / 10000,	// CurrentR
-			logvalf[2],		// x
-			logvalf[3]		// y
+			logvalf[1] * 180.0F / M_PI,		// angleSensor
+			logvalf[3],		// x
+			logvalf[4]		// y
 		);
 
 		// 文字列をSDカードに送信
