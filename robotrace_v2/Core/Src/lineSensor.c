@@ -96,9 +96,8 @@ float getAngleSensor(void)
 {
 	uint16_t indexL, indexR, index, sen1, sen2, min;
 	const uint16_t *sensorValues;
-	float nsen1, nsen2, phi, dthita,test;
+	float nsen1, nsen2, phi, dthita;
 	static float beforeAngle = 0.0F;
-	static const float centerAngle = 0.5 * (float)M_PI/180.0F;
 	static const float thitaRad = THITA_SENSOR * (float)M_PI / 180.0f; // 角度をラジアンへ変換する係数を事前計算
 	static const float degPerRad = 180.0f / (float)M_PI; // ラジアン→度変換係数を事前計算
 	static const float thitaScale = THITA_SENSOR / 90.0f; // 微小角度の換算係数を事前計算して乗算回数を削減
@@ -118,7 +117,7 @@ float getAngleSensor(void)
 	indexR = NUM_SENSORS/2; 	// 右側の最小値インデックス初期化
 	min = 4000; // 最小値初期化
 
-	for (int16_t i = NUM_SENSORS/2 - 1; i < 0; i--)
+	for (int16_t i = NUM_SENSORS/2 - 1; i >= 0; i--)
 	{
 		uint16_t current = sensorValues[i]; // 配列アクセスを一時変数に保持して再利用
 		if (current < min)
@@ -189,7 +188,6 @@ float getAngleSensor(void)
 		}
 		// angleSensor = angleSensor * degPerRad; // 弧度法に変換
 
-		return angleSensor;
 	}
 	else if(index == NUM_SENSORS) // 両端センサで同じ値が検出された場合
 	{
@@ -205,20 +203,33 @@ float getAngleSensor(void)
 		// 正規化
 		nsen1 = sen1 * invSum;
 		nsen2 = sen2 * invSum;
-		if (sensorValues[indexL] > sensorValues[indexR])
-		{
-			phi = atanf(nsen1 - nsen2); // 偏角φ計算
-		}
-		else
+		if (sensorValues[indexL] < sensorValues[indexR])
 		{
 			phi = atanf(nsen2 - nsen1); // 偏角φ計算
 		}
-		angleSensor = phi * thitaScale; // 微小角度dθ計算（定数計算を簡略化）
+		else
+		{
+			phi = atanf(nsen1 - nsen2); // 偏角φ計算
+		}
+		dthita = phi * thitaScale; // 微小角度dθ計算（定数計算を簡略化）
+		if(sensorValues[indexL] < sensorValues[indexR])
+		{
+			angleSensor = -(((4.0F - (float)indexL + 1) * thitaRad) + phi * thitaScale);
+		}
+		else
+		{
+			angleSensor = (((float)indexR - 5.0F + 1) * thitaRad) + phi * thitaScale;
+		}
+		// angleSensor = phi * thitaScale; // 微小角度dθ計算（定数計算を簡略化）
 
-		return angleSensor;
+	}
+	else
+	{
+		angleSensor = beforeAngle; // 端センサで検出されなかった場合は前回値を使用
 	}
 
 	beforeAngle = angleSensor;
+	return angleSensor;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 calibrationLinesensor

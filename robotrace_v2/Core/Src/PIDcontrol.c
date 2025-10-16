@@ -179,7 +179,7 @@ void motorControlTrace(void)
 	Dev = omega - BMI088val.gyro.z; // 目標値-現在値
 
 	// I成分積算
-	lineTraceCtrl.Int += (float)Dev * 0.002;
+	lineTraceCtrl.Int += (float)Dev * 0.001;
 	if (lineTraceCtrl.Int > 10000.0)
 		lineTraceCtrl.Int = 10000.0; // I成分リミット
 	else if (lineTraceCtrl.Int < -10000.0)
@@ -190,7 +190,7 @@ void motorControlTrace(void)
 	iI = (float)lineTraceCtrl.ki * lineTraceCtrl.Int; // 積分
 	iD = (float)lineTraceCtrl.kd * Dif;			   // 微分
 	iRet = (int32_t)(iP + iD);
-	iRet = iRet >> 4; // PWMを0～1000近傍に収める
+	iRet = iRet >> 5; // PWMを0～1000近傍に収める
 
 	lineTraceCtrl.pwm = (int16_t)iRet;
 	traceBefore = Dev; // 次回はこの値が1ms前の値となる
@@ -204,7 +204,7 @@ void motorControlTrace(void)
 void motorControlTraceSub(void)
 {
 	int32_t iP, iD, iRet, Dev, Dif;
-	static float speedEncoderBefore;
+	static int32_t speedEncoderBefore;
 
 	Dev = lineTraceCtrl.pwm - encCurrentN; // 偏差
 	Dif = Dev - speedEncoderBefore;		// 微分　dゲイン1/1000倍
@@ -212,7 +212,7 @@ void motorControlTraceSub(void)
 	iP = lineTraceCtrlSub.kp * Dev;		// 比例
 	iD = lineTraceCtrlSub.kd * Dif;		// 微分
 	iRet = iP + iD;
-	// iRet = iRet >> 10; // PWMを0～1000近傍に収める
+	iRet = iRet >> 2; // PWMを0～1000近傍に収める
 
 	// PWMの上限の設定
 	if (iRet > 900)

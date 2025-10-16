@@ -37,11 +37,11 @@ void Interrupt1ms(void)
 	encPulse5ms += encCurrentN; // 5ms間のエンコーダパルスを累積
 
 	// PID制御処理
-	if(cntPID++ >= 2)
-	{
+	// if(cntPID++ >= 2)
+	// {
 		motorControlTrace();
-		cntPID = 0;
-	}
+	// 	cntPID = 0;
+	// }
 	motorControlTraceSub();
 	motorControlSpeed();
 	motorControldist();

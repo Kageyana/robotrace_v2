@@ -564,7 +564,7 @@ void loopSystem(void)
 		{
 			setTargetSpeed(tgtParam.stop);
 		}
-		motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+		motorPwmOutSynth(lineTraceCtrlSub.pwm, veloCtrl.pwm, 0, 0);
 
 		if (encCurrentN == 0)
 		{
