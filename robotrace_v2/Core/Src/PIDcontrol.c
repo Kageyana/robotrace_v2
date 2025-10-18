@@ -179,12 +179,12 @@ void motorControlTrace(void)
 	Dev = omega - BMI088val.gyro.z; // 目標値-現在値
 
 	// I成分積算
-	lineTraceCtrl.Int += (float)Dev * 0.001;
+	lineTraceCtrl.Int += (float)Dev * 0.003;
 	if (lineTraceCtrl.Int > 10000.0)
 		lineTraceCtrl.Int = 10000.0; // I成分リミット
 	else if (lineTraceCtrl.Int < -10000.0)
 		lineTraceCtrl.Int = -10000.0;
-	Dif = Dev - traceBefore; // dゲイン1/500倍
+	Dif = Dev - traceBefore; // dゲイン1/200倍
 
 	iP = (float)lineTraceCtrl.kp * Dev;			   // 比例
 	iI = (float)lineTraceCtrl.ki * lineTraceCtrl.Int; // 積分
@@ -212,7 +212,7 @@ void motorControlTraceSub(void)
 	iP = lineTraceCtrlSub.kp * Dev;		// 比例
 	iD = lineTraceCtrlSub.kd * Dif;		// 微分
 	iRet = iP + iD;
-	iRet = iRet >> 2; // PWMを0～1000近傍に収める
+	iRet = iRet >> 4; // PWMを0～1000近傍に収める
 
 	// PWMの上限の設定
 	if (iRet > 900)

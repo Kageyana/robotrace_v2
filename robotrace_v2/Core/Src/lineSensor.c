@@ -20,6 +20,45 @@ uint16_t lSensorMax[NUM_SENSORS] = {0};	// 各センサの最大値
 uint16_t lSensorMin[NUM_SENSORS] = {[0 ... NUM_SENSORS - 1] = UINT16_MAX};	// 各センサの最小値
 uint8_t modeCalLinesensors = 0;
 /////////////////////////////////////////////////////////////////////
+// モジュール名 isCrossLinePattern
+// 処理概要  	クロスライン特有の明暗パターンを判定する
+// 引数     	sensorValues: 判定に使用するセンサ配列
+// 戻り値   	true:クロスライン false:通常ライン
+/////////////////////////////////////////////////////////////////////
+static bool isCrossLinePattern(const uint16_t *sensorValues)
+{
+	// 先頭・末尾センサの合計値が小さい場合は全体的な暗転とみなし、クロスラインを検出
+	const uint32_t edgeSum = (uint32_t)sensorValues[0] + (uint32_t)sensorValues[1] +
+	                         (uint32_t)sensorValues[NUM_SENSORS - 2] + (uint32_t)sensorValues[NUM_SENSORS - 1];
+	const uint32_t edgeThreshold = 4000U;
+
+	if (edgeSum < edgeThreshold)
+	{
+		return true;
+	}
+
+	const uint16_t crossThreshold = (uint16_t)(BASEVAL * 0.3f);
+	uint8_t activeCount = 0;
+	uint8_t firstIndex = NUM_SENSORS;
+	uint8_t lastIndex = 0;
+
+	// 低照度のセンサが一定数以上連続している場合はクロスライン通過と判断する
+	for (uint8_t i = 0; i < NUM_SENSORS; i++)
+	{
+		if (sensorValues[i] <= crossThreshold)
+		{
+			activeCount++;
+			if (firstIndex == NUM_SENSORS)
+			{
+				firstIndex = i;
+			}
+			lastIndex = i;
+		}
+	}
+
+	return (activeCount >= 5U) && ((lastIndex - firstIndex) >= (NUM_SENSORS / 2));
+}
+/////////////////////////////////////////////////////////////////////
 // モジュール名 powerLineSensors
 // 処理概要  	ラインセンサのON/OFF処理
 // 引数     	0:OFF 1:ON
@@ -112,6 +151,13 @@ float getAngleSensor(void)
 		sensorValues = lSensor;
 	}
 
+	// クロスライン通過中は直前角度を維持してステア角の乱れを防ぐ
+	if (isCrossLinePattern(sensorValues))
+	{
+		angleSensor = beforeAngle;
+		return angleSensor;
+	}
+
 	index = NUM_SENSORS; // 最小値探索用インデックス初期化
 	indexL = NUM_SENSORS/2 - 1;	// 左側の最小値インデックス初期化
 	indexR = NUM_SENSORS/2; 	// 右側の最小値インデックス初期化
@@ -161,7 +207,8 @@ float getAngleSensor(void)
 		uint32_t sum = (uint32_t)sen1 + (uint32_t)sen2; // 隣接値合計を32bitで確保し加算回数を削減
 		if (sum == 0U)
 		{
-			return; // 分母ゼロ時は計算を行わない
+			angleSensor = beforeAngle;
+			return angleSensor; // ゼロ割防止として直前角度を保持
 		}
 		float invSum = 1.0f / (float)sum; // 逆数を保持して除算回数を削減
 		// 正規化
@@ -189,15 +236,16 @@ float getAngleSensor(void)
 		// angleSensor = angleSensor * degPerRad; // 弧度法に変換
 
 	}
-	else if(index == NUM_SENSORS) // 両端センサで同じ値が検出された場合
+	else if(index == NUM_SENSORS)
 	{
-		// 両端での配列アクセスを避ける
+		// センター付近で同じ値が検出された場合
 		sen1 = sensorValues[indexL];
 		sen2 = sensorValues[indexR];
 		uint32_t sum = (uint32_t)sen1 + (uint32_t)sen2; // 隣接値合計を32bitで確保し加算回数を削減
 		if (sum == 0U)
 		{
-			return; // 分母ゼロ時は計算を行わない
+			angleSensor = beforeAngle;
+			return angleSensor; // ゼロ割防止として直前角度を保持
 		}
 		float invSum = 1.0f / (float)sum; // 逆数を保持して除算回数を削減
 		// 正規化
@@ -214,11 +262,11 @@ float getAngleSensor(void)
 		dthita = phi * thitaScale; // 微小角度dθ計算（定数計算を簡略化）
 		if(sensorValues[indexL] < sensorValues[indexR])
 		{
-			angleSensor = -(((4.0F - (float)indexL + 1) * thitaRad) + phi * thitaScale);
+			angleSensor = -dthita;
 		}
 		else
 		{
-			angleSensor = (((float)indexR - 5.0F + 1) * thitaRad) + phi * thitaScale;
+			angleSensor = dthita;
 		}
 		// angleSensor = phi * thitaScale; // 微小角度dθ計算（定数計算を簡略化）
 
