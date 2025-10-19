@@ -313,28 +313,35 @@ int16_t readLogDistance(int logNumber)
 
 			// numDを件数として扱うため、以下のループでも境界外アクセスは発生しない
 
-			// 加速 インデックス2から開始
-			for (i = 2; i < numD; i++)
+			// 加速インデックス1から末尾まで平滑化
+			for (int32_t idx = 1; idx < numD; idx++)
 			{
-				dv = (PPAD[i].boostSpeed - PPAD[i - 1].boostSpeed);	// 区間速度
+				dv = (PPAD[idx].boostSpeed - PPAD[idx - 1].boostSpeed);	// 区間速度差
+				if (fabsf(dv) < 1e-6f)
+				{
+					continue;	// 速度差が極小なら補正不要
+				}
 				elapsedTime = fabs(dl / dv);		// 区間時間
-				acceleration = dv / elapsedTime;	// 加速度
+				acceleration = dv / elapsedTime;	// 実測加速度
 				if (acceleration > MACHINEACCELE)
 				{
-					// 加速度が大きすぎる場合は補正	
-					PPAD[i].boostSpeed = PPAD[i - 1].boostSpeed + (MACHINEACCELE * dl);
+					PPAD[idx].boostSpeed = PPAD[idx - 1].boostSpeed + (MACHINEACCELE * dl);
 				}
 			}
 
-			// 減速 インデックス末尾から開始
-			for (i = numD - 2; i >= 1; i--)
+			// 減速インデックス末尾から先頭まで平滑化
+			for (int32_t idx = numD - 2; idx >= 0; idx--)
 			{
-				dv = (PPAD[i].boostSpeed - PPAD[i + 1].boostSpeed);
+				dv = (PPAD[idx].boostSpeed - PPAD[idx + 1].boostSpeed);	// 区間速度差
+				if (fabsf(dv) < 1e-6f)
+				{
+					continue;	// 速度差が極小なら補正不要
+				}
 				elapsedTime = fabs(dl / dv);
 				acceleration = dv / elapsedTime;
 				if (acceleration > MACHINEDECREACE)
 				{
-					PPAD[i].boostSpeed = PPAD[i + 1].boostSpeed + (MACHINEDECREACE * dl);
+					PPAD[idx].boostSpeed = PPAD[idx + 1].boostSpeed + (MACHINEDECREACE * dl);
 				}
 			}
 
