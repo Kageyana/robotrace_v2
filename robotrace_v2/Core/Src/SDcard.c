@@ -169,7 +169,6 @@ void createLog(void)
 	setLogStr("ROC", "%f");
 
 	setLogStr("targetSpeed", "%d");
-	setLogStr("modeCurve", "%d");
 	setLogStr("optimalIndex", "%d");
 	// setLogStr("motorpwmL", "%d");
 	// setLogStr("motorpwmR", "%d");
@@ -177,6 +176,7 @@ void createLog(void)
 	// setLogStr("CurrentR", "%f");
 	setLogStr("lineTraceCtrl", "%d");
 	setLogStr("lineTraceCtrlSub", "%d");
+	setLogStr("veloCtrl", "%d");
 	setLogStr("angleSensor", "%f");
 
 	setLogStr("x", "%f");
@@ -537,12 +537,11 @@ void endLog(void)
 			marker,
 			distance,
 			logvalf[2],		// ROC
-
 			logval8[0],		// targetSpeed
-			logval8[2],		// modeCurve
 			logval16[2],	// optimalIndex
 			(int16_t)logval16[3],	// lineTraceCtrl
 			(int16_t)logval16[4],	// lineTraceCtrlSub
+			(int16_t)logval16[5],	// veloCtrl
 			// (int16_t)logval16[3],		// motorpwmL
 			// (int16_t)logval16[4],		// motorpwmR
 			// (float)logval16[5] / 10000,	// CurrentL

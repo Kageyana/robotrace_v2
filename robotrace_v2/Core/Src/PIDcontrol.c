@@ -262,10 +262,10 @@ void motorControlSpeed(void)
 	iRet = iRet;
 
 	// PWMの上限の設定
-	if (iRet > 900)
-		iRet = 900;
-	if (iRet < -900)
-		iRet = -900;
+	if (iRet > 1000)
+		iRet = 1000;
+	if (iRet < -1000)
+		iRet = -1000;
 
 	veloCtrl.pwm = iRet;
 	speedEncoderBefore = Dev;		      // 次回はこの値が1ms前の値となる

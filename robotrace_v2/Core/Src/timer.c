@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "timer.h"
+#include "PIDcontrol.h"
 #define STRAIGHT_STATE_THRESHOLD_MM	70	// 直線判定の距離閾値[mm]
 //====================================//
 // グローバル変数の宣
@@ -113,13 +114,13 @@ void Interrupt1ms(void)
 					// 8bit
 					targetSpeed,
 					courseMarkerLog,
-					straightState,
 					// 16bit
 					cntRun,
 					encCurrentN,
 					optimalIndex,
 					lineTraceCtrl.pwm,
 					lineTraceCtrlSub.pwm,
+					veloCtrl.pwm,
 					// motorpwmL,
 					// motorpwmR,
 					// (int16_t)(motorCurrentL * 10000),
