@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "control.h"
+#include "courseAnalysis.h"
 #include "fatfs.h"
 #include "battery.h"
 //====================================//
@@ -432,7 +433,15 @@ void loopSystem(void)
 
 	case 11:
 		// スタートマーカー通過までの走行
-		setTargetSpeed(tgtParam.straight); // 目標速度
+		if(optimalTrace == BOOST_DISTANCE)
+		{
+			setTargetSpeed(PPAD[0].boostSpeed/2); // 目標速度
+		}
+		else
+		{
+			setTargetSpeed(tgtParam.straight); // 目標速度
+		}
+		
 		// ライントレース
 		motorPwmOutSynth(lineTraceCtrlSub.pwm, veloCtrl.pwm, 0, 0);
 

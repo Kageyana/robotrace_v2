@@ -179,7 +179,7 @@ void motorControlTrace(void)
 	Dev = omega - BMI088val.gyro.z; // 目標値-現在値
 
 	// I成分積算
-	lineTraceCtrl.Int += (float)Dev * 0.003;
+	lineTraceCtrl.Int += (float)Dev * 0.001;
 	if (lineTraceCtrl.Int > 10000.0)
 		lineTraceCtrl.Int = 10000.0; // I成分リミット
 	else if (lineTraceCtrl.Int < -10000.0)
@@ -215,10 +215,10 @@ void motorControlTraceSub(void)
 	iRet = iRet >> 4; // PWMを0～1000近傍に収める
 
 	// PWMの上限の設定
-	if (iRet > 900)
-		iRet = 900;
-	if (iRet < -900)
-		iRet = -900;
+	if (iRet > 1000)
+		iRet = 1000;
+	if (iRet < -1000)
+		iRet = -1000;
 
 	lineTraceCtrlSub.pwm = (int16_t)iRet;
 
