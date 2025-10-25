@@ -3,13 +3,15 @@
 //====================================//
 #include "lineSensor.h"
 #include "fatfs.h"
+#include <stdbool.h>
+#include <stdint.h>
 //====================================//
 // グローバル変数の宣言
 //====================================//
 
 // ラインセンサ関連
 uint32_t lSensorInt[NUM_SENSORS] = {0};	 // ラインセンサの立ち上がりエッジAD値積算用
-uint16_t lSensor[NUM_SENSORS] = {0};	 // ラインセンサの平均AD値
+int16_t lSensor[NUM_SENSORS] = {0};	 // ラインセンサの平均AD値
 uint16_t lSensorCari[NUM_SENSORS] = {0}; // 正規化したラインセンサのAD値
 bool lineSensorState = false;			 // true:ラインセンサ点灯 false:ラインセンサ消灯
 // 仮想センサステア関連
@@ -68,12 +70,10 @@ void powerLineSensors(uint8_t onoff)
 {
 	if (onoff == 0)
 	{
-		lineSensorState = false;
 		__HAL_TIM_SET_COMPARE(&LS_TIMER, LS_CHANNEL, 0);
 	}
 	else if (onoff == 1)
 	{
-		lineSensorState = true;
 		__HAL_TIM_SET_COMPARE(&LS_TIMER, LS_CHANNEL, LS_COUNTERPERIOD);
 	}
 }
@@ -86,44 +86,89 @@ void powerLineSensors(uint8_t onoff)
 void getLineSensor(void)
 {
 	uint8_t i;
-	uint16_t s;
-	uint32_t ii;
-	static uint16_t cntls = 0; // ラインセンサの立ち上がりエッジ積算回数カウント用
+	static uint16_t cntls=0,cntlson=0,cntlsoff=0; // ラインセンサの立ち上がりエッジ積算回数カウント用
+	static uint32_t lSensorOnInt[NUM_SENSORS] = {0};	 // ラインセンサの立ち上がりエッジAD値積算用
+	static uint32_t lSensorOffInt[NUM_SENSORS] = {0};	 // ラインセンサの立ち下がりエッジAD値積算用
+	static uint32_t lSensorOn[NUM_SENSORS] = {0};	 // ラインセンサの立ち上がりエッジAD値保存用
+	static uint32_t lSensorOff[NUM_SENSORS] = {0};	 // ラインセンサの立ち下がりエッジAD値保存用
 
 	cntls++;
+
 	for (i = 0; i < NUM_SENSORS; i++)
 	{
-		lSensorInt[i] += analogVal1[i];
-		if (cntls > 16)
+		if(lineSensorState == true)
 		{
-			lSensor[i] = lSensorInt[i] >> 4; // 平均値算出
-			lSensorInt[i] = 0;				 // 積算値リセット
-			// 最大値・最小値を更新
-			if (modeCalLinesensors == 1)
+			cntlson++;
+			lSensorOnInt[i] += analogValLSon[i];
+			if(cntlson >= 16)
 			{
-				if (lSensor[i] > lSensorMax[i])
-				{
-					lSensorMax[i] = lSensor[i];	// 最大値更新
-				}
-				if (lSensor[i] < lSensorMin[i])
-				{
-					lSensorMin[i] = lSensor[i];	// 最小値更新
-				}
-			}
-			// 正規化計算
-			uint16_t range = lSensorMax[i] - lSensorMin[i];
-			if (range != 0)
-			{
-				lSensorCari[i] = (uint16_t)((lSensor[i] - lSensorMin[i]) * BASEVAL / range);
-			}
-			else
-			{
-				lSensorCari[i] = 0;	// 分母ゼロ対策
+				cntlson = 0;
+				lSensorOn[i] = lSensorOnInt[i] >> 4; // 平均値算出
+				lSensorOnInt[i] = 0;				 // 積算値リセット
 			}
 		}
+		
+		if(lineSensorState == false)
+		{
+			cntlsoff++;
+			lSensorOffInt[i] += analogValLSoff[i];
+			if(cntlsoff >= 16)
+			{
+				cntlsoff = 0;
+				lSensorOff[i] = lSensorOffInt[i] >> 4; // 平均値算出
+				lSensorOffInt[i] = 0;				 // 積算値リセット
+			}
+		}
+
+		lSensor[i] = lSensorOff[i] - lSensorOn[i];
+
+		// // ラインセンサ値は点灯時と消灯時の差分を使用する
+		// if (lSensorOff[i] > lSensorOn[i])
+		// {
+		// 	lSensor[i] = lSensorOff[i] - lSensorOn[i];
+		// }
+		// else
+		// {
+		// 	lSensor[i] = 0;
+		// }
+		
+	// 	if (cntls > 32)
+	// 	{
+	// 		// ラインセンサ値は点灯時と消灯時の差分を使用する
+	// 		if (lSensorOn[i] > lSensorOff[i])
+	// 		{
+	// 			lSensor[i] = lSensorOn[i] - lSensorOff[i];
+	// 		}
+	// 		else
+	// 		{
+	// 			lSensor[i] = 0;
+	// 		}
+
+	// 		// // 最大値・最小値を更新
+	// 		// if (modeCalLinesensors == 1)
+	// 		// {
+	// 		// 	if (lSensor[i] > lSensorMax[i])
+	// 		// 	{
+	// 		// 		lSensorMax[i] = lSensor[i];	// 最大値更新
+	// 		// 	}
+	// 		// 	if (lSensor[i] < lSensorMin[i])
+	// 		// 	{
+	// 		// 		lSensorMin[i] = lSensor[i];	// 最小値更新
+	// 		// 	}
+	// 		// }
+	// 		// // 正規化計算
+	// 		// uint16_t range = lSensorMax[i] - lSensorMin[i];
+	// 		// if (range != 0)
+	// 		// {
+	// 		// 	lSensorCari[i] = (uint16_t)((lSensor[i] - lSensorMin[i]) * BASEVAL / range);
+	// 		// }
+	// 		// else
+	// 		// {
+	// 		// 	lSensorCari[i] = 0;	// 分母ゼロ対策
+	// 		// }
+			// cntls = 0;
+	// 	}
 	}
-	if (cntls > 16)
-		cntls = 0;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getAngleSensor

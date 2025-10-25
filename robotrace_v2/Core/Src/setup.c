@@ -399,26 +399,26 @@ static void test_linesensor(void)
 	}
 
 	ssd1306_SetCursor(37, 22);
-	ssd1306_printf(Font_6x8, "%4d", lSensorCari[4]);
+	ssd1306_printf(Font_6x8, "%4d", lSensor[4]);
 	ssd1306_SetCursor(31, 30);
-	ssd1306_printf(Font_6x8, "%4d", lSensorCari[3]);
+	ssd1306_printf(Font_6x8, "%4d", lSensor[3]);
 	ssd1306_SetCursor(22, 38);
-	ssd1306_printf(Font_6x8, "%4d", lSensorCari[2]);
+	ssd1306_printf(Font_6x8, "%4d", lSensor[2]);
 	ssd1306_SetCursor(13, 46);
-	ssd1306_printf(Font_6x8, "%4d", lSensorCari[1]);
+	ssd1306_printf(Font_6x8, "%4d", lSensor[1]);
 	ssd1306_SetCursor(6, 54);
-	ssd1306_printf(Font_6x8, "%4d", lSensorCari[0]);
+	ssd1306_printf(Font_6x8, "%4d", lSensor[0]);
 
 	ssd1306_SetCursor(65, 22);
-	ssd1306_printf(Font_6x8, "%4d", lSensorCari[5]);
+	ssd1306_printf(Font_6x8, "%4d", lSensor[5]);
 	ssd1306_SetCursor(71, 30);
-	ssd1306_printf(Font_6x8, "%4d", lSensorCari[6]);
+	ssd1306_printf(Font_6x8, "%4d", lSensor[6]);
 	ssd1306_SetCursor(80, 38);
-	ssd1306_printf(Font_6x8, "%4d", lSensorCari[7]);
+	ssd1306_printf(Font_6x8, "%4d", lSensor[7]);
 	ssd1306_SetCursor(89, 46);
-	ssd1306_printf(Font_6x8, "%4d", lSensorCari[8]);
+	ssd1306_printf(Font_6x8, "%4d", lSensor[8]);
 	ssd1306_SetCursor(95, 54);
-	ssd1306_printf(Font_6x8, "%4d", lSensorCari[9]);
+	ssd1306_printf(Font_6x8, "%4d", lSensor[9]);
 
 	ssd1306_SetCursor(43, 54);
 	ssd1306_printf(Font_7x10, "%5.1f", angleSensor * 180.0F / (float)M_PI);

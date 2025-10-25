@@ -12,7 +12,7 @@
 #define THITA_SENSOR 10.15F // ラインセンサの間隔(角度)
 #define LENGTHSENSORBAR 0.04F // ラインセンサ円弧中心からトレッド軸までの長さ[m]
 #define BASEVAL 4095.0F
-#define LS_COUNTERPERIOD htim3.Init.Period * 0.8
+#define LS_COUNTERPERIOD htim3.Init.Period * 0.5
 #define LS_TIMER htim3
 #define LS_CHANNEL TIM_CHANNEL_3
 
@@ -21,7 +21,7 @@
 //====================================//
 // グローバル変数の宣言
 //====================================//
-extern uint16_t lSensor[NUM_SENSORS];
+extern int16_t lSensor[NUM_SENSORS];
 extern float angleSensor;
 extern bool lineSensorState;
 

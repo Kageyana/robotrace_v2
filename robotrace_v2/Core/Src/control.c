@@ -21,7 +21,8 @@ uint8_t modeCurve = 0;		// カーブ判断			0:直線			1:カーブ進入
 uint8_t autoStart = 0;		// 5走を自動で開始する
 int16_t autoStartAnalize = 0; // 自動走行で使用するログの解析番号
 
-uint16_t analogVal1[NUM_SENSORS]; // ADC結果格納配列
+uint16_t analogValLSon[NUM_SENSORS]; // ADC結果格納配列
+uint16_t analogValLSoff[NUM_SENSORS]; // ADC結果格納配列
 uint16_t analogVal2[4];			  // ADC結果格納配列
 float batteryVoltage_V = 0.0f;	// DWT初期化後に取得したバッテリ電圧[V]を保持
 
@@ -74,7 +75,7 @@ void initSystem(void)
 	if(!softreset)
 	{
 		// ADC
-		resultHAL[0] = HAL_ADC_Start_DMA(&hadc1, analogVal1, NUM_SENSORS);
+		// resultHAL[0] = HAL_ADC_Start_DMA(&hadc1, analogVal1, NUM_SENSORS);
 		resultHAL[1] = HAL_ADC_Start_DMA(&hadc2, analogVal2, 4);
 
 		// Encoder count
@@ -90,6 +91,7 @@ void initSystem(void)
 		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_R, 0);
 		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_SUCTION_TIM_CH, 0);
 		// line sensor PWM
+		HAL_TIM_Base_Start_IT(&htim3);
 		resultHAL[7] = HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_3);
 	}
 	motorPwmOut(0, 0);
