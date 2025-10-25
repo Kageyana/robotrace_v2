@@ -230,8 +230,7 @@ static void MX_ADC1_Init(void)
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
   hadc1.Init.ScanConvMode = ENABLE;
   hadc1.Init.ContinuousConvMode = DISABLE;
-  hadc1.Init.DiscontinuousConvMode = ENABLE;
-  hadc1.Init.NbrOfDiscConversion = 1;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
@@ -1065,9 +1064,14 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 		datasentflag = false;
 	}
 	if(htim->Instance==TIM3 && htim->Channel==HAL_TIM_ACTIVE_CHANNEL_3){
-		// LED OFF
-		lineSensorState = true;
-		HAL_ADC_Start_DMA(&hadc1, (uint32_t*)analogValLSon, NUM_SENSORS);
+		// LED just turned off: sample ambient component
+		if ((hadc1.State & HAL_ADC_STATE_BUSY_REG) == 0U)
+		{
+			if (HAL_ADC_Start_DMA(&hadc1, (uint32_t*)analogValLSoff, NUM_SENSORS) == HAL_OK)
+			{
+				lineSensorState = false;
+			}
+		}
 
 	}
 }
@@ -1078,9 +1082,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 	if(htim->Instance==TIM3)
 	{
-		// LED ON
-		lineSensorState = false;
-		HAL_ADC_Start_DMA(&hadc1, (uint32_t*)analogValLSoff, NUM_SENSORS);
+		// LED turned on: capture reflected light
+		if ((hadc1.State & HAL_ADC_STATE_BUSY_REG) == 0U)
+		{
+			if (HAL_ADC_Start_DMA(&hadc1, (uint32_t*)analogValLSon, NUM_SENSORS) == HAL_OK)
+			{
+				lineSensorState = true;
+			}
+		}
   	}
 	if (htim->Instance == TIM6)
 	{

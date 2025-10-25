@@ -5,6 +5,8 @@
 #include "fatfs.h"
 #include <stdbool.h>
 #include <stdint.h>
+
+#define LS_AVERAGE_SAMPLES 16U
 //====================================//
 // グローバル変数の宣言
 //====================================//
@@ -85,91 +87,41 @@ void powerLineSensors(uint8_t onoff)
 /////////////////////////////////////////////////////////////////////
 void getLineSensor(void)
 {
-	uint8_t i;
-	static uint16_t cntls=0,cntlson=0,cntlsoff=0; // ラインセンサの立ち上がりエッジ積算回数カウント用
-	static uint32_t lSensorOnInt[NUM_SENSORS] = {0};	 // ラインセンサの立ち上がりエッジAD値積算用
-	static uint32_t lSensorOffInt[NUM_SENSORS] = {0};	 // ラインセンサの立ち下がりエッジAD値積算用
-	static uint32_t lSensorOn[NUM_SENSORS] = {0};	 // ラインセンサの立ち上がりエッジAD値保存用
-	static uint32_t lSensorOff[NUM_SENSORS] = {0};	 // ラインセンサの立ち下がりエッジAD値保存用
+	static uint32_t accum[2][NUM_SENSORS] = {{0}};
+	static uint32_t average[2][NUM_SENSORS] = {{0}};
+	static uint16_t sampleCount[2] = {0};
+	static uint8_t readyMask = 0;
+	const uint8_t phase = lineSensorState ? 1U : 0U; // 1: LED on, 0: LED off
+	uint32_t *acc = accum[phase];
+	const uint16_t *sample = (phase == 1U) ? analogValLSon : analogValLSoff;
 
-	cntls++;
-
-	for (i = 0; i < NUM_SENSORS; i++)
+	for (uint8_t i = 0; i < NUM_SENSORS; i++)
 	{
-		if(lineSensorState == true)
+		acc[i] += sample[i];
+	}
+
+	if (++sampleCount[phase] >= LS_AVERAGE_SAMPLES)
+	{
+		for (uint8_t i = 0; i < NUM_SENSORS; i++)
 		{
-			cntlson++;
-			lSensorOnInt[i] += analogValLSon[i];
-			if(cntlson >= 16)
-			{
-				cntlson = 0;
-				lSensorOn[i] = lSensorOnInt[i] >> 4; // 平均値算出
-				lSensorOnInt[i] = 0;				 // 積算値リセット
-			}
+			average[phase][i] = acc[i] / LS_AVERAGE_SAMPLES;
+			acc[i] = 0;
 		}
-		
-		if(lineSensorState == false)
+		sampleCount[phase] = 0;
+		readyMask |= (1U << phase);
+	}
+
+	if (readyMask == 0x03U)
+	{
+		for (uint8_t i = 0; i < NUM_SENSORS; i++)
 		{
-			cntlsoff++;
-			lSensorOffInt[i] += analogValLSoff[i];
-			if(cntlsoff >= 16)
-			{
-				cntlsoff = 0;
-				lSensorOff[i] = lSensorOffInt[i] >> 4; // 平均値算出
-				lSensorOffInt[i] = 0;				 // 積算値リセット
-			}
+			int32_t diff = (int32_t)average[0][i] - (int32_t)average[1][i];
+			lSensor[i] = (diff > 0) ? (int16_t)diff : 0;
 		}
-
-		lSensor[i] = lSensorOff[i] - lSensorOn[i];
-
-		// // ラインセンサ値は点灯時と消灯時の差分を使用する
-		// if (lSensorOff[i] > lSensorOn[i])
-		// {
-		// 	lSensor[i] = lSensorOff[i] - lSensorOn[i];
-		// }
-		// else
-		// {
-		// 	lSensor[i] = 0;
-		// }
-		
-	// 	if (cntls > 32)
-	// 	{
-	// 		// ラインセンサ値は点灯時と消灯時の差分を使用する
-	// 		if (lSensorOn[i] > lSensorOff[i])
-	// 		{
-	// 			lSensor[i] = lSensorOn[i] - lSensorOff[i];
-	// 		}
-	// 		else
-	// 		{
-	// 			lSensor[i] = 0;
-	// 		}
-
-	// 		// // 最大値・最小値を更新
-	// 		// if (modeCalLinesensors == 1)
-	// 		// {
-	// 		// 	if (lSensor[i] > lSensorMax[i])
-	// 		// 	{
-	// 		// 		lSensorMax[i] = lSensor[i];	// 最大値更新
-	// 		// 	}
-	// 		// 	if (lSensor[i] < lSensorMin[i])
-	// 		// 	{
-	// 		// 		lSensorMin[i] = lSensor[i];	// 最小値更新
-	// 		// 	}
-	// 		// }
-	// 		// // 正規化計算
-	// 		// uint16_t range = lSensorMax[i] - lSensorMin[i];
-	// 		// if (range != 0)
-	// 		// {
-	// 		// 	lSensorCari[i] = (uint16_t)((lSensor[i] - lSensorMin[i]) * BASEVAL / range);
-	// 		// }
-	// 		// else
-	// 		// {
-	// 		// 	lSensorCari[i] = 0;	// 分母ゼロ対策
-	// 		// }
-			// cntls = 0;
-	// 	}
+		readyMask = 0;
 	}
 }
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getAngleSensor
 // 処理概要  	ラインセンサのAD値からステア角を算出する
