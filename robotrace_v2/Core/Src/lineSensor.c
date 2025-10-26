@@ -108,6 +108,7 @@ void delayLineSensorConversionStart(uint32_t us)
 /////////////////////////////////////////////////////////////////////
 void getLineSensor(void)
 {
+	// LED点灯／消灯それぞれの平均を取るためのワークバッファ
 	static uint32_t accum[2][NUM_SENSORS] = {{0}};
 	static uint32_t average[2][NUM_SENSORS] = {{0}};
 	static uint16_t sampleCount[2] = {0};
@@ -116,11 +117,13 @@ void getLineSensor(void)
 	uint32_t *acc = accum[phase];
 	const uint16_t *sample = (phase == 1U) ? analogValLSon : analogValLSoff;
 
+	// 取得したADC値を位相ごとに積算
 	for (uint8_t i = 0; i < NUM_SENSORS; i++)
 	{
 		acc[i] += sample[i];
 	}
 
+	// 所定回数サンプリングしたら平均値に反映
 	if (++sampleCount[phase] >= LS_AVERAGE_SAMPLES)
 	{
 		for (uint8_t i = 0; i < NUM_SENSORS; i++)
@@ -132,6 +135,7 @@ void getLineSensor(void)
 		readyMask |= (1U << phase);
 	}
 
+	// LED点灯／消灯の両方が揃ったら差分を計算
 	if (readyMask == 0x03U)
 	{
 		for (uint8_t i = 0; i < NUM_SENSORS; i++)
@@ -140,9 +144,9 @@ void getLineSensor(void)
 			lSensor[i] = (diff > 0) ? (int16_t)diff : 0;
 		}
 		readyMask = 0;
+		calibrationLinesensor(); // 最新のライン値でキャリブレーション／正規化を更新
 	}
 }
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getAngleSensor
 // 処理概要  	ラインセンサのAD値からステア角を算出する
@@ -305,16 +309,44 @@ float getAngleSensor(void)
 /////////////////////////////////////////////////////////////////////
 void calibrationLinesensor(void)
 {
-	uint8_t i;
-	for (i = 0; i < NUM_SENSORS; i++)
+	const uint32_t baseVal = (uint32_t)BASEVAL;
+
+	for (uint8_t i = 0; i < NUM_SENSORS; i++)
 	{
-		if (lSensor[i] > lSensorMax[i])
+		uint16_t current = (lSensor[i] > 0) ? (uint16_t)lSensor[i] : 0U;
+
+		if (modeCalLinesensors)
 		{
-			lSensorMax[i] = lSensor[i];	// 最大値更新
+			if (current > lSensorMax[i])
+			{
+				lSensorMax[i] = current; // 最大値更新
+			}
+			if (current < lSensorMin[i])
+			{
+				lSensorMin[i] = current; // 最小値更新
+			}
 		}
-		if (lSensor[i] < lSensorMin[i])
+
+		uint16_t minVal = lSensorMin[i];
+		uint16_t maxVal = lSensorMax[i];
+
+		if (maxVal > minVal)
 		{
-			lSensorMin[i] = lSensor[i];	// 最小値更新
+			uint32_t span = (uint32_t)maxVal - (uint32_t)minVal;
+			uint32_t offset = (current > minVal) ? (uint32_t)(current - minVal) : 0U;
+
+			if (offset >= span)
+			{
+				lSensorCari[i] = (uint16_t)baseVal;
+			}
+			else
+			{
+				lSensorCari[i] = (uint16_t)((offset * baseVal + (span / 2U)) / span);
+			}
+		}
+		else
+		{
+			lSensorCari[i] = current;
 		}
 	}
 }
