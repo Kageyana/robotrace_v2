@@ -34,6 +34,7 @@ extern uint8_t modeCalLinesensors;
 // プロトタイプ宣言
 //====================================//
 void powerLineSensors(uint8_t onoff);
+void delayLineSensorConversionStart(uint32_t us);
 void getLineSensor(void);
 float getAngleSensor(void);
 void calibrationLinesensor(void);

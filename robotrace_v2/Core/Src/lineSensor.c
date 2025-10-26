@@ -79,6 +79,27 @@ void powerLineSensors(uint8_t onoff)
 		__HAL_TIM_SET_COMPARE(&LS_TIMER, LS_CHANNEL, LS_COUNTERPERIOD);
 	}
 }
+//////////////////////////////////////////////////////////////////////
+// モジュール名 arm_cc1_after_us
+// 処理概要  	TIM3のCC1割り込みを指定したus後に発生させる（ワンショット）
+// 引数     	us: 割り込み発生までの時間[us]
+// 戻り値    	なし
+//////////////////////////////////////////////////////////////////////
+void delayLineSensorConversionStart(uint32_t us)
+{
+	// 指定したus後にTIM3のCC1割り込みが発生するようにセット（ワンショット）
+    // 安全マージン（レース回避で最低+10tick）
+    if(us < 10) us = 10; // レース回避
+    uint32_t arr = __HAL_TIM_GET_AUTORELOAD(&htim3);
+    uint32_t now = __HAL_TIM_GET_COUNTER(&htim3);
+    uint32_t tgt = now + us; if(tgt > arr) tgt -= (arr+1);
+
+    __HAL_TIM_DISABLE_IT(&htim3, TIM_IT_CC1);				// 念のため無効化
+    __HAL_TIM_DISABLE_OCxPRELOAD(&htim3, TIM_CHANNEL_1);	// OC1PE=0を保証
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, tgt);		// 即反映
+    __HAL_TIM_CLEAR_IT(&htim3, TIM_IT_CC1);					// 念のためクリア	
+    __HAL_TIM_ENABLE_IT(&htim3, TIM_IT_CC1);				// 有効化
+}
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getLineSensor
 // 処理概要  	ラインセンサのAD値を取得し、平均値を計算する

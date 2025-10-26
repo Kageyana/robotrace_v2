@@ -246,7 +246,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_1;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_15CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -670,9 +670,13 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 11;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 374;
+  htim3.Init.Period = 1199;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_OC_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
   if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
   {
     Error_Handler();
@@ -683,10 +687,15 @@ static void MX_TIM3_Init(void)
   {
     Error_Handler();
   }
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.OCMode = TIM_OCMODE_TIMING;
   sConfigOC.Pulse = 0;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_OC_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
   if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
   {
     Error_Handler();
@@ -1044,6 +1053,21 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+// static inline void arm_cc1_after_us(uint32_t us){
+// 	// 指定したus後にTIM3のCC1割り込みが発生するようにセット（ワンショット）
+//     // 安全マージン（レース回避で最低+10tick）
+//     if(us < 10) us = 10; // レース回避
+//     uint32_t arr = __HAL_TIM_GET_AUTORELOAD(&htim3);
+//     uint32_t now = __HAL_TIM_GET_COUNTER(&htim3);
+//     uint32_t tgt = now + us; if(tgt > arr) tgt -= (arr+1);
+
+//     __HAL_TIM_DISABLE_IT(&htim3, TIM_IT_CC1);				// 念のため無効化
+//     __HAL_TIM_DISABLE_OCxPRELOAD(&htim3, TIM_CHANNEL_1);	// OC1PE=0を保証
+//     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, tgt);		// 即反映
+//     __HAL_TIM_CLEAR_IT(&htim3, TIM_IT_CC1);					// 念のためクリア	
+//     __HAL_TIM_ENABLE_IT(&htim3, TIM_IT_CC1);				// 有効化
+// }
+
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *AdcHandle)
 {
 	if (AdcHandle->Instance == ADC1)
@@ -1064,13 +1088,11 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 		datasentflag = false;
 	}
 	if(htim->Instance==TIM3 && htim->Channel==HAL_TIM_ACTIVE_CHANNEL_3){
-		// LED just turned off: sample ambient component
+		// LED消灯
 		if ((hadc1.State & HAL_ADC_STATE_BUSY_REG) == 0U)
 		{
-			if (HAL_ADC_Start_DMA(&hadc1, (uint32_t*)analogValLSoff, NUM_SENSORS) == HAL_OK)
-			{
-				lineSensorState = false;
-			}
+			lineSensorState = false;
+			delayLineSensorConversionStart(200);
 		}
 
 	}
@@ -1078,17 +1100,15 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	// タイマ割り込み処理 コンペアマッチイベント
+	// タイマ割り込み処理 更新イベント
 
 	if(htim->Instance==TIM3)
 	{
-		// LED turned on: capture reflected light
+		// LED点灯
 		if ((hadc1.State & HAL_ADC_STATE_BUSY_REG) == 0U)
 		{
-			if (HAL_ADC_Start_DMA(&hadc1, (uint32_t*)analogValLSon, NUM_SENSORS) == HAL_OK)
-			{
-				lineSensorState = true;
-			}
+			lineSensorState = true;
+			delayLineSensorConversionStart(200);
 		}
   	}
 	if (htim->Instance == TIM6)
@@ -1100,6 +1120,27 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		Interrupt100us();
 	}
 	
+}
+
+void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
+	// タイマ割り込み処理 比較一致イベント
+    if(htim->Instance==TIM3 && htim->Channel==HAL_TIM_ACTIVE_CHANNEL_1){
+		__HAL_TIM_DISABLE_IT(&htim3, TIM_IT_CC1);  // ワンショット完了
+		// ラインセンサのADC変換開始
+		if(lineSensorState){
+			// LED ON時：反射光の取得
+			if (HAL_ADC_Start_DMA(&hadc1, (uint32_t*)analogValLSon, NUM_SENSORS) != HAL_OK)
+			{
+				Error_Handler();
+			}
+		}else{
+			// LED OFF時：環境光の取得
+			if (HAL_ADC_Start_DMA(&hadc1, (uint32_t*)analogValLSoff, NUM_SENSORS) != HAL_OK)
+			{
+				Error_Handler();
+			}
+		}
+    }
 }
 
 /* I2Cメモリ転送完了割り込み */
