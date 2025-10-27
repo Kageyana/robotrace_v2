@@ -430,7 +430,14 @@ void loopSystem(void)
 
 	case 11:
 		// スタートマーカー通過までの走行
-		setTargetSpeed(tgtParam.straight); // 目標速度
+		if(optimalTrace == BOOST_DISTANCE)
+		{
+			setTargetSpeed(PPAD[0].boostSpeed/2); // 目標速度
+		}
+		else
+		{
+			setTargetSpeed(tgtParam.straight); // 目標速度
+		}
 		// ライントレース
 		motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 
@@ -480,33 +487,43 @@ void loopSystem(void)
 		}
 		else if (optimalTrace == BOOST_DISTANCE)
 		{
-			// 距離基準2次走行
-			// スタートマーカーを超えた時から距離計測開始
-			if (SGmarker > 0 && DistanceOptimal == 0)
+			// Boost run based on course distance table
+			if (numPPADarry > 0)
 			{
-				DistanceOptimal = encTotalOptimal;
-			}
-			// 一定区間ごとにインデックスを更新
-			if (DistanceOptimal > 0)
-			{
-				if (encTotalOptimal - DistanceOptimal >= encMM(CALCDISTANCE))
+				if (optimalIndex >= numPPADarry)
 				{
-					boostSpeed = PPAD[optimalIndex].boostSpeed; // 目標速度を更新
-					DistanceOptimal = encTotalOptimal;			// 距離計測位置を更新
-					if (optimalIndex + 1 < numPPADarry)
+					optimalIndex = numPPADarry - 1;
+				}
+				const int32_t segmentPulse = encMM(CALCDISTANCE);
+				int32_t remainingPulse = encTotalOptimal - DistanceOptimal;
+				if (segmentPulse > 0)
+				{
+					while (remainingPulse >= segmentPulse && (optimalIndex + 1) < numPPADarry)
 					{
-						// 配列要素数を超えない範囲でインデックスを更新する
-						optimalIndex++;
+						DistanceOptimal += segmentPulse;	// Consume next distance segment
+						remainingPulse -= segmentPulse;
+						optimalIndex++;					// Advance to the next boost profile
 					}
 				}
+				if (remainingPulse < 0)
+				{
+					remainingPulse = 0;
+					DistanceOptimal = encTotalOptimal;
+				}
+				// Apply boost speed associated with current segment
+				boostSpeed = PPAD[optimalIndex].boostSpeed;
+				if ((optimalIndex + 1) >= numPPADarry)
+				{
+					DistanceOptimal = encTotalOptimal - remainingPulse;
+				}
 			}
-			else if (DistanceOptimal == 0)
+			else
 			{
 				boostSpeed = tgtParam.straight;
 			}
-			// 目標速度に設定
+			// Update target speed
 			setTargetSpeed(boostSpeed);
-			// ライントレース
+			// Output motor command
 			motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 		}
 		else if (optimalTrace == BOOST_SHORTCUT)
