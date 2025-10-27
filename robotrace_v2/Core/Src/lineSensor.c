@@ -31,25 +31,50 @@ uint8_t modeCalLinesensors = 0;
 /////////////////////////////////////////////////////////////////////
 static bool isCrossLinePattern(const uint16_t *sensorValues)
 {
-	// 先頭・末尾センサの合計値が小さい場合は全体的な暗転とみなし、クロスラインを検出
+	// センサ配列の最大値を取得し、以降の閾値計算の基準とする
+	uint16_t peak = 0U;
+
+	for (uint8_t i = 0; i < NUM_SENSORS; i++)
+	{
+		if (sensorValues[i] > peak)
+		{
+			peak = sensorValues[i];
+		}
+	}
+
+	if (peak == 0U)
+	{
+		return false;
+	}
+
+	// 最大値の70%を閾値とし、白線を検出するための明るさ基準を動的に決定
+	const uint16_t crossThreshold = (uint16_t)(((uint32_t)peak * 7U) / 10U);
+
+	if (crossThreshold == 0U)
+	{
+		return false;
+	}
+
+	// 端部センサ4本の合計値が閾値を超える場合はクロスラインと判定する
+	const uint32_t edgeThreshold = (uint32_t)crossThreshold * 4U;
 	const uint32_t edgeSum = (uint32_t)sensorValues[0] + (uint32_t)sensorValues[1] +
 	                         (uint32_t)sensorValues[NUM_SENSORS - 2] + (uint32_t)sensorValues[NUM_SENSORS - 1];
-	const uint32_t edgeThreshold = 4000U;
 
-	if (edgeSum < edgeThreshold)
+	// Treat bright edges as a cross-line pattern when the sum is large
+	if (edgeSum >= edgeThreshold)
 	{
 		return true;
 	}
 
-	const uint16_t crossThreshold = (uint16_t)(BASEVAL * 0.3f);
 	uint8_t activeCount = 0;
 	uint8_t firstIndex = NUM_SENSORS;
 	uint8_t lastIndex = 0;
 
-	// 低照度のセンサが一定数以上連続している場合はクロスライン通過と判断する
+	// 十分に明るい領域が連続しているかを調べ、クロスラインパターンを検出する
+	// Detect consecutive high-intensity sensors as a cross line
 	for (uint8_t i = 0; i < NUM_SENSORS; i++)
 	{
-		if (sensorValues[i] <= crossThreshold)
+		if (sensorValues[i] >= crossThreshold)
 		{
 			activeCount++;
 			if (firstIndex == NUM_SENSORS)
@@ -62,6 +87,7 @@ static bool isCrossLinePattern(const uint16_t *sensorValues)
 
 	return (activeCount >= 5U) && ((lastIndex - firstIndex) >= (NUM_SENSORS / 2));
 }
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 powerLineSensors
 // 処理概要  	ラインセンサのON/OFF処理
@@ -155,7 +181,7 @@ void getLineSensor(void)
 /////////////////////////////////////////////////////////////////////
 float getAngleSensor(void)
 {
-	uint16_t indexL, indexR, index, sen1, sen2, min;
+	uint16_t indexL, indexR, index, sen1, sen2, maxVal;
 	const uint16_t *sensorValues;
 	float nsen1, nsen2, phi, dthita;
 	static float beforeAngle = 0.0F;
@@ -180,34 +206,35 @@ float getAngleSensor(void)
 		return angleSensor;
 	}
 
-	index = NUM_SENSORS; // 最小値探索用インデックス初期化
-	indexL = NUM_SENSORS/2 - 1;	// 左側の最小値インデックス初期化
-	indexR = NUM_SENSORS/2; 	// 右側の最小値インデックス初期化
-	min = 4000; // 最小値初期化
+	// 最大値を用いてライン中心を推定するため、中央から左右の最大値センサを探索する
+	index = NUM_SENSORS; // 最大値探索用インデックス初期化
+	indexL = NUM_SENSORS / 2 - 1; // 左側の最大値インデックス初期化
+	indexR = NUM_SENSORS / 2; // 右側の最大値インデックス初期化
+	maxVal = 0U; // 最大値初期化
 
-	for (int16_t i = NUM_SENSORS/2 - 1; i >= 0; i--)
+	for (int16_t i = NUM_SENSORS / 2 - 1; i >= 0; i--)
 	{
 		uint16_t current = sensorValues[i]; // 配列アクセスを一時変数に保持して再利用
-		if (current < min)
+		if (current > maxVal)
 		{
-			min = current;
+			maxVal = current;
 			indexL = i;
 		}
 	}
 
-	min = 4000; // 最小値初期化
-	for (int16_t i = NUM_SENSORS/2; i < NUM_SENSORS; i++)
+	maxVal = 0U; // 最大値初期化
+	for (int16_t i = NUM_SENSORS / 2; i < NUM_SENSORS; i++)
 	{
 		uint16_t current = sensorValues[i]; // 配列アクセスを一時変数に保持して再利用
-		if (current < min)
+		if (current > maxVal)
 		{
-			min = current;
+			maxVal = current;
 			indexR = i;
 		}
 	}
 
-	// 左右の最小値を比較して全体の最小値インデックスを決定
-	if (sensorValues[indexL] < sensorValues[indexR])
+	// 左右の最大値を比較して全体の最大値インデックスを決定
+	if (sensorValues[indexL] > sensorValues[indexR])
 	{
 		index = indexL;
 	}
@@ -216,7 +243,8 @@ float getAngleSensor(void)
 		index = indexR;
 	}
 
-	if(indexL == NUM_SENSORS/2 -1 && indexR == NUM_SENSORS/2){
+	if (indexL == NUM_SENSORS / 2 - 1 && indexR == NUM_SENSORS / 2)
+	{
 		// 両端センサで同じ値が検出された場合は0を返す
 		index = NUM_SENSORS;
 	}
@@ -238,11 +266,11 @@ float getAngleSensor(void)
 		nsen2 = sen2 * invSum;
 		if (index >= NUM_SENSORS / 2)
 		{
-			phi = atanf(nsen1 - nsen2); // 偏角φ計算
+			phi = atanf(nsen2 - nsen1); // 偏角φ計算
 		}
 		else
 		{
-			phi = atanf(nsen2 - nsen1); // 偏角φ計算
+			phi = atanf(nsen1 - nsen2); // 偏角φ計算
 		}
 		dthita = phi * thitaScale; // 微小角度dθ計算（定数計算を簡略化）
 
@@ -255,10 +283,8 @@ float getAngleSensor(void)
 		{
 			angleSensor = -(((4.0F - (float)index + 1) * thitaRad) + dthita);
 		}
-		// angleSensor = angleSensor * degPerRad; // 弧度法に変換
-
 	}
-	else if(index == NUM_SENSORS)
+	else if (index == NUM_SENSORS)
 	{
 		// センター付近で同じ値が検出された場合
 		sen1 = sensorValues[indexL];
@@ -273,16 +299,16 @@ float getAngleSensor(void)
 		// 正規化
 		nsen1 = sen1 * invSum;
 		nsen2 = sen2 * invSum;
-		if (sensorValues[indexL] < sensorValues[indexR])
-		{
-			phi = atanf(nsen2 - nsen1); // 偏角φ計算
-		}
-		else
+		if (sensorValues[indexL] > sensorValues[indexR])
 		{
 			phi = atanf(nsen1 - nsen2); // 偏角φ計算
 		}
+		else
+		{
+			phi = atanf(nsen2 - nsen1); // 偏角φ計算
+		}
 		dthita = phi * thitaScale; // 微小角度dθ計算（定数計算を簡略化）
-		if(sensorValues[indexL] < sensorValues[indexR])
+		if (sensorValues[indexL] > sensorValues[indexR])
 		{
 			angleSensor = -dthita;
 		}
@@ -290,8 +316,6 @@ float getAngleSensor(void)
 		{
 			angleSensor = dthita;
 		}
-		// angleSensor = phi * thitaScale; // 微小角度dθ計算（定数計算を簡略化）
-
 	}
 	else
 	{
@@ -301,6 +325,7 @@ float getAngleSensor(void)
 	beforeAngle = angleSensor;
 	return angleSensor;
 }
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 calibrationLinesensor
 // 処理概要  	ラインセンサのAD値を正規化する
