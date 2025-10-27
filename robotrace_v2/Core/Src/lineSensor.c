@@ -38,6 +38,27 @@ void powerLineSensors(uint8_t onoff)
 		__HAL_TIM_SET_COMPARE(&LS_TIMER, LS_CHANNEL, LS_COUNTERPERIOD);
 	}
 }
+//////////////////////////////////////////////////////////////////////
+// モジュール名 arm_cc1_after_us
+// 処理概要  	TIM3のCC1割り込みを指定したus後に発生させる（ワンショット）
+// 引数     	us: 割り込み発生までの時間[us]
+// 戻り値    	なし
+//////////////////////////////////////////////////////////////////////
+void delayLineSensorConversionStart(uint32_t us)
+{
+	// 指定したus後にTIM3のCC1割り込みが発生するようにセット（ワンショット）
+    // 安全マージン（レース回避で最低+10tick）
+    if(us < 10) us = 10; // レース回避
+    uint32_t arr = __HAL_TIM_GET_AUTORELOAD(&htim3);
+    uint32_t now = __HAL_TIM_GET_COUNTER(&htim3);
+    uint32_t tgt = now + us; if(tgt > arr) tgt -= (arr+1);
+
+    __HAL_TIM_DISABLE_IT(&htim3, TIM_IT_CC1);				// 念のため無効化
+    __HAL_TIM_DISABLE_OCxPRELOAD(&htim3, TIM_CHANNEL_1);	// OC1PE=0を保証
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, tgt);		// 即反映
+    __HAL_TIM_CLEAR_IT(&htim3, TIM_IT_CC1);					// 念のためクリア	
+    __HAL_TIM_ENABLE_IT(&htim3, TIM_IT_CC1);				// 有効化
+}
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getLineSensor
 // 処理概要  	ラインセンサのAD値を取得し、平均値を計算する
@@ -46,45 +67,44 @@ void powerLineSensors(uint8_t onoff)
 /////////////////////////////////////////////////////////////////////
 void getLineSensor(void)
 {
-	uint8_t i;
-	uint16_t s;
-	uint32_t ii;
-	static uint16_t cntls = 0; // ラインセンサの立ち上がりエッジ積算回数カウント用
+	// LED点灯／消灯それぞれの平均を取るためのワークバッファ
+	static uint32_t accum[2][NUM_SENSORS] = {{0}};
+	static uint32_t average[2][NUM_SENSORS] = {{0}};
+	static uint16_t sampleCount[2] = {0};
+	static uint8_t readyMask = 0;
+	const uint8_t phase = lineSensorState ? 1U : 0U; // 1: LED on, 0: LED off
+	uint32_t *acc = accum[phase];
+	const uint16_t *sample = (phase == 1U) ? analogValLSon : analogValLSoff;
 
-	cntls++;
-	for (i = 0; i < NUM_SENSORS; i++)
+	// 取得したADC値を位相ごとに積算
+	for (uint8_t i = 0; i < NUM_SENSORS; i++)
 	{
-		lSensorInt[i] += analogVal1[i];
-		if (cntls > 16)
-		{
-			lSensor[i] = lSensorInt[i] >> 4; // 平均値算出
-			lSensorInt[i] = 0;				 // 積算値リセット
-			// 最大値・最小値を更新
-			if (modeCalLinesensors == 1)
-			{
-				if (lSensor[i] > lSensorMax[i])
-				{
-					lSensorMax[i] = lSensor[i];	// 最大値更新
-				}
-				if (lSensor[i] < lSensorMin[i])
-				{
-					lSensorMin[i] = lSensor[i];	// 最小値更新
-				}
-			}
-			// 正規化計算
-			uint16_t range = lSensorMax[i] - lSensorMin[i];
-			if (range != 0)
-			{
-				lSensorCari[i] = (uint16_t)((lSensor[i] - lSensorMin[i]) * BASEVAL / range);
-			}
-			else
-			{
-				lSensorCari[i] = 0;	// 分母ゼロ対策
-			}
-		}
+		acc[i] += sample[i];
 	}
-	if (cntls > 16)
-		cntls = 0;
+
+	// 所定回数サンプリングしたら平均値に反映
+	if (++sampleCount[phase] >= LS_AVERAGE_SAMPLES)
+	{
+		for (uint8_t i = 0; i < NUM_SENSORS; i++)
+		{
+			average[phase][i] = acc[i] / LS_AVERAGE_SAMPLES;
+			acc[i] = 0;
+		}
+		sampleCount[phase] = 0;
+		readyMask |= (1U << phase);
+	}
+
+	// LED点灯／消灯の両方が揃ったら差分を計算
+	if (readyMask == 0x03U)
+	{
+		for (uint8_t i = 0; i < NUM_SENSORS; i++)
+		{
+			int32_t diff = (int32_t)average[0][i] - (int32_t)average[1][i];
+			lSensor[i] = (diff > 0) ? (int16_t)diff : 0;
+		}
+		readyMask = 0;
+		calibrationLinesensor(); // 最新のライン値でキャリブレーション／正規化を更新
+	}
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getAngleSensor
@@ -145,16 +165,44 @@ void getAngleSensor(void)
 /////////////////////////////////////////////////////////////////////
 void calibrationLinesensor(void)
 {
-	uint8_t i;
-	for (i = 0; i < NUM_SENSORS; i++)
+	const uint32_t baseVal = (uint32_t)BASEVAL;
+
+	for (uint8_t i = 0; i < NUM_SENSORS; i++)
 	{
-		if (lSensor[i] > lSensorMax[i])
+		uint16_t current = (lSensor[i] > 0) ? (uint16_t)lSensor[i] : 0U;
+
+		if (modeCalLinesensors)
 		{
-			lSensorMax[i] = lSensor[i];	// 最大値更新
+			if (current > lSensorMax[i])
+			{
+				lSensorMax[i] = current; // 最大値更新
+			}
+			if (current < lSensorMin[i])
+			{
+				lSensorMin[i] = current; // 最小値更新
+			}
 		}
-		if (lSensor[i] < lSensorMin[i])
+
+		uint16_t minVal = lSensorMin[i];
+		uint16_t maxVal = lSensorMax[i];
+
+		if (maxVal > minVal)
 		{
-			lSensorMin[i] = lSensor[i];	// 最小値更新
+			uint32_t span = (uint32_t)maxVal - (uint32_t)minVal;
+			uint32_t offset = (current > minVal) ? (uint32_t)(current - minVal) : 0U;
+
+			if (offset >= span)
+			{
+				lSensorCari[i] = (uint16_t)baseVal;
+			}
+			else
+			{
+				lSensorCari[i] = (uint16_t)((offset * baseVal + (span / 2U)) / span);
+			}
+		}
+		else
+		{
+			lSensorCari[i] = current;
 		}
 	}
 }

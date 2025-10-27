@@ -144,20 +144,20 @@ void motorControlTrace(void)
 	static int32_t traceBefore;
 
 	// サーボモータ用PWM値計算
-	if (lSensorMax[0] > lSensorMin[0])
-	{
+	// if (lSensorMax[0] > lSensorMin[0])
+	// {
 		// マクロで設定した重みを掛け合わせてセンサ値を合成
 		senL = (lSensorCari[4] * TRACE_WEIGHT_CENTER) + (lSensorCari[3] * TRACE_WEIGHT_INNER) + (lSensorCari[2] * TRACE_WEIGHT_MIDDLE) + (lSensorCari[1] * TRACE_WEIGHT_OUTER) + (lSensorCari[0] * TRACE_WEIGHT_FAR);
 		senR = (lSensorCari[5] * TRACE_WEIGHT_CENTER) + (lSensorCari[6] * TRACE_WEIGHT_INNER) + (lSensorCari[7] * TRACE_WEIGHT_MIDDLE) + (lSensorCari[8] * TRACE_WEIGHT_OUTER) + (lSensorCari[9] * TRACE_WEIGHT_FAR);
-	}
-	else
-	{
+	// }
+	// else
+	// {
 		// senL = (lSensor[4]) + (lSensor[3]*0.8) + (lSensor[2]*0.7) + (lSensor[1]*0.5) + (lSensor[0]*0.3);
 		// senR = (lSensor[5]) + (lSensor[6]*0.8) + (lSensor[7]*0.7) + (lSensor[8]*0.5) + (lSensor[9]*0.3);
-		senL = (lSensor[5]);
-		senR = (lSensor[6]);
-	}
-	Dev = senL - senR;
+		// senL = (lSensor[5]);
+		// senR = (lSensor[6]);
+	// }
+	Dev = senR - senL;
 
 	// I成分積算
 	lineTraceCtrl.Int += (float)Dev * 0.001;
