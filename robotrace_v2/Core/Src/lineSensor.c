@@ -109,6 +109,11 @@ void getAngleSensor(void)
 
 	if (index >= 0 && index <= NUM_SENSORS - 1)
 	{ // 両端のセンサが白線の上にあるときは無視
+		if (index == 0 || index >= NUM_SENSORS - 1)
+		{
+			// クロスライン通過時など端のセンサが最小となった場合は角度計算を行わず、前回値を保持して姿勢乱れを防止
+			return;
+		}
 		// 白線に一番近いセンサの両隣のセンサ値を取得
 		sen1 = lSensor[index - 1];
 		sen2 = lSensor[index + 1];
