@@ -97,6 +97,7 @@ void getAngleSensor(void)
 	uint16_t index, sen1, sen2, i, min;
 	float nsen1, nsen2, phi, dthita;
 	uint8_t lowReflectCount = 0;
+	static bool angleCrosslineHold; // クロスライン保持状態のフラグ
 
 	min = 1000;
 	index = 0;
@@ -113,9 +114,20 @@ void getAngleSensor(void)
 		}
 	}
 
-	if (lowReflectCount >= TRACE_CROSSLINE_MIN_COUNT)
+	if (!angleCrosslineHold && lowReflectCount >= TRACE_CROSSLINE_MIN_COUNT)
 	{
-		// クロスライン通過中は角度更新を停止して急激な姿勢変化を防止
+		// クロスライン突入を検知したら保持状態へ移行
+		angleCrosslineHold = true;
+	}
+	else if (angleCrosslineHold && lowReflectCount <= TRACE_CROSSLINE_RELEASE_COUNT)
+	{
+		// 白線検出数が十分減少したら保持状態を解除
+		angleCrosslineHold = false;
+	}
+
+	if (angleCrosslineHold)
+	{
+		// クロスライン保持中は前回角度を維持して急激な姿勢変化を防止
 		return;
 	}
 

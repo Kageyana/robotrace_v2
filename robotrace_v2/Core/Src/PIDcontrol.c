@@ -143,6 +143,7 @@ void motorControlTrace(void)
 	int32_t iP, iI, iD, iRet, Dev, Dif, senL, senR;
 	static int32_t traceBefore;
 	static int32_t tracePwmBefore; // クロスライン通過時に前回の制御量を保持
+	static bool traceCrosslineHold; // クロスライン保持状態のフラグ
 	uint16_t min = UINT16_MAX;
 	uint16_t index = 0;
 	uint8_t i;
@@ -162,9 +163,20 @@ void motorControlTrace(void)
 		}
 	}
 
-	if (lowReflectCount >= TRACE_CROSSLINE_MIN_COUNT)
+	if (!traceCrosslineHold && lowReflectCount >= TRACE_CROSSLINE_MIN_COUNT)
 	{
-		// 多数のセンサが同時に白線を検知した場合はクロスラインとみなし制御量を固定
+		// クロスライン突入を検知したら保持状態へ移行
+		traceCrosslineHold = true;
+	}
+	else if (traceCrosslineHold && lowReflectCount <= TRACE_CROSSLINE_RELEASE_COUNT)
+	{
+		// 白線検出数が十分減少したら保持状態を解除
+		traceCrosslineHold = false;
+	}
+
+	if (traceCrosslineHold)
+	{
+		// クロスライン保持中は制御量を固定して揺れを抑制
 		lineTraceCtrl.pwm = tracePwmBefore;
 		return;
 	}
