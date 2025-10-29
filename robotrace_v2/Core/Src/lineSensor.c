@@ -96,8 +96,11 @@ void getAngleSensor(void)
 {
 	uint16_t index, sen1, sen2, i, min;
 	float nsen1, nsen2, phi, dthita;
+	uint8_t lowReflectCount = 0;
+	static bool angleCrosslineHold; // クロスライン保持状態のフラグ
 
 	min = 1000;
+	index = 0;
 	for (i = 0; i < NUM_SENSORS; i++)
 	{
 		if (lSensor[i] < min)
@@ -105,10 +108,36 @@ void getAngleSensor(void)
 			min = lSensor[i];
 			index = i;
 		}
+		if (lSensorCari[i] < TRACE_CROSSLINE_LOW_REFLECT_THRESHOLD)
+		{
+			lowReflectCount++;
+		}
+	}
+
+	if (!angleCrosslineHold && lowReflectCount >= TRACE_CROSSLINE_MIN_COUNT)
+	{
+		// クロスライン突入を検知したら保持状態へ移行
+		angleCrosslineHold = true;
+	}
+	else if (angleCrosslineHold && lowReflectCount <= TRACE_CROSSLINE_RELEASE_COUNT)
+	{
+		// 白線検出数が十分減少したら保持状態を解除
+		angleCrosslineHold = false;
+	}
+
+	if (angleCrosslineHold)
+	{
+		// クロスライン保持中は前回角度を維持して急激な姿勢変化を防止
+		return;
 	}
 
 	if (index >= 0 && index <= NUM_SENSORS - 1)
 	{ // 両端のセンサが白線の上にあるときは無視
+		if (index == 0 || index >= NUM_SENSORS - 1)
+		{
+			// クロスライン通過時など端のセンサが最小となった場合は角度計算を行わず、前回値を保持して姿勢乱れを防止
+			return;
+		}
 		// 白線に一番近いセンサの両隣のセンサ値を取得
 		sen1 = lSensor[index - 1];
 		sen2 = lSensor[index + 1];
