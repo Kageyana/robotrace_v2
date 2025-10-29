@@ -96,8 +96,10 @@ void getAngleSensor(void)
 {
 	uint16_t index, sen1, sen2, i, min;
 	float nsen1, nsen2, phi, dthita;
+	uint8_t lowReflectCount = 0;
 
 	min = 1000;
+	index = 0;
 	for (i = 0; i < NUM_SENSORS; i++)
 	{
 		if (lSensor[i] < min)
@@ -105,6 +107,16 @@ void getAngleSensor(void)
 			min = lSensor[i];
 			index = i;
 		}
+		if (lSensorCari[i] < TRACE_CROSSLINE_LOW_REFLECT_THRESHOLD)
+		{
+			lowReflectCount++;
+		}
+	}
+
+	if (lowReflectCount >= TRACE_CROSSLINE_MIN_COUNT)
+	{
+		// クロスライン通過中は角度更新を停止して急激な姿勢変化を防止
+		return;
 	}
 
 	if (index >= 0 && index <= NUM_SENSORS - 1)

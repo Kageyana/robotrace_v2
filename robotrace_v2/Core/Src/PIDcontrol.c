@@ -146,6 +146,7 @@ void motorControlTrace(void)
 	uint16_t min = UINT16_MAX;
 	uint16_t index = 0;
 	uint8_t i;
+	uint8_t lowReflectCount = 0;
 
 	// クロスライン判定用に最小値となるセンサのインデックスを探索
 	for (i = 0; i < NUM_SENSORS; i++)
@@ -155,6 +156,17 @@ void motorControlTrace(void)
 			min = lSensor[i];
 			index = i;
 		}
+		if (lSensorCari[i] < TRACE_CROSSLINE_LOW_REFLECT_THRESHOLD)
+		{
+			lowReflectCount++;
+		}
+	}
+
+	if (lowReflectCount >= TRACE_CROSSLINE_MIN_COUNT)
+	{
+		// 多数のセンサが同時に白線を検知した場合はクロスラインとみなし制御量を固定
+		lineTraceCtrl.pwm = tracePwmBefore;
+		return;
 	}
 
 	if (index == 0 || index >= NUM_SENSORS - 1)
