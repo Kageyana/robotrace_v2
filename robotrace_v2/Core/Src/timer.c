@@ -65,8 +65,8 @@ void Interrupt1ms(void)
 		// if (cntEmcStopAngleY()) emcStop = STOP_ANGLE_Y;
 		if (cntEmcStopEncStop())
 			emcStop = STOP_ENCODER_STOP;
-		// if (cntEmcStopLineSensor() && optimalTrace != BOOST_SHORTCUT)
-		// 	emcStop = STOP_LINESENSOR;
+		if (cntEmcStopLineSensor() && optimalTrace != BOOST_SHORTCUT)
+			emcStop = STOP_LINESENSOR;
 		if (judgeOverSpeed())
 			emcStop = STOP_OVERSPEED;
 

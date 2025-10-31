@@ -104,7 +104,7 @@ bool cntEmcStopEncStop(void)
 bool cntEmcStopLineSensor(void)
 {
 	// 緊急停止条件
-	if (lSensor[3] + lSensor[4] + lSensor[5] + lSensor[6] > 12000)
+	if (lSensorCari[3] + lSensorCari[4] + lSensorCari[5] + lSensorCari[6] > 12000)
 	{
 		cntLineSensor++;
 	}
