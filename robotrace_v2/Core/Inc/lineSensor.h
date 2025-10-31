@@ -14,9 +14,6 @@
 #define LS_COUNTERPERIOD htim3.Init.Period
 #define LS_TIMER htim3
 #define LS_CHANNEL TIM_CHANNEL_3
-#define TRACE_CROSSLINE_LOW_REFLECT_THRESHOLD	300	// クロスライン判定用の正規化値しきい値
-#define TRACE_CROSSLINE_MIN_COUNT		2	// クロスライン検出の開始条件とする低反射センサ数
-#define TRACE_CROSSLINE_RELEASE_COUNT	1	// クロスライン解除条件とする低反射センサ数
 
 // ファイル名
 #define FILENAME_LS_VAL "lsval"

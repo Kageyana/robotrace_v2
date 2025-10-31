@@ -142,51 +142,6 @@ void motorControlTrace(void)
 {
 	int32_t iP, iI, iD, iRet, Dev, Dif, senL, senR;
 	static int32_t traceBefore;
-	static int32_t tracePwmBefore; // クロスライン通過時に前回の制御量を保持
-	static bool traceCrosslineHold; // クロスライン保持状態のフラグ
-	uint16_t min = UINT16_MAX;
-	uint16_t index = 0;
-	uint8_t i;
-	uint8_t lowReflectCount = 0;
-
-	// クロスライン判定用に最小値となるセンサのインデックスを探索
-	for (i = 0; i < NUM_SENSORS; i++)
-	{
-		if (lSensor[i] < min)
-		{
-			min = lSensor[i];
-			index = i;
-		}
-		if (lSensorCari[i] < TRACE_CROSSLINE_LOW_REFLECT_THRESHOLD)
-		{
-			lowReflectCount++;
-		}
-	}
-
-	if (!traceCrosslineHold && lowReflectCount >= TRACE_CROSSLINE_MIN_COUNT)
-	{
-		// クロスライン突入を検知したら保持状態へ移行
-		traceCrosslineHold = true;
-	}
-	else if (traceCrosslineHold && lowReflectCount <= TRACE_CROSSLINE_RELEASE_COUNT)
-	{
-		// 白線検出数が十分減少したら保持状態を解除
-		traceCrosslineHold = false;
-	}
-
-	if (traceCrosslineHold)
-	{
-		// クロスライン保持中は制御量を固定して揺れを抑制
-		lineTraceCtrl.pwm = tracePwmBefore;
-		return;
-	}
-
-	if (index == 0 || index >= NUM_SENSORS - 1)
-	{
-		// クロスライン通過時など端のセンサが最小となった場合はPID制御の更新を保留して乱れを防止
-		lineTraceCtrl.pwm = tracePwmBefore;
-		return;
-	}
 
 	// サーボモータ用PWM値計算
 	if (lSensorMax[0] > lSensorMin[0])
@@ -226,7 +181,6 @@ void motorControlTrace(void)
 
 	lineTraceCtrl.pwm = iRet;
 	traceBefore = Dev; // 次回はこの値が1ms前の値となる
-	tracePwmBefore = iRet; // 次回用に最新の制御量を記憶
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 motorControlSpeed
