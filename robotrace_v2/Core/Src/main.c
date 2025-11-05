@@ -246,7 +246,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_1;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_15CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -670,7 +670,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 11;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 4499;
+  htim3.Init.Period = 3749;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_OC_Init(&htim3) != HAL_OK)
@@ -1077,7 +1077,7 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 		if ((hadc1.State & HAL_ADC_STATE_BUSY_REG) == 0U)
 		{
 			lineSensorState = false;
-			delayLineSensorConversionStart(150);
+			delayLineSensorConversionStart(120);
 		}
 
 	}
@@ -1112,6 +1112,7 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
     if(htim->Instance==TIM3 && htim->Channel==HAL_TIM_ACTIVE_CHANNEL_1){
 		__HAL_TIM_DISABLE_IT(&htim3, TIM_IT_CC1);  // ワンショット完了
 		// ラインセンサのADC変換開始
+		powerMarkerSensors(lineSensorState);
 		if(lineSensorState){
 			// LED ON時：反射光の取得
 			if (HAL_ADC_Start_DMA(&hadc1, (uint32_t*)analogValLSon, NUM_SENSORS) != HAL_OK)

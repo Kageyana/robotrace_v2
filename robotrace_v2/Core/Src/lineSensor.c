@@ -46,12 +46,15 @@ void powerLineSensors(uint8_t onoff)
 //////////////////////////////////////////////////////////////////////
 void delayLineSensorConversionStart(uint32_t us)
 {
+	uint32_t ticks;
 	// 指定したus後にTIM3のCC1割り込みが発生するようにセット（ワンショット）
     // 安全マージン（レース回避で最低+10tick）
     if(us < 10) us = 10; // レース回避
+	ticks = us * TIMER_TICK/(PSC+1);
     uint32_t arr = __HAL_TIM_GET_AUTORELOAD(&htim3);
     uint32_t now = __HAL_TIM_GET_COUNTER(&htim3);
-    uint32_t tgt = now + us; if(tgt > arr) tgt -= (arr+1);
+    // uint32_t tgt = now + ticks; if(tgt > arr) tgt -= (arr+1);
+	uint32_t tgt = (now + ticks) % (arr+1);
 
     __HAL_TIM_DISABLE_IT(&htim3, TIM_IT_CC1);				// 念のため無効化
     __HAL_TIM_DISABLE_OCxPRELOAD(&htim3, TIM_CHANNEL_1);	// OC1PE=0を保証

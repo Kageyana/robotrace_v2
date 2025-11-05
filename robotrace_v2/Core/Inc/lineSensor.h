@@ -11,10 +11,12 @@
 #define NUM_SENSORS 10
 #define THITA_SENSOR 11.0F // ラインセンサの間隔(角度)
 #define BASEVAL 4095.0F
-#define LS_AVERAGE_SAMPLES 16U	 // ラインセンサ平均化サンプル数
+#define LS_AVERAGE_SAMPLES 2U	 // ラインセンサ平均化サンプル数
 #define LS_COUNTERPERIOD htim3.Init.Period * 0.5
 #define LS_TIMER htim3
 #define LS_CHANNEL TIM_CHANNEL_3
+#define PSC htim3.Init.Prescaler
+#define TIMER_TICK 90 // タイマクロック周波数[MHz]
 
 // ファイル名
 #define FILENAME_LS_VAL "lsval"
