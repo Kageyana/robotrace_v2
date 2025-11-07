@@ -16,10 +16,10 @@
 
 // ライントレース用センサ重み係数（中央から外側に向かって適用）
 #define TRACE_WEIGHT_CENTER		1.0f
-#define TRACE_WEIGHT_INNER		0.99f
-#define TRACE_WEIGHT_MIDDLE		0.98f
-#define TRACE_WEIGHT_OUTER		0.97f
-#define TRACE_WEIGHT_FAR		0.96f
+#define TRACE_WEIGHT_INNER		1.01f
+#define TRACE_WEIGHT_MIDDLE		1.02f
+#define TRACE_WEIGHT_OUTER		1.03f
+#define TRACE_WEIGHT_FAR		1.06f
 
 #define KP2		15
 #define KI2		100

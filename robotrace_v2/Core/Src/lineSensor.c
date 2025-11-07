@@ -90,7 +90,7 @@ void getLineSensor(void)
 	{
 		for (uint8_t i = 0; i < NUM_SENSORS; i++)
 		{
-			average[phase][i] = acc[i] / LS_AVERAGE_SAMPLES;
+			average[phase][i] = acc[i] >> LS_AVERAGE_SAMPLES;
 			acc[i] = 0;
 		}
 		sampleCount[phase] = 0;

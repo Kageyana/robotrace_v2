@@ -1112,7 +1112,6 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
     if(htim->Instance==TIM3 && htim->Channel==HAL_TIM_ACTIVE_CHANNEL_1){
 		__HAL_TIM_DISABLE_IT(&htim3, TIM_IT_CC1);  // ワンショット完了
 		// ラインセンサのADC変換開始
-		powerMarkerSensors(lineSensorState);
 		if(lineSensorState){
 			// LED ON時：反射光の取得
 			if (HAL_ADC_Start_DMA(&hadc1, (uint32_t*)analogValLSon, NUM_SENSORS) != HAL_OK)
