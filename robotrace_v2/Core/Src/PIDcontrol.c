@@ -152,12 +152,11 @@ void motorControlTrace(void)
 	}
 	else
 	{
-		// senL = (lSensor[4]) + (lSensor[3]*0.8) + (lSensor[2]*0.7) + (lSensor[1]*0.5) + (lSensor[0]*0.3);
-		// senR = (lSensor[5]) + (lSensor[6]*0.8) + (lSensor[7]*0.7) + (lSensor[8]*0.5) + (lSensor[9]*0.3);
-		senL = (lSensor[5]);
-		senR = (lSensor[6]);
+		senL = (lSensor[4] * TRACE_WEIGHT_CENTER) + (lSensor[3] * TRACE_WEIGHT_INNER) + (lSensor[2] * TRACE_WEIGHT_MIDDLE) + (lSensor[1] * TRACE_WEIGHT_OUTER) + (lSensor[0] * TRACE_WEIGHT_FAR);
+		senR = (lSensor[5] * TRACE_WEIGHT_CENTER) + (lSensor[6] * TRACE_WEIGHT_INNER) + (lSensor[7] * TRACE_WEIGHT_MIDDLE) + (lSensor[8] * TRACE_WEIGHT_OUTER) + (lSensor[9] * TRACE_WEIGHT_FAR);
+
 	}
-	Dev = senL - senR;
+	Dev = senR - senL;
 
 	// I成分積算
 	lineTraceCtrl.Int += (float)Dev * 0.001;

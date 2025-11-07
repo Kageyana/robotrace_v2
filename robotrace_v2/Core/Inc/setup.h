@@ -77,6 +77,7 @@ typedef struct
 	uint8_t motor_test;      // モータテスト
 	uint8_t trace_test;      // トレーステスト
 	uint8_t beforeMotorTest; // テスト状態保存用
+	uint8_t lineSensor_test; // ラインセンサテスト
 } TestFlags;
 
 //======================================//
