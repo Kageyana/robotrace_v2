@@ -5,6 +5,7 @@
 //====================================//
 // グローバル変数の宣言
 //====================================//
+uint8_t markerSensor = 0;
 uint8_t SGmarker = 0;
 uint8_t crossLine = 0;
 
@@ -14,19 +15,38 @@ uint8_t crossLine = 0;
 // 引数         なし
 // 戻り値       0x1:右センサ反応 0x2:左センサ反応
 /////////////////////////////////////////////////////////////////////
-uint8_t getMarkerSensor(void)
+void getMarkerSensor(void)
 {
-	uint8_t r = 1, l = 1, ret = 0;
+	uint8_t ret = 0;
+	static uint8_t ron = 1, roff = 1, lon = 1, loff = 1;
+	static uint8_t readyMask = 0;
+	const uint8_t phase = lineSensorState ? 1U : 0U; // 1: LED on, 0: LED off
 
-	l = HAL_GPIO_ReadPin(SidesensorL_GPIO_Port, SidesensorL_Pin);
-	r = HAL_GPIO_ReadPin(SidesensorR_GPIO_Port, SidesensorR_Pin);
+	// マーカーセンサ値取得(白:0 黒:1)
+	if(phase){
+		lon = HAL_GPIO_ReadPin(SidesensorL_GPIO_Port, SidesensorL_Pin);
+		ron = HAL_GPIO_ReadPin(SidesensorR_GPIO_Port, SidesensorR_Pin);
+	}
+	else
+	{
+		loff = HAL_GPIO_ReadPin(SidesensorL_GPIO_Port, SidesensorL_Pin);
+		roff = HAL_GPIO_ReadPin(SidesensorR_GPIO_Port, SidesensorR_Pin);
+	}
+	readyMask |= (1U << phase);
 
-	if (r == 0)
-		ret += RIGHTMARKER;
-	if (l == 0)
-		ret += LEFTMARKER;
-
-	return ret;
+	if (readyMask == 0x03U)
+	{
+		uint8_t diffR, diffL;
+		diffR = (roff > ron) ? (roff - ron) : 0U;
+		diffL = (loff > lon) ? (loff - lon) : 0U;
+		if (diffR == 1)
+			ret += RIGHTMARKER;
+		if (diffL == 1)
+			ret += LEFTMARKER;
+		readyMask = 0;
+		markerSensor = ret;
+	}
+	
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 checkMarker
@@ -41,7 +61,7 @@ uint8_t checkMarker(void)
 	static int32_t encMarkerL = 0, encMarkerR = 1, encMarkerN, nowEncTotalN;
 	static int32_t distL, distR, distN;
 
-	nowMarker = getMarkerSensor(); // マーカーセンサ値を取得
+	nowMarker = markerSensor; // マーカーセンサ値を取得
 	nowEncTotalN = encTotalN;
 
 	// 反応があればマーカー幅計測開始

@@ -3,6 +3,7 @@
 //====================================//
 #include "lineSensor.h"
 #include "fatfs.h"
+#include <stdint.h>
 //====================================//
 // グローバル変数の宣言
 //====================================//
@@ -76,6 +77,7 @@ void getLineSensor(void)
 	static uint16_t sampleCount[2] = {0};
 	static uint8_t readyMask = 0;
 	const uint8_t phase = lineSensorState ? 1U : 0U; // 1: LED on, 0: LED off
+	const uint8_t div = LS_AVERAGE_SAMPLES / 2;
 	uint32_t *acc = accum[phase];
 	const uint16_t *sample = (phase == 1U) ? analogValLSon : analogValLSoff;
 
@@ -90,7 +92,7 @@ void getLineSensor(void)
 	{
 		for (uint8_t i = 0; i < NUM_SENSORS; i++)
 		{
-			average[phase][i] = acc[i] >> LS_AVERAGE_SAMPLES;
+			average[phase][i] = acc[i] >> div;
 			acc[i] = 0;
 		}
 		sampleCount[phase] = 0;

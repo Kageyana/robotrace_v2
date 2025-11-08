@@ -319,18 +319,18 @@ static void test_marker(void)
 		init_sensor_test("Marker sensors", Font_7x10, 15); // 画面クリアとタイトル表示
 	}
 	ssd1306_SetCursor(0, 30);
-	ssd1306_printf(Font_7x10, "sensors:%d", getMarkerSensor());
+	ssd1306_printf(Font_7x10, "sensors:%d", markerSensor);
 	ssd1306_SetCursor(0, 45);
 	ssd1306_printf(Font_7x10, "britght:%d", testFlags.motor_test);
 
 	data_select(&testFlags.motor_test, SW_PUSH);
 	if (testFlags.motor_test == 1)
 	{
-		powerMarkerSensors(1);
+		powerLineSensors(1);
 	}
 	else
 	{
-		powerMarkerSensors(0);
+		powerLineSensors(0);
 	}
 }
 

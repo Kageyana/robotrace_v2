@@ -1057,6 +1057,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *AdcHandle)
 {
 	if (AdcHandle->Instance == ADC1)
 	{
+		getMarkerSensor();
 		getLineSensor();
 	}
 	if (AdcHandle->Instance == ADC2)
@@ -1077,6 +1078,7 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 		if ((hadc1.State & HAL_ADC_STATE_BUSY_REG) == 0U)
 		{
 			lineSensorState = false;
+			powerMarkerSensors(lineSensorState);
 			delayLineSensorConversionStart(120);
 		}
 
@@ -1093,6 +1095,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		if ((hadc1.State & HAL_ADC_STATE_BUSY_REG) == 0U)
 		{
 			lineSensorState = true;
+			powerMarkerSensors(lineSensorState);
 			delayLineSensorConversionStart(150);
 		}
   	}

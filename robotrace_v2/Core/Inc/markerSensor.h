@@ -5,12 +5,14 @@
 // インクルード
 //====================================//
 #include "main.h"
+#include <stdint.h>
 //====================================//
 // シンボル定義
 //====================================//
 #define RIGHTMARKER      0x1
 #define LEFTMARKER       0x2
 #define CROSSLINE       0x3
+#define NUM_MARKER_SENSORS 2
 
 #define SidesensorL_GPIO_Port SIDEMARKER_L_GPIO_Port
 #define SidesensorR_GPIO_Port SIDEMARKER_R_GPIO_Port
@@ -20,12 +22,13 @@
 //====================================//
 // グローバル変数の宣言
 //====================================//
+extern uint8_t  markerSensor;
 extern uint8_t  SGmarker;
 extern uint8_t  crossLine;
 //====================================//
 // プロトタイプ宣言
 //====================================//
-uint8_t getMarkerSensor ( void );
+void getMarkerSensor ( void );
 uint8_t checkMarker( void );
 void checkStartGoalMarker(void);
 bool checkCrossLine(void);
