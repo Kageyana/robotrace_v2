@@ -36,7 +36,7 @@ void getMarkerSensor(void)
 
 	if (readyMask == 0x03U)
 	{
-		uint8_t diffR, diffL;
+		uint8_t diffR=0, diffL=0;
 		diffR = (roff > ron) ? (roff - ron) : 0U;
 		diffL = (loff > lon) ? (loff - lon) : 0U;
 		if (diffR == 1)
