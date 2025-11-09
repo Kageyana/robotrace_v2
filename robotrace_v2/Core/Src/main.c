@@ -670,7 +670,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 11;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 749;
+  htim3.Init.Period = 1499;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_OC_Init(&htim3) != HAL_OK)
@@ -1079,7 +1079,7 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 		{
 			lineSensorState = false;
 			powerMarkerSensors(lineSensorState);
-			delayLineSensorConversionStart(20);
+			delayLineSensorConversionStart(50);
 		}
 
 	}
@@ -1096,7 +1096,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		{
 			lineSensorState = true;
 			powerMarkerSensors(lineSensorState);
-			delayLineSensorConversionStart(20);
+			delayLineSensorConversionStart(50);
 		}
   	}
 	if (htim->Instance == TIM6)
