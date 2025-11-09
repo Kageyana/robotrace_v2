@@ -3,6 +3,7 @@
 //====================================//
 #include "lineSensor.h"
 #include "fatfs.h"
+#include <stdbool.h>
 #include <stdint.h>
 //====================================//
 // グローバル変数の宣言
@@ -13,6 +14,7 @@ uint32_t lSensorInt[NUM_SENSORS] = {0};	 // ラインセンサの立ち上がり
 uint16_t lSensor[NUM_SENSORS] = {0};	 // ラインセンサの平均AD値
 uint16_t lSensorCari[NUM_SENSORS] = {0}; // 正規化したラインセンサのAD値
 bool lineSensorState = false;			 // true:ラインセンサ点灯 false:ラインセンサ消灯
+bool lineSensorPower = false;			 // ラインセンサ電源状態
 // 仮想センサステア関連
 uint16_t lineIndex = 0;
 float angleSensor;
@@ -30,12 +32,12 @@ void powerLineSensors(uint8_t onoff)
 {
 	if (onoff == 0)
 	{
-		lineSensorState = false;
+		lineSensorPower = false;
 		__HAL_TIM_SET_COMPARE(&LS_TIMER, LS_CHANNEL, 0);
 	}
 	else if (onoff == 1)
 	{
-		lineSensorState = true;
+		lineSensorPower = true;
 		__HAL_TIM_SET_COMPARE(&LS_TIMER, LS_CHANNEL, LS_COUNTERPERIOD);
 	}
 }

@@ -1075,7 +1075,7 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 	}
 	if(htim->Instance==TIM3 && htim->Channel==HAL_TIM_ACTIVE_CHANNEL_3){
 		// LED消灯
-		if ((hadc1.State & HAL_ADC_STATE_BUSY_REG) == 0U)
+		if ((hadc1.State & HAL_ADC_STATE_BUSY_REG) == 0U && lineSensorPower)
 		{
 			lineSensorState = false;
 			powerMarkerSensors(lineSensorState);
@@ -1092,7 +1092,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	if(htim->Instance==TIM3)
 	{
 		// LED点灯
-		if ((hadc1.State & HAL_ADC_STATE_BUSY_REG) == 0U)
+		if ((hadc1.State & HAL_ADC_STATE_BUSY_REG) == 0U && lineSensorPower)
 		{
 			lineSensorState = true;
 			powerMarkerSensors(lineSensorState);

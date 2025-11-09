@@ -26,6 +26,7 @@
 extern uint16_t lSensor[NUM_SENSORS];
 extern float angleSensor;
 extern bool lineSensorState;
+extern bool lineSensorPower;
 
 extern uint16_t lSensorCari[NUM_SENSORS];
 extern uint16_t lSensorMax[NUM_SENSORS];	// 各センサの最大値

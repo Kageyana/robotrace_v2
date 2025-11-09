@@ -330,6 +330,7 @@ static void test_marker(void)
 	}
 	else
 	{
+		powerMarkerSensors(0);
 		powerLineSensors(0);
 	}
 }
