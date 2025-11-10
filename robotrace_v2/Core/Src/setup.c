@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "setup.h"
+#include <stdint.h>
 //====================================//
 // グローバル変数の宣言
 //====================================//
@@ -56,6 +57,7 @@ int32_t encClick = 0;
 //======================================//
 static void setup_sensors(void); 		// センサ表示とテストメニューを制御する処理
 static void setup_pid_trace(void);		// ゲイン調整(直線トレース)
+static void setup_pid_traceOmegaFB(void); // ゲイン調整(直線トレース 角速度フィードバック)
 static void setup_pid_dist(void);		// ゲイン調整(距離)
 static void setup_pid_angle(void);		// ゲイン調整(角度)
 static void setup_pid_angular(void);	// ゲイン調整(角速度)
@@ -421,6 +423,13 @@ static void test_linesensor(void)
 		ssd1306_printf(Font_6x8, "%4d", lSensor[8]);
 		ssd1306_SetCursor(95, 54);
 		ssd1306_printf(Font_6x8, "%4d", lSensor[9]);
+
+		uint32_t senL, senR;
+		senL = (lSensor[4] * TRACE_WEIGHT_CENTER) + (lSensor[3] * TRACE_WEIGHT_INNER) + (lSensor[2] * TRACE_WEIGHT_MIDDLE) + (lSensor[1] * TRACE_WEIGHT_OUTER) + (lSensor[0] * TRACE_WEIGHT_FAR);
+		senR = (lSensor[5] * TRACE_WEIGHT_CENTER) + (lSensor[6] * TRACE_WEIGHT_INNER) + (lSensor[7] * TRACE_WEIGHT_MIDDLE) + (lSensor[8] * TRACE_WEIGHT_OUTER) + (lSensor[9] * TRACE_WEIGHT_FAR);
+		
+		ssd1306_SetCursor(40, 54);
+		ssd1306_printf(Font_6x8, "%6d", senR-senL);
 	}
 	else
 	{
@@ -445,8 +454,14 @@ static void test_linesensor(void)
 		ssd1306_printf(Font_6x8, "%4d", lSensorCari[8]);
 		ssd1306_SetCursor(95, 54);
 		ssd1306_printf(Font_6x8, "%4d", lSensorCari[9]);
+
+		uint32_t senL, senR;
+		senL = (lSensorCari[4] * TRACE_WEIGHT_CENTER) + (lSensorCari[3] * TRACE_WEIGHT_INNER) + (lSensorCari[2] * TRACE_WEIGHT_MIDDLE) + (lSensorCari[1] * TRACE_WEIGHT_OUTER) + (lSensorCari[0] * TRACE_WEIGHT_FAR);
+		senR = (lSensorCari[5] * TRACE_WEIGHT_CENTER) + (lSensorCari[6] * TRACE_WEIGHT_INNER) + (lSensorCari[7] * TRACE_WEIGHT_MIDDLE) + (lSensorCari[8] * TRACE_WEIGHT_OUTER) + (lSensorCari[9] * TRACE_WEIGHT_FAR);
+		
+		ssd1306_SetCursor(40, 54);
+		ssd1306_printf(Font_6x8, "%6d", senR-senL);
 	}
-	
 
 	data_select(&testFlags.motor_test, SW_PUSH);
 	data_select(&testFlags.lineSensor_test, SW_DOWN);
@@ -675,7 +690,92 @@ static void setup_pid_trace(void)
 		}
 	}
 }
+///////////////////////////////////////////////////////////////////////////////////////
+// モジュール名 setup_pid_trace
+// 処理概要     ゲイン調整(直線トレース)
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////////////////
+static void setup_pid_traceOmegaFB(void)
+{
+	if (pattern.display != pattern.beforeHex)
+	{
+		// 切替時に実行
+		ssd1306_printf(Font_6x8, "Trace PID");
 
+		ssd1306_SetCursor(0, 18);
+		ssd1306_printf(Font_7x10, "kp:");
+		ssd1306_SetCursor(0, 32);
+		ssd1306_printf(Font_7x10, "ki:");
+		ssd1306_SetCursor(0, 44);
+		ssd1306_printf(Font_7x10, "kd:");
+		ssd1306_SetCursor(60, 30);
+		ssd1306_printf(Font_7x10, "pwm:");
+	}
+
+	data_select(&testFlags.trace_test, SW_PUSH); // PUSHでトレースON/OFFの選択
+	// PUSHでトレースON/OFF
+	if (testFlags.trace_test == 1)
+	{
+		motorPwmOutSynth(lineTraceOmegaFBCtrl.pwm, 0, 0, 0); // モータを指定PWMで駆動
+		powerLineSensors(1);                          // ラインセンサを有効化
+	}
+	else
+	{
+		motorPwmOutSynth(0, 0, 0, 0);                // モータ停止
+		powerLineSensors(0);                         // ラインセンサ停止
+	}
+	if (testFlags.trace_test != testFlags.beforeMotorTest && testFlags.trace_test == 0)
+	{
+		testFlags.trace_test = 2;                              // 停止待機状態へ遷移
+	}
+	if (testFlags.trace_test == 2 && encCurrentL == 0) // ホイールの回転が停止したら0
+	{
+		testFlags.trace_test = 0;                              // 完全停止後に終了
+	}
+	testFlags.beforeMotorTest = testFlags.trace_test;                        // 状態を保存
+
+	// ゲイン表示
+	dataTuningUD(&pattern.gain, 1, 3, 1);
+	if (testFlags.trace_test == 0)
+	{
+		ssd1306_SetCursor(21, 18);
+		if (pattern.gain == 1)
+			ssd1306_printfB(Font_7x10, "%3d", lineTraceOmegaFBCtrl.kp);
+		else
+			ssd1306_printf(Font_7x10, "%3d", lineTraceOmegaFBCtrl.kp);
+		ssd1306_SetCursor(21, 32);
+		if (pattern.gain == 2)
+			ssd1306_printfB(Font_7x10, "%3d", lineTraceOmegaFBCtrl.ki);
+		else
+			ssd1306_printf(Font_7x10, "%3d", lineTraceOmegaFBCtrl.ki);
+		ssd1306_SetCursor(21, 44);
+		if (pattern.gain == 3)
+			ssd1306_printfB(Font_7x10, "%3d", lineTraceOmegaFBCtrl.kd);
+		else
+			ssd1306_printf(Font_7x10, "%3d", lineTraceOmegaFBCtrl.kd);
+
+		// 制御量表示
+		ssd1306_SetCursor(88, 30);
+		ssd1306_printf(Font_7x10, "%4d", lineTraceOmegaFBCtrl.pwm);
+
+		switch (pattern.gain)
+		{
+		case 1:
+			// kp
+			dataTuningLR(&lineTraceOmegaFBCtrl.kp, 1, 0, 255);
+			break;
+		case 2:
+			// ki
+			dataTuningLR(&lineTraceOmegaFBCtrl.ki, 1, 0, 255);
+			break;
+		case 3:
+			// kd
+			dataTuningLR(&lineTraceOmegaFBCtrl.kd, 1, 0, 255);
+			break;
+		}
+	}
+}
 /////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_pid_angular
 // 処理概要     ゲイン調整(角速度)
@@ -1299,10 +1399,10 @@ void setup(void)
 				setupFlags.clickStart = -1;
 			}
 
-			if (pattern.display > HEX_PID_DIST)
+			if (pattern.display > HEX_PID_SPEED)
 				pattern.display = 0;
 			else if (pattern.display < 0)
-				pattern.display = HEX_PID_DIST;
+				pattern.display = HEX_PID_SPEED;
 			encClick = 0;
 		}
 	}
@@ -1383,6 +1483,14 @@ void setup(void)
 		break;
 	}
 	//------------------------------------------------------------------
+	// ゲイン調整(直線トレース 角速度フィードバック)
+	//------------------------------------------------------------------
+	case HEX_PID_TRACE_OMEGA:
+	{
+		setup_pid_traceOmegaFB(); // ゲイン調整(直線トレース)
+		break;
+	}
+	//------------------------------------------------------------------
 	// ゲイン調整(速度)
 	//------------------------------------------------------------------
 	case HEX_PID_SPEED:
@@ -1390,30 +1498,30 @@ void setup(void)
 		setup_pid_speed(); // 速度PIDゲイン調整
 		break;
 	}
-	//------------------------------------------------------------------
-	// ゲイン調整(角速度)
-	//------------------------------------------------------------------
-	case HEX_PID_ANGULAR:
-	{
-		setup_pid_angular(); // 角速度PIDの設定処理を呼び出し
-		break;
-	}
-	//------------------------------------------------------------------
-	// ゲイン調整(角度)
-	//------------------------------------------------------------------
-	case HEX_PID_ANGLE:
-	{
-		setup_pid_angle(); // ゲイン調整(角度)
-		break;
-	}
-	//------------------------------------------------------------------
-	// ゲイン調整(距離)
-	//------------------------------------------------------------------
-	case HEX_PID_DIST:
-	{
-		setup_pid_dist(); // 距離PID調整処理を実行
-		break;
-	}
+	// //------------------------------------------------------------------
+	// // ゲイン調整(角速度)
+	// //------------------------------------------------------------------
+	// case HEX_PID_ANGULAR:
+	// {
+	// 	setup_pid_angular(); // 角速度PIDの設定処理を呼び出し
+	// 	break;
+	// }
+	// //------------------------------------------------------------------
+	// // ゲイン調整(角度)
+	// //------------------------------------------------------------------
+	// case HEX_PID_ANGLE:
+	// {
+	// 	setup_pid_angle(); // ゲイン調整(角度)
+	// 	break;
+	// }
+	// //------------------------------------------------------------------
+	// // ゲイン調整(距離)
+	// //------------------------------------------------------------------
+	// case HEX_PID_DIST:
+	// {
+	// 	setup_pid_dist(); // 距離PID調整処理を実行
+	// 	break;
+	// }
 
 	default:
 	{

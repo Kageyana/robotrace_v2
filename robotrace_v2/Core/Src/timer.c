@@ -36,11 +36,6 @@ void Interrupt1ms(void)
 	setEncoderVal();
 	encPulse5ms += encCurrentN; // 5ms間のエンコーダパルスを累積
 
-	// PID制御処理
-	motorControlTrace();
-	motorControlSpeed();
-	motorControldist();
-
 	// IMU処理
 	if (initIMU)
 	{
@@ -56,6 +51,12 @@ void Interrupt1ms(void)
 			calibrationIMU();
 		}
 	}
+
+	// PID制御処理
+	motorControlTrace();
+	motorControlTraceOmegaFB();
+	motorControlSpeed();
+	motorControldist();
 
 	if (patternTrace > 10 && patternTrace < 100)
 	{
@@ -117,7 +118,7 @@ void Interrupt1ms(void)
 					// motorpwmR,
 					// (int16_t)(motorCurrentL * 10000),
 					// (int16_t)(motorCurrentR * 10000),
-					lineTraceCtrl.pwm,
+					lineTraceOmegaFBCtrl.pwm,
 					veloCtrl.pwm,
 					// 32bit
 					encTotalOptimal,

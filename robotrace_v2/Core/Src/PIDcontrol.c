@@ -2,11 +2,15 @@
 // インクルード
 //====================================//
 #include "PIDcontrol.h"
+#include "BMI088.h"
+#include "encoder.h"
 #include "fatfs.h"
+#include <stdint.h>
 //====================================//
 // グローバル変数の宣言
 //====================================//
 pidParam lineTraceCtrl = {"line", KP1, KI1, KD1, 0, 0};
+pidParam lineTraceOmegaFBCtrl = {"lineomega", KP6, KI6, KD6, 0, 0};
 pidParam veloCtrl = {"speed", KP2, KI2, KD2, 0, 0};
 pidParam yawRateCtrl = {"yawRate", KP3, KI3, KD3, 0, 0};
 pidParam yawCtrl = {"yaw", KP4, KI4, KD4, 0, 0};
@@ -182,6 +186,56 @@ void motorControlTrace(void)
 	traceBefore = Dev; // 次回はこの値が1ms前の値となる
 }
 ///////////////////////////////////////////////////////////////////////////
+// モジュール名 motorControlTrace
+// 処理概要     ライントレース時の制御量の計算
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void motorControlTraceOmegaFB(void)
+{
+	int32_t iP, iI, iD, iRet, target, Dev, Dif, senL, senR;
+	static int32_t traceBefore;
+
+	// サーボモータ用PWM値計算
+	if (lSensorMax[0] > lSensorMin[0])
+	{
+		// マクロで設定した重みを掛け合わせてセンサ値を合成
+		senL = (lSensorCari[4] * TRACE_WEIGHT_CENTER) + (lSensorCari[3] * TRACE_WEIGHT_INNER) + (lSensorCari[2] * TRACE_WEIGHT_MIDDLE) + (lSensorCari[1] * TRACE_WEIGHT_OUTER) + (lSensorCari[0] * TRACE_WEIGHT_FAR);
+		senR = (lSensorCari[5] * TRACE_WEIGHT_CENTER) + (lSensorCari[6] * TRACE_WEIGHT_INNER) + (lSensorCari[7] * TRACE_WEIGHT_MIDDLE) + (lSensorCari[8] * TRACE_WEIGHT_OUTER) + (lSensorCari[9] * TRACE_WEIGHT_FAR);
+	}
+	else
+	{
+		senL = (lSensor[4] * TRACE_WEIGHT_CENTER) + (lSensor[3] * TRACE_WEIGHT_INNER) + (lSensor[2] * TRACE_WEIGHT_MIDDLE) + (lSensor[1] * TRACE_WEIGHT_OUTER) + (lSensor[0] * TRACE_WEIGHT_FAR);
+		senR = (lSensor[5] * TRACE_WEIGHT_CENTER) + (lSensor[6] * TRACE_WEIGHT_INNER) + (lSensor[7] * TRACE_WEIGHT_MIDDLE) + (lSensor[8] * TRACE_WEIGHT_OUTER) + (lSensor[9] * TRACE_WEIGHT_FAR);
+
+	}
+	target = ((senR - senL) * encCurrentN) >> 6;
+	Dev = target - (int32_t)BMI088val.gyro.z;
+
+	// I成分積算
+	lineTraceOmegaFBCtrl.Int += (float)Dev * 0.001;
+	if (lineTraceOmegaFBCtrl.Int > 10000.0)
+		lineTraceOmegaFBCtrl.Int = 10000.0; // I成分リミット
+	else if (lineTraceOmegaFBCtrl.Int < -10000.0)
+		lineTraceOmegaFBCtrl.Int = -10000.0;
+	Dif = (Dev - traceBefore) * 1; // dゲイン1/1000倍
+
+	iP = lineTraceOmegaFBCtrl.kp * Dev;			   // 比例
+	iI = lineTraceOmegaFBCtrl.ki * lineTraceOmegaFBCtrl.Int; // 積分
+	iD = lineTraceOmegaFBCtrl.kd * Dif;			   // 微分
+	iRet = iP + iI + iD;
+	iRet = iRet >> 5; // PWMを0～1000近傍に収める
+
+	// PWMの上限の設定
+	if (iRet > 900)
+		iRet = 900;
+	if (iRet < -900)
+		iRet = -900;
+
+	lineTraceOmegaFBCtrl.pwm = iRet;
+	traceBefore = Dev; // 次回はこの値が1ms前の値となる
+}
+///////////////////////////////////////////////////////////////////////////
 // モジュール名 motorControlSpeed
 // 処理概要     モーターの制御量の計算
 // 引数         なし
@@ -216,7 +270,7 @@ void motorControlSpeed(void)
 	iD = veloCtrl.kd * Dif;		// 微分
 	// PID制御出力にフィードフォワード補償を加えて応答を改善
 	iRet = iP + iI + iD + feedForwardPwm;
-	iRet = iRet;
+	// iRet = iRet;
 
 	// PWMの上限の設定
 	if (iRet > 900)

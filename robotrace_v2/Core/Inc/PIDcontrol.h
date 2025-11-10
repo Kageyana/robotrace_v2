@@ -10,9 +10,9 @@
 //====================================//
 // シンボル定義
 //====================================//
-#define KP1		20
+#define KP1		28
 #define KI1		0
-#define KD1		220
+#define KD1		200
 
 // ライントレース用センサ重み係数（中央から外側に向かって適用）
 #define TRACE_WEIGHT_CENTER		1.0f
@@ -21,13 +21,13 @@
 #define TRACE_WEIGHT_OUTER		1.03f
 #define TRACE_WEIGHT_FAR		1.06f
 
-#define KP2		15
-#define KI2		100
+#define KP2		10
+#define KI2		0
 #define KD2		0
 
 #define KP3		38
-#define KI3		100
-#define KD3		8
+#define KI3		1
+#define KD3		15
 
 #define KP4		6
 #define KI4		0
@@ -37,8 +37,12 @@
 #define KI5		1
 #define KD5		5
 
+#define KP6		100
+#define KI6		1
+#define KD6		5
+
 // 速度フィードフォワード関連定義
-#define SPEED_FEEDFORWARD_GAIN_DEFAULT          150      // Crr×1000 の初期値(例:0.020)
+#define SPEED_FEEDFORWARD_GAIN_DEFAULT          133      // Crr×1000 の初期値(例:0.020)
 #define SPEED_FEEDFORWARD_GEAR_RATIO            2.0f    // ギア比 G
 #define SPEED_FEEDFORWARD_EFFICIENCY            0.90f   // ギア効率 η
 #define SPEED_FEEDFORWARD_KV_RPM_PER_V          2710.0f // Kv[rpm/V]
@@ -69,6 +73,7 @@ extern float    targetAngularVelocity;  // 目標角速度
 extern int16_t  targetDist;		        // 目標X座標
 
 extern pidParam lineTraceCtrl;
+extern pidParam lineTraceOmegaFBCtrl;
 extern pidParam veloCtrl;
 extern pidParam yawRateCtrl;
 extern pidParam yawCtrl;
@@ -88,6 +93,7 @@ void readPIDparameters(pidParam *pid);
 void writeSpeedFeedForwardGain(int16_t gain);
 void readSpeedFeedForwardGain(int16_t *gain);
 void motorControlTrace(void);
+void motorControlTraceOmegaFB(void);
 void motorControlSpeed(void);
 void motorControlYawRate(void);
 void motorControlYaw(void);

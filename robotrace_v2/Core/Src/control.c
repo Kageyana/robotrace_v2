@@ -144,6 +144,7 @@ void initSystem(void)
 			readPIDparameters(&yawRateCtrl);
 			readPIDparameters(&yawCtrl);
 			readPIDparameters(&distCtrl);
+			readPIDparameters(&lineTraceOmegaFBCtrl);
 
             readLinesenval(); // ラインセンサの最大値と最小値を取得
 			readTgtspeeds();  // 目標速度を取得
@@ -400,6 +401,7 @@ void loopSystem(void)
 			if (autoStart == 0)
 			{
 				writePIDparameters(&lineTraceCtrl);
+				writePIDparameters(&lineTraceOmegaFBCtrl);
 				writePIDparameters(&veloCtrl);
 				writeSpeedFeedForwardGain(speedFeedForwardGain);	// 速度フィードフォワード係数も保存
 				writePIDparameters(&yawRateCtrl);
@@ -485,7 +487,7 @@ void loopSystem(void)
 				setTargetSpeed(tgtParam.curve);
 			}
 			// ライントレース
-			motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+			motorPwmOutSynth(lineTraceOmegaFBCtrl.pwm, veloCtrl.pwm, 0, 0);
 		}
 		else if (optimalTrace == BOOST_DISTANCE)
 		{
@@ -526,7 +528,7 @@ void loopSystem(void)
 			// Update target speed
 			setTargetSpeed(boostSpeed);
 			// Output motor command
-			motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+			motorPwmOutSynth(lineTraceOmegaFBCtrl.pwm, veloCtrl.pwm, 0, 0);
 		}
 		else if (optimalTrace == BOOST_SHORTCUT)
 		{
