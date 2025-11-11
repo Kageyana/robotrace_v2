@@ -131,8 +131,12 @@ void initSystem(void)
 	ssd1306_SetCursor(0, 28);
 	if (insertSD())
 	{
-		initMSD = initMicroSD();
-		if (initMSD)
+		if(!softreset)
+		{
+			initMSD = initMicroSD();
+		}
+
+		if(initMSD || softreset)
 		{
 			getFileNumbers();	// 走行ログのファイル番号を取得
 			getLogNumber();		// 前回の解析ログナンバーを取得
@@ -145,7 +149,7 @@ void initSystem(void)
 			readPIDparameters(&yawCtrl);
 			readPIDparameters(&distCtrl);
 
-            readLinesenval(); // ラインセンサの最大値と最小値を取得
+			readLinesenval(); // ラインセンサの最大値と最小値を取得
 			readTgtspeeds();  // 目標速度を取得
 
 			if (modeDSP)
@@ -685,11 +689,6 @@ void loopSystem(void)
 		motorPwmOutSynth(0, 0, 0, 0);
 		powerLineSensors(0);
 		powerMarkerSensors(0);
-
-		if(initMSD)
-		{
-			sd_unmount();	// SDカードマウント解除
-		}
 		
 		// リセット待ち
 		if(swValTact == SW_PUSH)
