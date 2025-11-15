@@ -301,12 +301,8 @@ void loopSystem(void)
 		{
 			// 2次走行
 			motorPwmOut(0, 0);
-			// 初期化
-			SGmarker = 0;	// スタートマーカー通過フラグクリア
-			resetEmcStop();	// 緊急停止フラグクリア
 
 			// 目標速度調整
-
 			// コース解析
 			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 			ssd1306_SetCursor(0, 25);
@@ -622,6 +618,10 @@ void loopSystem(void)
 			}
 			else if (autoStart >= 3)
 			{
+				if(autoStart == 3)
+				{
+					autoStartAnalize++; // 2次走行のログを解析するためにログ番号をインクリメント
+				}
 				// 3走目以降は速度を上げる
 				tgtParam.bstStraight *= PARAM_UP_STEP;
 				tgtParam.bst1500 *= PARAM_UP_STEP;
@@ -654,6 +654,11 @@ void loopSystem(void)
 				// 走行準備へ
 				powerLineSensors(0);
 				powerMarkerSensors(0);
+				// 初期化
+				SGmarker = 0;	// スタートマーカー通過フラグクリア
+				initMarkerSensor();	// マーカーセンサ初期化
+				resetEmcStop();	// 緊急停止フラグクリア
+				encTotalN = 0;	// エンコーダ総パルス数クリア
 
 				patternTrace = 0;
 				break;

@@ -89,7 +89,7 @@ void saveLogNumber(int16_t fileNumber)
 	fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_WRITE); // create file
 	if (fresult == FR_OK)
 	{
-		f_printf(&fil, "%04d", fileNumber);
+		f_printf(&fil, "%05d", fileNumber);
 	}
 	f_close(&fil);
 }
@@ -113,7 +113,7 @@ void getLogNumber(void)
 	{
 		// 解析済みのログ番号を取得
 		f_gets(log, sizeof(log), &fil);
-		sscanf(log, "%d", &analizedNumber);	
+		sscanf(log, "%05d", &analizedNumber);	
 		f_close(&fil);
 	}
 
