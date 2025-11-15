@@ -10,6 +10,8 @@
 //====================================//
 // シンボル定義
 //====================================//
+
+// PID制御用ゲイン定義(ライントレース 角速度FBなし)
 #define KP1		28
 #define KI1		0
 #define KD1		200
@@ -21,28 +23,33 @@
 #define TRACE_WEIGHT_OUTER		1.03f
 #define TRACE_WEIGHT_FAR		1.04f
 
+// PID制御用ゲイン定義(速度制御)
 #define KP2		10
 #define KI2		0
 #define KD2		0
 
+// PID制御用ゲイン定義(角速度制御)
 #define KP3		38
 #define KI3		1
 #define KD3		15
 
+// PID制御用ゲイン定義(角度制御)
 #define KP4		6
 #define KI4		0
 #define KD4		10
 
+// PID制御用ゲイン定義(距離制御)
 #define KP5		100
 #define KI5		1
 #define KD5		5
 
-#define KP6		100
-#define KI6		1
-#define KD6		5
+// PID制御用ゲイン定義(ライントレース 角速度FBあり)
+#define KP6		7
+#define KI6		0
+#define KD6		25
 
 // 速度フィードフォワード関連定義
-#define SPEED_FEEDFORWARD_GAIN_DEFAULT          133      // Crr×1000 の初期値(例:0.020)
+#define SPEED_FEEDFORWARD_GAIN_DEFAULT          150      // Crr×1000 の初期値(例:0.020)
 #define SPEED_FEEDFORWARD_GEAR_RATIO            2.0f    // ギア比 G
 #define SPEED_FEEDFORWARD_EFFICIENCY            0.90f   // ギア効率 η
 #define SPEED_FEEDFORWARD_KV_RPM_PER_V          2710.0f // Kv[rpm/V]
