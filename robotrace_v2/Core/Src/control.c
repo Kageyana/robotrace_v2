@@ -398,7 +398,6 @@ void loopSystem(void)
 		if (!calibratIMU && countdown == 0)
 		{
 			powerLineSensors(1);   // ラインセンサ点灯
-			powerMarkerSensors(1); // マーカーセンサ点灯
 
 			// SDカードに変数保存
 			// PIDゲインを記録
@@ -698,14 +697,15 @@ void loopSystem(void)
 			while(swValTact == SW_PUSH);	// スイッチが離されるまで待つ
 			softreset = true;				// ソフトウェアリセット実行
 			initSystem();			// 初期化処理実行
+			initMarkerSensor();	// マーカーセンサ初期化
 			resetEmcStop();		// 緊急停止フラグクリア
 			setupFlags.start= 0;	// スタートフラグクリア
 			autoStart = 0;			// 自動走行フラグクリア
-			SGmarker = 0;			// スタートマーカー通過フラグクリア
 			optimalTrace = 0;		// 2次走行モードクリア
 			pattern.display = HEX_START; // 16進表示モードクリア
 			pattern.beforeHex = 255;	// 16進表示モードクリア
 			encClick = 0;			// ホイールクリッククリア
+			encTotalN = 0;			// エンコーダ総パルス数クリア
 			patternTrace = 0;
 		}
 		break;

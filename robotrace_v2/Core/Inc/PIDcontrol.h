@@ -19,7 +19,7 @@
 #define TRACE_WEIGHT_INNER		1.01f
 #define TRACE_WEIGHT_MIDDLE		1.02f
 #define TRACE_WEIGHT_OUTER		1.03f
-#define TRACE_WEIGHT_FAR		1.06f
+#define TRACE_WEIGHT_FAR		1.04f
 
 #define KP2		10
 #define KI2		0

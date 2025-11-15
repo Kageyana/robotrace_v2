@@ -2,13 +2,15 @@
 // インクルード
 //====================================//
 #include "markerSensor.h"
+#include "control.h"
+#include "encoder.h"
+#include <stdint.h>
 //====================================//
 // グローバル変数の宣言
 //====================================//
 uint8_t markerSensor = 0;
 uint8_t SGmarker = 0;
-uint8_t crossLine = 0;
-
+static int32_t encMarkerL = PALSE_METER/10, encMarkerR = (PALSE_METER/10) + 1;
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getMarksensor
 // 処理概要     マーカーセンサの値を取得
@@ -46,7 +48,19 @@ void getMarkerSensor(void)
 		readyMask = 0;
 		markerSensor = ret;
 	}
-	
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 initMarkerSensor
+// 処理概要     マーカーセンサ関連変数初期化
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void initMarkerSensor(void)
+{
+    markerSensor = 0;
+    SGmarker = 0;
+    encMarkerL = PALSE_METER/10;
+    encMarkerR = (PALSE_METER/10) + 1;
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 checkMarker
@@ -58,8 +72,8 @@ uint8_t checkMarker(void)
 {
 	uint8_t ret = 0;
 	static uint8_t checkStart, nowMarker, existMarker;
-	static int32_t encMarkerL = 0, encMarkerR = 1, encMarkerN, nowEncTotalN;
-	static int32_t distL, distR, distN;
+	static int32_t encMarkerN, nowEncTotalN;
+	static int32_t distL, distR;
 
 	nowMarker = markerSensor; // マーカーセンサ値を取得
 	nowEncTotalN = encTotalN;

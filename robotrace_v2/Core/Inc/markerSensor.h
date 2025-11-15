@@ -24,12 +24,12 @@
 //====================================//
 extern uint8_t  markerSensor;
 extern uint8_t  SGmarker;
-extern uint8_t  crossLine;
 //====================================//
 // プロトタイプ宣言
 //====================================//
-void getMarkerSensor ( void );
-uint8_t checkMarker( void );
+void getMarkerSensor (void);
+void initMarkerSensor(void);
+uint8_t checkMarker(void);
 void checkStartGoalMarker(void);
 bool checkCrossLine(void);
 void powerMarkerSensors(uint8_t onoff);
