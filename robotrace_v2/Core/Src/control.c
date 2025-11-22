@@ -413,6 +413,18 @@ void loopSystem(void)
 				writeTgtspeeds(); // 目標速度を記録
 			}
 
+			if (optimalTrace == BOOST_NONE)
+			{
+				lineTraceOmegaFBCtrl.kp = 4;
+				lineTraceOmegaFBCtrl.ki = 0;
+				lineTraceOmegaFBCtrl.kd = 30;
+
+				veloCtrl.kp = 8;
+				veloCtrl.ki = 0;
+				veloCtrl.kp = 0;
+				speedFeedForwardGain = 150;
+			}
+
 			if (initMSD)
 			{
 				initLog(); // ログ一時ファイル作成
