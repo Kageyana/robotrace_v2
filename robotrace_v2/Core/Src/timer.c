@@ -43,8 +43,8 @@ void Interrupt1ms(void)
 		{
 			BMI088getGyro();		// 角速度取得
 			calcDegrees();			// コンプリメンタリフィルタで角度算出
-			motorControlYawRate();	// 角速度制御
-			motorControlYaw();		// 角度制御
+			// motorControlYawRate();	// 角速度制御
+			// motorControlYaw();		// 角度制御
 		}
 		else
 		{
@@ -53,10 +53,19 @@ void Interrupt1ms(void)
 	}
 
 	// PID制御処理
-	motorControlTrace();
-	motorControlTraceOmegaFB();
+	if(patternTrace < 12 || patternTrace > 100)
+	{
+		motorControlTrace();
+	}
+	else 
+	{
+		motorControlTraceOmegaFB();
+	}
 	motorControlSpeed();
-	motorControldist();
+	if(optimalTrace == BOOST_SHORTCUT)
+	{
+		motorControldist();
+	}
 
 	if (patternTrace > 10 && patternTrace < 100)
 	{
