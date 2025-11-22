@@ -415,13 +415,13 @@ void loopSystem(void)
 
 			if (optimalTrace == BOOST_NONE)
 			{
-				lineTraceOmegaFBCtrl.kp = 4;
+				lineTraceOmegaFBCtrl.kp = 3;
 				lineTraceOmegaFBCtrl.ki = 0;
 				lineTraceOmegaFBCtrl.kd = 30;
 
 				veloCtrl.kp = 8;
 				veloCtrl.ki = 0;
-				veloCtrl.kp = 0;
+				veloCtrl.kd = 0;
 				speedFeedForwardGain = 150;
 			}
 

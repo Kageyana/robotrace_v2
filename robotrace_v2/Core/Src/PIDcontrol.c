@@ -207,7 +207,6 @@ void motorControlTraceOmegaFB(void)
 	{
 		senL = (lSensor[4] * TRACE_WEIGHT_CENTER) + (lSensor[3] * TRACE_WEIGHT_INNER) + (lSensor[2] * TRACE_WEIGHT_MIDDLE) + (lSensor[1] * TRACE_WEIGHT_OUTER) + (lSensor[0] * TRACE_WEIGHT_FAR);
 		senR = (lSensor[5] * TRACE_WEIGHT_CENTER) + (lSensor[6] * TRACE_WEIGHT_INNER) + (lSensor[7] * TRACE_WEIGHT_MIDDLE) + (lSensor[8] * TRACE_WEIGHT_OUTER) + (lSensor[9] * TRACE_WEIGHT_FAR);
-
 	}
 	target = ((senR - senL) * encCurrentN) >> 6;
 	Dev = target - (int32_t)BMI088val.gyro.z;
