@@ -858,10 +858,10 @@ uint8_t ssd1306_GetDisplayOn()
 // 引数         Font:フォント format:書式指定文字列 ...
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void ssd1306_printf(FontDef Font, uint8_t *format, ...)
+void ssd1306_printf(FontDef Font, char *format, ...)
 {
 	va_list argptr;
-	uint8_t str[SSD1306_WIDTH / 6 + 10];
+	char str[SSD1306_WIDTH / 6 + 10];
 
 	va_start(argptr, format);
 	vsprintf(str, format, argptr);
@@ -875,10 +875,10 @@ void ssd1306_printf(FontDef Font, uint8_t *format, ...)
 // 引数         Font:フォント format:書式指定文字列 ...
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void ssd1306_printfB(FontDef Font, uint8_t *format, ...)
+void ssd1306_printfB(FontDef Font, char *format, ...)
 {
 	va_list argptr;
-	uint8_t str[SSD1306_WIDTH / 6 + 10];
+	char str[SSD1306_WIDTH / 6 + 10];
 
 	va_start(argptr, format);
 	vsprintf(str, format, argptr);

@@ -82,7 +82,7 @@ void saveLogNumber(int16_t fileNumber)
 {
 	FRESULT fresult;
 	FIL fil;
-	uint8_t fileName[20] = PATH_SETTING;
+	char fileName[20] = PATH_SETTING;
 
 	strcat(fileName, FILENAME_ANALIZENUMBER);					 // ファイル名追加
 	strcat(fileName, ".txt");									 // 拡張子追加
@@ -104,7 +104,7 @@ void getLogNumber(void)
 	FRESULT fresult;
 	FIL fil;
 	TCHAR log[20];
-	uint8_t fileName[20] = PATH_SETTING;
+	char fileName[20] = PATH_SETTING;
 
 	strcat(fileName, FILENAME_ANALIZENUMBER);					// ファイル名追加
 	strcat(fileName, ".txt");									// 拡張子追加
@@ -165,9 +165,8 @@ int16_t readLogDistance(int logNumber)
 	// ファイル読み込み
 	FIL fil_Read;
 	FRESULT fresult;
-	uint8_t fileName[10];
+	char fileName[10];
 	int16_t ret = 0;
-	uint32_t i;
 	bool fileOpened = false; // f_closeの要否を判断するためのフラグ
 	bool errorDetected = false; // 解析途中のエラー発生を検知するフラグ
 
@@ -453,9 +452,8 @@ int16_t readLogTest(int logNumber)
 	// ファイル読み込み
 	FIL fil_Read;
 	FRESULT fresult;
-	uint8_t fileName[10];
+	char fileName[10];
 	int16_t ret = 0;
-	uint32_t i;
 
 	snprintf(fileName, sizeof(fileName), "%d", logNumber);			   // 数値を文字列に変換
 	strcat(fileName, ".csv");										   // 拡張子を追加
@@ -466,10 +464,8 @@ int16_t readLogTest(int logNumber)
 		TCHAR log[512];
 		int32_t time, marker, velo, distance;
 		float angVelo;
-		int32_t startEnc = 0, numD = 0, numM = 0, cntCurR = 0, beforeMarker = 0;
+		int32_t startEnc = 0, numD = 0, numM = 0, beforeMarker = 0;
 		bool analysis = false;
-		float ROCbuff[600] = {0};
-		float *sortROC;
 
 		// 前処理
 		// 構造体配列の初期化
@@ -522,7 +518,7 @@ int16_t calcXYcies(int logNumber)
 {
 	FIL fil_Read, fil_Plot;
 	FRESULT fresult1, fresult2;
-	uint8_t fileName[10];
+	char fileName[10];
 	int16_t ret = 0;
 
 	// ファイル読み込み
@@ -872,13 +868,6 @@ static void activateFailSafe(void)
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void processMarkerEvent(void) {
-	static uint8_t beforeModeCurve = 0; // 前回のカーブモード
-	bool checkDistance = false;	  // 距離補正状態
-
-	if (modeCurve == 0 && beforeModeCurve > 0) {
-		// カーブモードからストレートモードに変化したとき
-		checkDistance = false;   // 距離補正状態をクリア
-	}
 	// カーブマーカー,クロスラインを検出した時の処理
 	if (courseMarker > 0 && beforeCourseMarker == 0) {
 		cntMarker++; // マーカーカウント
@@ -946,6 +935,5 @@ void processMarkerEvent(void) {
 #endif
 	}
 	beforeCourseMarker = courseMarker; // 前回のマーカー状態を更新
-	beforeModeCurve = modeCurve;       // 前回のカーブモードを更新
 }
 

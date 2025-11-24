@@ -13,7 +13,7 @@ FIL fil_W;
 FIL fil_R;
 
 // ログヘッダー
-uint8_t columnTitle[512] = "", formatLog[256] = "";
+char columnTitle[512] = "", formatLog[256] = "";
 
 // ログバッファ
 #ifdef LOG_RUNNING_WRITE
@@ -136,7 +136,7 @@ bool initMicroSD(void)
 void createLog(void)
 {
 	FRESULT fresult;
-	uint8_t fileName[10];
+	char fileName[10];
 	static uint16_t fileNumber = 0;
 
 	if(fileNumber == 0)
@@ -441,7 +441,7 @@ void endLog(void)
 	FRESULT fresult;
 	FIL fil;
 	uint8_t log[LOG_SIZE];
-	uint8_t logStr[256];
+	char logStr[256];
 	UINT readByte, writtenlog; // FatFsの読み書きサイズ
 	uint16_t j, cnt;
 	uint16_t marker, time, beforeTime = 0, speed, beforeSpeed = 0;
@@ -643,10 +643,10 @@ int16_t getFileNumbers(void)
 // 引数         column: ヘッダー文字列 format: フォーマット文字列
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void setLogStr(uint8_t *column, uint8_t *format)
+void setLogStr(char *column, char *format)
 {
-	uint8_t columnStr[30];	// ヘッダー文字列を一時的に格納するバッファ
-	uint8_t formatStr[30];	// フォーマット文字列を一時的に格納するバッファ
+	char columnStr[30];	// ヘッダー文字列を一時的に格納するバッファ
+	char formatStr[30];	// フォーマット文字列を一時的に格納するバッファ
 
        // copy str to local variable
        snprintf((char *)columnStr, sizeof(columnStr), "%s", column); // バッファサイズを指定して安全にコピー
@@ -685,7 +685,7 @@ void SDtest(void)
 // 引数         ディレクトリ名
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void createDir(uint8_t *dirName)
+void createDir(checkDistance *dirName)
 {
 	FRESULT fresult;
 	DIR dir;         // Directory

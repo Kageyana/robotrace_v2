@@ -223,8 +223,8 @@ void writeLinesenval(void)
 {
 	FIL fil;
 	FRESULT fresult;
-	uint8_t str[10], fileName[20] = PATH_SETTING;
-	int16_t i, ret = 0;
+	char str[10], fileName[20] = PATH_SETTING;
+	int16_t i;
 
 	// ファイル読み込み
 	strcat(fileName, FILENAME_LS_VAL);							 // ファイル名追加
@@ -259,9 +259,9 @@ void readLinesenval(void)
 {
 	FIL fil;
 	FRESULT fresult;
-	uint8_t fileName[20] = PATH_SETTING;
+	char fileName[20] = PATH_SETTING;
 	TCHAR str[10];
-	int16_t i, ret = 0;
+	int16_t i;
 
 	// ファイル読み込み
 	strcat(fileName, FILENAME_LS_VAL);							  // ファイル名追加

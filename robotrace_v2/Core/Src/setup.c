@@ -1372,9 +1372,7 @@ static void setup_start(void)
 ///////////////////////////////////////////////////////////////////////////////////////
 void setup(void)
 {
-	uint8_t cntLed, i, j, k;
 	static uint8_t beforeBATLV;
-	static int16_t x = 0, y = 0, offset, ret = 0;
 
 	SchmittBatery(); // バッテリレベルを取得
 	if (batteryLevel != beforeBATLV)

@@ -925,8 +925,8 @@ void writeTgtspeeds(void)
 {
 	FIL fil;
 	FRESULT fresult;
-	uint8_t format[100] = "", fileName[30] = PATH_SETTING;
-	int16_t i, ret = 0;
+	char format[100] = "", fileName[30] = PATH_SETTING;
+	int16_t i;
 
 	// ファイル読み込み
 	strcat(fileName, FILENAME_TARGET_SPEED);					 // ファイル名追加
@@ -955,10 +955,10 @@ void readTgtspeeds(void)
 {
 	FIL fil;
 	FRESULT fresult;
-	uint8_t format[100] = "", fileName[30] = PATH_SETTING;
+	char fileName[30] = PATH_SETTING;
 	int16_t param[20];
 	TCHAR paramStr[100];
-	int16_t i, ret = 0;
+	int16_t i;
 
 	// ファイル読み込み
 	strcat(fileName, FILENAME_TARGET_SPEED);					  // ファイル名追加

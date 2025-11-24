@@ -424,8 +424,7 @@ void writePIDparameters(pidParam *pid)
 {
 	FIL fil;
 	FRESULT fresult;
-	uint8_t fileName[20] = PATH_SETTING;
-	int16_t ret = 0;
+	char fileName[20] = PATH_SETTING;
 
 	// ファイル読み込み
 	strcat(fileName, pid->name);								 // ファイル名追加
@@ -449,9 +448,8 @@ void readPIDparameters(pidParam *pid)
 {
 	FIL fil;
 	FRESULT fresult;
-	uint8_t fileName[20] = PATH_SETTING;
+	char fileName[20] = PATH_SETTING;
 	TCHAR gain[20];
-	int16_t ret = 0;
 
 	// ファイル読み込み
 	strcat(fileName, pid->name);								  // ファイル名追加
@@ -466,7 +464,6 @@ void readPIDparameters(pidParam *pid)
 
 	f_close(&fil);
 }
-
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 writeSpeedFeedForwardGain
 // 処理概要     速度フィードフォワード係数をSDカードへ保存
@@ -477,7 +474,7 @@ void writeSpeedFeedForwardGain(int16_t gain)
 {
 	FIL fil;
 	FRESULT fresult;
-	uint8_t fileName[20] = PATH_SETTING;
+	char fileName[20] = PATH_SETTING;
 
 	// ファイル名を生成して係数を書き込み
 	strcat(fileName, "speed_ff.txt");
@@ -491,7 +488,6 @@ void writeSpeedFeedForwardGain(int16_t gain)
 
 	f_close(&fil);
 }
-
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 readSpeedFeedForwardGain
 // 処理概要     速度フィードフォワード係数をSDカードから読み込む
@@ -502,7 +498,7 @@ void readSpeedFeedForwardGain(int16_t *gain)
 {
 	FIL fil;
 	FRESULT fresult;
-	uint8_t fileName[20] = PATH_SETTING;
+	char fileName[20] = PATH_SETTING;
 	TCHAR gainStr[10];
 	int16_t readGain = *gain;
 

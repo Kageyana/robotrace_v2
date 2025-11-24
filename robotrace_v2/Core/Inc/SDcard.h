@@ -62,7 +62,7 @@ void writeLogBufferPrint(void);
 void writeLogPrint(void);
 #endif
 int16_t getFileNumbers(void);
-void setLogStr(uint8_t *column, uint8_t *format);
+void setLogStr(char *column, char *format);
 void SDtest(void);
-void createDir(uint8_t *dirName);
+void createDir(char *dirName);
 #endif // SDCARD_H_
