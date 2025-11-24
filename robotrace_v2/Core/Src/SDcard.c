@@ -580,7 +580,7 @@ void endLog(void)
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void getFileNumbers(void)
+int16_t getFileNumbers(void)
 {
 	DIR dir;		// Directory
 	FILINFO fno;	// File Info
@@ -629,11 +629,13 @@ void getFileNumbers(void)
 				}
 			}
 		}
-		endFileIndex = fileCount - 1; // 最終インデックスを更新
-		fileIndexLog = endFileIndex;
+		endFileIndex = fileCount - 1;	// 最終インデックスを更新
+		fileIndexLog = endFileIndex;	// 現在のログ番号を最終インデックスに設定
 	}
 
 	f_closedir(&dir); // directory close
+
+	return endFileIndex;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setLogStr

@@ -4,6 +4,7 @@
 // インクルード
 //====================================//
 #include "main.h"
+#include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 //====================================//
@@ -24,6 +25,7 @@
 
 #define BUFFER_SIZE_MARKER 500
 #define FILENUMBER_NUM 1000		// ログファイルナンバーの上限
+#define FILENUMBER_LIMIT 300	// 書き込み不備を警告する数
 
 #define PATH_SETTING "./setting/"
 
@@ -59,7 +61,7 @@ uint32_t logPut32bit(void);
 void writeLogBufferPrint(void);
 void writeLogPrint(void);
 #endif
-void getFileNumbers(void);
+int16_t getFileNumbers(void);
 void setLogStr(uint8_t *column, uint8_t *format);
 void SDtest(void);
 void createDir(uint8_t *dirName);

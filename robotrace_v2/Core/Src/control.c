@@ -4,6 +4,7 @@
 #include "control.h"
 #include "fatfs.h"
 #include "battery.h"
+#include <stdint.h>
 //====================================//
 // グローバル変数の宣言
 //====================================//
@@ -69,6 +70,7 @@ void initSystem(void)
 {
 	HAL_StatusTypeDef resultHAL[12] = {};
 	bool statusGPIO = true;
+	int16_t cntFiles = 0;
 
 	// GPIO初期化 ソフトリセット中の場合は実行しない
 	if(!softreset)
@@ -138,7 +140,7 @@ void initSystem(void)
 
 		if(initMSD || softreset)
 		{
-			getFileNumbers();	// 走行ログのファイル番号を取得
+			cntFiles = getFileNumbers();	// 走行ログのファイル番号を取得
 			getLogNumber();		// 前回の解析ログナンバーを取得
 
 			// 前回のPIDゲインを取得
@@ -253,6 +255,21 @@ void initSystem(void)
 			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 			ssd1306_SetCursor(15, 30);
 			ssd1306_printf(Font_11x18, "No SDcard");
+			SSD1306_DMA_Completed = 0; // 全ページ送信完了フラグリセット
+			while(!ssd1306_IsTransferCompleted());	// 全ページ送信完了まで待つ
+
+			HAL_Delay(1000);
+		}
+	}
+	else
+	{
+		if(cntFiles > FILENUMBER_LIMIT)
+		{
+			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+			ssd1306_SetCursor(20, 16);
+			ssd1306_printf(Font_11x18, "Too many");
+			ssd1306_SetCursor(14, 36	);
+			ssd1306_printf(Font_11x18, "Log files");
 			SSD1306_DMA_Completed = 0; // 全ページ送信完了フラグリセット
 			while(!ssd1306_IsTransferCompleted());	// 全ページ送信完了まで待つ
 
