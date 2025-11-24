@@ -195,31 +195,35 @@ void motorControlTrace(void)
 void motorControlTraceOmegaFB(void)
 {
 	int32_t iP, iI, iD, iRet, target, Dev, Dif, senL, senR;
-	static int32_t traceBefore, encCrossline = 0, beforeGainP=0;
+	static int32_t traceBefore, encCrossline = 0, beforeGainP = 0, beforeGainD = 0;
 
 	// サーボモータ用PWM値計算
 	if (lSensorMax[0] > lSensorMin[0])
 	{
 		// クロスライン検出
-		if(lSensorCari[5] > 2000 && lSensorCari[4] > 2000)
+		if(lSensorCari[5] > TRACE_CROSSLINE_TH && lSensorCari[4] > TRACE_CROSSLINE_TH)
 		{
 			encCrossline = encTotalN;	// クロスライン通過時のエンコーダ値を保存
 		}
 		
 		// クロスライン付近ではPゲインを下げる
-		if(encMM(encTotalN - encCrossline) < 50)
+		if(encMM(encTotalN - encCrossline) < TRACE_CROSSLINE_DISTANCE)
 		{
-			if(beforeGainP == 0)
+			if(beforeGainP == 0 && beforeGainD == 0)
 			{
 				beforeGainP = lineTraceOmegaFBCtrl.kp;
-				lineTraceOmegaFBCtrl.kp = 1;
+				beforeGainD = lineTraceOmegaFBCtrl.kd;
+				lineTraceOmegaFBCtrl.kp = 2;
+				lineTraceOmegaFBCtrl.kd = 0;
 			}
 		}
 		// クロスラインから離れたらPゲインを元に戻す
-		if(encMM(encTotalN - encCrossline) > 50 && beforeGainP != 0)
+		if(encMM(encTotalN - encCrossline) > TRACE_CROSSLINE_DISTANCE && beforeGainP != 0 && beforeGainD != 0)
 		{
 			lineTraceOmegaFBCtrl.kp = beforeGainP;
+			lineTraceOmegaFBCtrl.kd = beforeGainD;
 			beforeGainP = 0;
+			beforeGainD = 0;
 		}
 		// マクロで設定した重みを掛け合わせてセンサ値を合成
 		senL = (lSensorCari[4] * TRACE_WEIGHT_CENTER) + (lSensorCari[3] * TRACE_WEIGHT_INNER) + (lSensorCari[2] * TRACE_WEIGHT_MIDDLE) + (lSensorCari[1] * TRACE_WEIGHT_OUTER) + (lSensorCari[0] * TRACE_WEIGHT_FAR);

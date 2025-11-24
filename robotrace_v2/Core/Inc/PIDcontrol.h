@@ -23,6 +23,9 @@
 #define TRACE_WEIGHT_OUTER		1.03f
 #define TRACE_WEIGHT_FAR		1.04f
 
+#define TRACE_CROSSLINE_TH		2000	// クロスライン検出閾値
+#define TRACE_CROSSLINE_DISTANCE 40		// クロスライン付近でゲインを変更する距離[mm]
+
 // PID制御用ゲイン定義(速度制御)
 #define KP2		10
 #define KI2		0
