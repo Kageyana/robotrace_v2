@@ -4,6 +4,7 @@
 #include "SDcard.h"
 #include "sd_functions.h"
 #include "stdio.h"
+#include <stdint.h>
 //====================================//
 // グローバル変数の宣
 //====================================//
@@ -169,12 +170,11 @@ void createLog(void)
 	setLogStr("ROC", "%f");
 
 	setLogStr("targetSpeed", "%d");
-	setLogStr("modeCurve", "%d");
 	setLogStr("optimalIndex", "%d");
-	// setLogStr("motorpwmL", "%d");
-	// setLogStr("motorpwmR", "%d");
-	// setLogStr("CurrentL", "%f");
-	// setLogStr("CurrentR", "%f");
+	setLogStr("motorpwmL", "%d");
+	setLogStr("motorpwmR", "%d");
+	setLogStr("CurrentL", "%f");
+	setLogStr("CurrentR", "%f");
 	setLogStr("lineTraceCtrl", "%d");
 	setLogStr("veloCtrl", "%d");
 
@@ -505,25 +505,32 @@ void endLog(void)
 			logvalf[cnt] = ftoi.f;
 		}
 
+		// コース解析に使用する変数を取得
 		marker = logval8[1];
 		time = logval16[0];
 		speed = logval16[1];
 		distance = logval32[0];
 		zg = logvalf[0];
 
+		// 異常値補正
 		if (abs(speed - beforeSpeed) > 500)
 		{
 			speed = beforeSpeed;
 			logval16[1] = beforeSpeed;
 		}
 		beforeSpeed = speed;
+
+		int16_t cL,cR;
+		cL = (int16_t)logval16[5];
+		cR = (int16_t)logval16[6];
+
 		dt = (float)(time - beforeTime) / 1000; // 経過時間
 
-		cnt = LOG_NUM_FLOAT;					 // float型のログの続きを使用する
+		cnt = LOG_NUM_FLOAT;	// float型のログの続きを使用する
 		logvalf[cnt++] = calcROC(speed, zg, dt); // 曲率半径を計算
 
-		dt = (float)(time - beforeTime) / 1000; // 経過時間
-		calcXYcie(speed, zg, dt);				// xy座標を計算
+		dt = (float)(time - beforeTime) / 1000;			// 経過時間
+		calcXYcie(speed, zg, dt);	// xy座標を計算
 		logvalf[cnt++] = xycie.x;
 		logvalf[cnt++] = xycie.y;
 		beforeTime = time; // 時間を更新
@@ -538,14 +545,13 @@ void endLog(void)
 			logvalf[1],		// ROC
 
 			logval8[0],		// targetSpeed
-			logval8[2],		// modeCurve
 			logval16[2],	// optimalIndex
-			// (int16_t)logval16[3],		// motorpwmL
-			// (int16_t)logval16[4],		// motorpwmR
-			// (float)logval16[5] / 10000,	// CurrentL
-			// (float)logval16[6] / 10000,	// CurrentR
-			(int16_t)logval16[3],		// lineTraceCtrl
-			(int16_t)logval16[4],		// veloCtrl
+			(int16_t)logval16[3],	// motorpwmL
+			(int16_t)logval16[4],	// motorpwmR
+			(float)cL / 10000.0f,	// CurrentL
+			(float)cR / 10000.0f,	// CurrentR
+			(int16_t)logval16[7],	// lineTraceCtrl
+			(int16_t)logval16[8],	// veloCtrl
 			logvalf[2],		// x
 			logvalf[3]		// y
 		);

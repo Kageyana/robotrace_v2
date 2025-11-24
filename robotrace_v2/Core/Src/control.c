@@ -417,7 +417,7 @@ void loopSystem(void)
 			{
 				lineTraceOmegaFBCtrl.kp = 3;
 				lineTraceOmegaFBCtrl.ki = 0;
-				lineTraceOmegaFBCtrl.kd = 30;
+				lineTraceOmegaFBCtrl.kd = 15;
 
 				veloCtrl.kp = 8;
 				veloCtrl.ki = 0;
@@ -447,7 +447,15 @@ void loopSystem(void)
 		// スタートマーカー通過までの走行
 		if(optimalTrace == BOOST_DISTANCE)
 		{
-			setTargetSpeed(PPAD[0].boostSpeed/2); // 目標速度
+			if(PPAD[0].boostSpeed/2 > 2.0F)
+			{
+				setTargetSpeed(2.0F); // 目標速度
+			}
+			else
+			{
+				setTargetSpeed(PPAD[0].boostSpeed/2); // 目標速度
+			}
+			
 		}
 		else
 		{
@@ -502,22 +510,22 @@ void loopSystem(void)
 		}
 		else if (optimalTrace == BOOST_DISTANCE)
 		{
-			// Boost run based on course distance table
+			// 距離基準2次走行
 			if (numPPADarry > 0)
 			{
 				if (optimalIndex >= numPPADarry)
 				{
 					optimalIndex = numPPADarry - 1;
 				}
-				const int32_t segmentPulse = encMM(CALCDISTANCE);
-				int32_t remainingPulse = encTotalOptimal - DistanceOptimal;
+				const int32_t segmentPulse = encMM(CALCDISTANCE);		// セグメント距離をパルスに変換
+				int32_t remainingPulse = encTotalOptimal - DistanceOptimal;	// セグメント内の残りパルス数
 				if (segmentPulse > 0)
 				{
 					while (remainingPulse >= segmentPulse && (optimalIndex + 1) < numPPADarry)
 					{
-						DistanceOptimal += segmentPulse;	// Consume next distance segment
-						remainingPulse -= segmentPulse;
-						optimalIndex++;					// Advance to the next boost profile
+						DistanceOptimal += segmentPulse;	// 次の距離セグメントへ
+						remainingPulse -= segmentPulse;		// セグメント内の残りパルス数を更新
+						optimalIndex++;						// 速度計画インデックス更新
 					}
 				}
 				if (remainingPulse < 0)
@@ -525,7 +533,7 @@ void loopSystem(void)
 					remainingPulse = 0;
 					DistanceOptimal = encTotalOptimal;
 				}
-				// Apply boost speed associated with current segment
+				// 速度計画から速度を取得
 				boostSpeed = PPAD[optimalIndex].boostSpeed;
 				if ((optimalIndex + 1) >= numPPADarry)
 				{
@@ -536,9 +544,9 @@ void loopSystem(void)
 			{
 				boostSpeed = tgtParam.straight;
 			}
-			// Update target speed
+			// 目標速度に設定
 			setTargetSpeed(boostSpeed);
-			// Output motor command
+			// モーター出力
 			motorPwmOutSynth(lineTraceOmegaFBCtrl.pwm, veloCtrl.pwm, 0, 0);
 		}
 		else if (optimalTrace == BOOST_SHORTCUT)

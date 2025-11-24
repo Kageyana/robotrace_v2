@@ -201,7 +201,7 @@ void motorControlTraceOmegaFB(void)
 	if (lSensorMax[0] > lSensorMin[0])
 	{
 		// クロスライン検出
-		if(lSensorCari[5] > 3000 && lSensorCari[4] > 3000)
+		if(lSensorCari[5] > 2000 && lSensorCari[4] > 2000)
 		{
 			encCrossline = encTotalN;	// クロスライン通過時のエンコーダ値を保存
 		}
@@ -212,7 +212,7 @@ void motorControlTraceOmegaFB(void)
 			if(beforeGainP == 0)
 			{
 				beforeGainP = lineTraceOmegaFBCtrl.kp;
-				lineTraceOmegaFBCtrl.kp = 2;
+				lineTraceOmegaFBCtrl.kp = 1;
 			}
 		}
 		// クロスラインから離れたらPゲインを元に戻す
