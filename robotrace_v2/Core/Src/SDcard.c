@@ -582,11 +582,10 @@ void endLog(void)
 /////////////////////////////////////////////////////////////////////
 void getFileNumbers(void)
 {
-	DIR dir;         // Directory
-	FILINFO fno; // File Info
+	DIR dir;		// Directory
+	FILINFO fno;	// File Info
 	FRESULT fresult;
-	uint8_t fileName[10];
-	uint8_t *tp, i;
+	uint8_t *tp;
 
 	for(uint16_t j=0;j<FILENUMBER_NUM;j++){
 		fileNumbers[j] = 0; // 配列を初期化
@@ -595,6 +594,7 @@ void getFileNumbers(void)
     fresult = f_opendir(&dir, "/"); // directory open
 	if (fresult == FR_OK)
 	{
+		endFileIndex = 0; // 最終インデックスを初期化
 		do
 		{
 			fresult = f_readdir(&dir, &fno);
