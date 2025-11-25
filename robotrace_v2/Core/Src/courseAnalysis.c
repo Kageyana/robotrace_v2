@@ -6,6 +6,7 @@
 #include "PIDcontrol.h"
 #include "markerSensor.h"
 #include "BMI088.h"
+#include "control.h"
 //====================================//
 // グローバル変数の宣
 //====================================//
@@ -185,7 +186,9 @@ int16_t readLogDistance(int logNumber)
 		static int16_t ROCbuff[600] = {0};
 		int16_t sortROC[CALCDISTANCE / 10];	// sortROCの最大要素数はCALCDISTANCE/10(=5)。動的確保とデバッグprintfを排除するため自動配列を利用
 		int32_t straightMeter = 0;
-		bool straightState = false;
+bool straightState = false;
+float angVeloSum = 0.0f;
+int32_t angVeloCount = 0;
 
 		// 前処理
 		// 構造体配列の初期化
@@ -242,6 +245,7 @@ int16_t readLogDistance(int logNumber)
 				}
 
 				PPAD[numD].boostSpeed = asignVelocity(PPAD[numD].ROC); // 曲率半径ごとの速度を計算する
+				PPAD[numD].angVelo = (angVeloCount > 0) ? (angVeloSum / (float)angVeloCount) : 0.0f; // 区間平均の角速度を保持
 
 				// 前回の曲率半径と比較(numDが1以上の場合のみ)
 				if (numD >= 1 && PPAD[numD].ROC == PPAD[numD - 1].ROC)
@@ -254,6 +258,8 @@ int16_t readLogDistance(int logNumber)
 				}
 
 				cntCurR = 0; // 曲率半径用配列のカウントクリア
+				angVeloSum = 0.0f; // 次区間の角速度計算用に初期化
+				angVeloCount = 0; // 次区間の角速度計算用に初期化
 				numD++;		 // 距離解析インデックス更新
 				if (numD >= OPT_BUFF_SIZE)
 				{
@@ -264,6 +270,8 @@ int16_t readLogDistance(int logNumber)
 			}
 			// 曲率半径の計算
 			ROCbuff[cntCurR] = roc;
+			angVeloSum += angVelo; // 角速度の合計を取得
+			angVeloCount++; // 角速度サンプル数をカウント
 
 			if (abs(ROCbuff[cntCurR]) >= 700)
 			{
@@ -331,10 +339,10 @@ int16_t readLogDistance(int logNumber)
 			// 減速インデックス末尾から先頭まで平滑化
 			for (int32_t idx = numD - 2; idx >= 0; idx--)
 			{
-				dv = (PPAD[idx].boostSpeed - PPAD[idx + 1].boostSpeed);	// 区間速度差
+				dv = (PPAD[idx].boostSpeed - PPAD[idx + 1].boostSpeed); // 区間速度差
 				if (fabsf(dv) < 1e-6f)
 				{
-					continue;	// 速度差が極小なら補正不要
+					continue;       // 速度差が極小なら補正不要
 				}
 				elapsedTime = fabs(dl / dv);
 				acceleration = dv / elapsedTime;
@@ -344,7 +352,44 @@ int16_t readLogDistance(int logNumber)
 				}
 			}
 
-			// for (i = 0; i < numD; i++)
+			// 角加速度・角減速度を用いた追加の平滑化
+			for (int32_t idx = numD - 2; idx >= 0; idx--)
+			{
+				dv = (PPAD[idx].boostSpeed - PPAD[idx + 1].boostSpeed); // 区間速度差
+				if (fabsf(dv) < 1e-6f)
+				{
+					continue;       // 速度差が極小なら補正不要
+				}
+
+				float angAccel = (PPAD[idx + 1].angVelo - PPAD[idx].angVelo) / (DELTATIME * (CALCDISTANCE / 10.0f)); // 区間間の角加速度
+				float dynamicDecel = MACHINEDECREACE; // 基準減速度
+
+				if (angAccel > tgtParam.angAccele)
+				{
+					// 角加速度が大きい区間ではより強く減速する
+					float excess = angAccel - tgtParam.angAccele;
+					dynamicDecel += (excess / tgtParam.angAccele) * MACHINEDECREACE;
+				}
+				else if (angAccel < -tgtParam.angDecreace)
+				{
+					// 角減速度が大きい区間では減速幅を抑える
+					float reduction = (-angAccel - tgtParam.angDecreace) / tgtParam.angDecreace;
+					dynamicDecel = MACHINEDECREACE * (1.0f - reduction);
+					if (dynamicDecel < 0.0f)
+					{
+						dynamicDecel = 0.0f;
+					}
+				}
+
+				elapsedTime = fabs(dl / dv);
+				acceleration = dv / elapsedTime;
+				if (acceleration > dynamicDecel)
+				{
+					PPAD[idx].boostSpeed = PPAD[idx + 1].boostSpeed + (dynamicDecel * dl);
+				}
+			}
+
+// for (i = 0; i < numD; i++)
 			// {
 			// 	printf("%f\n", PPAD[i].boostSpeed);
 			// }

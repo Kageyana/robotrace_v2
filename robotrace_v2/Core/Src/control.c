@@ -28,24 +28,26 @@ float batteryVoltage_V = 0.0f;	// DWT初期化後に取得したバッテリ電�
 
 // 速度パラメータ関連
 speedParam tgtParam = {
-	PARAM_STRAIGHT,
-	PARAM_CURVE,
-	PARAM_STOP,
-	PARAM_BOOST_STRAIGHT,
-	PARAM_BOOST_1500,
-	PARAM_BOOST_1300,
-	PARAM_BOOST_1000,
-	PARAM_BOOST_800,
-	PARAM_BOOST_700,
-	PARAM_BOOST_600,
-	PARAM_BOOST_600,
-	PARAM_BOOST_400,
-	PARAM_BOOST_300,
-	PARAM_BOOST_200,
-	PARAM_BOOST_100,
-	MACHINEACCELE,
-	MACHINEDECREACE,
-	PARAM_SHORTCUT};
+PARAM_STRAIGHT,
+PARAM_CURVE,
+PARAM_STOP,
+PARAM_BOOST_STRAIGHT,
+PARAM_BOOST_1500,
+PARAM_BOOST_1300,
+PARAM_BOOST_1000,
+PARAM_BOOST_800,
+PARAM_BOOST_700,
+PARAM_BOOST_600,
+PARAM_BOOST_600,
+PARAM_BOOST_400,
+PARAM_BOOST_300,
+PARAM_BOOST_200,
+PARAM_BOOST_100,
+MACHINEACCELE,
+MACHINEDECREACE,
+PARAM_SHORTCUT,
+PARAM_ANG_ACCELE,
+PARAM_ANG_DECREACE};
 
 // タイマ関連
 uint32_t cntRun = 0;
@@ -940,7 +942,7 @@ void writeTgtspeeds(void)
 			strcat(format, "%03d,");
 		}
 
-		f_printf(&fil, format, (int32_t)(round(tgtParam.straight * 100)), (int32_t)(round(tgtParam.curve * 100)), (int32_t)(round(tgtParam.stop * 100)), (int32_t)(round(tgtParam.bstStraight * 100)), (int32_t)(round(tgtParam.bst1500 * 100)), (int32_t)(round(tgtParam.bst1300 * 100)), (int32_t)(round(tgtParam.bst1000 * 100)), (int32_t)(round(tgtParam.bst800 * 100)), (int32_t)(round(tgtParam.bst700 * 100)), (int32_t)(round(tgtParam.bst600 * 100)), (int32_t)(round(tgtParam.bst500 * 100)), (int32_t)(round(tgtParam.bst400 * 100)), (int32_t)(round(tgtParam.bst300 * 100)), (int32_t)(round(tgtParam.bst200 * 100)), (int32_t)(round(tgtParam.bst100 * 100)), (int32_t)(round(tgtParam.acceleF * 100)), (int32_t)(round(tgtParam.acceleD * 100)), (int32_t)(round(tgtParam.shortCut * 100)));
+		f_printf(&fil, format, (int32_t)(round(tgtParam.straight * 100)), (int32_t)(round(tgtParam.curve * 100)), (int32_t)(round(tgtParam.stop * 100)), (int32_t)(round(tgtParam.bstStraight * 100)), (int32_t)(round(tgtParam.bst1500 * 100)), (int32_t)(round(tgtParam.bst1300 * 100)), (int32_t)(round(tgtParam.bst1000 * 100)), (int32_t)(round(tgtParam.bst800 * 100)), (int32_t)(round(tgtParam.bst700 * 100)), (int32_t)(round(tgtParam.bst600 * 100)), (int32_t)(round(tgtParam.bst500 * 100)), (int32_t)(round(tgtParam.bst400 * 100)), (int32_t)(round(tgtParam.bst300 * 100)), (int32_t)(round(tgtParam.bst200 * 100)), (int32_t)(round(tgtParam.bst100 * 100)), (int32_t)(round(tgtParam.acceleF * 100)), (int32_t)(round(tgtParam.acceleD * 100)), (int32_t)(round(tgtParam.shortCut * 100)), (int32_t)(round(tgtParam.angAccele * 100)), (int32_t)(round(tgtParam.angDecreace * 100)));
 	}
 
 	f_close(&fil);
@@ -956,7 +958,7 @@ void readTgtspeeds(void)
 	FIL fil;
 	FRESULT fresult;
 	char fileName[30] = PATH_SETTING;
-	int16_t param[20];
+int16_t param[22];
 	TCHAR paramStr[100];
 	int16_t i;
 
@@ -987,10 +989,12 @@ void readTgtspeeds(void)
 		tgtParam.bst400 = (float)param[11] / 100;
 		tgtParam.bst300 = (float)param[12] / 100;
 		tgtParam.bst200 = (float)param[13] / 100;
-		tgtParam.bst100 = (float)param[14] / 100;
-		tgtParam.acceleF = (float)param[15] / 100;
-		tgtParam.acceleD = (float)param[16] / 100;
-		tgtParam.shortCut = (float)param[17] / 100;
+tgtParam.bst100 = (float)param[14] / 100;
+tgtParam.acceleF = (float)param[15] / 100;
+tgtParam.acceleD = (float)param[16] / 100;
+tgtParam.shortCut = (float)param[17] / 100;
+tgtParam.angAccele = (float)param[18] / 100;
+tgtParam.angDecreace = (float)param[19] / 100;
 	}
 
 	f_close(&fil);

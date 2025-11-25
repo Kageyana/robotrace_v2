@@ -27,6 +27,8 @@
 #define PARAM_BOOST_300 1.7F
 #define PARAM_BOOST_200 1.6F
 #define PARAM_BOOST_100 1.5F
+#define PARAM_ANG_ACCELE 800.0F
+#define PARAM_ANG_DECREACE 800.0F
 
 #define PARAM_UP_STEP 1.02F
 
@@ -57,9 +59,11 @@ typedef struct
 	float bst300;
 	float bst200;
 	float bst100;
-	float acceleF;
-	float acceleD;
-	float shortCut;
+        float acceleF;
+        float acceleD;
+        float shortCut;
+        float angAccele;
+        float angDecreace;
 } speedParam;
 //====================================//
 // グローバル変数の宣言

@@ -33,6 +33,7 @@ typedef struct
 {
 	int16_t ROC;
 	float boostSpeed;
+	float angVelo;
 } AnalysisData;
 
 typedef struct
