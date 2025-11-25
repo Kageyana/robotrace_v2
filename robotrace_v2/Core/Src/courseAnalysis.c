@@ -186,9 +186,9 @@ int16_t readLogDistance(int logNumber)
 		static int16_t ROCbuff[600] = {0};
 		int16_t sortROC[CALCDISTANCE / 10];	// sortROCの最大要素数はCALCDISTANCE/10(=5)。動的確保とデバッグprintfを排除するため自動配列を利用
 		int32_t straightMeter = 0;
-bool straightState = false;
-float angVeloSum = 0.0f;
-int32_t angVeloCount = 0;
+		bool straightState = false;
+		float angVeloSum = 0.0f;        // 区間平均角速度算出用の合計値
+		int32_t angVeloCount = 0;       // 区間平均角速度算出用のサンプル数
 
 		// 前処理
 		// 構造体配列の初期化
@@ -245,7 +245,8 @@ int32_t angVeloCount = 0;
 				}
 
 				PPAD[numD].boostSpeed = asignVelocity(PPAD[numD].ROC); // 曲率半径ごとの速度を計算する
-				PPAD[numD].angVelo = (angVeloCount > 0) ? (angVeloSum / (float)angVeloCount) : 0.0f; // 区間平均の角速度を保持
+				// ログ区間の平均角速度を計算して保存しておく
+				PPAD[numD].angVelo = (angVeloCount > 0) ? (angVeloSum / (float)angVeloCount) : 0.0f;
 
 				// 前回の曲率半径と比較(numDが1以上の場合のみ)
 				if (numD >= 1 && PPAD[numD].ROC == PPAD[numD - 1].ROC)
@@ -258,8 +259,8 @@ int32_t angVeloCount = 0;
 				}
 
 				cntCurR = 0; // 曲率半径用配列のカウントクリア
-				angVeloSum = 0.0f; // 次区間の角速度計算用に初期化
-				angVeloCount = 0; // 次区間の角速度計算用に初期化
+				angVeloSum = 0.0f;    // 次区間の角速度計算用に初期化
+				angVeloCount = 0;     // 次区間の角速度計算用に初期化
 				numD++;		 // 距離解析インデックス更新
 				if (numD >= OPT_BUFF_SIZE)
 				{
@@ -361,8 +362,9 @@ int32_t angVeloCount = 0;
 					continue;       // 速度差が極小なら補正不要
 				}
 
-				float angAccel = (PPAD[idx + 1].angVelo - PPAD[idx].angVelo) / (DELTATIME * (CALCDISTANCE / 10.0f)); // 区間間の角加速度
-				float dynamicDecel = MACHINEDECREACE; // 基準減速度
+				// 区間間の角速度変化を角加速度として換算し、減速幅を動的に決定する
+				float angAccel = (PPAD[idx + 1].angVelo - PPAD[idx].angVelo) / (DELTATIME * (CALCDISTANCE / 10.0f));
+				float dynamicDecel = MACHINEDECREACE; // 角度変化が小さい場合の基準減速度
 
 				if (angAccel > tgtParam.angAccele)
 				{
@@ -385,11 +387,12 @@ int32_t angVeloCount = 0;
 				acceleration = dv / elapsedTime;
 				if (acceleration > dynamicDecel)
 				{
+					// 角加速度に応じた減速幅で目標速度を上書きする
 					PPAD[idx].boostSpeed = PPAD[idx + 1].boostSpeed + (dynamicDecel * dl);
 				}
 			}
 
-// for (i = 0; i < numD; i++)
+			// for (i = 0; i < numD; i++)
 			// {
 			// 	printf("%f\n", PPAD[i].boostSpeed);
 			// }

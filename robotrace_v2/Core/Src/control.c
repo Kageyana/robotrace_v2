@@ -958,7 +958,7 @@ void readTgtspeeds(void)
 	FIL fil;
 	FRESULT fresult;
 	char fileName[30] = PATH_SETTING;
-int16_t param[22];
+	int16_t param[22];
 	TCHAR paramStr[100];
 	int16_t i;
 
@@ -989,12 +989,12 @@ int16_t param[22];
 		tgtParam.bst400 = (float)param[11] / 100;
 		tgtParam.bst300 = (float)param[12] / 100;
 		tgtParam.bst200 = (float)param[13] / 100;
-tgtParam.bst100 = (float)param[14] / 100;
-tgtParam.acceleF = (float)param[15] / 100;
-tgtParam.acceleD = (float)param[16] / 100;
-tgtParam.shortCut = (float)param[17] / 100;
-tgtParam.angAccele = (float)param[18] / 100;
-tgtParam.angDecreace = (float)param[19] / 100;
+		tgtParam.bst100 = (float)param[14] / 100;
+		tgtParam.acceleF = (float)param[15] / 100;
+		tgtParam.acceleD = (float)param[16] / 100;
+		tgtParam.shortCut = (float)param[17] / 100;
+		tgtParam.angAccele = (float)param[18] / 100;
+		tgtParam.angDecreace = (float)param[19] / 100;
 	}
 
 	f_close(&fil);
