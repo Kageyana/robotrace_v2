@@ -927,7 +927,7 @@ void writeTgtspeeds(void)
 {
 	FIL fil;
 	FRESULT fresult;
-        char format[120] = "", fileName[30] = PATH_SETTING;
+	char format[120] = "", fileName[30] = PATH_SETTING;
 	int16_t i;
 
 	// ファイル読み込み
@@ -942,7 +942,28 @@ void writeTgtspeeds(void)
 			strcat(format, "%03d,");
 		}
 
-		f_printf(&fil, format, (int32_t)(round(tgtParam.straight * 100)), (int32_t)(round(tgtParam.curve * 100)), (int32_t)(round(tgtParam.stop * 100)), (int32_t)(round(tgtParam.bstStraight * 100)), (int32_t)(round(tgtParam.bst1500 * 100)), (int32_t)(round(tgtParam.bst1300 * 100)), (int32_t)(round(tgtParam.bst1000 * 100)), (int32_t)(round(tgtParam.bst800 * 100)), (int32_t)(round(tgtParam.bst700 * 100)), (int32_t)(round(tgtParam.bst600 * 100)), (int32_t)(round(tgtParam.bst500 * 100)), (int32_t)(round(tgtParam.bst400 * 100)), (int32_t)(round(tgtParam.bst300 * 100)), (int32_t)(round(tgtParam.bst200 * 100)), (int32_t)(round(tgtParam.bst100 * 100)), (int32_t)(round(tgtParam.acceleF * 100)), (int32_t)(round(tgtParam.acceleD * 100)), (int32_t)(round(tgtParam.shortCut * 100)), (int32_t)(round(tgtParam.angAccele * 100)), (int32_t)(round(tgtParam.angDecreace * 100)));
+		// 速度設定を整数化し、フォーマット文字列に沿って逐次書き込む
+		f_printf(&fil, format,
+			(int32_t)(round(tgtParam.straight * 100)),
+			(int32_t)(round(tgtParam.curve * 100)),
+			(int32_t)(round(tgtParam.stop * 100)),
+			(int32_t)(round(tgtParam.bstStraight * 100)),
+			(int32_t)(round(tgtParam.bst1500 * 100)),
+			(int32_t)(round(tgtParam.bst1300 * 100)),
+			(int32_t)(round(tgtParam.bst1000 * 100)),
+			(int32_t)(round(tgtParam.bst800 * 100)),
+			(int32_t)(round(tgtParam.bst700 * 100)),
+			(int32_t)(round(tgtParam.bst600 * 100)),
+			(int32_t)(round(tgtParam.bst500 * 100)),
+			(int32_t)(round(tgtParam.bst400 * 100)),
+			(int32_t)(round(tgtParam.bst300 * 100)),
+			(int32_t)(round(tgtParam.bst200 * 100)),
+			(int32_t)(round(tgtParam.bst100 * 100)),
+			(int32_t)(round(tgtParam.acceleF * 100)),
+			(int32_t)(round(tgtParam.acceleD * 100)),
+			(int32_t)(round(tgtParam.shortCut * 100)),
+			(int32_t)(round(tgtParam.angAccele * 100)),
+			(int32_t)(round(tgtParam.angDecreace * 100)));
 	}
 
 	f_close(&fil);

@@ -365,6 +365,7 @@ int16_t readLogDistance(int logNumber)
 				}
 
 				// 区間間の角速度変化を角加速度として換算し、減速幅を動的に決定する
+				// DELTATIMEと距離分解能から角速度変化の時間スケールを算出し、単位をdeg/s^2に統一する
 				float angAccel = (PPAD[idx + 1].angVelo - PPAD[idx].angVelo) / (DELTATIME * (CALCDISTANCE / 10.0f));
 				float dynamicDecel = MACHINEDECREACE; // 角度変化が小さい場合の基準減速度
 
@@ -385,6 +386,7 @@ int16_t readLogDistance(int logNumber)
 					}
 				}
 
+				// 角度変化に合わせた減速幅で再計算し、オーバーシュートを抑える
 				elapsedTime = fabs(dl / dv);
 				acceleration = dv / elapsedTime;
 				if (acceleration > dynamicDecel)
@@ -396,9 +398,10 @@ int16_t readLogDistance(int logNumber)
 
 			// 平滑化後の目標速度配列をSDカードへ記録する
 			FIL fil_Boost;
-			FRESULT fresult_Boost;
-			char boostFileName[32];
-			snprintf(boostFileName, sizeof(boostFileName), "%sboost_%05d.csv", PATH_SETTING, logNumber);
+				FRESULT fresult_Boost;
+				char boostFileName[32];
+				// ログ番号をゼロ埋めで付与し、保存順を揃える
+				snprintf(boostFileName, sizeof(boostFileName), "%sboost_%05d.csv", PATH_SETTING, logNumber);
 			fresult_Boost = f_open(&fil_Boost, boostFileName, FA_CREATE_ALWAYS | FA_WRITE);
 			if (fresult_Boost == FR_OK)
 			{
