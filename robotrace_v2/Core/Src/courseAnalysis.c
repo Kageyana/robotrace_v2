@@ -7,6 +7,8 @@
 #include "markerSensor.h"
 #include "BMI088.h"
 #include "control.h"
+#include <stdio.h>
+#include <string.h>
 //====================================//
 // グローバル変数の宣
 //====================================//
@@ -401,10 +403,15 @@ int16_t readLogDistance(int logNumber)
 			if (fresult_Boost == FR_OK)
 			{
 				// CSVヘッダを書き込み、平滑化済みのboostSpeedを順番に保存する
+				UINT bytesWritten;
 				f_printf(&fil_Boost, "index,boost_speed\n");
 				for (int32_t idx = 0; idx < numD; idx++)
 				{
-					f_printf(&fil_Boost, "%ld,%f\n", (long)idx, PPAD[idx].boostSpeed);
+					char boostLine[48];
+
+					// f_printfは%f非対応のため、1行分を文字列に整形してから書き込む
+					snprintf(boostLine, sizeof(boostLine), "%ld,%.3f\n", (long)idx, PPAD[idx].boostSpeed);
+					f_write(&fil_Boost, boostLine, strlen(boostLine), &bytesWritten);
 				}
 				f_close(&fil_Boost);
 			}

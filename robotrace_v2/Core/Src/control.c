@@ -927,7 +927,7 @@ void writeTgtspeeds(void)
 {
 	FIL fil;
 	FRESULT fresult;
-	char format[100] = "", fileName[30] = PATH_SETTING;
+        char format[120] = "", fileName[30] = PATH_SETTING;
 	int16_t i;
 
 	// ファイル読み込み
