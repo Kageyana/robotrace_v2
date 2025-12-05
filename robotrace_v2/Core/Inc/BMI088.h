@@ -44,7 +44,7 @@
 
 #define REG_TEMP_MSB 0x22
 
-// #define USE_ACCELE	// 加速度センサ使用
+#define USE_ACCELE	// 加速度センサ使用
 
 /***************************************自動生成関数*************************************/
 #define SPI_Handle_IMU hspi2
