@@ -20,3 +20,6 @@ CTestTestfile.cmake
 _deps
 CMakeUserPresets.json
 build.ninja
+
+#Circuit
+fp-info-cache

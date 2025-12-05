@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "timer.h"
+#include "BMI088.h"
 #define STRAIGHT_STATE_THRESHOLD_MM	70	// 直線判定の距離閾値[mm]
 //====================================//
 // グローバル変数の宣
@@ -42,6 +43,7 @@ void Interrupt1ms(void)
 		if (!calibratIMU)
 		{
 			BMI088getGyro();		// 角速度取得
+			BMI088getAccele();		// 加速度取得（角度補正に使用）
 			calcDegrees();			// コンプリメンタリフィルタで角度算出
 			// motorControlYawRate();	// 角速度制御
 			// motorControlYaw();		// 角度制御

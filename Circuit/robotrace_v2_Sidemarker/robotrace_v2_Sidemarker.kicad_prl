@@ -1,8 +1,8 @@
 {
   "board": {
-    "active_layer": 0,
-    "active_layer_preset": "",
-    "auto_track_width": false,
+    "active_layer": 37,
+    "active_layer_preset": "Front Layers",
+    "auto_track_width": true,
     "hidden_netclasses": [],
     "hidden_nets": [],
     "high_contrast_mode": 0,
@@ -64,8 +64,14 @@
       39,
       40
     ],
-    "visible_layers": "00090aa_00000001",
+    "visible_layers": "00290aa_00000001",
     "zone_display_mode": 0
+  },
+  "git": {
+    "repo_password": "",
+    "repo_type": "",
+    "repo_username": "",
+    "ssh_key": ""
   },
   "meta": {
     "filename": "robotrace_v2_Sidemarker.kicad_prl",

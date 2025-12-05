@@ -685,7 +685,7 @@ void SDtest(void)
 // 引数         ディレクトリ名
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void createDir(checkDistance *dirName)
+void createDir(char *dirName)
 {
 	FRESULT fresult;
 	DIR dir;         // Directory

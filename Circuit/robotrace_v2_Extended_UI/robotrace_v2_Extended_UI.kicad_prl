@@ -1,6 +1,6 @@
 {
   "board": {
-    "active_layer": 0,
+    "active_layer": 44,
     "active_layer_preset": "Front Layers",
     "auto_track_width": true,
     "hidden_netclasses": [],
@@ -66,6 +66,12 @@
     ],
     "visible_layers": "0015055_80000000",
     "zone_display_mode": 0
+  },
+  "git": {
+    "repo_password": "",
+    "repo_type": "",
+    "repo_username": "",
+    "ssh_key": ""
   },
   "meta": {
     "filename": "robotrace_v2_Extended_UI.kicad_prl",
