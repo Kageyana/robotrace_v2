@@ -33,6 +33,7 @@ typedef struct
 {
 	int16_t ROC;
 	float boostSpeed;
+	float angVelo;        // 角速度の平滑化に用いる区間平均角速度[deg/s]
 } AnalysisData;
 
 typedef struct

@@ -6,6 +6,9 @@
 #include "PIDcontrol.h"
 #include "markerSensor.h"
 #include "BMI088.h"
+#include "control.h"
+#include <stdio.h>
+#include <string.h>
 //====================================//
 // グローバル変数の宣
 //====================================//
@@ -186,6 +189,8 @@ int16_t readLogDistance(int logNumber)
 		int16_t sortROC[CALCDISTANCE / 10];	// sortROCの最大要素数はCALCDISTANCE/10(=5)。動的確保とデバッグprintfを排除するため自動配列を利用
 		int32_t straightMeter = 0;
 		bool straightState = false;
+		float angVeloSum = 0.0f;        // 区間平均角速度算出用の合計値
+		int32_t angVeloCount = 0;       // 区間平均角速度算出用のサンプル数
 
 		// 前処理
 		// 構造体配列の初期化
@@ -242,6 +247,8 @@ int16_t readLogDistance(int logNumber)
 				}
 
 				PPAD[numD].boostSpeed = asignVelocity(PPAD[numD].ROC); // 曲率半径ごとの速度を計算する
+				// ログ区間の平均角速度を計算して保存しておく
+				PPAD[numD].angVelo = (angVeloCount > 0) ? (angVeloSum / (float)angVeloCount) : 0.0f;
 
 				// 前回の曲率半径と比較(numDが1以上の場合のみ)
 				if (numD >= 1 && PPAD[numD].ROC == PPAD[numD - 1].ROC)
@@ -254,6 +261,8 @@ int16_t readLogDistance(int logNumber)
 				}
 
 				cntCurR = 0; // 曲率半径用配列のカウントクリア
+				angVeloSum = 0.0f;    // 次区間の角速度計算用に初期化
+				angVeloCount = 0;     // 次区間の角速度計算用に初期化
 				numD++;		 // 距離解析インデックス更新
 				if (numD >= OPT_BUFF_SIZE)
 				{
@@ -264,6 +273,8 @@ int16_t readLogDistance(int logNumber)
 			}
 			// 曲率半径の計算
 			ROCbuff[cntCurR] = roc;
+			angVeloSum += angVelo; // 角速度の合計を取得
+			angVeloCount++; // 角速度サンプル数をカウント
 
 			if (abs(ROCbuff[cntCurR]) >= 700)
 			{
@@ -331,10 +342,10 @@ int16_t readLogDistance(int logNumber)
 			// 減速インデックス末尾から先頭まで平滑化
 			for (int32_t idx = numD - 2; idx >= 0; idx--)
 			{
-				dv = (PPAD[idx].boostSpeed - PPAD[idx + 1].boostSpeed);	// 区間速度差
+				dv = (PPAD[idx].boostSpeed - PPAD[idx + 1].boostSpeed); // 区間速度差
 				if (fabsf(dv) < 1e-6f)
 				{
-					continue;	// 速度差が極小なら補正不要
+					continue;       // 速度差が極小なら補正不要
 				}
 				elapsedTime = fabs(dl / dv);
 				acceleration = dv / elapsedTime;
@@ -342,6 +353,70 @@ int16_t readLogDistance(int logNumber)
 				{
 					PPAD[idx].boostSpeed = PPAD[idx + 1].boostSpeed + (MACHINEDECREACE * dl);
 				}
+			}
+
+			// 角加速度・角減速度を用いた追加の平滑化
+			for (int32_t idx = numD - 2; idx >= 0; idx--)
+			{
+				dv = (PPAD[idx].boostSpeed - PPAD[idx + 1].boostSpeed); // 区間速度差
+				if (fabsf(dv) < 1e-6f)
+				{
+					continue;       // 速度差が極小なら補正不要
+				}
+
+				// 区間間の角速度変化を角加速度として換算し、減速幅を動的に決定する
+				// DELTATIMEと距離分解能から角速度変化の時間スケールを算出し、単位をdeg/s^2に統一する
+				float angAccel = (PPAD[idx + 1].angVelo - PPAD[idx].angVelo) / (DELTATIME * (CALCDISTANCE / 10.0f));
+				float dynamicDecel = MACHINEDECREACE; // 角度変化が小さい場合の基準減速度
+
+				if (angAccel > tgtParam.angAccele)
+				{
+					// 角加速度が大きい区間ではより強く減速する
+					float excess = angAccel - tgtParam.angAccele;
+					dynamicDecel += (excess / tgtParam.angAccele) * MACHINEDECREACE;
+				}
+				else if (angAccel < -tgtParam.angDecreace)
+				{
+					// 角減速度が大きい区間では減速幅を抑える
+					float reduction = (-angAccel - tgtParam.angDecreace) / tgtParam.angDecreace;
+					dynamicDecel = MACHINEDECREACE * (1.0f - reduction);
+					if (dynamicDecel < 0.0f)
+					{
+						dynamicDecel = 0.0f;
+					}
+				}
+
+				// 角度変化に合わせた減速幅で再計算し、オーバーシュートを抑える
+				elapsedTime = fabs(dl / dv);
+				acceleration = dv / elapsedTime;
+				if (acceleration > dynamicDecel)
+				{
+					// 角加速度に応じた減速幅で目標速度を上書きする
+					PPAD[idx].boostSpeed = PPAD[idx + 1].boostSpeed + (dynamicDecel * dl);
+				}
+			}
+
+			// 平滑化後の目標速度配列をSDカードへ記録する
+			FIL fil_Boost;
+				FRESULT fresult_Boost;
+				char boostFileName[32];
+				// ログ番号をゼロ埋めで付与し、保存順を揃える
+				snprintf(boostFileName, sizeof(boostFileName), "%sboost_%05d.csv", PATH_SETTING, logNumber);
+			fresult_Boost = f_open(&fil_Boost, boostFileName, FA_CREATE_ALWAYS | FA_WRITE);
+			if (fresult_Boost == FR_OK)
+			{
+				// CSVヘッダを書き込み、平滑化済みのboostSpeedを順番に保存する
+				UINT bytesWritten;
+				f_printf(&fil_Boost, "index,boost_speed\n");
+				for (int32_t idx = 0; idx < numD; idx++)
+				{
+					char boostLine[48];
+
+					// f_printfは%f非対応のため、1行分を文字列に整形してから書き込む
+					snprintf(boostLine, sizeof(boostLine), "%ld,%.3f\n", (long)idx, PPAD[idx].boostSpeed);
+					f_write(&fil_Boost, boostLine, strlen(boostLine), &bytesWritten);
+				}
+				f_close(&fil_Boost);
 			}
 
 			// for (i = 0; i < numD; i++)

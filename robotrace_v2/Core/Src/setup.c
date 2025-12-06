@@ -127,7 +127,9 @@ static const SpeedParamInfo speedParamTable[] = {
 	{"BST 100", &tgtParam.bst100, 0.1, 0.0, 10.0, "m/s"},
 	{"BST acceleF", &tgtParam.acceleF, 0.1, 0.0, 10.0, "m/ss"},
 	{"BST acceleD", &tgtParam.acceleD, 0.1, 0.0, 10.0, "m/ss"},
-	{"BST shortCut", &tgtParam.shortCut, 0.1, 0.0, 10.0, "m/s"}
+	{"BST shortCut", &tgtParam.shortCut, 0.1, 0.0, 10.0, "m/s"},
+	{"ANG ACC", &tgtParam.angAccele, 10.0, 0.0, 2000.0, "deg/ss"},
+	{"ANG DEC", &tgtParam.angDecreace, 10.0, 0.0, 2000.0, "deg/ss"}
 }; // 速度パラメータの対応テーブル
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_speed_param
@@ -145,7 +147,7 @@ static void setup_speed_param(void)
 		ssd1306_printf(Font_6x8, "Parameter");
 	}
 
-	dataTuningLR(&pattern.parameter1, 1, 1, 18); // パラメータ項目切替
+	dataTuningLR(&pattern.parameter1, 1, 1, 20); // パラメータ項目切替
 
 	if (beforePparam != pattern.parameter1)
 	{
