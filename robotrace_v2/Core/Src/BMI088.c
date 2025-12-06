@@ -105,13 +105,11 @@ void BMI088readAxisData(bool sensorType, uint8_t reg, uint8_t *rxData, uint8_t r
 /////////////////////////////////////////////////////////////////////
 bool initBMI088(void)
 {
-	HAL_Delay(100);
+	HAL_Delay(20);
 	BMI088readByte(ACCELE, REG_ACC_CHIP_ID); // 加速度センサSPIモードに切り替え(SPIダミーリード)
-	HAL_Delay(10);
-	BMI088val.Aid = BMI088readByte(ACCELE, REG_ACC_CHIP_ID); // ノーマルモード移行前にチップIDを読む
 	BMI088writeByte(ACCELE, REG_ACC_PWR_CTRL, 0x04); // 加速度センサノーマルモードに移行
 	HAL_Delay(10);
-	BMI088val.Aid = BMI088readByte(ACCELE, REG_ACC_CHIP_ID); // ノーマルモード移行前にチップIDを読む
+	BMI088readByte(ACCELE, REG_ACC_CHIP_ID); // 加速度センサSPIモードに切り替え(SPIダミーリード)
 	BMI088val.Aid = BMI088readByte(ACCELE, REG_ACC_CHIP_ID); // ノーマルモード移行前にチップIDを読む
 	BMI088val.Gid = BMI088readByte(GYRO, REG_GYRO_CHIP_ID);
 	
@@ -120,13 +118,13 @@ bool initBMI088(void)
 		// コンフィグ設定
 		// 加速度
 		BMI088writeByte(ACCELE, REG_ACC_RANGE, 0x00); // レンジを3gに設定
-		BMI088writeByte(ACCELE, REG_ACC_CONF, 0xA9);  // ODRを200Hzに設定
+		BMI088writeByte(ACCELE, REG_ACC_CONF, 0xAc);  // ODRを1600Hzに設定
 		BMI088writeByte(ACCELE, REG_ACC_PWR_CTRL, 0x04); // 加速度センサノーマルモードに移行
-		HAL_Delay(100);
+		HAL_Delay(10);
 		
 		// ジャイロ
 		BMI088writeByte(GYRO, REG_GYRO_SOFTRESET, 0xB6); // ソフトウェアリセット
-		HAL_Delay(100);
+		HAL_Delay(10);
 		BMI088writeByte(GYRO, REG_GYRO_BANDWISTH, 0x02); // ODRを1kHz バンドフィルタ116Hzに設定
 		BMI088writeByte(GYRO, REG_GYRO_RANGE, 0x00);	// レンジを2000dpsに設定
 

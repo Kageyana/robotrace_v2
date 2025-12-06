@@ -123,16 +123,16 @@ void Interrupt1ms(void)
 					cntRun,
 					encCurrentN,
 					optimalIndex,
-					motorpwmL,
-					motorpwmR,
-					(int16_t)(motorCurrentL * 10000),
-					(int16_t)(motorCurrentR * 10000),
 					lineTraceOmegaFBCtrl.pwm,
 					veloCtrl.pwm,
 					// 32bit
 					encTotalOptimal,
 					// float型
-					BMI088val.gyro.z
+					BMI088val.gyro.z,
+					BMI088val.accele.x,
+					BMI088val.accele.y,
+					motorCurrentL,
+					motorCurrentR
 				);
 #else
 				writeLogBufferPrint(); // バッファにログを保存
