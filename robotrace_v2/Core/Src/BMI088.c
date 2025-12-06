@@ -13,6 +13,9 @@ axis angle = {0.0F, 0.0F, 0.0F};
 volatile IMUval BMI088val;
 
 int16_t angleOffset[3] = {0, 0, 0};
+#ifdef USE_ACCELE
+int16_t acceleOffset[3] = {0, 0, 0};
+#endif
 bool calibratIMU = false;
 /////////////////////////////////////////////////////////////////////
 // モジュール名 BMI088ReadByteG
@@ -182,10 +185,10 @@ void BMI088getAccele(void)
 	// 加速度の生データを取得
 	BMI088readAxisData(ACCELE, REG_ACC_X_LSB, rawData, 7);
 	// LSBとMSBを結合
-	// 最初のデータは破棄する 
-	accelVal[0] = (rawData[2] << 8) | rawData[1];
-	accelVal[1] = (rawData[4] << 8) | rawData[3];
-	accelVal[2] = (rawData[6] << 8) | rawData[5];
+	// 最初のデータは破棄する
+	accelVal[0] = ((rawData[2] << 8) | rawData[1]) - acceleOffset[0];
+	accelVal[1] = ((rawData[4] << 8) | rawData[3]) - acceleOffset[1];
+	accelVal[2] = ((rawData[6] << 8) | rawData[5]) - acceleOffset[2];
 
 	BMI088val.accele.x = (float)accelVal[0] / ACCELELSB; // x軸加速度[g]
 	BMI088val.accele.y = (float)accelVal[1] / ACCELELSB; // y軸加速度[g]
@@ -262,9 +265,16 @@ void calcDegrees(void)
 void calibrationIMU(void)
 {
 	static int32_t angleInt[3];
+#ifdef USE_ACCELE
+	static int32_t acceleInt[3];
+#endif
 	static uint16_t i = 0;
 	uint8_t rawData[6];
 	int16_t gyroVal[3];
+#ifdef USE_ACCELE
+	uint8_t rawAccele[8];
+	int16_t accelVal[3];
+#endif
 
 	if (i < (uint32_t)(1.0 / DEFF_TIME))
 	{
@@ -278,6 +288,18 @@ void calibrationIMU(void)
 		angleInt[0] += gyroVal[0];
 		angleInt[1] += gyroVal[1];
 		angleInt[2] += gyroVal[2];
+#ifdef USE_ACCELE
+		// 加速度の生データを取得（ジャイロと同様の平均化処理）
+		BMI088readAxisData(ACCELE, REG_ACC_X_LSB, rawAccele, 7);
+		// LSBとMSBを結合（最初のデータは破棄）
+		accelVal[0] = (rawAccele[2] << 8) | rawAccele[1];
+		accelVal[1] = (rawAccele[4] << 8) | rawAccele[3];
+		accelVal[2] = (rawAccele[6] << 8) | rawAccele[5];
+
+		acceleInt[0] += accelVal[0];
+		acceleInt[1] += accelVal[1];
+		acceleInt[2] += accelVal[2];
+#endif
 		i++;
 	}
 	else
@@ -288,6 +310,15 @@ void calibrationIMU(void)
 		angleInt[0] = 0;
 		angleInt[1] = 0;
 		angleInt[2] = 0;
+#ifdef USE_ACCELE
+		// 加速度オフセットの平均値を算出
+		acceleOffset[0] = acceleInt[0] / i;
+		acceleOffset[1] = acceleInt[1] / i;
+		acceleOffset[2] = acceleInt[2] / i;
+		acceleInt[0] = 0;
+		acceleInt[1] = 0;
+		acceleInt[2] = 0;
+#endif
 		i = 0;
 		calibratIMU = false;
 	}
