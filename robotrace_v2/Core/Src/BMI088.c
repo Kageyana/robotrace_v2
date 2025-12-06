@@ -264,14 +264,12 @@ void calcDegrees(void)
 /////////////////////////////////////////////////////////////////////
 void calibrationIMU(void)
 {
-	static int32_t angleInt[3];
-#ifdef USE_ACCELE
-	static int32_t acceleInt[3];
-#endif
 	static uint16_t i = 0;
+	static int32_t angleInt[3];
 	uint8_t rawData[6];
 	int16_t gyroVal[3];
 #ifdef USE_ACCELE
+	static int32_t acceleInt[3];
 	uint8_t rawAccele[8];
 	int16_t accelVal[3];
 #endif
@@ -289,7 +287,7 @@ void calibrationIMU(void)
 		angleInt[1] += gyroVal[1];
 		angleInt[2] += gyroVal[2];
 #ifdef USE_ACCELE
-		// 加速度の生データを取得（ジャイロと同様の平均化処理）
+		// 加速度の生データを取得
 		BMI088readAxisData(ACCELE, REG_ACC_X_LSB, rawAccele, 7);
 		// LSBとMSBを結合（最初のデータは破棄）
 		accelVal[0] = (rawAccele[2] << 8) | rawAccele[1];
