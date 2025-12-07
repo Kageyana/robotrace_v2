@@ -338,7 +338,7 @@ void calibrationIMU(void)
 		acceleInt[0] += accelVal[0];
 		acceleInt[1] += accelVal[1];
 		acceleInt[2] += accelVal[2];
-#endif
+	#endif
 		i++;
 	}
 	else
@@ -349,15 +349,32 @@ void calibrationIMU(void)
 		angleInt[0] = 0;
 		angleInt[1] = 0;
 		angleInt[2] = 0;
-#ifdef USE_ACCELE
-		// 加速度オフセットの平均値を算出
-		acceleOffset[0] = acceleInt[0] / i;
-		acceleOffset[1] = acceleInt[1] / i;
-		acceleOffset[2] = acceleInt[2] / i;
+	#ifdef USE_ACCELE
+		// 加速度オフセットの平均値を算出（重力成分を保持したままバイアスのみ補正）
+		float acceleAvgX = (float)acceleInt[0] / i;
+		float acceleAvgY = (float)acceleInt[1] / i;
+		float acceleAvgZ = (float)acceleInt[2] / i;
+		float gravityScale = sqrtf((acceleAvgX * acceleAvgX) + (acceleAvgY * acceleAvgY) + (acceleAvgZ * acceleAvgZ));
+		float gravityCompX = 0.0f;
+		float gravityCompY = 0.0f;
+		float gravityCompZ = 0.0f;
+
+		// 計測方向に1g分の重力を復元することで、角度計算用の基準ベクトルを確保
+		if (gravityScale > 0.0f)
+		{
+			float normCoef = ACCELELSB / gravityScale;
+			gravityCompX = acceleAvgX * normCoef;
+			gravityCompY = acceleAvgY * normCoef;
+			gravityCompZ = acceleAvgZ * normCoef;
+		}
+
+		acceleOffset[0] = (int16_t)(acceleAvgX - gravityCompX);
+		acceleOffset[1] = (int16_t)(acceleAvgY - gravityCompY);
+		acceleOffset[2] = (int16_t)(acceleAvgZ - gravityCompZ);
 		acceleInt[0] = 0;
 		acceleInt[1] = 0;
 		acceleInt[2] = 0;
-#endif
+	#endif
 		i = 0;
 		calibratIMU = false;
 	}
