@@ -42,8 +42,10 @@ void Interrupt1ms(void)
 	{
 		if (!calibratIMU)
 		{
-			BMI088getGyro();		// 角速度取得
-			calcDegrees();			// コンプリメンタリフィルタで角度算出
+			BMI088getGyro();	// 角速度取得
+			BMI088getAccele();	// 加速度取得
+			calcDegrees();		// コンプリメンタリフィルタで角度算出
+			calcVelocity();		// 加速度から速度算出
 			// motorControlYawRate();	// 角速度制御
 			// motorControlYaw();		// 角度制御
 		}
@@ -129,8 +131,7 @@ void Interrupt1ms(void)
 					encTotalOptimal,
 					// float型
 					BMI088val.gyro.z,
-					BMI088val.accele.x,
-					BMI088val.accele.y,
+					BMI088val.velo.x,
 					motorCurrentL,
 					motorCurrentR
 				);
@@ -184,7 +185,6 @@ void Interrupt1ms(void)
 		{
 			if (!calibratIMU)
 			{
-				BMI088getAccele();	// 加速度取得（角度補正に使用）
 				BMI088getTemp(); 	// 温度取得
 			}
 		}

@@ -7,8 +7,8 @@
 // グローバル変数の宣
 //====================================//
 axis accele = {0.0F, 0.0F, 0.0F};
+axis velo = {0.0F, 0.0F, 0.0F};
 axis gyro = {0.0F, 0.0F, 0.0F};
-axis gyroTotal = {0.0F, 0.0F, 0.0F};
 axis angle = {0.0F, 0.0F, 0.0F};
 volatile IMUval BMI088val;
 
@@ -120,9 +120,9 @@ bool initBMI088(void)
 	{
 		// コンフィグ設定
 		// 加速度
-		BMI088writeByte(ACCELE, REG_ACC_RANGE, 0x00); // レンジを3gに設定
-		BMI088writeByte(ACCELE, REG_ACC_CONF, 0xAc);  // ODRを1600Hzに設定
 		BMI088writeByte(ACCELE, REG_ACC_PWR_CTRL, 0x04); // 加速度センサノーマルモードに移行
+		BMI088writeByte(ACCELE, REG_ACC_RANGE, 0x01); // レンジを6gに設定
+		BMI088writeByte(ACCELE, REG_ACC_CONF, 0xAc);  // ODRを1600Hzに設定
 		HAL_Delay(10);
 		
 		// ジャイロ
@@ -238,13 +238,7 @@ void calcDegrees(void)
 	{
 		return;
 	}
-	// ジャイロ積分による角度更新 度数法
-#ifndef USE_ACCELE
-    BMI088val.angle.x += BMI088val.gyro.x * DEFF_TIME;  // pitch
-    BMI088val.angle.y += BMI088val.gyro.y * DEFF_TIME;  // roll
-#endif
-    BMI088val.angle.z += BMI088val.gyro.z * DEFF_TIME;  // yaw（補正しない）
-
+	// ジャイロ積分による角度更新 度数法 
 #ifdef USE_ACCELE
     // 加速度からのピッチ・ロール角算出 度数法
     volatile float pitchAccele = atan2f(BMI088val.accele.y, BMI088val.accele.z) * 180.0f / M_PI;
@@ -253,12 +247,59 @@ void calcDegrees(void)
     // 相補フィルタでドリフト補正
     BMI088val.angle.x = COEFF_COMPFILTER * BMI088val.angle.x + (1.0f - COEFF_COMPFILTER) * pitchAccele;
     BMI088val.angle.y = COEFF_COMPFILTER * BMI088val.angle.y + (1.0f - COEFF_COMPFILTER) * rollAccele;
+#else
+	BMI088val.angle.x += BMI088val.gyro.x * DEFF_TIME;  // pitch
+    BMI088val.angle.y += BMI088val.gyro.y * DEFF_TIME;  // roll
 #endif
     // Z軸（ヨー角）は加速度では補正できないのでそのまま
+	BMI088val.angle.z += BMI088val.gyro.z * DEFF_TIME;  // yaw（補正しない）
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 calcVelocity
+// 処理概要     速度の計算
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void calcVelocity(void)
+{
+#ifdef USE_ACCELE
+	if(!BMI088val.Initialized)
+	{
+		return;
+	}
+
+	BMI088val.velo.x += BMI088val.accele.x * 9.81f * DEFF_TIME; // x軸加速度[m/s²]から速度[m/s]を計算
+	BMI088val.velo.y += BMI088val.accele.y * 9.81f * DEFF_TIME; // y軸加速度[m/s²]から速度[m/s]を計算
+	BMI088val.velo.z += BMI088val.accele.z * 9.81f * DEFF_TIME; // z軸加速度[m/s²]から速度[m/s]を計算
+#endif
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 clearIMUval
+// 処理概要     IMU値の初期化
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void clearIMUval(void)
+{
+	BMI088val.accele.x = 0.0F;
+	BMI088val.accele.y = 0.0F;
+	BMI088val.accele.z = 0.0F;
+
+	BMI088val.velo.x = 0.0F;
+	BMI088val.velo.y = 0.0F;
+	BMI088val.velo.z = 0.0F;
+
+	BMI088val.gyro.x = 0.0F;
+	BMI088val.gyro.y = 0.0F;
+	BMI088val.gyro.z = 0.0F;
+
+	BMI088val.angle.x = 0.0F;
+	BMI088val.angle.y = 0.0F;
+	BMI088val.angle.z = 0.0F;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 cariblationIMU
-// 処理概要     角速度キャリブレーション
+// 処理概要     角速度,加速度キャリブレーション
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////

@@ -432,9 +432,9 @@ void loopSystem(void)
 
 			if (optimalTrace == BOOST_NONE)
 			{
-				lineTraceOmegaFBCtrl.kp = 3;
+				lineTraceOmegaFBCtrl.kp = 2;
 				lineTraceOmegaFBCtrl.ki = 0;
-				lineTraceOmegaFBCtrl.kd = 15;
+				lineTraceOmegaFBCtrl.kd = 30;
 
 				veloCtrl.kp = 8;
 				veloCtrl.ki = 0;
@@ -491,9 +491,7 @@ void loopSystem(void)
 			DistanceOptimal = 0;
 			cntRun = 0;
 			cntLog = 0;
-			BMI088val.angle.x = 0.0F;
-			BMI088val.angle.y = 0.0F;
-			BMI088val.angle.z = 0.0F;
+			clearIMUval(); // IMU値初期化
 			yawCtrl.Int = 0.0;
 			distCtrl.Int = 0.0;
 			modeCurve = 0;

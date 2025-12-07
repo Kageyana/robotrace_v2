@@ -13,7 +13,7 @@
 #define ACCELE		false
 
 //  unit settings
-#define ACCELELSB 10920.0F
+#define ACCELELSB 5460.0F
 #define GYROLSB 16.384F
 #define MAGPLSB 16.0F
 
@@ -62,8 +62,8 @@ typedef struct
 typedef struct
 {
 	axis accele;
+	axis velo;
 	axis gyro;
-	axis gyroTotal;
 	axis angle;
 	float temp;
 	uint8_t Aid;
@@ -86,6 +86,8 @@ void BMI088getGyro(void);
 void BMI088getAccele(void);
 void BMI088getTemp(void);
 void calcDegrees(void);
+void calcVelocity(void);
+void clearIMUval(void);
 void calibrationIMU(void);
 
 #endif // BMI088_H_
