@@ -358,7 +358,7 @@ void calibrationIMU(void)
 		float gravityCompX = 0.0f;
 		float gravityCompY = 0.0f;
 		float gravityCompZ = 0.0f;
-		
+
 		// 計測方向に1g分の重力を復元することで、角度計算用の基準ベクトルを確保
 		if (gravityScale > 0.0f)
 		{
@@ -367,7 +367,7 @@ void calibrationIMU(void)
 			gravityCompY = acceleAvgY * normCoef;
 			gravityCompZ = acceleAvgZ * normCoef;
 		}
-		
+
 		acceleOffset[0] = (int16_t)(acceleAvgX - gravityCompX);
 		acceleOffset[1] = (int16_t)(acceleAvgY - gravityCompY);
 		acceleOffset[2] = (int16_t)(acceleAvgZ - gravityCompZ);
@@ -377,4 +377,5 @@ void calibrationIMU(void)
 	#endif
 		i = 0;
 		calibratIMU = false;
+	}
 }
