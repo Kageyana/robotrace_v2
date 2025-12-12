@@ -48,6 +48,18 @@ speedParam tgtParam = {
 	MACHINEACCELE,
 	MACHINEDECREACE,
 	PARAM_SHORTCUT};
+// スリップ検出用の状態（1ms割り込みで軽量に処理するためここで管理）
+static float slipImuIntegral = 0.0f;                                  // IMU加速度を積分した累積値[m/s]
+static float slipImuIntegralHist[SLIP_WINDOW_SAMPLES];                // 時間窓の開始時点のIMU積分値（リングバッファ）
+static float slipEncSpeedHist[SLIP_WINDOW_SAMPLES];                   // 時間窓の開始時点のエンコーダ由来速度[m/s]（リングバッファ）
+static uint16_t slipBufIndex = 0;                                     // リングバッファの書き込み位置
+static float slipDeltaImu = 0.0f;                                     // 窓内のIMU由来速度変化量[m/s]
+static float slipDeltaEnc = 0.0f;                                     // 窓内のエンコーダ由来速度変化量[m/s]
+static float slipIndicatorRaw = 0.0f;                                 // 比率で定義したスリップ指標の生値
+static float slipIndicatorFiltered = 0.0f;                            // スリップ指標の一次LPF後の値
+static uint16_t slipHighCount = 0;                                    // スリップ立ち上がり判定用の連続カウンタ
+static uint16_t slipLowCount = 0;                                     // スリップ解除判定用の連続カウンタ
+static bool slipFlag = false;                                         // ヒステリシス付きスリップ判定フラグ
 
 // タイマ関連
 uint32_t cntRun = 0;
@@ -494,6 +506,7 @@ void loopSystem(void)
 			cntLog = 0;
 			optimalIndex = 0;
 			clearIMUval(); // IMU値初期化
+			optimalIndex = 0;
 			yawCtrl.Int = 0.0;
 			distCtrl.Int = 0.0;
 
@@ -505,6 +518,7 @@ void loopSystem(void)
 			}
 			
 			patternTrace = 12;
+			break;
 		}
 		break;
 
@@ -894,6 +908,120 @@ void getADC2(void)
 	getMotorAD(analogVal2[0], analogVal2[1]);
 	getBatteryAD(analogVal2[2]);
 	getSwitchAD(analogVal2[3]);
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 updateSlipDetection
+// 処理概要     時間窓でΔv_encとΔv_imuを比率化し、ヒステリシス付きでスリップ判定する
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void updateSlipDetection(void)
+{
+	// エンコーダ由来の並進速度[m/s]（1msのカウント差分を距離換算）
+	float encSpeed = (float)encCurrentN / PALSE_MILLIMETER;
+	// 前後方向の加速度[m/s^2]（オフセット補正済みを想定）
+	float accelBodyX = BMI088val.accele.x * 9.81f;
+
+	// 時間窓の開始時点の値を取得（リングバッファでO(1)処理）
+	float baseImuIntegral = slipImuIntegralHist[slipBufIndex];
+	float baseEncSpeed = slipEncSpeedHist[slipBufIndex];
+
+	// 加速度を積分してIMU由来速度を更新（累積なので後で窓分差分を取る）
+	slipImuIntegral += accelBodyX * SLIP_SAMPLE_PERIOD_S;
+
+	// 現在値をリングバッファに格納（次回の窓開始点になる）
+	slipImuIntegralHist[slipBufIndex] = slipImuIntegral;
+	slipEncSpeedHist[slipBufIndex] = encSpeed;
+
+	// バッファ位置を更新（固定長で循環させる）
+	slipBufIndex++;
+	if (slipBufIndex >= SLIP_WINDOW_SAMPLES)
+	{
+		slipBufIndex = 0;
+	}
+
+	// 窓内の速度変化量Δvを計算（IMUは積分値差、エンコーダは速度差）
+	slipDeltaImu = slipImuIntegral - baseImuIntegral;
+	slipDeltaEnc = encSpeed - baseEncSpeed;
+
+	// 停止〜超低速時はノイズが支配的なため判定をスキップ
+	if (fabsf(encSpeed) < SLIP_SPEED_SKIP_MPS)
+	{
+		slipHighCount = 0;
+		slipLowCount = 0;
+		slipIndicatorRaw = 0.0f;
+		// 割り込み負荷を増やさないようLPFもゼロ方向へ軽く収束
+		slipIndicatorFiltered += SLIP_LPF_COEF * (0.0f - slipIndicatorFiltered);
+		slipFlag = false;
+		return;
+	}
+
+	// 比率で定義したスリップ指標を計算（|Δv_enc - Δv_imu| / max(|Δv_enc|, |Δv_imu|, ε)）
+	float numerator = fabsf(slipDeltaEnc - slipDeltaImu);
+	float denominator = fmaxf(fmaxf(fabsf(slipDeltaEnc), fabsf(slipDeltaImu)), SLIP_DENOM_EPS);
+	slipIndicatorRaw = numerator / denominator;
+
+	// 一次LPFで平滑化（割り込みなので簡易な一次フィルタで負荷を抑える）
+	slipIndicatorFiltered += SLIP_LPF_COEF * (slipIndicatorRaw - slipIndicatorFiltered);
+
+	// ヒステリシス付きスリップ判定：上側しきい値を連続で超えたら立ち上げ
+	if (slipIndicatorFiltered > SLIP_RATIO_HIGH)
+	{
+		if (slipHighCount < SLIP_HIGH_COUNT_REQ)
+		{
+			slipHighCount++;
+		}
+		if (slipHighCount >= SLIP_HIGH_COUNT_REQ)
+		{
+			slipFlag = true;
+		}
+		slipLowCount = 0; // 上側を超えている間は解除カウンタをリセット
+	}
+	else
+	{
+		slipHighCount = 0;
+	}
+
+	// ヒステリシス付きスリップ解除：下側しきい値を連続で下回ったら解除
+	if (slipFlag)
+	{
+		if (slipIndicatorFiltered < SLIP_RATIO_LOW)
+		{
+			if (slipLowCount < SLIP_LOW_COUNT_REQ)
+			{
+				slipLowCount++;
+			}
+			if (slipLowCount >= SLIP_LOW_COUNT_REQ)
+			{
+				slipFlag = false;
+				slipLowCount = 0;
+			}
+		}
+		else
+		{
+			slipLowCount = 0;
+		}
+	}
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 getSlipDeltaImu/getSlipDeltaEnc/getSlipIndicatorFiltered/getSlipFlag
+// 処理概要     割り込み外からスリップ検出結果を参照するためのアクセサ
+///////////////////////////////////////////////////////////////////////////
+float getSlipDeltaImu(void)
+{
+	return slipDeltaImu;
+}
+float getSlipDeltaEnc(void)
+{
+	return slipDeltaEnc;
+}
+float getSlipIndicatorFiltered(void)
+{
+	return slipIndicatorFiltered;
+}
+bool getSlipFlag(void)
+{
+	return slipFlag;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setEncoderVal
