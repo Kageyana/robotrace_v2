@@ -46,6 +46,7 @@ void Interrupt1ms(void)
 			BMI088getAccele();	// 加速度取得
 			calcDegrees();		// コンプリメンタリフィルタで角度算出
 			calcVelocity();		// 加速度から速度算出
+			updateSlipDetection(); // スリップ検出（Δv比率とフラグ更新を1msで実行）
 			// motorControlYawRate();	// 角速度制御
 			// motorControlYaw();		// 角度制御
 		}
@@ -121,6 +122,7 @@ void Interrupt1ms(void)
 					// 8bit
 					targetSpeed,
 					courseMarkerLog,
+					(uint8_t)getSlipFlag(),
 					// 16bit
 					cntRun,
 					encCurrentN,
@@ -133,7 +135,10 @@ void Interrupt1ms(void)
 					BMI088val.gyro.z,
 					BMI088val.velo.x,
 					motorCurrentL,
-					motorCurrentR
+					motorCurrentR,
+					getSlipDeltaImu(),
+					getSlipDeltaEnc(),
+					getSlipIndicatorFiltered()
 				);
 #else
 				writeLogBufferPrint(); // バッファにログを保存

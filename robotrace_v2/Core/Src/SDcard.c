@@ -181,6 +181,10 @@ void createLog(void)
 
 	setLogStr("x", "%f");
 	setLogStr("y", "%f");
+	setLogStr("slipDeltaImu", "%f");
+	setLogStr("slipDeltaEnc", "%f");
+	setLogStr("slipRatio", "%f");
+	setLogStr("slipFlag", "%d");
 #else
 	setLogStr("cntlog", "%d");
 	setLogStr("encCurrentN", "%d");
@@ -539,7 +543,7 @@ void endLog(void)
 			zg,
 			marker,
 			distance,
-			logvalf[4],		// ROC
+			logvalf[7],		// ROC
 
 			logval8[0],		// targetSpeed
 			logval16[2],	// optimalIndex
@@ -549,8 +553,12 @@ void endLog(void)
 			logvalf[2],		// CurrentL
 			logvalf[3],		// CurrentR
 
-			logvalf[5],		// x
-			logvalf[6]		// y
+			logvalf[8],		// x
+			logvalf[9],		// y
+			logvalf[4],		// slipDeltaImu
+			logvalf[5],		// slipDeltaEnc
+			logvalf[6],		// slipRatio(LPF後)
+			logval8[2]		// slipFlag
 		);
 
 		// 文字列をSDカードに送信
