@@ -329,8 +329,6 @@ void loopSystem(void)
 			if(ret > 0)
 			{
 				// コース解析成功
-				optimalIndex = 0;
-
 				countdown = 2000;							  // カウントダウンスタート
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56, 28);
@@ -434,7 +432,7 @@ void loopSystem(void)
 			{
 				lineTraceOmegaFBCtrl.kp = 2;
 				lineTraceOmegaFBCtrl.ki = 0;
-				lineTraceOmegaFBCtrl.kd = 30;
+				lineTraceOmegaFBCtrl.kd = 20;
 
 				veloCtrl.kp = 8;
 				veloCtrl.ki = 0;
@@ -491,6 +489,7 @@ void loopSystem(void)
 			DistanceOptimal = 0;
 			cntRun = 0;
 			cntLog = 0;
+			optimalIndex = 0;
 			clearIMUval(); // IMU値初期化
 			yawCtrl.Int = 0.0;
 			distCtrl.Int = 0.0;
