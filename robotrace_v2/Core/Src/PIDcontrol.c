@@ -3,6 +3,7 @@
 //====================================//
 #include "PIDcontrol.h"
 #include "BMI088.h"
+#include "control.h"
 #include "encoder.h"
 #include "fatfs.h"
 #include "lineSensor.h"
@@ -197,36 +198,50 @@ void motorControlTrace(void)
 void motorControlTraceOmegaFB(void)
 {
 	int32_t iP, iI, iD, iRet, target, Dev, Dif, senL2, senR2;;
-	static int32_t traceBefore, encCrossline = 0, beforeGainP = 0, beforeGainD = 0;
+	static int32_t traceBefore, encCrossLine = 0, beforeGainP = 0, beforeGainD = 0;
+	static bool stateCrossLine = false;
 
 	// サーボモータ用PWM値計算
 	if (lSensorMax[0] > lSensorMin[0])
 	{
-		// クロスライン検出
-		if(lSensorCari[5] > TRACE_CROSSLINE_TH && lSensorCari[4] > TRACE_CROSSLINE_TH)
+		if(patternTrace < 10)
 		{
-			encCrossline = encTotalN;	// クロスライン通過時のエンコーダ値を保存
+			encCrossLine = 0;
+			beforeGainP = 0;
+			beforeGainD = 0;
+			stateCrossLine = false;
+		}
+		// クロスライン検出 (中央2センサが閾値以上かつ、外側1センサが閾値以上)
+		if((lSensorCari[4] > TRACE_CROSSLINE_TH && lSensorCari[5] > TRACE_CROSSLINE_TH) && (lSensorCari[3] > TRACE_CROSSLINE_TH || lSensorCari[6] > TRACE_CROSSLINE_TH))
+		{
+			stateCrossLine = true;
+			encCrossLine = encTotalN;	// クロスライン通過時のエンコーダ値を保存
 		}
 		
 		// クロスライン付近ではPゲインを下げる
-		if(encMM(encTotalN - encCrossline) < TRACE_CROSSLINE_DISTANCE)
+		if (stateCrossLine)
 		{
-			if(beforeGainP == 0 && beforeGainD == 0)
+			if((encTotalN - encCrossLine) < encMM(TRACE_CROSSLINE_DISTANCE))
 			{
-				beforeGainP = lineTraceOmegaFBCtrl.kp;
-				beforeGainD = lineTraceOmegaFBCtrl.kd;
-				lineTraceOmegaFBCtrl.kp = 10;
-				lineTraceOmegaFBCtrl.kd = 0;
+				if(beforeGainP == 0 && beforeGainD == 0)
+				{
+					beforeGainP = lineTraceOmegaFBCtrl.kp;
+					beforeGainD = lineTraceOmegaFBCtrl.kd;
+					lineTraceOmegaFBCtrl.kp = 10;
+					lineTraceOmegaFBCtrl.kd = 0;
+				}
+			}
+			else
+			{
+				// クロスラインから離れたらPゲインを元に戻す
+				lineTraceOmegaFBCtrl.kp = beforeGainP;
+				lineTraceOmegaFBCtrl.kd = beforeGainD;
+				beforeGainP = 0;
+				beforeGainD = 0;
+				stateCrossLine = false;
 			}
 		}
-		// クロスラインから離れたらPゲインを元に戻す
-		if(encMM(encTotalN - encCrossline) > TRACE_CROSSLINE_DISTANCE && beforeGainP != 0 && beforeGainD != 0)
-		{
-			lineTraceOmegaFBCtrl.kp = beforeGainP;
-			lineTraceOmegaFBCtrl.kd = beforeGainD;
-			beforeGainP = 0;
-			beforeGainD = 0;
-		}
+		
 		// マクロで設定した重みを掛け合わせてセンサ値を合成
 		senL2 = (lSensorCari[4] * TRACE_WEIGHT_CENTER) + (lSensorCari[3] * TRACE_WEIGHT_INNER) + (lSensorCari[2] * TRACE_WEIGHT_MIDDLE) + (lSensorCari[1] * TRACE_WEIGHT_OUTER) + (lSensorCari[0] * TRACE_WEIGHT_FAR);
 		senR2 = (lSensorCari[5] * TRACE_WEIGHT_CENTER) + (lSensorCari[6] * TRACE_WEIGHT_INNER) + (lSensorCari[7] * TRACE_WEIGHT_MIDDLE) + (lSensorCari[8] * TRACE_WEIGHT_OUTER) + (lSensorCari[9] * TRACE_WEIGHT_FAR);

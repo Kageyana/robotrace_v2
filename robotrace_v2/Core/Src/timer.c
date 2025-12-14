@@ -4,6 +4,7 @@
 #include "timer.h"
 #include "BMI088.h"
 #include "PIDcontrol.h"
+#include "lineSensor.h"
 #include <stdint.h>
 #define STRAIGHT_STATE_THRESHOLD_MM	70	// 直線判定の距離閾値[mm]
 //====================================//
@@ -79,8 +80,8 @@ void Interrupt1ms(void)
 		// 緊急停止処理
 		// if (cntEmcStopAngleX()) emcStop = STOP_ANGLE_X;
 		// if (cntEmcStopAngleY()) emcStop = STOP_ANGLE_Y;
-		if (cntEmcStopEncStop())
-			emcStop = STOP_ENCODER_STOP;
+		// if (cntEmcStopEncStop())
+		// 	emcStop = STOP_ENCODER_STOP;
 		if (cntEmcStopLineSensor() && optimalTrace != BOOST_SHORTCUT)
 			emcStop = STOP_LINESENSOR;
 		if (judgeOverSpeed())
@@ -127,15 +128,19 @@ void Interrupt1ms(void)
 					// 16bit
 					cntRun,
 					encCurrentN,
-					optimalIndex,
+					// optimalIndex,
 					lineTraceOmegaFBCtrl.pwm,
-					veloCtrl.pwm,
+					lineTraceOmegaFBCtrl.kp,
+					// veloCtrl.pwm,
+					lSensorCari[3],
+					lSensorCari[4],
+					lSensorCari[5],
+					lSensorCari[6],
 					// 32bit
 					encTotalOptimal,
 					((int32_t)(senR - senL) * encCurrentN)>>9,
 					// float型
-					BMI088val.gyro.z,
-					BMI088val.velo.x
+					BMI088val.gyro.z
 				);
 #else
 				writeLogBufferPrint(); // バッファにログを保存
