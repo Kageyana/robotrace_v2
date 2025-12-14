@@ -29,6 +29,8 @@ static int16_t speedTargetBefore = 0;	// 速度PID用の前回目標値
 static int16_t speedEncoderBefore = 0;	// 速度PID用の前回偏差
 extern float batteryVoltage_V;	// control.cで保持したバッテリ電圧[V]
 
+int32_t senL, senR;
+
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 calcSpeedFeedForward
 // 処理概要     目標速度からフィードフォワード項を算出
@@ -145,7 +147,7 @@ void resetSpeedPID(void)
 ///////////////////////////////////////////////////////////////////////////
 void motorControlTrace(void)
 {
-	int32_t iP, iI, iD, iRet, Dev, Dif, senL, senR;
+	int32_t iP, iI, iD, iRet, Dev, Dif;
 	static int32_t traceBefore;
 
 	// サーボモータ用PWM値計算
@@ -194,7 +196,7 @@ void motorControlTrace(void)
 ///////////////////////////////////////////////////////////////////////////
 void motorControlTraceOmegaFB(void)
 {
-	int32_t iP, iI, iD, iRet, target, Dev, Dif, senL, senR;
+	int32_t iP, iI, iD, iRet, target, Dev, Dif, senL2, senR2;;
 	static int32_t traceBefore, encCrossline = 0, beforeGainP = 0, beforeGainD = 0;
 
 	// サーボモータ用PWM値計算
@@ -213,7 +215,7 @@ void motorControlTraceOmegaFB(void)
 			{
 				beforeGainP = lineTraceOmegaFBCtrl.kp;
 				beforeGainD = lineTraceOmegaFBCtrl.kd;
-				lineTraceOmegaFBCtrl.kp = 2;
+				lineTraceOmegaFBCtrl.kp = 10;
 				lineTraceOmegaFBCtrl.kd = 0;
 			}
 		}
@@ -226,15 +228,15 @@ void motorControlTraceOmegaFB(void)
 			beforeGainD = 0;
 		}
 		// マクロで設定した重みを掛け合わせてセンサ値を合成
-		senL = (lSensorCari[4] * TRACE_WEIGHT_CENTER) + (lSensorCari[3] * TRACE_WEIGHT_INNER) + (lSensorCari[2] * TRACE_WEIGHT_MIDDLE) + (lSensorCari[1] * TRACE_WEIGHT_OUTER) + (lSensorCari[0] * TRACE_WEIGHT_FAR);
-		senR = (lSensorCari[5] * TRACE_WEIGHT_CENTER) + (lSensorCari[6] * TRACE_WEIGHT_INNER) + (lSensorCari[7] * TRACE_WEIGHT_MIDDLE) + (lSensorCari[8] * TRACE_WEIGHT_OUTER) + (lSensorCari[9] * TRACE_WEIGHT_FAR);
+		senL2 = (lSensorCari[4] * TRACE_WEIGHT_CENTER) + (lSensorCari[3] * TRACE_WEIGHT_INNER) + (lSensorCari[2] * TRACE_WEIGHT_MIDDLE) + (lSensorCari[1] * TRACE_WEIGHT_OUTER) + (lSensorCari[0] * TRACE_WEIGHT_FAR);
+		senR2 = (lSensorCari[5] * TRACE_WEIGHT_CENTER) + (lSensorCari[6] * TRACE_WEIGHT_INNER) + (lSensorCari[7] * TRACE_WEIGHT_MIDDLE) + (lSensorCari[8] * TRACE_WEIGHT_OUTER) + (lSensorCari[9] * TRACE_WEIGHT_FAR);
 	}
 	else
 	{
-		senL = (lSensor[4] * TRACE_WEIGHT_CENTER) + (lSensor[3] * TRACE_WEIGHT_INNER) + (lSensor[2] * TRACE_WEIGHT_MIDDLE) + (lSensor[1] * TRACE_WEIGHT_OUTER) + (lSensor[0] * TRACE_WEIGHT_FAR);
-		senR = (lSensor[5] * TRACE_WEIGHT_CENTER) + (lSensor[6] * TRACE_WEIGHT_INNER) + (lSensor[7] * TRACE_WEIGHT_MIDDLE) + (lSensor[8] * TRACE_WEIGHT_OUTER) + (lSensor[9] * TRACE_WEIGHT_FAR);
+		senL2 = (lSensor[4] * TRACE_WEIGHT_CENTER) + (lSensor[3] * TRACE_WEIGHT_INNER) + (lSensor[2] * TRACE_WEIGHT_MIDDLE) + (lSensor[1] * TRACE_WEIGHT_OUTER) + (lSensor[0] * TRACE_WEIGHT_FAR);
+		senR2 = (lSensor[5] * TRACE_WEIGHT_CENTER) + (lSensor[6] * TRACE_WEIGHT_INNER) + (lSensor[7] * TRACE_WEIGHT_MIDDLE) + (lSensor[8] * TRACE_WEIGHT_OUTER) + (lSensor[9] * TRACE_WEIGHT_FAR);
 	}
-	target = ((senR - senL) * encCurrentN) >> 6;
+	target = ((senR2 - senL2) * encCurrentN) >> 9;
 	Dev = target - (int32_t)BMI088val.gyro.z;
 
 	// I成分積算

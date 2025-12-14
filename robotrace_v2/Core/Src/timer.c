@@ -3,6 +3,8 @@
 //====================================//
 #include "timer.h"
 #include "BMI088.h"
+#include "PIDcontrol.h"
+#include <stdint.h>
 #define STRAIGHT_STATE_THRESHOLD_MM	70	// 直線判定の距離閾値[mm]
 //====================================//
 // グローバル変数の宣
@@ -130,11 +132,10 @@ void Interrupt1ms(void)
 					veloCtrl.pwm,
 					// 32bit
 					encTotalOptimal,
+					((int32_t)(senR - senL) * encCurrentN)>>9,
 					// float型
 					BMI088val.gyro.z,
-					BMI088val.velo.x,
-					motorCurrentL,
-					motorCurrentR
+					BMI088val.velo.x
 				);
 #else
 				writeLogBufferPrint(); // バッファにログを保存

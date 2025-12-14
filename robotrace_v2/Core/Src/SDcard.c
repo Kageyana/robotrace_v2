@@ -176,8 +176,7 @@ void createLog(void)
 	setLogStr("lineTraceCtrl", "%d");
 	setLogStr("veloCtrl", "%d");
 	setLogStr("velocity", "%f");
-	setLogStr("CurrentL", "%f");
-	setLogStr("CurrentR", "%f");
+	setLogStr("targetAngularvelo", "%d");
 
 	setLogStr("x", "%f");
 	setLogStr("y", "%f");
@@ -539,18 +538,17 @@ void endLog(void)
 			zg,
 			marker,
 			distance,
-			logvalf[4],		// ROC
+			logvalf[2],		// ROC
 
 			logval8[0],		// targetSpeed
 			logval16[2],	// optimalIndex
 			(int16_t)logval16[3],	// lineTraceCtrl
 			(int16_t)logval16[4],	// veloCtrl
 			logvalf[1],		// velocity
-			logvalf[2],		// CurrentL
-			logvalf[3],		// CurrentR
+			(int32_t)logval32[1],	// targetAngularvelo
 
-			logvalf[5],		// x
-			logvalf[6]		// y
+			logvalf[3],		// x
+			logvalf[4]		// y
 		);
 
 		// 文字列をSDカードに送信

@@ -16,8 +16,8 @@
 #define BUFFER_SIZE_LOG 512
 #define LOG_NUM_8BIT 2
 #define LOG_NUM_16BIT 5
-#define LOG_NUM_32BIT 1
-#define LOG_NUM_FLOAT 4
+#define LOG_NUM_32BIT 2
+#define LOG_NUM_FLOAT 2
 #define LOG_SIZE (LOG_NUM_8BIT * sizeof(uint8_t)) + (LOG_NUM_16BIT * sizeof(uint16_t)) + (LOG_NUM_32BIT * sizeof(uint32_t)) + (LOG_NUM_FLOAT * sizeof(float))
 #else
 #define BUFFER_SIZE_LOG 5000 // 綴りの誤りを修正
