@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "control.h"
+#include "PIDcontrol.h"
 #include "fatfs.h"
 #include "battery.h"
 #include <stdint.h>
@@ -520,7 +521,7 @@ void loopSystem(void)
 				setTargetSpeed(tgtParam.curve);
 			}
 			// ライントレース
-			motorPwmOutSynth(lineTraceOmegaFBCtrl.pwm, veloCtrl.pwm, 0, 0);
+			motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 		}
 		else if (optimalTrace == BOOST_DISTANCE)
 		{
@@ -561,7 +562,7 @@ void loopSystem(void)
 			// 目標速度に設定
 			setTargetSpeed(boostSpeed);
 			// モーター出力
-			motorPwmOutSynth(lineTraceOmegaFBCtrl.pwm, veloCtrl.pwm, 0, 0);
+			motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 		}
 		else if (optimalTrace == BOOST_SHORTCUT)
 		{

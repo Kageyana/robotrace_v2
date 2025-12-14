@@ -62,6 +62,7 @@ void Interrupt1ms(void)
 	}
 	else 
 	{
+		motorControlTrace();
 		motorControlTraceOmegaFB();
 	}
 	motorControlSpeed();
