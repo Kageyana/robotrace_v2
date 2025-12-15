@@ -803,8 +803,11 @@ void emargencyStop(void)
 		case STOP_ENCODER_STOP:
 			ssd1306_printf(Font_7x10, "ENCODER_STOP");
 			break;
-		case STOP_LINESENSOR:
-			ssd1306_printf(Font_7x10, "LINESENSOR");
+		case STOP_LINESENSOR_BRIGHT:
+			ssd1306_printf(Font_7x10, "LINESENSOR B");
+			break;
+		case STOP_LINESENSOR_UNBRIGHT:
+			ssd1306_printf(Font_7x10, "LINESENSOR UB");
 			break;
 		case STOP_OVERSPEED:
 			ssd1306_printf(Font_7x10, "OVERSPEED");

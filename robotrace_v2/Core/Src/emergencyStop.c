@@ -96,15 +96,49 @@ bool cntEmcStopEncStop(void)
 	}
 }
 /////////////////////////////////////////////////////////////////////
-// モジュール名 cntEmcStopLinesensor
-// 処理概要     緊急停止要因のカウント ラインセンサ飽和
+// モジュール名 cntEmcStopLineSensorBright
+// 処理概要     緊急停止要因のカウント ラインセンサ反応あり
 // 引数         なし
 // 戻り値       true:緊急停止 false:異常なし
 /////////////////////////////////////////////////////////////////////
-bool cntEmcStopLineSensor(void)
+bool cntEmcStopLineSensorBright(void)
 {
 	// 緊急停止条件
-	if (lSensorCari[3] + lSensorCari[4] + lSensorCari[5] + lSensorCari[6] > 7500)
+	if (lSensorCari[3] > STOP_TH_LINE_SENSOR_BRIGHT
+		&& lSensorCari[4]> STOP_TH_LINE_SENSOR_BRIGHT
+		&& lSensorCari[5]> STOP_TH_LINE_SENSOR_BRIGHT
+		&& lSensorCari[6] > STOP_TH_LINE_SENSOR_BRIGHT)
+	{
+		cntLineSensor++;
+	}
+	else
+	{
+		cntLineSensor = 0;
+	}
+
+	// 停止条件継続タイマ
+	if (cntLineSensor > STOP_COUNT_LINESENSOR)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 cntEmcStopLineSensorUnbright
+// 処理概要     緊急停止要因のカウント ラインセンサ反応無し
+// 引数         なし
+// 戻り値       true:緊急停止 false:異常なし
+/////////////////////////////////////////////////////////////////////
+bool cntEmcStopLineSensorUnbright(void)
+{
+	// 緊急停止条件
+	if (lSensorCari[3] < STOP_TH_LINE_SENSOR_UNBRIGHT
+		&& lSensorCari[4] < STOP_TH_LINE_SENSOR_UNBRIGHT
+		&& lSensorCari[5] < STOP_TH_LINE_SENSOR_UNBRIGHT
+		&& lSensorCari[6] < STOP_TH_LINE_SENSOR_UNBRIGHT)
 	{
 		cntLineSensor++;
 	}

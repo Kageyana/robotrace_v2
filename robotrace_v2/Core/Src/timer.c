@@ -82,8 +82,10 @@ void Interrupt1ms(void)
 		// if (cntEmcStopAngleY()) emcStop = STOP_ANGLE_Y;
 		// if (cntEmcStopEncStop())
 		// 	emcStop = STOP_ENCODER_STOP;
-		if (cntEmcStopLineSensor() && optimalTrace != BOOST_SHORTCUT)
-			emcStop = STOP_LINESENSOR;
+		if (cntEmcStopLineSensorBright() && optimalTrace != BOOST_SHORTCUT)
+			emcStop = STOP_LINESENSOR_BRIGHT;
+		if (cntEmcStopLineSensorUnbright() && optimalTrace != BOOST_SHORTCUT)
+			emcStop = STOP_LINESENSOR_UNBRIGHT;
 		if (judgeOverSpeed())
 			emcStop = STOP_OVERSPEED;
 
@@ -128,7 +130,7 @@ void Interrupt1ms(void)
 					// 16bit
 					cntRun,
 					encCurrentN,
-					// optimalIndex,
+					optimalIndex,
 					lineTraceOmegaFBCtrl.pwm,
 					lineTraceOmegaFBCtrl.kp,
 					// veloCtrl.pwm,
