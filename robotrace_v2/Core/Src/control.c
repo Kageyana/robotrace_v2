@@ -463,9 +463,9 @@ void loopSystem(void)
 		// スタートマーカー通過までの走行
 		if(optimalTrace == BOOST_DISTANCE)
 		{
-			if(PPAD[0].boostSpeed/2 > 2.0F)
+			if(PPAD[0].boostSpeed/2 > 1.5F)
 			{
-				setTargetSpeed(2.0F); // 目標速度
+				setTargetSpeed(1.5F); // 目標速度
 			}
 			else
 			{
@@ -744,8 +744,9 @@ void loopSystem(void)
 			optimalTrace = 0;		// 2次走行モードクリア
 			pattern.display = HEX_START; // 16進表示モードクリア
 			pattern.beforeHex = 255;	// 16進表示モードクリア
-			encClick = 0;			// ホイールクリッククリア
-			encTotalN = 0;			// エンコーダ総パルス数クリア
+			encClick = 0;				// ホイールクリッククリア
+			encTotalN = 0;				// エンコーダ総パルス数クリア
+			clearMarkerProcessState();	// マーカーセンサ処理状態クリア
 			patternTrace = 0;
 		}
 		break;

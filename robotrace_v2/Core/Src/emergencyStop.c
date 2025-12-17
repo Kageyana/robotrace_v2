@@ -9,7 +9,8 @@ uint8_t emcStop = 0;
 static uint16_t cntAngleX = 0;
 static uint16_t cntAngleY = 0;
 static uint16_t cntEncStop = 0;
-static uint16_t cntLineSensor = 0;
+static uint16_t cntLineSensorBright = 0;
+static uint16_t cntLineSensorUnbright = 0;
 static uint16_t cntOverSpeed = 0;
 /////////////////////////////////////////////////////////////////////
 // モジュール名 cntEmcStopAngleX
@@ -103,21 +104,21 @@ bool cntEmcStopEncStop(void)
 /////////////////////////////////////////////////////////////////////
 bool cntEmcStopLineSensorBright(void)
 {
-	// 緊急停止条件
+	// 緊急停止条件 
 	if (lSensorCari[3] > STOP_TH_LINE_SENSOR_BRIGHT
-		&& lSensorCari[4]> STOP_TH_LINE_SENSOR_BRIGHT
-		&& lSensorCari[5]> STOP_TH_LINE_SENSOR_BRIGHT
+		&& lSensorCari[4] > STOP_TH_LINE_SENSOR_BRIGHT
+		&& lSensorCari[5] > STOP_TH_LINE_SENSOR_BRIGHT
 		&& lSensorCari[6] > STOP_TH_LINE_SENSOR_BRIGHT)
 	{
-		cntLineSensor++;
+		cntLineSensorBright++;
 	}
 	else
 	{
-		cntLineSensor = 0;
+		cntLineSensorBright = 0;
 	}
 
 	// 停止条件継続タイマ
-	if (cntLineSensor > STOP_COUNT_LINESENSOR)
+	if (cntLineSensorBright > STOP_COUNT_LINESENSOR)
 	{
 		return true;
 	}
@@ -140,15 +141,15 @@ bool cntEmcStopLineSensorUnbright(void)
 		&& lSensorCari[5] < STOP_TH_LINE_SENSOR_UNBRIGHT
 		&& lSensorCari[6] < STOP_TH_LINE_SENSOR_UNBRIGHT)
 	{
-		cntLineSensor++;
+		cntLineSensorUnbright++;
 	}
 	else
 	{
-		cntLineSensor = 0;
+		cntLineSensorUnbright = 0;
 	}
 
 	// 停止条件継続タイマ
-	if (cntLineSensor > STOP_COUNT_LINESENSOR)
+	if (cntLineSensorUnbright > STOP_COUNT_LINESENSOR)
 	{
 		return true;
 	}
@@ -197,6 +198,7 @@ void resetEmcStop(void)
 	cntAngleX = 0;
 	cntAngleY = 0;
 	cntEncStop = 0;
-	cntLineSensor = 0;
+	cntLineSensorBright = 0;
+	cntLineSensorUnbright = 0;
 	cntOverSpeed = 0;
 }

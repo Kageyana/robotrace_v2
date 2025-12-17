@@ -35,6 +35,7 @@ int32_t encPID = 0;			 // 距離制御用の距離変数
 float xydegz = 0;
 int32_t straightMeter;
 bool straightState;
+
 static uint8_t missedCorrections = 0;	// 連続補正失敗回数
 static bool failSafeActive = false;	// フェイルセーフ動作中フラグ
 static int16_t lastCorrectedMarker = 0;	// 直近で補正したマーカーインデックス
@@ -958,4 +959,18 @@ void processMarkerEvent(void) {
 	}
 	beforeCourseMarker = courseMarker; // 前回のマーカー状態を更新
 }
-
+/////////////////////////////////////////////////////////////////////
+// モジュール名 cleaerMarkerProcessState
+// 処理概要     マーカー通過処理状態の初期化
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void clearMarkerProcessState(void) {
+	beforeCourseMarker = 0;
+	cntMarker = 0;
+	straightState = false;
+	pathedMarker = 0;
+	lastCorrectedMarker = 0;
+	missedCorrections = 0;
+	failSafeActive = false;
+}
