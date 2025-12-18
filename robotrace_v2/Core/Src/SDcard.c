@@ -189,6 +189,10 @@ void createLog(void)
 	setLogStr("slipDeltaEnc", "%f");
 	setLogStr("slipRatio", "%f");
 	setLogStr("slipFlag", "%d");
+	setLogStr("slipDeltaImu", "%f");
+	setLogStr("slipDeltaEnc", "%f");
+	setLogStr("slipRatio", "%f");
+	setLogStr("slipFlag", "%d");
 #else
 	setLogStr("cntlog", "%d");
 	setLogStr("encCurrentN", "%d");
@@ -547,6 +551,7 @@ void endLog(void)
 			zg,
 			marker,
 			distance,
+			logvalf[7],		// ROC
 			logvalf[7],		// ROC
 
 			logval8[0],		// targetSpeed
