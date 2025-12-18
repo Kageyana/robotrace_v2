@@ -187,10 +187,7 @@ void createLog(void)
 	setLogStr("slipDeltaEnc", "%f");
 	setLogStr("slipRatio", "%f");
 	setLogStr("slipFlag", "%d");
-	setLogStr("slipDeltaImu", "%f");
-	setLogStr("slipDeltaEnc", "%f");
-	setLogStr("slipRatio", "%f");
-	setLogStr("slipFlag", "%d");
+
 #else
 	setLogStr("cntlog", "%d");
 	setLogStr("encCurrentN", "%d");
@@ -591,20 +588,20 @@ void endLog(void)
 			logval8[1],		// targetSpeed
 			logval16[2],	// optimalIndex
 			(int16_t)logval16[3],	// lineTraceCtrl
-			(int16_t)logval16[4],	// lineTraceCtrlkp
-			(int16_t)logval16[5],	// lSensorCari[3]
-			(int16_t)logval16[6],	// lSensorCari[4]
-			(int16_t)logval16[7],	// lSensorCari[5]
-			(int16_t)logval16[8],	// lSensorCari[6]
+			// (int16_t)logval16[4],	// lineTraceCtrlkp
+			// (int16_t)logval16[5],	// lSensorCari[3]
+			// (int16_t)logval16[6],	// lSensorCari[4]
+			// (int16_t)logval16[7],	// lSensorCari[5]
+			// (int16_t)logval16[8],	// lSensorCari[6]
 			// (int16_t)logval16[4],	// veloCtrl
 			// logvalf[1],		// velocity
-			(int32_t)logval32[1],	// targetAngularvelo
+			// (int32_t)logval32[1],	// targetAngularvelo
 
-			logvalf[8],		// x
-			logvalf[9],		// y
-			logvalf[4],		// slipDeltaImu
-			logvalf[5],		// slipDeltaEnc
-			logvalf[6],		// slipRatio(LPF後)
+			logvalf[5],		// x
+			logvalf[6],		// y
+			logvalf[1],		// slipDeltaImu
+			logvalf[2],		// slipDeltaEnc
+			logvalf[3],		// slipRatio(LPF後)
 			logval8[2]		// slipFlag
 		);
 

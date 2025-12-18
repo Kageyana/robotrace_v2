@@ -157,9 +157,9 @@ void Interrupt1ms(void)
 					encTotalOptimal,
 					// float型
 					BMI088val.gyro.z,
-					BMI088val.velo.x,
-					motorCurrentL,
-					motorCurrentR,
+					// BMI088val.velo.x,
+					// motorCurrentL,
+					// motorCurrentR,
 					getSlipDeltaImu(),
 					getSlipDeltaEnc(),
 					getSlipIndicatorFiltered()
