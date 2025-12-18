@@ -29,14 +29,14 @@
 
 #define PARAM_UP_STEP 1.02F
 // スリップ検出パラメータ（1ms割り込みで使用するのでマクロで管理）
-#define SLIP_WINDOW_SAMPLES   20U    // Δvを取る時間窓長[ms]（リングバッファ長）
+#define SLIP_WINDOW_SAMPLES   2U    // Δvを取る時間窓長[ms]（リングバッファ長）
 #define SLIP_SAMPLE_PERIOD_S  DEFF_TIME // サンプリング周期[s]（1ms）
 #define SLIP_SPEED_SKIP_MPS   0.1f  // 超低速時に判定をスキップする速度閾値[m/s]
 #define SLIP_RATIO_HIGH       1.35f   // スリップ指標の上側しきい値
 #define SLIP_RATIO_LOW        1.05f   // スリップ解除用の下側しきい値（ヒステリシス）
 #define SLIP_HIGH_COUNT_REQ   10U     // 上側しきい値を超え続ける必要サンプル数
 #define SLIP_LOW_COUNT_REQ    5U    // 下側しきい値を下回り続ける必要サンプル数
-#define SLIP_LPF_COEF         0.1f   // スリップ指標に掛ける一次LPF係数
+#define SLIP_LPF_COEF         0.15f   // スリップ指標に掛ける一次LPF係数
 #define SLIP_DENOM_EPS        0.03f  // 分母の最小値（0除算防止用）
 
 // ゴール

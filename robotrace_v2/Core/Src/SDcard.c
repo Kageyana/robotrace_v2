@@ -187,6 +187,8 @@ void createLog(void)
 	setLogStr("slipDeltaEnc", "%f");
 	setLogStr("slipRatio", "%f");
 	setLogStr("slipFlag", "%d");
+	setLogStr("x", "%f");
+	setLogStr("y", "%f");
 
 #else
 	setLogStr("cntlog", "%d");
@@ -597,12 +599,15 @@ void endLog(void)
 			// logvalf[1],		// velocity
 			// (int32_t)logval32[1],	// targetAngularvelo
 
-			logvalf[5],		// x
-			logvalf[6],		// y
-			logvalf[1],		// slipDeltaImu
-			logvalf[2],		// slipDeltaEnc
-			logvalf[3],		// slipRatio(LPF後)
-			logval8[2]		// slipFlag
+			logvalf[1],		// acceleVal_X
+			logvalf[2],		// acceleVal_Y
+			logvalf[3],		// slipDeltaImu
+			logvalf[4],		// slipDeltaEnc
+			logvalf[5],		// slipRatio(LPF後)
+			logval8[2],		// slipFlag
+
+			logvalf[7],		// x
+			logvalf[8]		// y
 		);
 
 		// 文字列をSDカードに送信
