@@ -145,7 +145,8 @@ void Interrupt1ms(void)
 					// ((int32_t)(senR - senL) * encCurrentN)>>9,
 					// float型
 					BMI088val.gyro.z,
-					// BMI088val.velo.x,
+					BMI088val.accele.x,
+					BMI088val.accele.y,
 					// motorCurrentL,
 					// motorCurrentR,
 					getSlipDeltaImu(),

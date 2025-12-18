@@ -924,44 +924,51 @@ void getADC2(void)
 ///////////////////////////////////////////////////////////////////////////
 void updateSlipDetection(void)
 {
-    // ---- ボディ座標の速度状態（IMU積分）----
-    static float vbx = 0.0f; // 前後速度[m/s]
-    static float vby = 0.0f; // 左右速度[m/s]
+	// IMUが未初期化・キャリブ中はスリップ検出を行わない
+	if (!initIMU || calibratIMU)
+	{
+		return;
+	}
+
+	// ---- ボディ座標の速度状態（IMU積分）----
+	static float vbx = 0.0f; // 前後速度[m/s]
+	static float vby = 0.0f; // 左右速度[m/s]
 
     // ---- 状態遷移検出用 ----
     static bool prevRunning = false;
     static bool prevMoving  = false;
 
-    bool running = (patternTrace > 10 && patternTrace < 100);
+    // patternTrace=11(走行開始)でもスリップ検出を行う
+    bool running = (patternTrace >= 11 && patternTrace < 100);
 
     //==========================================================
     // 走行外：遷移時だけリセット（毎msクリアしない）
     //==========================================================
-    if (!running) {
-        if (prevRunning) {
-            // 走行→非走行に入った瞬間だけ全リセット
-            slipImuIntegral = 0.0f;
-            slipDeltaImu = 0.0f;
-            slipDeltaEnc = 0.0f;
-            slipIndicatorRaw = 0.0f;
-            slipIndicatorFiltered = 0.0f;
-            slipHighCount = 0;
-            slipLowCount = 0;
-            slipFlag = false;
+	if (!running) {
+		if (prevRunning) {
+			// 走行→非走行に入った瞬間だけ全リセット
+			slipImuIntegral = 0.0f;
+			slipDeltaImu = 0.0f;
+			slipDeltaEnc = 0.0f;
+			slipIndicatorRaw = 0.0f;
+			slipIndicatorFiltered = 0.0f;
+			slipHighCount = 0;
+			slipLowCount = 0;
+			slipFlag = false;
 
-            vbx = 0.0f;
-            vby = 0.0f;
+			vbx = 0.0f;
+			vby = 0.0f;
 
-            for (uint16_t i = 0; i < SLIP_WINDOW_SAMPLES; i++) {
-                slipImuIntegralHist[i] = 0.0f;
-                slipEncSpeedHist[i] = 0.0f;
-            }
-            slipBufIndex = 0;
-        }
-        prevRunning = false;
-        prevMoving  = false;
-        return;
-    }
+			for (uint16_t i = 0; i < SLIP_WINDOW_SAMPLES; i++) {
+				slipImuIntegralHist[i] = 0.0f;
+				slipEncSpeedHist[i] = 0.0f;
+			}
+			slipBufIndex = 0;
+		}
+		prevRunning = false;
+		prevMoving  = false;
+		return;
+	}
     prevRunning = true;
 
     // ---- エンコーダ速度 ----
@@ -970,28 +977,31 @@ void updateSlipDetection(void)
     //==========================================================
     // 超低速：遷移時だけ履歴も含めてリセット（Δvの飛び防止）
     //==========================================================
-    if (fabsf(encSpeed) < SLIP_SPEED_SKIP_MPS) {
+	if (fabsf(encSpeed) < SLIP_SPEED_SKIP_MPS) {
 
-        if (prevMoving) {
-            // 移動→低速に入った瞬間だけリセット
-            vbx = 0.0f;
-            vby = 0.0f;
-            slipImuIntegral = 0.0f;
+		if (prevMoving) {
+			// 移動→低速に入った瞬間だけリセット
+			vbx = 0.0f;
+			vby = 0.0f;
+			slipImuIntegral = 0.0f;
 
-            for (uint16_t i = 0; i < SLIP_WINDOW_SAMPLES; i++) {
-                slipImuIntegralHist[i] = 0.0f;
-                slipEncSpeedHist[i] = 0.0f;
-            }
-            slipBufIndex = 0;
+			for (uint16_t i = 0; i < SLIP_WINDOW_SAMPLES; i++) {
+				slipImuIntegralHist[i] = 0.0f;
+				slipEncSpeedHist[i] = 0.0f;
+			}
+			slipBufIndex = 0;
 
-            slipHighCount = 0;
-            slipLowCount = 0;
-            slipFlag = false;
-        }
+			slipHighCount = 0;
+			slipLowCount = 0;
+			slipFlag = false;
+			slipDeltaImu = 0.0f;
+			slipDeltaEnc = 0.0f;
+			slipIndicatorRaw = 0.0f;
+		}
 
-        prevMoving = false;
+		prevMoving = false;
 
-        // フィルタ値だけはゼロへ軽く収束（ログ見やすさ）
+		// フィルタ値だけはゼロへ軽く収束（ログ見やすさ）
         slipIndicatorRaw = 0.0f;
         slipIndicatorFiltered += SLIP_LPF_COEF * (0.0f - slipIndicatorFiltered);
         return;
