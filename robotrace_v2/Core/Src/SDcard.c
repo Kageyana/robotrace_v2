@@ -13,7 +13,7 @@ FIL fil_W;
 FIL fil_R;
 
 // ログヘッダー
-char columnTitle[512] = "", formatLog[256] = "";
+char columnTitle[1024] = "", formatLog[256] = "";
 
 // ログバッファ
 #ifdef LOG_RUNNING_WRITE
@@ -161,6 +161,24 @@ void createLog(void)
 
 	columnTitle[0] = 0; // バッファを安全に初期化
 	formatLog[0] = 0;   // バッファを安全に初期化
+	setLogHeaderStrF("lineTraceCtrl.kp", lineTraceCtrl.kp);
+	setLogHeaderStrF("lineTraceCtrl.ki", lineTraceCtrl.ki);
+	setLogHeaderStrF("lineTraceCtrl.kd", lineTraceCtrl.kd);
+	setLogHeaderStrF("lineTraceOmegaFBCtrl.kp", lineTraceOmegaFBCtrl.kp);
+	setLogHeaderStrF("lineTraceOmegaFBCtrl.ki", lineTraceOmegaFBCtrl.ki);
+	setLogHeaderStrF("lineTraceOmegaFBCtrl.kd", lineTraceOmegaFBCtrl.kd);
+	setLogHeaderStrF("veloCtrl.kp", veloCtrl.kp);
+	setLogHeaderStrF("veloCtrl.ki", veloCtrl.ki);
+	setLogHeaderStrF("veloCtrl.kd", veloCtrl.kd);
+	setLogHeaderStrF("yawRateCtrl.kp", yawRateCtrl.kp);
+	setLogHeaderStrF("yawRateCtrl.ki", yawRateCtrl.ki);
+	setLogHeaderStrF("yawRateCtrl.kd", yawRateCtrl.kd);
+	setLogHeaderStrF("yawCtrl.kp", yawCtrl.kp);
+	setLogHeaderStrF("yawCtrl.ki", yawCtrl.ki);
+	setLogHeaderStrF("yawCtrl.kd", yawCtrl.kd);
+	setLogHeaderStrF("distCtrl.kp", distCtrl.kp);
+	setLogHeaderStrF("distCtrl.ki", distCtrl.ki);
+	setLogHeaderStrF("distCtrl.kd", distCtrl.kd);
 #ifdef LOG_RUNNING_WRITE
 	setLogStr("cntlog", "%d");
 	setLogStr("encCurrentN", "%d");
@@ -655,6 +673,32 @@ void setLogStr(char *column, char *format)
        strncat((char *)formatStr, ",", sizeof(formatStr) - strlen((char *)formatStr) - 1); // バッファサイズを指定して安全に結合
        strncat((char *)columnTitle, (char *)columnStr, sizeof(columnTitle) - strlen((char *)columnTitle) - 1); // バッファサイズを指定して安全に結合
        strncat((char *)formatLog, (char *)formatStr, sizeof(formatLog) - strlen((char *)formatLog) - 1);       // バッファサイズを指定して安全に結合
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 setLogHeaderStr
+// 処理概要     ログCSVのヘッダーに "変数名=値" を追記する
+// 引数         name: 変数名 value: 値
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void setLogHeaderStr(char *name, int32_t value)
+{
+	char headerStr[64];
+
+	snprintf((char *)headerStr, sizeof(headerStr), "%s=%ld\n", name, (long)value); // バッファサイズを指定して安全に変換
+	strncat((char *)columnTitle, (char *)headerStr, sizeof(columnTitle) - strlen((char *)columnTitle) - 1); // バッファサイズを指定して安全に結合
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 setLogHeaderStrF
+// 処理概要     ログCSVのヘッダーに "変数名=値" を追記する (float用)
+// 引数         name: 変数名 value: 値
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void setLogHeaderStrF(char *name, float value)
+{
+    char headerStr[64];
+
+    snprintf((char *)headerStr, sizeof(headerStr), "%s=%f\n", name, (double)value);
+    strncat((char *)columnTitle, (char *)headerStr, sizeof(columnTitle) - strlen((char *)columnTitle) - 1);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SDtest
