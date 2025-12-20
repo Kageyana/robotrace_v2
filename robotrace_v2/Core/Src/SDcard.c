@@ -175,13 +175,13 @@ void createLog(void)
 	// setLogStr("motorpwmR", "%d");
 	setLogStr("lineTraceCtrl", "%d");
 	setLogStr("lineTraceCtrlkp", "%d");
-	setLogStr("lSensorCari[3]", "%d");
-	setLogStr("lSensorCari[4]", "%d");
-	setLogStr("lSensorCari[5]", "%d");
-	setLogStr("lSensorCari[6]", "%d");
-	// setLogStr("veloCtrl", "%d");
+	// setLogStr("lSensorCari[3]", "%d");
+	// setLogStr("lSensorCari[4]", "%d");
+	// setLogStr("lSensorCari[5]", "%d");
+	// setLogStr("lSensorCari[6]", "%d");
+	setLogStr("veloCtrl", "%d");
 	// setLogStr("velocity", "%f");
-	setLogStr("targetAngularvelo", "%d");
+	// setLogStr("targetAngularvelo", "%d");
 
 	setLogStr("x", "%f");
 	setLogStr("y", "%f");
@@ -549,13 +549,7 @@ void endLog(void)
 			logval16[2],	// optimalIndex
 			(int16_t)logval16[3],	// lineTraceCtrl
 			(int16_t)logval16[4],	// lineTraceCtrlkp
-			(int16_t)logval16[5],	// lSensorCari[3]
-			(int16_t)logval16[6],	// lSensorCari[4]
-			(int16_t)logval16[7],	// lSensorCari[5]
-			(int16_t)logval16[8],	// lSensorCari[6]
-			// (int16_t)logval16[4],	// veloCtrl
-			// logvalf[1],		// velocity
-			(int32_t)logval32[1],	// targetAngularvelo
+			(int16_t)logval16[5],	// veloCtrl
 
 			logvalf[2],		// x
 			logvalf[3]		// y

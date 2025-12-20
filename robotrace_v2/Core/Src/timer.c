@@ -133,14 +133,9 @@ void Interrupt1ms(void)
 					optimalIndex,
 					lineTraceOmegaFBCtrl.pwm,
 					lineTraceOmegaFBCtrl.kp,
-					// veloCtrl.pwm,
-					lSensorCari[3],
-					lSensorCari[4],
-					lSensorCari[5],
-					lSensorCari[6],
+					veloCtrl.pwm,
 					// 32bit
 					encTotalOptimal,
-					((int32_t)(senR - senL) * encCurrentN)>>9,
 					// float型
 					BMI088val.gyro.z
 				);

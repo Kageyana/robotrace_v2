@@ -693,6 +693,7 @@ void loopSystem(void)
 				SGmarker = 0;	// スタートマーカー通過フラグクリア
 				initMarkerSensor();	// マーカーセンサ初期化
 				resetEmcStop();	// 緊急停止フラグクリア
+				clearMarkerProcessState();	// マーカーセンサ処理状態クリア
 				encTotalN = 0;	// エンコーダ総パルス数クリア
 
 				patternTrace = 0;
