@@ -694,6 +694,7 @@ void loopSystem(void)
 				initMarkerSensor();	// マーカーセンサ初期化
 				resetEmcStop();	// 緊急停止フラグクリア
 				clearMarkerProcessState();	// マーカーセンサ処理状態クリア
+				lineTraceOmegaFBCtrl.Int = 0;
 				encTotalN = 0;	// エンコーダ総パルス数クリア
 
 				patternTrace = 0;
@@ -747,6 +748,7 @@ void loopSystem(void)
 			pattern.beforeHex = 255;	// 16進表示モードクリア
 			encClick = 0;				// ホイールクリッククリア
 			encTotalN = 0;				// エンコーダ総パルス数クリア
+			lineTraceOmegaFBCtrl.Int = 0;
 			clearMarkerProcessState();	// マーカーセンサ処理状態クリア
 			patternTrace = 0;
 		}

@@ -30,7 +30,7 @@ static int16_t speedTargetBefore = 0;	// 速度PID用の前回目標値
 static int16_t speedEncoderBefore = 0;	// 速度PID用の前回偏差
 extern float batteryVoltage_V;	// control.cで保持したバッテリ電圧[V]
 
-int32_t senL, senR;
+int32_t log_targetAngularVelocity; // ログ用目標角速度
 
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 calcSpeedFeedForward
@@ -148,7 +148,7 @@ void resetSpeedPID(void)
 ///////////////////////////////////////////////////////////////////////////
 void motorControlTrace(void)
 {
-	int32_t iP, iI, iD, iRet, Dev, Dif;
+	int32_t iP, iI, iD, iRet, Dev, Dif, senL, senR;
 	static int32_t traceBefore;
 
 	// サーボモータ用PWM値計算
@@ -213,9 +213,10 @@ void motorControlTrace(void)
 ///////////////////////////////////////////////////////////////////////////
 void motorControlTraceOmegaFB(void)
 {
-	int32_t iP, iI, iD, iRet, target, Dev, Dif, senL2, senR2;;
+	int32_t iP, iI, iD, iRet, target, Dev, Dif, senL, senR;;
 	static int32_t traceBefore, encCrossLine = 0, beforeGainP = 0, beforeGainD = 0;
 	static bool stateCrossLine = false;
+	static int32_t eps = 10;
 
 	// サーボモータ用PWM値計算
 	if (lSensorMax[0] > lSensorMin[0])
@@ -260,12 +261,12 @@ void motorControlTraceOmegaFB(void)
 		}
 		
 		// マクロで設定した重みを掛け合わせてセンサ値を合成
-		senL2 = (lSensorCari[4] * TRACE_WEIGHT_CENTER) 
+		senL = (lSensorCari[4] * TRACE_WEIGHT_CENTER) 
 				+ (lSensorCari[3] * TRACE_WEIGHT_INNER)
 				+ (lSensorCari[2] * TRACE_WEIGHT_MIDDLE)
 				+ (lSensorCari[1] * TRACE_WEIGHT_OUTER)
 				+ (lSensorCari[0] * TRACE_WEIGHT_FAR);
-		senR2 = (lSensorCari[5] * TRACE_WEIGHT_CENTER)
+		senR = (lSensorCari[5] * TRACE_WEIGHT_CENTER)
 				+ (lSensorCari[6] * TRACE_WEIGHT_INNER)
 				+ (lSensorCari[7] * TRACE_WEIGHT_MIDDLE)
 				+ (lSensorCari[8] * TRACE_WEIGHT_OUTER)
@@ -273,22 +274,26 @@ void motorControlTraceOmegaFB(void)
 	}
 	else
 	{
-		senL2 = (lSensor[4] * TRACE_WEIGHT_CENTER)
+		senL = (lSensor[4] * TRACE_WEIGHT_CENTER)
 				+ (lSensor[3] * TRACE_WEIGHT_INNER)
 				+ (lSensor[2] * TRACE_WEIGHT_MIDDLE)
 				+ (lSensor[1] * TRACE_WEIGHT_OUTER)
 				+ (lSensor[0] * TRACE_WEIGHT_FAR);
-		senR2 = (lSensor[5] * TRACE_WEIGHT_CENTER)
+		senR = (lSensor[5] * TRACE_WEIGHT_CENTER)
 				+ (lSensor[6] * TRACE_WEIGHT_INNER)
 				+ (lSensor[7] * TRACE_WEIGHT_MIDDLE)
 				+ (lSensor[8] * TRACE_WEIGHT_OUTER)
 				+ (lSensor[9] * TRACE_WEIGHT_FAR);
 	}
-	target = ((senR2 - senL2) * encCurrentN) >> 9;
+	target = ((senR - senL) * encCurrentN) >> 9;
+	log_targetAngularVelocity = target; // ログ用に目標角速度を保存
 	Dev = target - (int32_t)BMI088val.gyro.z;
 
 	// I成分積算
-	lineTraceOmegaFBCtrl.Int += (float)Dev * 0.001;
+	if(lineTraceOmegaFBCtrl.pwm <= 900 || lineTraceOmegaFBCtrl.pwm >= -900)
+	{
+		lineTraceOmegaFBCtrl.Int += (float)Dev * 0.001;
+	}
 	if (lineTraceOmegaFBCtrl.Int > 10000.0)
 		lineTraceOmegaFBCtrl.Int = 10000.0; // I成分リミット
 	else if (lineTraceOmegaFBCtrl.Int < -10000.0)
@@ -337,7 +342,16 @@ void motorControlSpeed(void)
 				SPEED_FEEDFORWARD_PWM_MAX_DEFAULT, crr);	// フィードフォワード項
 	}
 
-	veloCtrl.Int += (float)Dev * 0.001;	// 時間積分
+	if(veloCtrl.pwm <= 900 || veloCtrl.pwm >= -900)
+	{
+		veloCtrl.Int += (float)Dev * 0.001;
+	}
+	if (veloCtrl.Int > 10000.0)
+		veloCtrl.Int = 10000.0; // I成分リミット
+	else if (veloCtrl.Int < -10000.0)
+		veloCtrl.Int = -10000.0;
+
+	// veloCtrl.Int += (float)Dev * 0.001;	// 時間積分
 	Dif = Dev - speedEncoderBefore;		// 微分　dゲイン1/1000倍
 
 	iP = veloCtrl.kp * Dev;		// 比例

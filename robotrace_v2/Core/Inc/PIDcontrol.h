@@ -90,7 +90,7 @@ extern pidParam yawCtrl;
 extern pidParam distCtrl;
 extern int16_t speedFeedForwardGain;
 
-extern int32_t senL, senR;
+extern int32_t log_targetAngularVelocity; // ログ用目標角速度
 
 //====================================//
 // プロトタイプ宣言

@@ -170,6 +170,7 @@ void createLog(void)
 	setLogHeaderStrF("veloCtrl.kp", veloCtrl.kp);
 	setLogHeaderStrF("veloCtrl.ki", veloCtrl.ki);
 	setLogHeaderStrF("veloCtrl.kd", veloCtrl.kd);
+	setLogHeaderStrF("speedFeedForwardGain", speedFeedForwardGain);
 	setLogHeaderStrF("yawRateCtrl.kp", yawRateCtrl.kp);
 	setLogHeaderStrF("yawRateCtrl.ki", yawRateCtrl.ki);
 	setLogHeaderStrF("yawRateCtrl.kd", yawRateCtrl.kd);
@@ -199,7 +200,7 @@ void createLog(void)
 	// setLogStr("lSensorCari[6]", "%d");
 	setLogStr("veloCtrl", "%d");
 	// setLogStr("velocity", "%f");
-	// setLogStr("targetAngularvelo", "%d");
+	setLogStr("targetAngularvelo", "%d");
 
 	setLogStr("x", "%f");
 	setLogStr("y", "%f");
@@ -568,6 +569,7 @@ void endLog(void)
 			(int16_t)logval16[3],	// lineTraceCtrl
 			(int16_t)logval16[4],	// lineTraceCtrlkp
 			(int16_t)logval16[5],	// veloCtrl
+			(int32_t)logval32[1],	// targetAngularvelo
 
 			logvalf[2],		// x
 			logvalf[3]		// y

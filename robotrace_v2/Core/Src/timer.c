@@ -136,6 +136,7 @@ void Interrupt1ms(void)
 					veloCtrl.pwm,
 					// 32bit
 					encTotalOptimal,
+					log_targetAngularVelocity,
 					// float型
 					BMI088val.gyro.z
 				);
