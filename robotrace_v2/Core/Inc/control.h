@@ -37,6 +37,10 @@
 #define START_SERACH 3
 #define START_OPTIMAL 4
 
+// クロスライン検出関連
+#define TRACE_CROSSLINE_TH			2000	// クロスライン検出閾値
+#define TRACE_CROSSLINE_DISTANCE	60		// クロスライン付近でゲインを変更する距離[mm]
+
 // ファイル名
 #define FILENAME_TARGET_SPEED "targetSpeeds"
 
@@ -65,15 +69,16 @@ typedef struct
 // グローバル変数の宣言
 //====================================//
 // パターン、モード関連
-extern uint8_t patternTrace; // パターン番号
-extern bool modeDSP;		 // LCD表示選択
-extern bool modeLOG;		 // ログ取得状況
-extern bool initMSD;		 // microSD初期化状況
-extern bool initLCD;		 // LCD初期化状況
-extern bool initIMU;		 // IMU初期化状況
-extern bool initCurrent;	 // 電流センサ初期化状況
-extern uint8_t modeCurve;	 // カーブ判断 0:直線 1:カーブ進入
-extern uint8_t autoStart;	 // 5走を自動で開始する
+extern uint8_t patternTrace;	// パターン番号
+extern bool modeDSP;			// LCD表示選択
+extern bool modeLOG;			// ログ取得状況
+extern bool initMSD;			// microSD初期化状況
+extern bool initLCD;			// LCD初期化状況
+extern bool initIMU;			// IMU初期化状況
+extern bool initCurrent;		// 電流センサ初期化状況
+extern uint8_t modeCurve;		// カーブ判断 0:直線 1:カーブ進入
+extern uint8_t autoStart;		// 5走を自動で開始する
+extern bool crossLineState;		// クロスライン検出状態
 
 extern uint16_t analogValLSon[10]; // ADC結果格納配列
 extern uint16_t analogValLSoff[10]; // ADC結果格納配列
@@ -104,5 +109,6 @@ void getADC2(void);
 void setEncoderVal(void);
 void writeTgtspeeds(void);
 void readTgtspeeds(void);
+void checkCrossLine(void);
 
 #endif // CONTROL_H_

@@ -5,6 +5,7 @@
 #include "PIDcontrol.h"
 #include "fatfs.h"
 #include "battery.h"
+#include <stdbool.h>
 #include <stdint.h>
 //====================================//
 // グローバル変数の宣言
@@ -18,9 +19,11 @@ bool initLCD = false;		// LCD初期化状況		false:初期化失敗	true:初期�
 bool initIMU = false;		// IMU初期化状況		false:初期化失敗	true:初期化成功
 bool initCurrent = false;	// 電流センサ初期化状況	false:初期化失敗	true:初期化成功
 static bool softreset = false;		// ソフトウェアリセット	false:リセット未実行	true:リセット実行
-uint8_t modeCurve = 0;		// カーブ判断			0:直線			1:カーブ進入
-uint8_t autoStart = 0;		// 5走を自動で開始する
-int16_t autoStartAnalize = 0; // 自動走行で使用するログの解析番号
+uint8_t modeCurve = 0;				// カーブ判断			0:直線			1:カーブ進入
+uint8_t autoStart = 0;				// 5走を自動で開始する
+int16_t autoStartAnalize = 0; 		// 自動走行で使用するログの解析番号
+
+bool crossLineState = false;			// クロスライン検出状態
 
 uint16_t analogValLSon[NUM_SENSORS]; // ADC結果格納配列
 uint16_t analogValLSoff[NUM_SENSORS]; // ADC結果格納配列s
@@ -696,6 +699,7 @@ void loopSystem(void)
 				clearMarkerProcessState();	// マーカーセンサ処理状態クリア
 				lineTraceOmegaFBCtrl.Int = 0;
 				encTotalN = 0;	// エンコーダ総パルス数クリア
+				crossLineState = false;		// クロスライン検出状態クリア
 
 				patternTrace = 0;
 				break;
@@ -749,6 +753,7 @@ void loopSystem(void)
 			encClick = 0;				// ホイールクリッククリア
 			encTotalN = 0;				// エンコーダ総パルス数クリア
 			lineTraceOmegaFBCtrl.Int = 0;
+			crossLineState = false;		// クロスライン検出状態クリア
 			clearMarkerProcessState();	// マーカーセンサ処理状態クリア
 			patternTrace = 0;
 		}
@@ -1003,4 +1008,38 @@ void readTgtspeeds(void)
 	}
 
 	f_close(&fil);
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 checkCrossLine
+// 処理概要     ラインセンサのクロスライン検出
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void checkCrossLine(void)
+{
+	static int32_t encCrossLine = 0;
+
+	if (lSensorMax[0] > lSensorMin[0])
+	{
+		// 中央2センサが閾値以上かつ、外側1センサが閾値以上でクロスライン検出
+		if((lSensorCari[4] > TRACE_CROSSLINE_TH&& lSensorCari[5] > TRACE_CROSSLINE_TH)
+		&& (lSensorCari[3] > TRACE_CROSSLINE_TH || lSensorCari[6] > TRACE_CROSSLINE_TH))
+		{
+			// 両センサが白を検出
+			if (!crossLineState)
+			{
+				crossLineState = true;
+				encCrossLine = encTotalN;	// クロスライン通過時のエンコーダ値を保存
+			}
+		}
+		
+		if (crossLineState)
+		{
+			if((encTotalN - encCrossLine) > encMM(TRACE_CROSSLINE_DISTANCE))
+			{
+				// クロスラインから離れたらゲインを元に戻す
+				crossLineState = false;
+			}
+		}
+	}
 }

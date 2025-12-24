@@ -108,7 +108,8 @@ bool cntEmcStopLineSensorBright(void)
 	if (lSensorCari[3] > STOP_TH_LINE_SENSOR_BRIGHT
 		&& lSensorCari[4] > STOP_TH_LINE_SENSOR_BRIGHT
 		&& lSensorCari[5] > STOP_TH_LINE_SENSOR_BRIGHT
-		&& lSensorCari[6] > STOP_TH_LINE_SENSOR_BRIGHT)
+		&& lSensorCari[6] > STOP_TH_LINE_SENSOR_BRIGHT
+		&& !crossLineState)
 	{
 		cntLineSensorBright++;
 	}

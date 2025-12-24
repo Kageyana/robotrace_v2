@@ -214,49 +214,37 @@ void motorControlTrace(void)
 void motorControlTraceOmegaFB(void)
 {
 	int32_t iP, iI, iD, iRet, target, Dev, Dif, senL, senR;;
-	static int32_t traceBefore, encCrossLine = 0, beforeGainP = 0, beforeGainD = 0;
-	static bool stateCrossLine = false;
-	static int32_t eps = 10;
+	static int32_t traceBefore, beforeGainP = 0, beforeGainD = 0;
+	// static bool stateCrossLine = false;
 
 	// サーボモータ用PWM値計算
 	if (lSensorMax[0] > lSensorMin[0])
 	{
 		if(patternTrace < 10)
 		{
-			encCrossLine = 0;
 			beforeGainP = 0;
 			beforeGainD = 0;
-			stateCrossLine = false;
 		}
-		// クロスライン検出 (中央2センサが閾値以上かつ、外側1センサが閾値以上)
-		if((lSensorCari[4] > TRACE_CROSSLINE_TH&& lSensorCari[5] > TRACE_CROSSLINE_TH)
-		&& (lSensorCari[3] > TRACE_CROSSLINE_TH || lSensorCari[6] > TRACE_CROSSLINE_TH))
+		// クロスライン検出
+		if(crossLineState)
 		{
-			stateCrossLine = true;
-			encCrossLine = encTotalN;	// クロスライン通過時のエンコーダ値を保存
-		}
-		
-		// クロスライン付近ではゲインを下げる
-		if (stateCrossLine)
-		{
-			if((encTotalN - encCrossLine) < encMM(TRACE_CROSSLINE_DISTANCE))
+			if(beforeGainP == 0 && beforeGainD == 0)
 			{
-				if(beforeGainP == 0 && beforeGainD == 0)
-				{
-					beforeGainP = lineTraceOmegaFBCtrl.kp;
-					beforeGainD = lineTraceOmegaFBCtrl.kd;
-					lineTraceOmegaFBCtrl.kp = 10;
-					lineTraceOmegaFBCtrl.kd = 0;
-				}
+				beforeGainP = lineTraceOmegaFBCtrl.kp;
+				beforeGainD = lineTraceOmegaFBCtrl.kd;
+				lineTraceOmegaFBCtrl.kp = 10;
+				lineTraceOmegaFBCtrl.kd = 0;
 			}
-			else
+		}
+		else
+		{
+			// クロスラインから離れたらゲインを元に戻す
+			if(beforeGainP != 0 && beforeGainD != 0)
 			{
-				// クロスラインから離れたらゲインを元に戻す
 				lineTraceOmegaFBCtrl.kp = beforeGainP;
 				lineTraceOmegaFBCtrl.kd = beforeGainD;
 				beforeGainP = 0;
 				beforeGainD = 0;
-				stateCrossLine = false;
 			}
 		}
 		

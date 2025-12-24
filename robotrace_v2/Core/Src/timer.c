@@ -90,6 +90,7 @@ void Interrupt1ms(void)
 			emcStop = STOP_OVERSPEED;
 
 		checkCurve();	// カーブ検出
+		checkCrossLine(); // クロスライン確認
 
 		courseMarker = checkMarker();	// マーカー検知
 		checkStartGoalMarker();			// ゴールマーカー処理

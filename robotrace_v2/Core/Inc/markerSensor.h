@@ -31,6 +31,5 @@ void getMarkerSensor (void);
 void initMarkerSensor(void);
 uint8_t checkMarker(void);
 void checkStartGoalMarker(void);
-bool checkCrossLine(void);
 void powerMarkerSensors(uint8_t onoff);
 #endif // MARKERSENSOR_H_

@@ -145,26 +145,6 @@ uint8_t checkMarker(void)
 	return ret;
 }
 /////////////////////////////////////////////////////////////
-// モジュール名 checkCrossLine
-// 処理概要  	ラインセンサのAD値からクロスラインを判定する
-// 引数     	なし
-// 戻り値    	なし
-/////////////////////////////////////////////////////////////
-bool checkCrossLine(void)
-{
-	int32_t valLine;
-	bool ret = false;
-
-	valLine = lSensorCari[0] + lSensorCari[1] + lSensorCari[8] + lSensorCari[9];
-
-	if (valLine < 4000)
-	{
-		ret = true;
-	}
-
-	return ret;
-}
-/////////////////////////////////////////////////////////////
 // モジュール名 checkStartGoalMarker
 // 処理概要     スートマーカーとゴールマーカーの検出
 // 引数         なし
