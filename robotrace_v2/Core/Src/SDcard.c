@@ -161,25 +161,6 @@ void createLog(void)
 
 	columnTitle[0] = 0; // バッファを安全に初期化
 	formatLog[0] = 0;   // バッファを安全に初期化
-	setLogHeaderStrF("lineTraceCtrl.kp", lineTraceCtrl.kp);
-	setLogHeaderStrF("lineTraceCtrl.ki", lineTraceCtrl.ki);
-	setLogHeaderStrF("lineTraceCtrl.kd", lineTraceCtrl.kd);
-	setLogHeaderStrF("lineTraceOmegaFBCtrl.kp", lineTraceOmegaFBCtrl.kp);
-	setLogHeaderStrF("lineTraceOmegaFBCtrl.ki", lineTraceOmegaFBCtrl.ki);
-	setLogHeaderStrF("lineTraceOmegaFBCtrl.kd", lineTraceOmegaFBCtrl.kd);
-	setLogHeaderStrF("veloCtrl.kp", veloCtrl.kp);
-	setLogHeaderStrF("veloCtrl.ki", veloCtrl.ki);
-	setLogHeaderStrF("veloCtrl.kd", veloCtrl.kd);
-	setLogHeaderStrF("speedFeedForwardGain", speedFeedForwardGain);
-	setLogHeaderStrF("yawRateCtrl.kp", yawRateCtrl.kp);
-	setLogHeaderStrF("yawRateCtrl.ki", yawRateCtrl.ki);
-	setLogHeaderStrF("yawRateCtrl.kd", yawRateCtrl.kd);
-	setLogHeaderStrF("yawCtrl.kp", yawCtrl.kp);
-	setLogHeaderStrF("yawCtrl.ki", yawCtrl.ki);
-	setLogHeaderStrF("yawCtrl.kd", yawCtrl.kd);
-	setLogHeaderStrF("distCtrl.kp", distCtrl.kp);
-	setLogHeaderStrF("distCtrl.ki", distCtrl.ki);
-	setLogHeaderStrF("distCtrl.kd", distCtrl.kd);
 #ifdef LOG_RUNNING_WRITE
 	setLogStr("cntlog", "%d");
 	setLogStr("encCurrentN", "%d");
@@ -218,6 +199,25 @@ void createLog(void)
 	// setLogStr("courseMarker",  "%d");
 	// setLogStr("encTotalN",    "%d");
 #endif
+	setLogHeaderStrF("lineTraceCtrl.kp", lineTraceCtrl.kp);
+	setLogHeaderStrF("lineTraceCtrl.ki", lineTraceCtrl.ki);
+	setLogHeaderStrF("lineTraceCtrl.kd", lineTraceCtrl.kd);
+	setLogHeaderStrF("lineTraceOmegaFBCtrl.kp", lineTraceOmegaFBCtrl.kp);
+	setLogHeaderStrF("lineTraceOmegaFBCtrl.ki", lineTraceOmegaFBCtrl.ki);
+	setLogHeaderStrF("lineTraceOmegaFBCtrl.kd", lineTraceOmegaFBCtrl.kd);
+	setLogHeaderStrF("veloCtrl.kp", veloCtrl.kp);
+	setLogHeaderStrF("veloCtrl.ki", veloCtrl.ki);
+	setLogHeaderStrF("veloCtrl.kd", veloCtrl.kd);
+	setLogHeaderStrF("speedFeedForwardGain", speedFeedForwardGain);
+	setLogHeaderStrF("yawRateCtrl.kp", yawRateCtrl.kp);
+	setLogHeaderStrF("yawRateCtrl.ki", yawRateCtrl.ki);
+	setLogHeaderStrF("yawRateCtrl.kd", yawRateCtrl.kd);
+	setLogHeaderStrF("yawCtrl.kp", yawCtrl.kp);
+	setLogHeaderStrF("yawCtrl.ki", yawCtrl.ki);
+	setLogHeaderStrF("yawCtrl.kd", yawCtrl.kd);
+	setLogHeaderStrF("distCtrl.kp", distCtrl.kp);
+	setLogHeaderStrF("distCtrl.ki", distCtrl.ki);
+	setLogHeaderStrF("distCtrl.kd", distCtrl.kd);
     strncat((char *)columnTitle, "\n", sizeof(columnTitle) - strlen((char *)columnTitle) - 1); // バッファサイズを指定して安全に改行を追加
     strncat((char *)formatLog, "\n", sizeof(formatLog) - strlen((char *)formatLog) - 1);       // バッファサイズを指定して安全に改行を追加
 	f_printf(&fil_W, columnTitle);
@@ -686,7 +686,7 @@ void setLogHeaderStr(char *name, int32_t value)
 {
 	char headerStr[64];
 
-	snprintf((char *)headerStr, sizeof(headerStr), "%s=%ld\n", name, (long)value); // バッファサイズを指定して安全に変換
+	snprintf((char *)headerStr, sizeof(headerStr), "%s=%ld,", name, (long)value); // バッファサイズを指定して安全に変換
 	strncat((char *)columnTitle, (char *)headerStr, sizeof(columnTitle) - strlen((char *)columnTitle) - 1); // バッファサイズを指定して安全に結合
 }
 /////////////////////////////////////////////////////////////////////
@@ -699,7 +699,7 @@ void setLogHeaderStrF(char *name, float value)
 {
     char headerStr[64];
 
-    snprintf((char *)headerStr, sizeof(headerStr), "%s=%f\n", name, (double)value);
+    snprintf((char *)headerStr, sizeof(headerStr), "%s=%f,", name, (double)value);
     strncat((char *)columnTitle, (char *)headerStr, sizeof(columnTitle) - strlen((char *)columnTitle) - 1);
 }
 /////////////////////////////////////////////////////////////////////
