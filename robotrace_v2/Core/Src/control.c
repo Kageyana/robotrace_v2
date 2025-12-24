@@ -766,9 +766,13 @@ void loopSystem(void)
 ///////////////////////////////////////////////////////////////////////////
 void emargencyStop(void)
 {
-
-	motorPwmOutSynth(0, 0, 0, 0);
-
+	// 機体停止処理
+	setTargetSpeed(0);
+	while (encCurrentN > 5)
+	{
+		motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
+	}
+	
 	if (!ssd1306_IsDMARunning())
 	{
 		ssd1306_UpdateScreen_DMA();        // 停止していた画面更新を再開
