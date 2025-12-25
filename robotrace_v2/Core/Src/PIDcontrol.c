@@ -7,6 +7,7 @@
 #include "encoder.h"
 #include "fatfs.h"
 #include "lineSensor.h"
+#include <stdbool.h>
 #include <stdint.h>
 //====================================//
 // グローバル変数の宣言
@@ -214,8 +215,9 @@ void motorControlTrace(void)
 void motorControlTraceOmegaFB(void)
 {
 	int32_t iP, iI, iD, iRet, target, Dev, Dif, senL, senR;;
-	static int32_t traceBefore, beforeGainP = 0, beforeGainD = 0;
-	// static bool stateCrossLine = false;
+	static int32_t traceBefore;
+	static int16_t beforeGainP = 0, beforeGainD = 0;
+	static bool changeGain = false;
 
 	// サーボモータ用PWM値計算
 	if (lSensorMax[0] > lSensorMin[0])
@@ -226,25 +228,27 @@ void motorControlTraceOmegaFB(void)
 			beforeGainD = 0;
 		}
 		// クロスライン検出
-		if(crossLineState)
+		if(stateCrossLine)
 		{
-			if(beforeGainP == 0 && beforeGainD == 0)
+			if(!changeGain)
 			{
 				beforeGainP = lineTraceOmegaFBCtrl.kp;
 				beforeGainD = lineTraceOmegaFBCtrl.kd;
 				lineTraceOmegaFBCtrl.kp = 10;
 				lineTraceOmegaFBCtrl.kd = 0;
+				changeGain = true;
 			}
 		}
 		else
 		{
 			// クロスラインから離れたらゲインを元に戻す
-			if(beforeGainP != 0 && beforeGainD != 0)
+			if(changeGain)
 			{
 				lineTraceOmegaFBCtrl.kp = beforeGainP;
 				lineTraceOmegaFBCtrl.kd = beforeGainD;
 				beforeGainP = 0;
 				beforeGainD = 0;
+				changeGain = false;
 			}
 		}
 		

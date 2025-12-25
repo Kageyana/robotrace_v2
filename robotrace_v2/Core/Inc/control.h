@@ -11,27 +11,27 @@
 // 機体諸元
 
 // 速度パラメータ関連
-#define PARAM_STRAIGHT 2.2F
-#define PARAM_CURVE 1.9F
+#define PARAM_STRAIGHT 1.0F
+#define PARAM_CURVE 1.0F
 #define PARAM_STOP 0.8F
 #define PARAM_SHORTCUT 0.5F
-#define PARAM_BOOST_STRAIGHT 2.6F
-#define PARAM_BOOST_1500 2.5F
+#define PARAM_BOOST_STRAIGHT 2.8F
+#define PARAM_BOOST_1500 2.6F
 #define PARAM_BOOST_1300 2.4F
-#define PARAM_BOOST_1000 2.3F
-#define PARAM_BOOST_800 2.2F
-#define PARAM_BOOST_700 2.1F
-#define PARAM_BOOST_600 2.0F
-#define PARAM_BOOST_500 1.9F
-#define PARAM_BOOST_400 1.8F
-#define PARAM_BOOST_300 1.7F
-#define PARAM_BOOST_200 1.6F
-#define PARAM_BOOST_100 1.5F
+#define PARAM_BOOST_1000 2.2F
+#define PARAM_BOOST_800 2.0F
+#define PARAM_BOOST_700 1.8F
+#define PARAM_BOOST_600 1.6F
+#define PARAM_BOOST_500 1.5F
+#define PARAM_BOOST_400 1.4F
+#define PARAM_BOOST_300 1.3F
+#define PARAM_BOOST_200 1.2F
+#define PARAM_BOOST_100 1.1F
 
 #define PARAM_UP_STEP 1.02F
 
 // ゴール
-#define COUNT_GOAL 2 // ゴールマーカーを読む回数
+#define COUNT_GOAL 3 // ゴールマーカーを読む回数
 
 // スタートモード
 #define START_SERACH 3
@@ -78,7 +78,7 @@ extern bool initIMU;			// IMU初期化状況
 extern bool initCurrent;		// 電流センサ初期化状況
 extern uint8_t modeCurve;		// カーブ判断 0:直線 1:カーブ進入
 extern uint8_t autoStart;		// 5走を自動で開始する
-extern bool crossLineState;		// クロスライン検出状態
+extern bool stateCrossLine;		// クロスライン検出状態
 
 extern uint16_t analogValLSon[10]; // ADC結果格納配列
 extern uint16_t analogValLSoff[10]; // ADC結果格納配列
