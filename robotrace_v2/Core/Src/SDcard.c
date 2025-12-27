@@ -174,7 +174,6 @@ void createLog(void)
 	// setLogStr("motorpwmL", "%d");
 	// setLogStr("motorpwmR", "%d");
 	setLogStr("lineTraceCtrl", "%d");
-	setLogStr("lineTraceCtrlkp", "%d");
 	// setLogStr("lSensorCari[3]", "%d");
 	// setLogStr("lSensorCari[4]", "%d");
 	// setLogStr("lSensorCari[5]", "%d");
@@ -182,6 +181,11 @@ void createLog(void)
 	setLogStr("veloCtrl", "%d");
 	// setLogStr("velocity", "%f");
 	setLogStr("targetAngularvelo", "%d");
+	setLogStr("log_veloCtrl_iP", "%d");
+	setLogStr("log_veloCtrl_fedfwd", "%d");
+	setLogStr("motorpwmL", "%d");
+	setLogStr("motorpwmR", "%d");
+	setLogStr("veloCtrl.Int", "%f");
 
 	setLogStr("x", "%f");
 	setLogStr("y", "%f");
@@ -562,17 +566,21 @@ void endLog(void)
 			zg,
 			marker,
 			distance,
-			logvalf[1],		// ROC
+			logvalf[2],		// ROC
 
 			logval8[0],		// targetSpeed
 			logval16[2],	// optimalIndex
 			(int16_t)logval16[3],	// lineTraceCtrl
-			(int16_t)logval16[4],	// lineTraceCtrlkp
-			(int16_t)logval16[5],	// veloCtrl
-			(int32_t)logval32[1],	// targetAngularvelo
+			(int16_t)logval16[4],	// veloCtrl
+			(int16_t)logval16[5],	// targetAngularvelo
+			(int16_t)logval16[6],	// log_veloCtrl_iP
+			(int16_t)logval16[7],	// log_veloCtrl_f
+			(int16_t)logval16[8],	// motorpwmL
+			(int16_t)logval16[9],	// motorpwmR
 
-			logvalf[2],		// x
-			logvalf[3]		// y
+			logvalf[1],		// veloCtrl.Int	
+			logvalf[3],		// x
+			logvalf[4]		// y
 		);
 
 		// 文字列をSDカードに送信
