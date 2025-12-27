@@ -221,9 +221,6 @@ void motorControlTraceOmegaFB(void)
 	static int16_t beforeGainP = 0, beforeGainD = 0;
 	static bool changeGain = false;
 
-	// 追加：targetAngularVelocityのフィルタ用（変化率制限後の値を保持）
-	static float targetFilt = 0.0f;
-
 	// サーボモータ用PWM値計算
 	if (lSensorMax[0] > lSensorMin[0])
 	{
@@ -282,40 +279,7 @@ void motorControlTraceOmegaFB(void)
 				+ (lSensor[8] * TRACE_WEIGHT_OUTER)
 				+ (lSensor[9] * TRACE_WEIGHT_FAR);
 	}
-
-	/* ===== ここから中変更：targetAngularVelocity生成を安定化 ===== */
-
-	// 追加：センサ差分をそのまま使わず、(差分/総和)で正規化して反射量変動に強くする
-	float diff = (float)(senR - senL);
-	float sum  = (float)(senR + senL);
-
-	// 追加：0割防止（暗い/異常時にsumが小さい場合の発散を防ぐ）
-	const float eps = 10.0f;
-	float err = diff / (sum + eps);
-
-	// 追加：正規化誤差errを角速度目標へ変換する係数（要調整）
-	// ※元の「(senR-senL)*encCurrentN>>9」と同等スケールに近づけるためのゲイン
-	const float traceOmegaGain = 10.0f;
-	float targetRaw = err * (float)encCurrentN * traceOmegaGain;
-
-	// 追加：目標角速度の上限（過大目標でPWM飽和→反転発振しやすいのを防ぐ）
-	const float targetOmegaMax = 600.0f;
-	if (targetRaw >  targetOmegaMax) targetRaw =  targetOmegaMax;
-	if (targetRaw < -targetOmegaMax) targetRaw = -targetOmegaMax;
-
-	// 追加：目標角速度の変化率制限（符号反転を鈍らせ、直線発振の燃料を減らす）
-	// ※1ms周期前提。周期が違う場合はmaxStepを調整してください。
-	const float maxStep = 50.0f;
-	float d = targetRaw - targetFilt;
-	if (d >  maxStep) d =  maxStep;
-	if (d < -maxStep) d = -maxStep;
-	targetFilt += d;
-
-	// 追加：最終的にintへ（既存のtarget/ログ形式に合わせる）
-	target = (int32_t)targetFilt;
-
-	/* ===== 中変更ここまで ===== */
-
+	target = ((senR - senL) * encCurrentN) >> 9;
 	log_targetAngularVelocity = target; // ログ用に目標角速度を保存
 	Dev = target - (int32_t)BMI088val.gyro.z;
 
@@ -336,7 +300,7 @@ void motorControlTraceOmegaFB(void)
 	iD = lineTraceOmegaFBCtrl.kd * Dif;                    // 微分
 	iRet = iP + iI + iD;
 
-	// 修正：スケーリングを戻す（以前の挙動：>>5でPWMレンジに収める）
+	// PWMを0～1000近傍に収める
 	iRet = iRet >> 5;
 
 	// PWMの上限の設定
@@ -346,7 +310,6 @@ void motorControlTraceOmegaFB(void)
 	lineTraceOmegaFBCtrl.pwm = iRet;
 	traceBefore = Dev; // 次回はこの値が1ms前の値となる
 }
-
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 motorControlSpeed
 // 処理概要     モーターの制御量の計算
