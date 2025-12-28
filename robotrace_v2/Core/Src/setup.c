@@ -904,6 +904,13 @@ static void setup_pid_speed(void)
 		powerLineSensors(0);          // ラインセンサ停止
 	}
 
+	veloCtrlL.kp = veloCtrl.kp; // 左右速度制御ゲイン同期
+	veloCtrlR.kp = veloCtrl.kp;
+	veloCtrlL.ki = veloCtrl.ki;
+	veloCtrlR.ki = veloCtrl.ki;
+	veloCtrlL.kd = veloCtrl.kd;
+	veloCtrlR.kd = veloCtrl.kd;
+
 	// ゲイン表示
 	dataTuningUD(&pattern.gain, 1, 4, 1); // 調整対象のゲインを選択(フィードフォワード係数を含む)
 	if (testFlags.trace_test == 0)

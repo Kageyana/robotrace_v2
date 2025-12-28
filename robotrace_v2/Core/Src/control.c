@@ -432,17 +432,17 @@ void loopSystem(void)
 				writeTgtspeeds(); // 目標速度を記録
 			}
 
-			// if (optimalTrace == BOOST_NONE)
-			// {
-			// 	lineTraceOmegaFBCtrl.kp = 2;
-			// 	lineTraceOmegaFBCtrl.ki = 0;
-			// 	lineTraceOmegaFBCtrl.kd = 20;
+			if (optimalTrace == BOOST_NONE)
+			{
+				lineTraceOmegaFBCtrl.kp = 12;
+				lineTraceOmegaFBCtrl.ki = 0;
+				lineTraceOmegaFBCtrl.kd = 0;
 
-			// 	veloCtrl.kp = 8;
-			// 	veloCtrl.ki = 0;
-			// 	veloCtrl.kd = 0;
-			// 	speedFeedForwardGain = 150;
-			// }
+				// veloCtrl.kp = 8;
+				// veloCtrl.ki = 0;
+				// veloCtrl.kd = 0;
+				// speedFeedForwardGain = 150;
+			}
 
 			if (initMSD)
 			{
@@ -482,6 +482,7 @@ void loopSystem(void)
 		}
 		// ライントレース
 		motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+		// motorPwmOut(veloCtrlR.pwm,veloCtrlR.pwm);
 
 		// スタートマーカーを通過したら本走行に移行
 		if (SGmarker > 0)
@@ -524,7 +525,8 @@ void loopSystem(void)
 				setTargetSpeed(tgtParam.curve);
 			}
 			// ライントレース
-			motorPwmOutSynth(lineTraceOmegaFBCtrl.pwm, veloCtrl.pwm, 0, 0);
+			// motorPwmOutSynth(lineTraceOmegaFBCtrl.pwm, veloCtrl.pwm, 0, 0);
+			motorPwmOut(veloCtrlL.pwm,veloCtrlR.pwm);
 		}
 		else if (optimalTrace == BOOST_DISTANCE)
 		{

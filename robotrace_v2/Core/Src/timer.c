@@ -69,6 +69,16 @@ void Interrupt1ms(void)
 		motorControlTraceOmegaFB();
 	}
 	motorControlSpeed();
+	int16_t delta = lineTraceOmegaFBCtrl.pwm;
+	int16_t targetL = (int16_t)targetSpeed + delta;
+	int16_t targetR = (int16_t)targetSpeed - delta;
+	// クリップ（例：目標が大きくなりすぎないように。上限は実機で調整）
+	const int16_t TARGET_MAX = (int16_t)PALSE_MILLIMETER * 4;	// 4.0m/s
+	if (targetL >  TARGET_MAX) targetL =  TARGET_MAX;
+	if (targetL < -TARGET_MAX) targetL = -TARGET_MAX;
+	if (targetR >  TARGET_MAX) targetR =  TARGET_MAX;
+	if (targetR < -TARGET_MAX) targetR = -TARGET_MAX;
+	motorControlSpeedLR(targetL, targetR);
 	if(optimalTrace == BOOST_SHORTCUT)
 	{
 		motorControldist();
@@ -137,8 +147,8 @@ void Interrupt1ms(void)
 					(int16_t)log_targetAngularVelocity,
 					log_veloCtrl_iP,
 					log_veloCtrl_fedfwd,
-					motorpwmL,
-					motorpwmR,
+					veloCtrlL.pwm,
+					veloCtrlR.pwm,
 					// 32bit
 					encTotalOptimal,
 					// float型

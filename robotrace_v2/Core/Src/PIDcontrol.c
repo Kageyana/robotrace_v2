@@ -15,6 +15,8 @@
 pidParam lineTraceCtrl = {"line", KP1, KI1, KD1, 0, 0};
 pidParam lineTraceOmegaFBCtrl = {"lineomega", KP6, KI6, KD6, 0, 0};
 pidParam veloCtrl = {"speed", KP2, KI2, KD2, 0, 0};
+pidParam veloCtrlL = {"speed", KP2, KI2, KD2, 0, 0};
+pidParam veloCtrlR = {"speed", KP2, KI2, KD2, 0, 0};
 pidParam yawRateCtrl = {"yawRate", KP3, KI3, KD3, 0, 0};
 pidParam yawCtrl = {"yaw", KP4, KI4, KD4, 0, 0};
 pidParam distCtrl = {"dist", KP5, KI5, KD5, 0, 0};
@@ -28,6 +30,9 @@ float targetAngle;			 // 目標角速度
 float targetAngularVelocity; // 目標角度
 int16_t targetDist;			 // 目標X座標
 static int16_t speedTargetBefore = 0;	// 速度PID用の前回目標値
+static int16_t speedTargetBeforeL = 0, speedTargetBeforeR = 0;
+static int16_t speedEncoderBeforeL = 0, speedEncoderBeforeR = 0;
+static int16_t feedForwardPwmL = 0, feedForwardPwmR = 0;
 static int16_t speedEncoderBefore = 0;	// 速度PID用の前回偏差
 extern float batteryVoltage_V;	// control.cで保持したバッテリ電圧[V]
 
@@ -236,7 +241,7 @@ void motorControlTraceOmegaFB(void)
 			{
 				beforeGainP = lineTraceOmegaFBCtrl.kp;
 				beforeGainD = lineTraceOmegaFBCtrl.kd;
-				lineTraceOmegaFBCtrl.kp = 10;
+				lineTraceOmegaFBCtrl.kp = 4;
 				lineTraceOmegaFBCtrl.kd = 0;
 				changeGain = true;
 			}
@@ -369,6 +374,89 @@ void motorControlSpeed(void)
 	veloCtrl.pwm = iRet;
 	speedEncoderBefore = Dev;		      // 次回はこの値が1ms前の値となる
 	speedTargetBefore = targetSpeed; // 前回の目標値を記録
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 motorControlSpeedLR
+// 処理概要     モーターの制御量の計算(左右独立）
+// 引数         targetEncL:左モーター目標エンコーダ値
+//              targetEncR:右モーター目標エンコーダ値
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void motorControlSpeedLR(int16_t targetEncL, int16_t targetEncR)
+{
+	float crr = (float)speedFeedForwardGain * SPEED_FEEDFORWARD_CRR_SCALE;
+
+	// --- Left ---
+	int32_t devL = (int32_t)targetEncL - (int32_t)encCurrentL;
+
+	if (targetEncL != speedTargetBeforeL){
+		veloCtrlL.Int = 0.0f;
+
+		// targetEncL[count/ms] -> mm/s
+		float target_mm_s_L = ((float)targetEncL / PALSE_MILLIMETER) * 1000.0f;
+		feedForwardPwmL = calcSpeedFeedForward(target_mm_s_L, batteryVoltage_V,
+			SPEED_FEEDFORWARD_PWM_MAX_DEFAULT, crr);
+	}
+
+	// アンチワインドアップ（※本当に止めたいなら「未飽和時のみ積分」にする）
+	if (veloCtrlL.pwm < 1000 && veloCtrlL.pwm > -1000){
+		veloCtrlL.Int += (float)devL * 0.001f;
+	}
+	if (veloCtrlL.Int > 10000.0f) veloCtrlL.Int = 10000.0f;
+	if (veloCtrlL.Int < -10000.0f) veloCtrlL.Int = -10000.0f;
+
+	int32_t difL = devL - speedEncoderBeforeL;
+
+	int32_t iPL = veloCtrlL.kp * devL;
+	int32_t iIL = (int32_t)(veloCtrlL.ki * veloCtrlL.Int);
+	int32_t iDL = veloCtrlL.kd * difL;
+	int32_t iRetL = iPL + iIL + iDL + feedForwardPwmL;
+
+  	
+	if (iRetL > 1000)
+		iRetL = 1000;
+	if (iRetL < -1000)
+		iRetL = -1000;
+
+	veloCtrlL.pwm = iRetL;
+
+	speedEncoderBeforeL = (int16_t)devL;
+	speedTargetBeforeL  = targetEncL;
+
+	// --- Right ---
+	int32_t devR = (int32_t)targetEncR - (int32_t)encCurrentR;
+
+	if (targetEncR != speedTargetBeforeR){
+		veloCtrlR.Int = 0.0f;
+
+		float target_mm_s_R = ((float)targetEncR / PALSE_MILLIMETER) * 1000.0f;
+		feedForwardPwmR = calcSpeedFeedForward(target_mm_s_R, batteryVoltage_V,
+			SPEED_FEEDFORWARD_PWM_MAX_DEFAULT, crr);
+	}
+
+	if (veloCtrlR.pwm < 1000 && veloCtrlR.pwm > -1000){
+		veloCtrlR.Int += (float)devR * 0.001f;
+	}
+	if (veloCtrlR.Int > 10000.0f) veloCtrlR.Int = 10000.0f;
+	if (veloCtrlR.Int < -10000.0f) veloCtrlR.Int = -10000.0f;
+
+	int32_t difR = devR - speedEncoderBeforeR;
+
+	int32_t iPR = veloCtrlR.kp * devR;
+	int32_t iIR = (int32_t)(veloCtrlR.ki * veloCtrlR.Int);
+	int32_t iDR = veloCtrlR.kd * difR;
+	int32_t iRetR = iPR + iIR + iDR + feedForwardPwmR;
+
+	// PWMの上限の設定
+	if (iRetR > 1000)
+		iRetR = 1000;
+	if (iRetR < -1000)
+		iRetR = -1000;
+
+	veloCtrlR.pwm = iRetR;
+
+	speedEncoderBeforeR = (int16_t)devR;
+	speedTargetBeforeR  = targetEncR;
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 motorControlYaw

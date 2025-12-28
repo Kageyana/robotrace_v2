@@ -83,6 +83,8 @@ extern int16_t  targetDist;		        // 目標X座標
 extern pidParam lineTraceCtrl;
 extern pidParam lineTraceOmegaFBCtrl;
 extern pidParam veloCtrl;
+extern pidParam veloCtrlL;
+extern pidParam veloCtrlR;
 extern pidParam yawRateCtrl;
 extern pidParam yawCtrl;
 extern pidParam distCtrl;
@@ -107,6 +109,7 @@ void readSpeedFeedForwardGain(int16_t *gain);
 void motorControlTrace(void);
 void motorControlTraceOmegaFB(void);
 void motorControlSpeed(void);
+void motorControlSpeedLR(int16_t targetEncL, int16_t targetEncR);
 void motorControlYawRate(void);
 void motorControlYaw(void);
 void motorControldist(void);
