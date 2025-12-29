@@ -62,16 +62,16 @@ float calcROC(int16_t velo, float angvelo, float dt)
     float absDrad = (drad < 0.0f) ? -drad : drad;
     float absDl   = (dl   < 0.0f) ? -dl   : dl;
 
-    // 直線判定：|dl/drad| > STRAIGHTTH ⇔ STRAIGHTTH * |drad| < |dl|
+    // 直線判定：|dl/drad| > ROC_STRAIGHTTH ⇔ ROC_STRAIGHTTH * |drad| < |dl|
     // → 除算せずに比較できる
-    if (absDrad < 1e-6f || STRAIGHTTH * absDrad < absDl) {
+    if (absDrad < 1e-6f || ROC_STRAIGHTTH * absDrad < absDl) {
         return 2000.0f; // 直線とみなす
     }
 
     // カーブの場合のみ除算実行
     float R = dl / drad;
     float absR = (R < 0.0f) ? -R : R;
-    return (absR > STRAIGHTTH) ? 2000.0f : R;
+    return (absR > ROC_STRAIGHTTH) ? 2000.0f : R;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 saveLogNumber

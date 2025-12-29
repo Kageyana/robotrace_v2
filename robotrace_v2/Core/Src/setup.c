@@ -110,8 +110,7 @@ typedef struct
 
 // 速度パラメータの一覧テーブル
 static const SpeedParamInfo speedParamTable[] = {
-	{"STRAIGHT", &tgtParam.straight, 0.1, 0.0, 10.0, "m/s"},
-	{"CURVE", &tgtParam.curve, 0.1, 0.0, 10.0, "m/s"},
+	{"STRAIGHT", &tgtParam.search, 0.1, 0.0, 10.0, "m/s"},
 	{"STOP", &tgtParam.stop, 0.1, 0.0, 10.0, "m/s"},
 	{"BST STRT", &tgtParam.bstStraight, 0.1, 0.0, 10.0, "m/s"},
 	{"BST 1500", &tgtParam.bst1500, 0.1, 0.0, 10.0, "m/s"},
@@ -145,7 +144,7 @@ static void setup_speed_param(void)
 		ssd1306_printf(Font_6x8, "Parameter");
 	}
 
-	dataTuningLR(&pattern.parameter1, 1, 1, 18); // パラメータ項目切替
+	dataTuningLR(&pattern.parameter1, 1, 1, sizeof(speedParamTable) / sizeof(speedParamTable[0])); // パラメータ項目切替
 
 	if (beforePparam != pattern.parameter1)
 	{

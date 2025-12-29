@@ -19,7 +19,6 @@ bool initLCD = false;		// LCD初期化状況		false:初期化失敗	true:初期�
 bool initIMU = false;		// IMU初期化状況		false:初期化失敗	true:初期化成功
 bool initCurrent = false;	// 電流センサ初期化状況	false:初期化失敗	true:初期化成功
 static bool softreset = false;		// ソフトウェアリセット	false:リセット未実行	true:リセット実行
-uint8_t modeCurve = 0;				// カーブ判断			0:直線			1:カーブ進入
 uint8_t autoStart = 0;				// 5走を自動で開始する
 int16_t autoStartAnalize = 0; 		// 自動走行で使用するログの解析番号
 
@@ -32,8 +31,7 @@ float batteryVoltage_V = 0.0f;	// DWT初期化後に取得したバッテリ電�
 
 // 速度パラメータ関連
 speedParam tgtParam = {
-	PARAM_STRAIGHT,
-	PARAM_CURVE,
+	PARAM_SEARCH,
 	PARAM_STOP,
 	PARAM_BOOST_STRAIGHT,
 	PARAM_BOOST_1500,
@@ -478,7 +476,7 @@ void loopSystem(void)
 		}
 		else
 		{
-			setTargetSpeed(tgtParam.straight); // 目標速度
+			setTargetSpeed(tgtParam.search); // 目標速度
 		}
 		// ライントレース
 		motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
@@ -498,8 +496,6 @@ void loopSystem(void)
 			clearIMUval(); // IMU値初期化
 			yawCtrl.Int = 0.0;
 			distCtrl.Int = 0.0;
-			modeCurve = 0;
-			checkCurve(); // カーブ判定変数初期化
 
 			clearXYcie(); // 座標計算変数初期化
 
@@ -516,15 +512,8 @@ void loopSystem(void)
 		// 目標速度設定
 		if (optimalTrace == BOOST_NONE)
 		{
-			// 探索走行のとき
-			if (modeCurve == 0)
-			{
-				setTargetSpeed(tgtParam.straight);
-			}
-			else
-			{
-				setTargetSpeed(tgtParam.curve);
-			}
+			// 探索走行
+			setTargetSpeed(tgtParam.search);
 			// ライントレース
 			// motorPwmOutSynth(lineTraceOmegaFBCtrl.pwm, veloCtrl.pwm, 0, 0);
 			motorPwmOut(veloCtrlL.pwm,veloCtrlR.pwm);
@@ -563,7 +552,7 @@ void loopSystem(void)
 			}
 			else
 			{
-				boostSpeed = tgtParam.straight;
+				boostSpeed = tgtParam.search;
 			}
 			// 目標速度に設定
 			setTargetSpeed(boostSpeed);
@@ -846,69 +835,34 @@ void countDown(void)
 		countdown--;
 }
 ///////////////////////////////////////////////////////////////////////////
-// モジュール名 checkCurve
-// 処理概要     カーブとストレートの判定
+// モジュール名 checkROC
+// 処理概要     ROCに応じてゲインを切り替える
 // 引数         なし
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
-void checkCurve(void)
+void checkROC(void)
 {
-	static uint8_t checkStraight, checkRight, checkLeft;
 	static bool changeGain = false;
 	static int16_t beforeGainP = 0, beforeGainD = 0;
-	float zg;
+	bool useStraightGain = false;
 
-	zg = BMI088val.gyro.z;
-
-	if (fabs(zg) < 50.0f)
+	// 距離基準2次走行のみ、ROC閾値で直線/カーブに合わせてゲインを切り替える
+	if (optimalTrace == BOOST_DISTANCE && numPPADarry > 0)
 	{
-		// ストレート時
-		checkRight = 0;
-		checkLeft = 0;
-		if (checkStraight == 0)
+		uint16_t rocIndex = optimalIndex;
+		if (rocIndex >= (uint16_t)numPPADarry)
 		{
-			encCurve = 0;
-			checkStraight = 1;
+			rocIndex = (uint16_t)(numPPADarry - 1);
 		}
-		if (checkStraight == 1 && encCurve > encMM(100))
+		if (PPAD[rocIndex].ROC > ROC_STRAIGHTTH)
 		{
-			modeCurve = 0;
-		}
-	}
-	else if (zg < -150.0f)
-	{
-		// 左カーブ時
-		checkStraight = 0;
-		checkRight = 0;
-		if (checkLeft == 0)
-		{
-			encCurve = 0;
-			checkLeft = 1;
-		}
-		if (checkLeft == 1 && encCurve > encMM(20))
-		{
-			modeCurve = 2;
-		}
-	}
-	else if (zg > 150.0f)
-	{
-		// 右カーブ時
-		checkStraight = 0;
-		checkLeft = 0;
-		if (checkRight == 0)
-		{
-			encCurve = 0;
-			checkRight = 1;
-		}
-		if (checkRight == 1 && encCurve > encMM(20))
-		{
-			modeCurve = 1;
+			useStraightGain = true;
 		}
 	}
 
-	if(modeCurve == 0)
+	if (useStraightGain)
 	{
-		if(!changeGain)
+		if (!changeGain)
 		{
 			beforeGainP = lineTraceOmegaFBCtrl.kp;
 			beforeGainD = lineTraceOmegaFBCtrl.kd;
@@ -919,14 +873,14 @@ void checkCurve(void)
 	}
 	else
 	{
-		if(changeGain)
-			{
-				lineTraceOmegaFBCtrl.kp = beforeGainP;
-				lineTraceOmegaFBCtrl.kd = beforeGainD;
-				beforeGainP = 0;
-				beforeGainD = 0;
-				changeGain = false;
-			}
+		if (changeGain)
+		{
+			lineTraceOmegaFBCtrl.kp = beforeGainP;
+			lineTraceOmegaFBCtrl.kd = beforeGainD;
+			beforeGainP = 0;
+			beforeGainD = 0;
+			changeGain = false;
+		}
 	}
 }
 /////////////////////////////////////////////////////////////////////
@@ -983,7 +937,23 @@ void writeTgtspeeds(void)
 			strcat(format, "%03d,");
 		}
 
-		f_printf(&fil, format, (int32_t)(round(tgtParam.straight * 100)), (int32_t)(round(tgtParam.curve * 100)), (int32_t)(round(tgtParam.stop * 100)), (int32_t)(round(tgtParam.bstStraight * 100)), (int32_t)(round(tgtParam.bst1500 * 100)), (int32_t)(round(tgtParam.bst1300 * 100)), (int32_t)(round(tgtParam.bst1000 * 100)), (int32_t)(round(tgtParam.bst800 * 100)), (int32_t)(round(tgtParam.bst700 * 100)), (int32_t)(round(tgtParam.bst600 * 100)), (int32_t)(round(tgtParam.bst500 * 100)), (int32_t)(round(tgtParam.bst400 * 100)), (int32_t)(round(tgtParam.bst300 * 100)), (int32_t)(round(tgtParam.bst200 * 100)), (int32_t)(round(tgtParam.bst100 * 100)), (int32_t)(round(tgtParam.acceleF * 100)), (int32_t)(round(tgtParam.acceleD * 100)), (int32_t)(round(tgtParam.shortCut * 100)));
+		f_printf(&fil, format, (int32_t)(round(tgtParam.search * 100)),
+										(int32_t)(round(tgtParam.stop * 100)),
+										(int32_t)(round(tgtParam.bstStraight * 100)),
+										(int32_t)(round(tgtParam.bst1500 * 100)),
+										(int32_t)(round(tgtParam.bst1300 * 100)),
+										(int32_t)(round(tgtParam.bst1000 * 100)),
+										(int32_t)(round(tgtParam.bst800 * 100)),
+										(int32_t)(round(tgtParam.bst700 * 100)),
+										(int32_t)(round(tgtParam.bst600 * 100)),		
+										(int32_t)(round(tgtParam.bst500 * 100)),
+										(int32_t)(round(tgtParam.bst400 * 100)),
+										(int32_t)(round(tgtParam.bst300 * 100)),
+										(int32_t)(round(tgtParam.bst200 * 100)),
+										(int32_t)(round(tgtParam.bst100 * 100)),
+										(int32_t)(round(tgtParam.acceleF * 100)),
+										(int32_t)(round(tgtParam.acceleD * 100)),
+										(int32_t)(round(tgtParam.shortCut * 100)));
 	}
 
 	f_close(&fil);
@@ -1015,25 +985,24 @@ void readTgtspeeds(void)
 			f_gets(paramStr, 5, &fil);			// 文字列取得 カンマ含む
 			sscanf(paramStr, "%d,", &param[i]); // 文字列→数値
 		}
-
-		tgtParam.straight = (float)param[0] / 100;
-		tgtParam.curve = (float)param[1] / 100;
-		tgtParam.stop = (float)param[2] / 100;
-		tgtParam.bstStraight = (float)param[3] / 100;
-		tgtParam.bst1500 = (float)param[4] / 100;
-		tgtParam.bst1300 = (float)param[5] / 100;
-		tgtParam.bst1000 = (float)param[6] / 100;
-		tgtParam.bst800 = (float)param[7] / 100;
-		tgtParam.bst700 = (float)param[8] / 100;
-		tgtParam.bst600 = (float)param[9] / 100;
-		tgtParam.bst500 = (float)param[10] / 100;
-		tgtParam.bst400 = (float)param[11] / 100;
-		tgtParam.bst300 = (float)param[12] / 100;
-		tgtParam.bst200 = (float)param[13] / 100;
-		tgtParam.bst100 = (float)param[14] / 100;
-		tgtParam.acceleF = (float)param[15] / 100;
-		tgtParam.acceleD = (float)param[16] / 100;
-		tgtParam.shortCut = (float)param[17] / 100;
+		i=0;
+		tgtParam.search = (float)param[i++] / 100;
+		tgtParam.stop = (float)param[i++] / 100;
+		tgtParam.bstStraight = (float)param[i++] / 100;
+		tgtParam.bst1500 = (float)param[i++] / 100;
+		tgtParam.bst1300 = (float)param[i++] / 100;
+		tgtParam.bst1000 = (float)param[i++] / 100;
+		tgtParam.bst800 = (float)param[i++] / 100;
+		tgtParam.bst700 = (float)param[i++] / 100;
+		tgtParam.bst600 = (float)param[i++] / 100;
+		tgtParam.bst500 = (float)param[i++] / 100;
+		tgtParam.bst400 = (float)param[i++] / 100;
+		tgtParam.bst300 = (float)param[i++] / 100;
+		tgtParam.bst200 = (float)param[i++] / 100;
+		tgtParam.bst100 = (float)param[i++] / 100;
+		tgtParam.acceleF = (float)param[i++] / 100;
+		tgtParam.acceleD = (float)param[i++] / 100;
+		tgtParam.shortCut = (float)param[i++] / 100;
 	}
 
 	f_close(&fil);

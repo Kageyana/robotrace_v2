@@ -4,6 +4,7 @@
 #include "PIDcontrol.h"
 #include "BMI088.h"
 #include "control.h"
+#include "courseAnalysis.h"
 #include "encoder.h"
 #include "fatfs.h"
 #include "lineSensor.h"
@@ -233,29 +234,33 @@ void motorControlTraceOmegaFB(void)
 			beforeGainD = 0;
 		}
 		// クロスライン検出
-		if(stateCrossLine)
+		if (optimalTrace == BOOST_NONE)
 		{
-			if(!changeGain)
+			if(stateCrossLine)
 			{
-				beforeGainP = lineTraceOmegaFBCtrl.kp;
-				beforeGainD = lineTraceOmegaFBCtrl.kd;
-				lineTraceOmegaFBCtrl.kp = 1;
-				lineTraceOmegaFBCtrl.kd = 0;
-				changeGain = true;
+				if(!changeGain)
+				{
+					beforeGainP = lineTraceOmegaFBCtrl.kp;
+					beforeGainD = lineTraceOmegaFBCtrl.kd;
+					lineTraceOmegaFBCtrl.kp = 1;
+					lineTraceOmegaFBCtrl.kd = 0;
+					changeGain = true;
+				}
+			}
+			else
+			{
+				// クロスラインから離れたらゲインを元に戻す
+				if(changeGain)
+				{
+					lineTraceOmegaFBCtrl.kp = beforeGainP;
+					lineTraceOmegaFBCtrl.kd = beforeGainD;
+					beforeGainP = 0;
+					beforeGainD = 0;
+					changeGain = false;
+				}
 			}
 		}
-		else
-		{
-			// クロスラインから離れたらゲインを元に戻す
-			if(changeGain)
-			{
-				lineTraceOmegaFBCtrl.kp = beforeGainP;
-				lineTraceOmegaFBCtrl.kd = beforeGainD;
-				beforeGainP = 0;
-				beforeGainD = 0;
-				changeGain = false;
-			}
-		}
+		
 
 		// マクロで設定した重みを掛け合わせてセンサ値を合成
 		senL = (lSensorCari[4] * TRACE_WEIGHT_CENTER)

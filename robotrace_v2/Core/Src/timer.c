@@ -105,8 +105,8 @@ void Interrupt1ms(void)
 		if (judgeOverSpeed())
 			emcStop = STOP_OVERSPEED;
 
-		checkCurve();	// カーブ検出
-		checkCrossLine(); // クロスライン確認
+		checkROC();			// ROCに応じてゲインを切り替える
+		checkCrossLine();	// クロスライン確認
 
 		courseMarker = checkMarker();	// マーカー検知
 		checkStartGoalMarker();			// ゴールマーカー処理
@@ -144,12 +144,12 @@ void Interrupt1ms(void)
 					// 8bit
 					courseMarkerLog,
 					targetSpeed,
-					modeCurve,
 					// 16bit
 					cntRun,
 					encCurrentN,
 					optimalIndex,
 					lineTraceOmegaFBCtrl.pwm,
+					lineTraceOmegaFBCtrl.kp,
 					veloCtrl.pwm,
 					(int16_t)log_targetAngularVelocity,
 					veloCtrlL.pwm,

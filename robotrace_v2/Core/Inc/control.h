@@ -11,8 +11,7 @@
 // 機体諸元
 
 // 速度パラメータ関連
-#define PARAM_STRAIGHT 1.0F
-#define PARAM_CURVE 1.0F
+#define PARAM_SEARCH 1.0F
 #define PARAM_STOP 0.8F
 #define PARAM_SHORTCUT 0.5F
 #define PARAM_BOOST_STRAIGHT 2.8F
@@ -31,7 +30,7 @@
 #define PARAM_UP_STEP 1.02F
 
 // ゴール
-#define COUNT_GOAL 3 // ゴールマーカーを読む回数
+#define COUNT_GOAL 5 // ゴールマーカーを読む回数
 
 // スタートモード
 #define START_SERACH 3
@@ -46,8 +45,7 @@
 
 typedef struct
 {
-	float straight;
-	float curve;
+	float search;
 	float stop;
 	float bstStraight;
 	float bst1500;
@@ -76,7 +74,6 @@ extern bool initMSD;			// microSD初期化状況
 extern bool initLCD;			// LCD初期化状況
 extern bool initIMU;			// IMU初期化状況
 extern bool initCurrent;		// 電流センサ初期化状況
-extern uint8_t modeCurve;		// カーブ判断 0:直線 1:カーブ進入
 extern uint8_t autoStart;		// 5走を自動で開始する
 extern bool stateCrossLine;		// クロスライン検出状態
 
@@ -104,7 +101,7 @@ void initSystem(void);
 void loopSystem(void);
 void emargencyStop(void);
 void countDown(void);
-void checkCurve(void);
+void checkROC(void);
 void getADC2(void);
 void setEncoderVal(void);
 void writeTgtspeeds(void);
