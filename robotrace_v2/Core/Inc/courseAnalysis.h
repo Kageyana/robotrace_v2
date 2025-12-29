@@ -26,6 +26,8 @@
 #define SHORTCUTWINDOW 4		 // ショートカットコース生成時の移動平均サンプル数
 #define STRAIGHTTH 1500.0F		 // 直線とみなす曲率半径の閾値[mm]
 
+// #define WRITE_BOOSTSPEED_LOG 	 // 速度計画ログを書き出すかどうかのフラグ
+
 // ファイル名
 #define FILENAME_ANALIZENUMBER "analize"
 

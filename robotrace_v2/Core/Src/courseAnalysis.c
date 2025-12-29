@@ -345,6 +345,7 @@ int16_t readLogDistance(int logNumber)
 				}
 			}
 
+#ifdef WRITE_BOOSTSPEED_LOG
 			// 平滑化後の目標速度配列をSDカードへ記録する
 			FIL fil_Boost;
 			FRESULT fresult_Boost;
@@ -366,11 +367,7 @@ int16_t readLogDistance(int logNumber)
 				}
 				f_close(&fil_Boost);
 			}
-
-			// for (i = 0; i < numD; i++)
-			// {
-			// 	printf("%f\n", PPAD[i].boostSpeed);
-			// }
+#endif
 
 			numPPAMarry = numM;
 			numPPADarry = numD;
