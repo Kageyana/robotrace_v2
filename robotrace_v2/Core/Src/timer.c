@@ -79,6 +79,7 @@ void Interrupt1ms(void)
 	if (targetR >  TARGET_MAX) targetR =  TARGET_MAX;
 	if (targetR < -TARGET_MAX) targetR = -TARGET_MAX;
 	motorControlSpeedLR(targetL, targetR);
+
 	if(optimalTrace == BOOST_SHORTCUT)
 	{
 		motorControldist();
