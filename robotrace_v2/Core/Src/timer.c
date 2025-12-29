@@ -149,15 +149,15 @@ void Interrupt1ms(void)
 					encCurrentN,
 					optimalIndex,
 					lineTraceOmegaFBCtrl.pwm,
-					lineTraceOmegaFBCtrl.kp,
-					veloCtrl.pwm,
 					(int16_t)log_targetAngularVelocity,
 					veloCtrlL.pwm,
 					veloCtrlR.pwm,
 					// 32bit
 					encTotalOptimal,
 					// float型
-					BMI088val.gyro.z
+					BMI088val.gyro.z,
+					BMI088val.accele.x,
+					BMI088val.accele.y
 				);
 #else
 				writeLogBufferPrint(); // バッファにログを保存
