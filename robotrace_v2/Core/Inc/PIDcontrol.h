@@ -91,8 +91,6 @@ extern pidParam distCtrl;
 extern int16_t speedFeedForwardGain;
 
 extern int32_t log_targetAngularVelocity; // ログ用目標角速度
-extern int16_t log_veloCtrl_iP;; // ログ用速度制御iP成分
-extern int16_t log_veloCtrl_fedfwd; // ログ用速度制御フィードフォワード成分
 
 //====================================//
 // プロトタイプ宣言

@@ -499,6 +499,7 @@ void loopSystem(void)
 			yawCtrl.Int = 0.0;
 			distCtrl.Int = 0.0;
 			modeCurve = 0;
+			checkCurve(); // カーブ判定変数初期化
 
 			clearXYcie(); // 座標計算変数初期化
 
@@ -853,6 +854,8 @@ void countDown(void)
 void checkCurve(void)
 {
 	static uint8_t checkStraight, checkRight, checkLeft;
+	static bool changeGain = false;
+	static int16_t beforeGainP = 0, beforeGainD = 0;
 	float zg;
 
 	zg = BMI088val.gyro.z;
@@ -901,6 +904,29 @@ void checkCurve(void)
 		{
 			modeCurve = 1;
 		}
+	}
+
+	if(modeCurve == 0)
+	{
+		if(!changeGain)
+		{
+			beforeGainP = lineTraceOmegaFBCtrl.kp;
+			beforeGainD = lineTraceOmegaFBCtrl.kd;
+			lineTraceOmegaFBCtrl.kp = 2;
+			lineTraceOmegaFBCtrl.kd = 0;
+			changeGain = true;
+		}
+	}
+	else
+	{
+		if(changeGain)
+			{
+				lineTraceOmegaFBCtrl.kp = beforeGainP;
+				lineTraceOmegaFBCtrl.kd = beforeGainD;
+				beforeGainP = 0;
+				beforeGainD = 0;
+				changeGain = false;
+			}
 	}
 }
 /////////////////////////////////////////////////////////////////////

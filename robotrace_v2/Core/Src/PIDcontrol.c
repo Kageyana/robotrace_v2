@@ -37,8 +37,6 @@ static int16_t speedEncoderBefore = 0;	// 速度PID用の前回偏差
 extern float batteryVoltage_V;	// control.cで保持したバッテリ電圧[V]
 
 int32_t log_targetAngularVelocity; // ログ用目標角速度
-int16_t log_veloCtrl_iP;; // ログ用速度制御iP成分
-int16_t log_veloCtrl_fedfwd; // ログ用速度制御フィードフォワード成分
 
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 calcSpeedFeedForward
@@ -241,7 +239,7 @@ void motorControlTraceOmegaFB(void)
 			{
 				beforeGainP = lineTraceOmegaFBCtrl.kp;
 				beforeGainD = lineTraceOmegaFBCtrl.kd;
-				lineTraceOmegaFBCtrl.kp = 4;
+				lineTraceOmegaFBCtrl.kp = 1;
 				lineTraceOmegaFBCtrl.kd = 0;
 				changeGain = true;
 			}
@@ -360,10 +358,6 @@ void motorControlSpeed(void)
 	iD = veloCtrl.kd * Dif;		// 微分
 	// PID制御出力にフィードフォワード補償を加えて応答を改善
 	iRet = iP + iI + iD + feedForwardPwm;
-	// iRet = iRet;
-
-	log_veloCtrl_iP = (int16_t)iP; // ログ用速度制御iP成分
-	log_veloCtrl_fedfwd = (int16_t)feedForwardPwm; // ログ用速度制御フィードフォワード成分
 
 	// PWMの上限の設定
 	if (iRet > 1000)

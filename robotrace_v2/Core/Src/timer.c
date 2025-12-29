@@ -61,24 +61,29 @@ void Interrupt1ms(void)
 	// PID制御処理
 	if(patternTrace < 12 || patternTrace > 100)
 	{
+		// スタート直後とゴール後は通常のライン制御
 		motorControlTrace();
+		motorControlSpeed();
 	}
 	else 
 	{
-		motorControlTrace();
+		// ライン追従＋左右独立速度制御
 		motorControlTraceOmegaFB();
+
+		int16_t delta = lineTraceOmegaFBCtrl.pwm;
+		int16_t targetL = (int16_t)targetSpeed + delta;
+		int16_t targetR = (int16_t)targetSpeed - delta;
+		// クリップ（例：目標が大きくなりすぎないように。上限は実機で調整）
+		const int16_t TARGET_MAX = (int16_t)PALSE_MILLIMETER * 4;	// 4.0m/s
+		if (targetL >  TARGET_MAX) targetL =  TARGET_MAX;
+		if (targetL < -TARGET_MAX) targetL = -TARGET_MAX;
+		if (targetR >  TARGET_MAX) targetR =  TARGET_MAX;
+		if (targetR < -TARGET_MAX) targetR = -TARGET_MAX;
+
+		motorControlSpeedLR(targetL, targetR);
 	}
-	motorControlSpeed();
-	int16_t delta = lineTraceOmegaFBCtrl.pwm;
-	int16_t targetL = (int16_t)targetSpeed + delta;
-	int16_t targetR = (int16_t)targetSpeed - delta;
-	// クリップ（例：目標が大きくなりすぎないように。上限は実機で調整）
-	const int16_t TARGET_MAX = (int16_t)PALSE_MILLIMETER * 4;	// 4.0m/s
-	if (targetL >  TARGET_MAX) targetL =  TARGET_MAX;
-	if (targetL < -TARGET_MAX) targetL = -TARGET_MAX;
-	if (targetR >  TARGET_MAX) targetR =  TARGET_MAX;
-	if (targetR < -TARGET_MAX) targetR = -TARGET_MAX;
-	motorControlSpeedLR(targetL, targetR);
+	
+	
 
 	if(optimalTrace == BOOST_SHORTCUT)
 	{
@@ -137,8 +142,9 @@ void Interrupt1ms(void)
 					LOG_NUM_32BIT,
 					LOG_NUM_FLOAT,
 					// 8bit
-					targetSpeed,
 					courseMarkerLog,
+					targetSpeed,
+					modeCurve,
 					// 16bit
 					cntRun,
 					encCurrentN,
@@ -146,15 +152,12 @@ void Interrupt1ms(void)
 					lineTraceOmegaFBCtrl.pwm,
 					veloCtrl.pwm,
 					(int16_t)log_targetAngularVelocity,
-					log_veloCtrl_iP,
-					log_veloCtrl_fedfwd,
 					veloCtrlL.pwm,
 					veloCtrlR.pwm,
 					// 32bit
 					encTotalOptimal,
 					// float型
-					BMI088val.gyro.z,
-					veloCtrl.Int
+					BMI088val.gyro.z
 				);
 #else
 				writeLogBufferPrint(); // バッファにログを保存

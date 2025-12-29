@@ -14,10 +14,10 @@
 
 #ifdef LOG_RUNNING_WRITE
 #define BUFFER_SIZE_LOG 512
-#define LOG_NUM_8BIT 2
-#define LOG_NUM_16BIT 10
+#define LOG_NUM_8BIT 3
+#define LOG_NUM_16BIT 8
 #define LOG_NUM_32BIT 1
-#define LOG_NUM_FLOAT 2
+#define LOG_NUM_FLOAT 1
 #define LOG_SIZE (LOG_NUM_8BIT * sizeof(uint8_t)) + (LOG_NUM_16BIT * sizeof(uint16_t)) + (LOG_NUM_32BIT * sizeof(uint32_t)) + (LOG_NUM_FLOAT * sizeof(float))
 #else
 #define BUFFER_SIZE_LOG 5000 // 綴りの誤りを修正

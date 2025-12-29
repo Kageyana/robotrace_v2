@@ -161,6 +161,8 @@ void createLog(void)
 
 	columnTitle[0] = 0; // バッファを安全に初期化
 	formatLog[0] = 0;   // バッファを安全に初期化
+
+	// ログヘッダー
 #ifdef LOG_RUNNING_WRITE
 	setLogStr("cntlog", "%d");
 	setLogStr("encCurrentN", "%d");
@@ -170,6 +172,7 @@ void createLog(void)
 	setLogStr("ROC", "%f");
 
 	setLogStr("targetSpeed", "%d");
+	setLogStr("modeCurve", "%d");
 	setLogStr("optimalIndex", "%d");
 	// setLogStr("motorpwmL", "%d");
 	// setLogStr("motorpwmR", "%d");
@@ -181,11 +184,8 @@ void createLog(void)
 	setLogStr("veloCtrl", "%d");
 	// setLogStr("velocity", "%f");
 	setLogStr("targetAngularvelo", "%d");
-	setLogStr("log_veloCtrl_iP", "%d");
-	setLogStr("log_veloCtrl_fedfwd", "%d");
 	setLogStr("motorpwmL", "%d");
 	setLogStr("motorpwmR", "%d");
-	setLogStr("veloCtrl.Int", "%f");
 
 	setLogStr("x", "%f");
 	setLogStr("y", "%f");
@@ -203,6 +203,24 @@ void createLog(void)
 	// setLogStr("courseMarker",  "%d");
 	// setLogStr("encTotalN",    "%d");
 #endif
+	// 制御パラメータ
+	setLogHeaderStrF("batteryVoltage_V", batteryVoltage_V);
+
+	setLogHeaderStrF("tgtParam.bstStraight", tgtParam.bstStraight);
+	setLogHeaderStrF("tgtParam.bst1500", tgtParam.bst1500);
+	setLogHeaderStrF("tgtParam.bst1300", tgtParam.bst1300);
+	setLogHeaderStrF("tgtParam.bst1000", tgtParam.bst1000);
+	setLogHeaderStrF("tgtParam.bst800", tgtParam.bst800);
+	setLogHeaderStrF("tgtParam.bst700", tgtParam.bst700);
+	setLogHeaderStrF("tgtParam.bst600", tgtParam.bst600);
+	setLogHeaderStrF("tgtParam.bst500", tgtParam.bst500);
+	setLogHeaderStrF("tgtParam.bst400", tgtParam.bst400);
+	setLogHeaderStrF("tgtParam.bst300", tgtParam.bst300);
+	setLogHeaderStrF("tgtParam.bst200", tgtParam.bst200);
+	setLogHeaderStrF("tgtParam.bst100", tgtParam.bst100);
+	setLogHeaderStrF("tgtParam.acceleF", tgtParam.acceleF);
+	setLogHeaderStrF("tgtParam.acceleD", tgtParam.acceleD);
+
 	setLogHeaderStrF("lineTraceCtrl.kp", lineTraceCtrl.kp);
 	setLogHeaderStrF("lineTraceCtrl.ki", lineTraceCtrl.ki);
 	setLogHeaderStrF("lineTraceCtrl.kd", lineTraceCtrl.kd);
@@ -534,7 +552,7 @@ void endLog(void)
 		}
 
 		// コース解析に使用する変数を取得
-		marker = logval8[1];
+		marker = logval8[0];
 		time = logval16[0];
 		speed = logval16[1];
 		distance = logval32[0];
@@ -566,21 +584,19 @@ void endLog(void)
 			zg,
 			marker,
 			distance,
-			logvalf[2],		// ROC
+			logvalf[1],		// ROC
 
-			logval8[0],		// targetSpeed
+			logval8[1],		// targetSpeed
+			logval8[2],		// modeCurve
 			logval16[2],	// optimalIndex
 			(int16_t)logval16[3],	// lineTraceCtrl
 			(int16_t)logval16[4],	// veloCtrl
 			(int16_t)logval16[5],	// targetAngularvelo
-			(int16_t)logval16[6],	// log_veloCtrl_iP
-			(int16_t)logval16[7],	// log_veloCtrl_f
-			(int16_t)logval16[8],	// motorpwmL
-			(int16_t)logval16[9],	// motorpwmR
-
-			logvalf[1],		// veloCtrl.Int	
-			logvalf[3],		// x
-			logvalf[4]		// y
+			(int16_t)logval16[6],	// motorpwmL
+			(int16_t)logval16[7],	// motorpwmR
+	
+			logvalf[2],		// x
+			logvalf[3]		// y
 		);
 
 		// 文字列をSDカードに送信
@@ -707,7 +723,7 @@ void setLogHeaderStrF(char *name, float value)
 {
     char headerStr[64];
 
-    snprintf((char *)headerStr, sizeof(headerStr), "%s=%f,", name, (double)value);
+    snprintf((char *)headerStr, sizeof(headerStr), "%s=%4.2f,", name, (double)value);
     strncat((char *)columnTitle, (char *)headerStr, sizeof(columnTitle) - strlen((char *)columnTitle) - 1);
 }
 /////////////////////////////////////////////////////////////////////
