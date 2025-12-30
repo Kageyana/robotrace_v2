@@ -39,7 +39,7 @@
 #define SLIP_MISMATCH_LOW_TURN		2.5f	// 係数倍
 #define SLIP_HIGH_COUNT_REQ			10U		// 上側しきい値を超え続ける必要サンプル数
 #define SLIP_LOW_COUNT_REQ			5U		// 下側しきい値を下回り続ける必要サンプル数
-#define SLIP_LPF_COEF				0.05f	// スリップ指標に掛ける一次LPF係数
+#define SLIP_LPF_COEF				0.02f	// スリップ指標に掛ける一次LPF係数
 
 #define SLIP_ACC_BIAS_COEF		0.001f   // ≒ dt/1s（1秒時定数くらい）
 #define SLIP_ACC_LPF_COEF		0.05f    // ≒ 20ms前後のLPF

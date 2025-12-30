@@ -242,7 +242,7 @@ void motorControlTraceOmegaFB(void)
 				{
 					beforeGainP = lineTraceOmegaFBCtrl.kp;
 					beforeGainD = lineTraceOmegaFBCtrl.kd;
-					lineTraceOmegaFBCtrl.kp = 1;
+					lineTraceOmegaFBCtrl.kp = 2;
 					lineTraceOmegaFBCtrl.kd = 0;
 					changeGain = true;
 				}

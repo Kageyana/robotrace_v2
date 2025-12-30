@@ -324,6 +324,7 @@ void loopSystem(void)
 	if (patternTrace > 10 && patternTrace < 100 && emcStop > 0)
 	{
 		goalTime = cntRun;
+		patternTrace = 255;
 		emargencyStop();
 	}
 
@@ -444,17 +445,17 @@ void loopSystem(void)
 				writeTgtspeeds(); // 目標速度を記録
 			}
 
-			// if (optimalTrace == BOOST_NONE)
-			// {
-			// 	lineTraceOmegaFBCtrl.kp = 12;
-			// 	lineTraceOmegaFBCtrl.ki = 0;
-			// 	lineTraceOmegaFBCtrl.kd = 0;
+			if (optimalTrace == BOOST_NONE)
+			{
+				lineTraceOmegaFBCtrl.kp = 12;
+				lineTraceOmegaFBCtrl.ki = 0;
+				lineTraceOmegaFBCtrl.kd = 0;
 
 				// veloCtrl.kp = 8;
 				// veloCtrl.ki = 0;
 				// veloCtrl.kd = 0;
 				// speedFeedForwardGain = 150;
-			// }
+			}
 
 			if (initMSD)
 			{
@@ -792,7 +793,9 @@ void emargencyStop(void)
 		ssd1306_UpdateScreen_DMA();        // 停止していた画面更新を再開
 	}
 
-	if (modeLOG)
+	motorPwmOut(0, 0);
+
+	if (initMSD)
 	{
 		if (modeDSP)
 		{
@@ -803,7 +806,15 @@ void emargencyStop(void)
 			ssd1306_printf(Font_11x18, "Writing");
 		}
 
-		endLog(); // ログ保存終了
+		if(modeLOG)
+		{
+			endLog(); // ログ保存終了
+		}
+		else
+		{
+			endTempFile(); // 一時ファイルをクローズ
+		}
+		
 	}
 
 	if (modeDSP)
@@ -882,7 +893,7 @@ void checkROC(void)
 		{
 			beforeGainP = lineTraceOmegaFBCtrl.kp;
 			beforeGainD = lineTraceOmegaFBCtrl.kd;
-			lineTraceOmegaFBCtrl.kp = 1;
+			lineTraceOmegaFBCtrl.kp = 2;
 			lineTraceOmegaFBCtrl.kd = 0;
 			changeGain = true;
 		}
