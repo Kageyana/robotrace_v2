@@ -44,8 +44,10 @@
 #define SLIP_ACC_BIAS_COEF		0.001f   // ≒ dt/1s（1秒時定数くらい）
 #define SLIP_ACC_LPF_COEF		0.05f    // ≒ 20ms前後のLPF
 
-#define SLIP_GYRO_THR_DPS		250.0f	// 旋回とみなす角速度閾値[deg/s]
-#define SLIP_GYRO_THR_RADS		(DPS2RADS(SLIP_GYRO_THR_DPS))
+#define SLIP_GYRO_ON_DPS		250.0f
+#define SLIP_GYRO_OFF_DPS		220.0f
+#define SLIP_GYRO_ON_RADS		(DPS2RADS(SLIP_GYRO_ON_DPS))
+#define SLIP_GYRO_OFF_RADS		(DPS2RADS(SLIP_GYRO_OFF_DPS))
 
 // ゴール
 #define COUNT_GOAL 5 // ゴールマーカーを読む回数
@@ -130,5 +132,7 @@ float getSlipDeltaImu(void);
 float getSlipDeltaEnc(void);
 float getSlipIndicatorFiltered(void);
 bool getSlipFlag(void);
+float getSlipthresholdHigh(void);
+float getSlipthresholdLow(void);
 
 #endif // CONTROL_H_

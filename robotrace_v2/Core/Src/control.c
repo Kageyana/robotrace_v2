@@ -7,6 +7,7 @@
 #include "BMI088.h"
 #include "fatfs.h"
 #include "battery.h"
+#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 //====================================//
@@ -51,16 +52,17 @@ speedParam tgtParam = {
 	MACHINEDECREACE,
 	PARAM_SHORTCUT};
 // スリップ検出用の状態（1ms割り込みで軽量に処理するためここで管理）
-static float slipEncSpeedHist[SLIP_WINDOW_SAMPLES];                   // 時間窓の開始時点のエンコーダ由来速度[m/s]（リングバッファ）
-static uint16_t slipBufIndex = 0;                                     // リングバッファの書き込み位置
-static float slipDeltaImu = 0.0f;                                     // 窓内のIMU由来速度変化量[m/s]
-static float slipDeltaEnc = 0.0f;                                     // 窓内のエンコーダ由来速度変化量[m/s]
-static float slipIndicatorRaw = 0.0f;                                 // 比率で定義したスリップ指標の生値
-static float slipIndicatorFiltered = 0.0f;                            // スリップ指標の一次LPF後の値
-static uint16_t slipHighCount = 0;                                    // スリップ立ち上がり判定用の連続カウンタ
-static uint16_t slipLowCount = 0;                                     // スリップ解除判定用の連続カウンタ
-static bool slipFlag = false;                                         // ヒステリシス付きスリップ判定フラグ
-
+static float slipEncSpeedHist[SLIP_WINDOW_SAMPLES];		// 時間窓の開始時点のエンコーダ由来速度[m/s]（リングバッファ）
+static uint16_t slipBufIndex = 0;						// リングバッファの書き込み位置
+static float slipDeltaImu = 0.0f;						// 窓内のIMU由来速度変化量[m/s]
+static float slipDeltaEnc = 0.0f;						// 窓内のエンコーダ由来速度変化量[m/s]
+static float slipIndicatorRaw = 0.0f;					// 比率で定義したスリップ指標の生値
+static float slipIndicatorFiltered = 0.0f;				// スリップ指標の一次LPF後の値
+static uint16_t slipHighCount = 0;						// スリップ立ち上がり判定用の連続カウンタ
+static uint16_t slipLowCount = 0;						// スリップ解除判定用の連続カウンタ
+static bool slipFlag = false;							// ヒステリシス付きスリップ判定フラグ
+static float slipThresholdHigh;							// スリップ検出高閾値
+static float slipThresholdLow;							// スリップ検出低閾値
 // タイマ関連
 uint32_t cntRun = 0;
 int16_t countdown;
@@ -880,7 +882,7 @@ void checkROC(void)
 		{
 			beforeGainP = lineTraceOmegaFBCtrl.kp;
 			beforeGainD = lineTraceOmegaFBCtrl.kd;
-			lineTraceOmegaFBCtrl.kp = 2;
+			lineTraceOmegaFBCtrl.kp = 1;
 			lineTraceOmegaFBCtrl.kd = 0;
 			changeGain = true;
 		}
@@ -934,8 +936,12 @@ void updateSlipDetection(void)
     static float imuAxF = 0.0f, imuAyF = 0.0f;
     static float encAxF = 0.0f, encAyF = 0.0f;
 
+	// ---- 旋回状態検出 ----
+	static bool turningState = false;
+	static bool slipPrimed = false;
+
     // patternTrace=11(走行開始)でもスリップ検出を行う
-    bool running = (patternTrace >= 11 && patternTrace < 100);
+    bool running = (patternTrace >= 12 && patternTrace < 100);
 
     //==========================================================
     // 走行外：遷移時だけリセット
@@ -948,6 +954,8 @@ void updateSlipDetection(void)
             slipIndicatorFiltered = 0.0f;
             slipHighCount = 0;
             slipLowCount = 0;
+			slipPrimed = false;
+			turningState = false;
             slipFlag = false;
 
             // 微分・フィルタ系リセット
@@ -986,6 +994,8 @@ void updateSlipDetection(void)
             slipIndicatorFiltered = 0.0f;
             slipHighCount = 0;
             slipLowCount = 0;
+			slipPrimed = false;
+			turningState = false;
             slipFlag = false;
 
             for (uint16_t i = 0; i < SLIP_WINDOW_SAMPLES; i++) {
@@ -996,12 +1006,57 @@ void updateSlipDetection(void)
 
         prevMoving = false;
 
+		float ax = BMI088val.accele.y * 9.81f;
+		float ay = BMI088val.accele.x * 9.81f;
+		float wz = BMI088val.gyro.z * DEG2RAD;
+		float absWz = fabsf(wz);
+		if (!turningState) {
+			if (absWz > SLIP_GYRO_ON_RADS) turningState = true;
+		} else {
+			if (absWz < SLIP_GYRO_OFF_RADS) turningState = false;
+		}
+		// 旋回していない時だけバイアス更新(横Gの影響を受けないようにするため)
+		if (!turningState) {
+			axBias += SLIP_ACC_BIAS_COEF * (ax - axBias);
+			ayBias += SLIP_ACC_BIAS_COEF * (ay - ayBias);
+		}
+
         // フィルタ値だけはゼロへ軽く収束
         slipIndicatorRaw = 0.0f;
         slipIndicatorFiltered += SLIP_LPF_COEF * (0.0f - slipIndicatorFiltered);
         return;
     }
     prevMoving = true;
+
+	// リングバッファ初期化スパイク対策
+	if (!slipPrimed) {
+		for (uint16_t i=0; i<SLIP_WINDOW_SAMPLES; i++) {
+			slipEncSpeedHist[i] = encSpeed;   // 0じゃなく現在値で埋める
+		}
+		slipBufIndex = 0;
+
+		// フィルタも初期化（必要なら）
+		imuAxF = imuAyF = 0.0f;
+		encAxF = encAyF = 0.0f;
+
+		// 指標もリセット
+		slipIndicatorRaw = 0.0f;
+		slipIndicatorFiltered = 0.0f;
+		slipHighCount = slipLowCount = 0;
+		slipDeltaImu = 0.0f;
+		slipDeltaEnc = 0.0f;
+		slipFlag = false;
+
+		float ax0 = BMI088val.accele.y * 9.81f;
+		float ay0 = BMI088val.accele.x * 9.81f;
+		axBias = ax0;
+		ayBias = ay0;
+		float wz0 = BMI088val.gyro.z * DEG2RAD;
+		turningState = (fabsf(wz0) > SLIP_GYRO_ON_RADS);
+
+		slipPrimed = true;
+		return; // 初回は判定しない
+	}
 
     // ---- IMU加速度（ボディ座標）----
     float ax = BMI088val.accele.y * 9.81f;  // 前後
@@ -1030,10 +1085,15 @@ void updateSlipDetection(void)
     //==========================================================
     // IMUのDC成分（バイアス/傾き由来の重力漏れ等）を除去
     //==========================================================
-    bool turning = (fabsf(wz) > SLIP_GYRO_THR_RADS);
-
 	// 旋回していない時だけバイアス更新(横Gの影響を受けないようにするため)
-	if (!turning) {
+	if (!turningState) {
+		if (fabsf(wz) > SLIP_GYRO_ON_RADS) turningState = true;
+	}
+	else
+	{
+		if (fabsf(wz) < SLIP_GYRO_OFF_RADS) turningState = false;
+	}
+	if (!turningState) {
 		axBias += SLIP_ACC_BIAS_COEF * (ax - axBias);
 		ayBias += SLIP_ACC_BIAS_COEF * (ay - ayBias);
 	}
@@ -1053,14 +1113,14 @@ void updateSlipDetection(void)
     slipDeltaEnc = encAxF;  // ENC前後加速度
 
     //==========================================================
-    // スリップ指標：加速度ベクトルの不一致率（積算なし）
+    // スリップ指標：加速度ベクトルの不一致率
     //==========================================================
-	float mismatch = hypotf(encAxF - imuAxF, encAyF - imuAyF);
-    float denomEnc    = hypotf(encAxF, encAyF);
-    float denomImu    = hypotf(imuAxF, imuAyF);
-	float accMag   = fmaxf(denomEnc, denomImu);
+	float mismatch	= hypotf(encAxF - imuAxF, encAyF - imuAyF);
+    float denomEnc	= hypotf(encAxF, encAyF);
+    float denomImu	= hypotf(imuAxF, imuAyF);
+	float accMag	= fmaxf(denomEnc, denomImu);
 
-	// 低加速度では見ない（任意だけど有効）
+	// 低加速度では見ない
 	if (accMag < 0.8f) {
 		mismatch = 0.0f;
 		slipHighCount = 0;
@@ -1073,17 +1133,17 @@ void updateSlipDetection(void)
 	//==============================
 	// 旋回が強い時だけ閾値を上げる
 	//==============================
-	float high = SLIP_MISMATCH_HIGH;
-	float low  = SLIP_MISMATCH_LOW;
+	slipThresholdHigh = SLIP_MISMATCH_HIGH;
+	slipThresholdLow= SLIP_MISMATCH_LOW;
 
-	if (fabsf(wz) > SLIP_GYRO_THR_RADS) {
-		high *= SLIP_MISMATCH_HIGH_TURN;
-		low  *= SLIP_MISMATCH_LOW_TURN;
+	if (turningState) {
+		slipThresholdHigh *= SLIP_MISMATCH_HIGH_TURN;
+		slipThresholdLow  *= SLIP_MISMATCH_LOW_TURN;
 	}
 
     // ---- ヒステリシス判定 ----
     if (!slipFlag) {
-		if (slipIndicatorFiltered > high) {
+		if (slipIndicatorFiltered > slipThresholdHigh) {
 			if (++slipHighCount >= SLIP_HIGH_COUNT_REQ) {
 				slipFlag = true;
 				slipHighCount = 0;
@@ -1092,7 +1152,7 @@ void updateSlipDetection(void)
 			slipHighCount = 0;
 		}
 	} else {
-		if (slipIndicatorFiltered < low) {
+		if (slipIndicatorFiltered < slipThresholdLow) {
 			if (++slipLowCount >= SLIP_LOW_COUNT_REQ) {
 				slipFlag = false;
 				slipLowCount = 0;
@@ -1103,7 +1163,12 @@ void updateSlipDetection(void)
 	}
 }
 ///////////////////////////////////////////////////////////////////////////
-// モジュール名 getSlipDeltaImu/getSlipDeltaEnc/getSlipIndicatorFiltered/getSlipFlag
+// モジュール名	getSlipDeltaImu
+// 				getSlipDeltaEnc
+// 				getSlipIndicatorFiltered
+// 				getSlipFlag
+// 				getSlipthresholdHigh
+// 				getSlipthresholdLow
 // 処理概要     割り込み外からスリップ検出結果を参照するためのアクセサ
 ///////////////////////////////////////////////////////////////////////////
 float getSlipDeltaImu(void)
@@ -1121,6 +1186,14 @@ float getSlipIndicatorFiltered(void)
 bool getSlipFlag(void)
 {
 	return slipFlag;
+}
+float getSlipthresholdHigh(void)
+{
+	return slipThresholdHigh;
+}
+float getSlipthresholdLow(void)
+{
+	return slipThresholdLow;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setEncoderVal

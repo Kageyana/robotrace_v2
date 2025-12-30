@@ -4,6 +4,7 @@
 #include "timer.h"
 #include "BMI088.h"
 #include "PIDcontrol.h"
+#include "control.h"
 #include "lineSensor.h"
 #include <stdint.h>
 #define STRAIGHT_STATE_THRESHOLD_MM	70	// 直線判定の距離閾値[mm]
@@ -163,7 +164,9 @@ void Interrupt1ms(void)
 					BMI088val.accele.y,
 					getSlipDeltaImu(),
 					getSlipDeltaEnc(),
-					getSlipIndicatorFiltered()
+					getSlipIndicatorFiltered(),
+					getSlipthresholdHigh(),
+					getSlipthresholdLow()
 				);
 #else
 				writeLogBufferPrint(); // バッファにログを保存

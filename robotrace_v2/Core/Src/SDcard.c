@@ -185,6 +185,8 @@ void createLog(void)
 	setLogStr("slipDeltaEnc", "%f");
 	setLogStr("slipRatio", "%f");
 	setLogStr("slipFlag", "%d");
+	setLogStr("slipThresholdHigh", "%f");
+	setLogStr("slipThresholdLow", "%f");
 	setLogStr("x", "%f");
 	setLogStr("y", "%f");
 
@@ -498,10 +500,10 @@ void endLog(void)
 		uint32_t i;
 	} ftoi;
 
-	uint8_t logval8[10];
-	uint16_t logval16[10];
-	uint32_t logval32[10];
-	float logvalf[10];
+	uint8_t logval8[15];
+	uint16_t logval16[15];
+	uint32_t logval32[15];
+	float logvalf[15];
 
 	while (sendSD) // 溜まったバッファをすべて書き出す
 		writeLogPuts(); // 未処理バッファを書き込む
@@ -583,8 +585,7 @@ void endLog(void)
 			zg,
 			marker,
 			distance,
-			logvalf[6],		// ROC
-			logvalf[6],		// ROC
+			logvalf[8],		// ROC
 
 			logval8[1],		// targetSpeed
 			logval16[2],	// optimalIndex
@@ -599,9 +600,11 @@ void endLog(void)
 			logvalf[4],		// slipDeltaEnc
 			logvalf[5],		// slipRatio(LPF後)
 			logval8[2],		// slipFlag
+			logvalf[6],		// slipThresholdHigh
+			logvalf[7],		// slipThresholdLow
 
-			logvalf[7],		// x
-			logvalf[8]		// y
+			logvalf[9],		// x
+			logvalf[10]		// y
 		);
 
 		// 文字列をSDカードに送信
