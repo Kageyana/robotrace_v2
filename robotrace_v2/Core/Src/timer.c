@@ -50,6 +50,7 @@ void Interrupt1ms(void)
 			calcDegrees();		// コンプリメンタリフィルタで角度算出
 			calcVelocity();		// 加速度から速度算出
 			updateSlipDetection(); // スリップ検出（Δv比率とフラグ更新を1msで実行）
+			updateSlipDetection(); // スリップ検出（Δv比率とフラグ更新を1msで実行）
 			// motorControlYawRate();	// 角速度制御
 			// motorControlYaw();		// 角度制御
 		}

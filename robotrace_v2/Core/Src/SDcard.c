@@ -584,6 +584,7 @@ void endLog(void)
 			marker,
 			distance,
 			logvalf[6],		// ROC
+			logvalf[6],		// ROC
 
 			logval8[1],		// targetSpeed
 			logval16[2],	// optimalIndex
