@@ -29,15 +29,23 @@
 
 #define PARAM_UP_STEP 1.02F
 // スリップ検出パラメータ（1ms割り込みで使用するのでマクロで管理）
-#define SLIP_WINDOW_SAMPLES   2U    // Δvを取る時間窓長[ms]（リングバッファ長）
-#define SLIP_SAMPLE_PERIOD_S  DEFF_TIME // サンプリング周期[s]（1ms）
-#define SLIP_SPEED_SKIP_MPS   0.1f  // 超低速時に判定をスキップする速度閾値[m/s]
-#define SLIP_RATIO_HIGH       1.35f   // スリップ指標の上側しきい値
-#define SLIP_RATIO_LOW        1.05f   // スリップ解除用の下側しきい値（ヒステリシス）
-#define SLIP_HIGH_COUNT_REQ   10U     // 上側しきい値を超え続ける必要サンプル数
-#define SLIP_LOW_COUNT_REQ    5U    // 下側しきい値を下回り続ける必要サンプル数
-#define SLIP_LPF_COEF         0.15f   // スリップ指標に掛ける一次LPF係数
-#define SLIP_DENOM_EPS        0.03f  // 分母の最小値（0除算防止用）
+#define SLIP_WINDOW_SAMPLES		15U    // Δvを取る時間窓長[ms]（リングバッファ長）
+#define SLIP_SAMPLE_PERIOD_S	DEFF_TIME // サンプリング周期[s]（1ms）
+#define SLIP_SPEED_SKIP_MPS		0.1f	// 超低速時に判定をスキップする速度閾値[m/s]
+#define SLIP_MISMATCH_HIGH		7.5f   // [m/s^2]
+#define SLIP_MISMATCH_LOW		5.5f   // [m/s^2]
+// 旋回中だけ上げる閾値
+#define SLIP_MISMATCH_HIGH_TURN		2.2f 	// 係数倍
+#define SLIP_MISMATCH_LOW_TURN		2.5f	// 係数倍
+#define SLIP_HIGH_COUNT_REQ			10U		// 上側しきい値を超え続ける必要サンプル数
+#define SLIP_LOW_COUNT_REQ			5U		// 下側しきい値を下回り続ける必要サンプル数
+#define SLIP_LPF_COEF				0.05f	// スリップ指標に掛ける一次LPF係数
+
+#define SLIP_ACC_BIAS_COEF		0.001f   // ≒ dt/1s（1秒時定数くらい）
+#define SLIP_ACC_LPF_COEF		0.05f    // ≒ 20ms前後のLPF
+
+#define SLIP_GYRO_THR_DPS		250.0f	// 旋回とみなす角速度閾値[deg/s]
+#define SLIP_GYRO_THR_RADS		(DPS2RADS(SLIP_GYRO_THR_DPS))
 
 // ゴール
 #define COUNT_GOAL 5 // ゴールマーカーを読む回数

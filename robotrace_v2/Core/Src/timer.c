@@ -144,6 +144,7 @@ void Interrupt1ms(void)
 					LOG_NUM_FLOAT,
 					// 8bit
 					courseMarkerLog,
+					targetSpeed,
 					(uint8_t)getSlipFlag(),
 					// 16bit
 					cntRun,
@@ -159,8 +160,6 @@ void Interrupt1ms(void)
 					BMI088val.gyro.z,
 					BMI088val.accele.x,
 					BMI088val.accele.y,
-					// motorCurrentL,
-					// motorCurrentR,
 					getSlipDeltaImu(),
 					getSlipDeltaEnc(),
 					getSlipIndicatorFiltered()
