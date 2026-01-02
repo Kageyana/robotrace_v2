@@ -56,8 +56,8 @@ static float slipEncSpeedHist[SLIP_WINDOW_SAMPLES];		// 時間窓の開始時点
 static uint16_t slipBufIndex = 0;						// リングバッファの書き込み位置
 static float slipDeltaImu = 0.0f;						// 窓内の横方向残差[m/s^2]
 static float slipDeltaEnc = 0.0f;						// 窓内の縦方向残差[m/s^2]
-static float slipIndicatorRaw = 0.0f;					// 比率で定義したスリップ指標の生値
-static float slipIndicatorFiltered = 0.0f;				// スリップ指標の一次LPF後の値
+static float slipIndicatorRaw = 0.0f;					// 縦スリップ指標の一次LPF後の値
+static float slipIndicatorFiltered = 0.0f;				// 横スリップ指標の一次LPF後の値（slipRatio相当）
 static uint16_t slipHighCount = 0;						// スリップ立ち上がり判定用の連続カウンタ
 static uint16_t slipLowCount = 0;						// スリップ解除判定用の連続カウンタ
 static uint16_t slipHighCountLat = 0;					// 横スリップ立ち上がり判定用の連続カウンタ
@@ -1042,7 +1042,7 @@ void updateSlipDetection(void)
 		}
 
 		// フィルタ値だけはゼロへ軽く収束
-		slipIndicatorRaw = 0.0f;
+		slipIndicatorRaw += SLIP_LPF_COEF * (0.0f - slipIndicatorRaw);
 		slipIndicatorFiltered += SLIP_LPF_COEF * (0.0f - slipIndicatorFiltered);
 		return;
 	}
@@ -1131,15 +1131,15 @@ void updateSlipDetection(void)
 	encAyF += SLIP_ACC_LPF_COEF * (encAy - encAyF);
 
 	//==========================================================
-	// 縦・横残差（ログ用）
+	// 縦・横残差（判定/ログ用）
 	//==========================================================
-	float dx = encAxF - imuAxF;
-	float dy = encAyF - imuAyF;
+	float dx = encAxF - imuAxF;	// 縦方向(前後)残差
+	float dy = encAyF - imuAyF;	// 横方向(左右)残差
 	float absDx = fabsf(dx);
 	float absDy = fabsf(dy);
 
 	//==========================================================
-	// スリップ指標：軽量な不一致指標（max(|dx|,|dy|)）
+	// 低加速度ゲート（誤検出抑制）
 	//==========================================================
 	float accMag = fmaxf(
 		fmaxf(fabsf(encAxF), fabsf(encAyF)),
@@ -1153,16 +1153,22 @@ void updateSlipDetection(void)
 		absDx = 0.0f;
 		absDy = 0.0f;
 		slipHighCount = 0;
+		slipLowCount = 0;
 		slipHighCountLat = 0;
+		slipLowCountLat = 0;
+		// フィルタ値は0へ収束させる（縦/横）
+		slipIndicatorRaw += SLIP_LPF_COEF * (0.0f - slipIndicatorRaw);
+		slipIndicatorFiltered += SLIP_LPF_COEF * (0.0f - slipIndicatorFiltered);
+	} else {
+		// 縦スリップ指標（absDxをLPF）
+		slipIndicatorRaw += SLIP_LPF_COEF * (absDx - slipIndicatorRaw);
+		// 横スリップ指標（absDyをLPF、slipRatio相当）
+		slipIndicatorFiltered += SLIP_LPF_COEF * (absDy - slipIndicatorFiltered);
 	}
 
 	// ログ用（低加速度時は0に収束）
 	slipDeltaEnc = dx;	// 縦方向残差
 	slipDeltaImu = dy;	// 横方向残差
-
-	// 指標は “max(|dx|,|dy|)”
-	slipIndicatorRaw = fmaxf(absDx, absDy);
-	slipIndicatorFiltered += SLIP_LPF_COEF * (slipIndicatorRaw - slipIndicatorFiltered);
 
 	//==============================
 	// 旋回が強い時だけ閾値を上げる
@@ -1175,9 +1181,9 @@ void updateSlipDetection(void)
 		slipThresholdLow  *= SLIP_MISMATCH_LOW_TURN;
 	}
 
-	// ---- 縦スリップ ヒステリシス判定 ----
+	// ---- 縦スリップ ヒステリシス判定（absDxのみ）----
 	if (!slipFlag) {
-		if (slipIndicatorFiltered > slipThresholdHigh) {
+		if (slipIndicatorRaw > slipThresholdHigh) {
 			if (++slipHighCount >= SLIP_HIGH_COUNT_REQ) {
 				slipFlag = true;
 				slipHighCount = 0;
@@ -1186,7 +1192,7 @@ void updateSlipDetection(void)
 			slipHighCount = 0;
 		}
 	} else {
-		if (slipIndicatorFiltered < slipThresholdLow) {
+		if (slipIndicatorRaw < slipThresholdLow) {
 			if (++slipLowCount >= SLIP_LOW_COUNT_REQ) {
 				slipFlag = false;
 				slipLowCount = 0;
@@ -1199,7 +1205,7 @@ void updateSlipDetection(void)
 	// ---- 横スリップ判定（旋回中のみ）----
 	bool latEnabled = turningState && (fabsf(encAyF) > SLIP_LAT_ENCAY_MIN);
 	if (!slipFlagLat) {
-		if (latEnabled && absDy > SLIP_LAT_HIGH) {
+		if (latEnabled && slipIndicatorFiltered > SLIP_LAT_HIGH) {
 			if (++slipHighCountLat >= SLIP_HIGH_COUNT_REQ) {
 				slipFlagLat = true;
 				slipHighCountLat = 0;
@@ -1209,7 +1215,7 @@ void updateSlipDetection(void)
 		}
 		slipLowCountLat = 0;
 	} else {
-		if (!latEnabled || absDy < SLIP_LAT_LOW) {
+		if (!latEnabled || slipIndicatorFiltered < SLIP_LAT_LOW) {
 			if (++slipLowCountLat >= SLIP_LOW_COUNT_REQ) {
 				slipFlagLat = false;
 				slipLowCountLat = 0;

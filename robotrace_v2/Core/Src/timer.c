@@ -165,7 +165,7 @@ void Interrupt1ms(void)
 					BMI088val.accele.y,
 					getSlipDeltaImu(),
 					getSlipDeltaEnc(),
-					getSlipIndicatorFiltered()
+					getSlipIndicatorFiltered()	// slipRatioLat(LPF後)
 				);
 #else
 				writeLogBufferPrint(); // バッファにログを保存
