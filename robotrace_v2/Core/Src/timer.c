@@ -164,9 +164,7 @@ void Interrupt1ms(void)
 					BMI088val.accele.y,
 					getSlipDeltaImu(),
 					getSlipDeltaEnc(),
-					getSlipIndicatorFiltered(),
-					getSlipthresholdHigh(),
-					getSlipthresholdLow()
+					getSlipIndicatorFiltered()
 				);
 #else
 				writeLogBufferPrint(); // バッファにログを保存
