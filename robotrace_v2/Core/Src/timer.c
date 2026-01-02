@@ -148,6 +148,7 @@ void Interrupt1ms(void)
 					courseMarkerLog,
 					targetSpeed,
 					(uint8_t)getSlipFlag(),
+					(uint8_t)getSlipFlagLat(),
 					// 16bit
 					cntRun,
 					encCurrentN,

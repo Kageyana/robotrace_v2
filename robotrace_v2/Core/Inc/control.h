@@ -49,8 +49,8 @@
 #define SLIP_GYRO_ON_RADS		(DPS2RADS(SLIP_GYRO_ON_DPS))
 #define SLIP_GYRO_OFF_RADS		(DPS2RADS(SLIP_GYRO_OFF_DPS))
 
-#define SLIP_LAT_HIGH			6.0f
-#define SLIP_LAT_LOW			4.5f
+#define SLIP_LAT_HIGH			6.0f   // [m/s^2] 横滑りON
+#define SLIP_LAT_LOW			4.5f   // [m/s^2] 横滑りOFF（ヒステリシス）
 // 横滑り判定を有効にする最小横G（小さい旋回やノイズで反応しないため）
 #define SLIP_LAT_ENCAY_MIN		3.0f   // [m/s^2]
 
@@ -137,6 +137,7 @@ float getSlipDeltaImu(void);
 float getSlipDeltaEnc(void);
 float getSlipIndicatorFiltered(void);
 bool getSlipFlag(void);
+bool getSlipFlagLat(void);
 float getSlipthresholdHigh(void);
 float getSlipthresholdLow(void);
 
