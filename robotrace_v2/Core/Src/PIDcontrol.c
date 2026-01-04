@@ -226,11 +226,6 @@ void motorControlTraceOmegaFB(void)
 	// サーボモータ用PWM値計算
 	if (lSensorMax[0] > lSensorMin[0])
 	{
-		if(patternTrace < 10)
-		{
-			beforeGainP = 0;
-			beforeGainD = 0;
-		}
 		// マクロで設定した重みを掛け合わせてセンサ値を合成
 		senL = (lSensorCari[4] * TRACE_WEIGHT_CENTER)
 				+ (lSensorCari[3] * TRACE_WEIGHT_INNER)
