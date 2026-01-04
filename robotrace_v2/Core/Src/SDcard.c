@@ -183,8 +183,9 @@ void createLog(void)
 	setLogStr("acceleVal_Y", "%f");
 	setLogStr("slipDeltaImu", "%f");
 	setLogStr("slipDeltaEnc", "%f");
-	setLogStr("slipRatio", "%f");
+	setLogStr("slipRatioLat", "%f");
 	setLogStr("slipFlag", "%d");
+	setLogStr("slipFlagLat", "%d");
 	setLogStr("x", "%f");
 	setLogStr("y", "%f");
 
@@ -606,8 +607,9 @@ void endLog(void)
 			logvalf[2],		// acceleVal_Y
 			logvalf[3],		// slipDeltaImu
 			logvalf[4],		// slipDeltaEnc
-			logvalf[5],		// slipRatio(LPF後)
+			logvalf[5],		// slipRatioLat(LPF後)
 			logval8[2],		// slipFlag
+			logval8[3],		// slipFlagLat
 
 			logvalf[7],		// x
 			logvalf[8]		// y

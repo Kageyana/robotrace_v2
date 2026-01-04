@@ -148,6 +148,7 @@ void Interrupt1ms(void)
 					courseMarkerLog,
 					targetSpeed,
 					(uint8_t)getSlipFlag(),
+					(uint8_t)getSlipFlagLat(),
 					// 16bit
 					cntRun,
 					encCurrentN,
@@ -164,7 +165,7 @@ void Interrupt1ms(void)
 					BMI088val.accele.y,
 					getSlipDeltaImu(),
 					getSlipDeltaEnc(),
-					getSlipIndicatorFiltered()
+					getSlipIndicatorFiltered()	// slipRatioLat(LPF後)
 				);
 #else
 				writeLogBufferPrint(); // バッファにログを保存
