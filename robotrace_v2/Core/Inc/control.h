@@ -126,7 +126,7 @@ void initSystem(void);
 void loopSystem(void);
 void emargencyStop(void);
 void countDown(void);
-void checkROC(void);
+void changeGain(void);
 void getADC2(void);
 void setEncoderVal(void);
 void writeTgtspeeds(void);

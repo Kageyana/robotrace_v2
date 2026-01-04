@@ -108,7 +108,7 @@ void Interrupt1ms(void)
 		if (judgeOverSpeed())
 			emcStop = STOP_OVERSPEED;
 
-		checkROC();			// ROCに応じてゲインを切り替える
+		changeGain();		// ROCに応じてゲインを切り替える
 		checkCrossLine();	// クロスライン確認
 
 		courseMarker = checkMarker();	// マーカー検知

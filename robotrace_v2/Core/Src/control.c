@@ -865,12 +865,12 @@ void countDown(void)
 		countdown--;
 }
 ///////////////////////////////////////////////////////////////////////////
-// モジュール名 checkROC
+// モジュール名 changeGain
 // 処理概要     ROCに応じてゲインを切り替える
 // 引数         なし
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
-void checkROC(void)
+void changeGain(void)
 {
 	static bool changeGain = false;
 	static int16_t beforeGainP = 0, beforeGainD = 0;
