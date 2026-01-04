@@ -154,6 +154,7 @@ void Interrupt1ms(void)
 					encCurrentN,
 					optimalIndex,
 					lineTraceOmegaFBCtrl.pwm,
+					lineTraceOmegaFBCtrl.kp,
 					(int16_t)log_targetAngularVelocity,
 					veloCtrlL.pwm,
 					veloCtrlR.pwm,

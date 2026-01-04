@@ -450,9 +450,9 @@ void loopSystem(void)
 
 			if (optimalTrace == BOOST_NONE)
 			{
-				lineTraceOmegaFBCtrl.kp = 12;
-				lineTraceOmegaFBCtrl.ki = 0;
-				lineTraceOmegaFBCtrl.kd = 0;
+				// lineTraceOmegaFBCtrl.kp = 12;
+				// lineTraceOmegaFBCtrl.ki = 0;
+				// lineTraceOmegaFBCtrl.kd = 0;
 
 				// veloCtrl.kp = 8;
 				// veloCtrl.ki = 0;
