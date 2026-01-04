@@ -222,8 +222,6 @@ void motorControlTraceOmegaFB(void)
 {
 	int32_t iP, iI, iD, iRet, target, Dev, Dif, senL, senR;;
 	static int32_t traceBefore;
-	static int16_t beforeGainP = 0, beforeGainD = 0;
-	static bool changeGain = false;
 
 	// サーボモータ用PWM値計算
 	if (lSensorMax[0] > lSensorMin[0])
@@ -233,35 +231,6 @@ void motorControlTraceOmegaFB(void)
 			beforeGainP = 0;
 			beforeGainD = 0;
 		}
-		// クロスライン検出
-		if (optimalTrace == BOOST_NONE)
-		{
-			if(stateCrossLine)
-			{
-				if(!changeGain)
-				{
-					beforeGainP = lineTraceOmegaFBCtrl.kp;
-					beforeGainD = lineTraceOmegaFBCtrl.kd;
-					lineTraceOmegaFBCtrl.kp = 2;
-					lineTraceOmegaFBCtrl.kd = 0;
-					changeGain = true;
-				}
-			}
-			else
-			{
-				// クロスラインから離れたらゲインを元に戻す
-				if(changeGain)
-				{
-					lineTraceOmegaFBCtrl.kp = beforeGainP;
-					lineTraceOmegaFBCtrl.kd = beforeGainD;
-					beforeGainP = 0;
-					beforeGainD = 0;
-					changeGain = false;
-				}
-			}
-		}
-		
-
 		// マクロで設定した重みを掛け合わせてセンサ値を合成
 		senL = (lSensorCari[4] * TRACE_WEIGHT_CENTER)
 				+ (lSensorCari[3] * TRACE_WEIGHT_INNER)
