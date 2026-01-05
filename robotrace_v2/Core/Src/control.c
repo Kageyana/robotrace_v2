@@ -768,6 +768,7 @@ void loopSystem(void)
 			lineTraceOmegaFBCtrl.Int = 0;
 			stateCrossLine = false;		// クロスライン検出状態クリア
 			clearMarkerProcessState();	// マーカーセンサ処理状態クリア
+			softreset = false;			// ソフトウェアリセット状態を解除
 			patternTrace = 0;
 		}
 		break;
@@ -874,7 +875,27 @@ void changeGain(void)
 {
 	static bool changeGain = false;
 	static int16_t beforeGainP = 0, beforeGainD = 0;
+	static bool softresetHandled = false;
 	bool useStraightGain = false;
+	bool useCrossLineGain = false;
+
+	// ソフトウェアリセット時はゲイン変更状態を初期化する
+	if (softreset && !softresetHandled)
+	{
+		if (changeGain)
+		{
+			lineTraceOmegaFBCtrl.kp = beforeGainP;
+			lineTraceOmegaFBCtrl.kd = beforeGainD;
+		}
+		beforeGainP = 0;
+		beforeGainD = 0;
+		changeGain = false;
+		softresetHandled = true;
+	}
+	else if (!softreset)
+	{
+		softresetHandled = false;
+	}
 
 	// 距離基準2次走行のみ、ROC閾値で直線/カーブに合わせてゲインを切り替える
 	if (optimalTrace == BOOST_DISTANCE && numPPADarry > 0)
@@ -890,7 +911,13 @@ void changeGain(void)
 		}
 	}
 
-	if (useStraightGain)
+	// クロスライン検出時のゲイン切り替え
+	if (optimalTrace == BOOST_NONE && stateCrossLine)
+	{
+		useCrossLineGain = true;
+	}
+
+	if (useStraightGain || useCrossLineGain)
 	{
 		if (!changeGain)
 		{
