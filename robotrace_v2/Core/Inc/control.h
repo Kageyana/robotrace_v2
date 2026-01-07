@@ -102,8 +102,8 @@ extern bool initCurrent;		// 電流センサ初期化状況
 extern uint8_t autoStart;		// 5走を自動で開始する
 extern bool stateCrossLine;		// クロスライン検出状態
 
-extern uint16_t analogValLSon[10]; // ADC結果格納配列
-extern uint16_t analogValLSoff[10]; // ADC結果格納配列
+extern uint16_t analogValLSon[11]; // ADC結果格納配列
+extern uint16_t analogValLSoff[11]; // ADC結果格納配列
 extern uint16_t analogVal2[4];	// ADC結果格納配列
 extern float batteryVoltage_V;	// DWT初期化後に取得したバッテリ電圧[V]
 

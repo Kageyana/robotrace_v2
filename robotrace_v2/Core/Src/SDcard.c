@@ -174,7 +174,6 @@ void createLog(void)
 	setLogStr("targetSpeed", "%d");
 	setLogStr("optimalIndex", "%d");
 	setLogStr("lineTraceCtrl", "%d");
-	setLogStr("lineTraceCtrl.kp", "%d");
 	// setLogStr("velocity", "%f");
 	setLogStr("targetAngularvelo", "%d");
 	setLogStr("motorpwmL", "%d");
@@ -187,6 +186,8 @@ void createLog(void)
 	setLogStr("slipRatioLat", "%f");
 	setLogStr("slipFlag", "%d");
 	setLogStr("slipFlagLat", "%d");
+	setLogStr("motorCurrentL", "%f");
+	setLogStr("motorCurrentR", "%f");
 	setLogStr("x", "%f");
 	setLogStr("y", "%f");
 
@@ -595,15 +596,14 @@ void endLog(void)
 			zg,
 			marker,
 			distance,
-			logvalf[6],		// ROC
+			logvalf[8],		// ROC
 
 			logval8[1],		// targetSpeed
 			logval16[2],	// optimalIndex
 			(int16_t)logval16[3],	// lineTraceCtrl
-			(int16_t)logval16[4],	// lineTraceCtrl.kps
-			(int16_t)logval16[5],	// targetAngularvelo
-			(int16_t)logval16[6],	// motorpwmL
-			(int16_t)logval16[7],	// motorpwmR
+			(int16_t)logval16[4],	// targetAngularvelo
+			(int16_t)logval16[5],	// motorpwmL
+			(int16_t)logval16[6],	// motorpwmR
 
 			logvalf[1],		// acceleVal_X
 			logvalf[2],		// acceleVal_Y
@@ -612,9 +612,11 @@ void endLog(void)
 			logvalf[5],		// slipRatioLat(LPF後)
 			logval8[2],		// slipFlag
 			logval8[3],		// slipFlagLat
+			logvalf[6],		// motorCurrentL
+			logvalf[7],		// motorCurrentR
 
-			logvalf[7],		// x
-			logvalf[8]		// y
+			logvalf[9],		// x
+			logvalf[10]		// y
 		);
 
 		// 文字列をSDカードに送信

@@ -153,7 +153,6 @@ void Interrupt1ms(void)
 					encCurrentN,
 					optimalIndex,
 					lineTraceOmegaFBCtrl.pwm,
-					lineTraceOmegaFBCtrl.kp,
 					(int16_t)log_targetAngularVelocity,
 					veloCtrlL.pwm,
 					veloCtrlR.pwm,
@@ -165,7 +164,9 @@ void Interrupt1ms(void)
 					BMI088val.accele.y,
 					getSlipDeltaImu(),
 					getSlipDeltaEnc(),
-					getSlipIndicatorFiltered()	// slipRatioLat(LPF後)
+					getSlipIndicatorFiltered(),	// slipRatioLat(LPF後)
+					motorCurrentL,
+					motorCurrentR
 				);
 #else
 				writeLogBufferPrint(); // バッファにログを保存
@@ -234,6 +235,7 @@ void Interrupt1ms(void)
 		getMotorCurrent();
 		break;
 	case 2:
+		getVref();
 		break;
 	case 9:
 		break;

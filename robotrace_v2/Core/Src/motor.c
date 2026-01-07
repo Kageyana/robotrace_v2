@@ -2,6 +2,8 @@
 // インクルード
 //====================================//
 #include "motor.h"
+#include "battery.h"
+#include <stdint.h>
 
 //====================================//
 // グローバル変数の宣言
@@ -12,6 +14,8 @@ uint16_t motorCurrentADL, motorCurrentADR;
 uint16_t motorCurrentADLInt[MOTOR_AD_WINDOW], motorCurrentADRInt[MOTOR_AD_WINDOW];
 uint32_t cntMotorAD = 0;
 float motorCurrentL, motorCurrentR;
+
+uint16_t motorCADL, motorCADR;
 /////////////////////////////////////////////////////////////////////
 // モジュール名 motorPwmOut
 // 処理概要     左右のモータにPWMを出力する
@@ -107,6 +111,8 @@ void getMotorAD(uint16_t LAD, uint16_t RAD)
 	motorCurrentADLInt[cntMotorAD & (MOTOR_AD_WINDOW - 1)] = LAD; // リングバッファに格納
 	motorCurrentADRInt[cntMotorAD & (MOTOR_AD_WINDOW - 1)] = RAD; // リングバッファに格納
 	cntMotorAD++; // 次回の格納位置を更新
+	motorCADL = LAD;
+	motorCADR = RAD;
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 getMotorCurrent
@@ -118,6 +124,7 @@ void getMotorCurrent(void)
 {
 	float vL, vR;
 	uint32_t Lint = 0, Rint = 0;
+	float vref = adcVref*0.5f; // 分圧比1:1での基準電圧
 
 	// リングバッファの総和を計算
 	for (uint16_t i = 0; i < MOTOR_AD_WINDOW; i++)
@@ -131,11 +138,11 @@ void getMotorCurrent(void)
 	motorCurrentADR = Rint / MOTOR_AD_WINDOW;
 
 	// AD値を電圧[V]に変換
-	vL = (float)(motorCurrentADL) / 4095 * 3.3;
-	vR = (float)(motorCurrentADR) / 4095 * 3.3;
+	vL = (float)(motorCurrentADL) / 4095 * adcVref;
+	vR = (float)(motorCurrentADR) / 4095 * adcVref;
 
-	motorCurrentL = 10000.0 * (vL - VREF_L) / RREF_L;
-	motorCurrentR = 10000.0 * (vR - VREF_R) / RREF_R;
+	motorCurrentL = 10000.0 * (vL - vref) / RREF_L;
+	motorCurrentR = 10000.0 * (vR - vref) / RREF_R;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 MotorFanPwmOut
@@ -145,9 +152,9 @@ void getMotorCurrent(void)
 /////////////////////////////////////////////////////////////////////
 void MotorFanPwmOut(int16_t pwm)
 {
-        // PWM が 0 のとき比較レジスタを 0 に設定
-        if (pwm == 0)
-                __HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_SUCTION_TIM_CH, 0); // 吸引モータ出力を停止
+	// PWM が 0 のとき比較レジスタを 0 に設定
+	if (pwm == 0)
+		__HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_SUCTION_TIM_CH, 0); // 吸引モータ出力を停止
 
 	if (pwm != 0)
 	{

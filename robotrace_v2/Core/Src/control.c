@@ -27,8 +27,8 @@ int16_t autoStartAnalize = 0; 		// 自動走行で使用するログの解析番
 
 bool stateCrossLine = false;			// クロスライン検出状態
 
-uint16_t analogValLSon[NUM_SENSORS]; // ADC結果格納配列
-uint16_t analogValLSoff[NUM_SENSORS]; // ADC結果格納配列s
+uint16_t analogValLSon[NUM_SENSORS+1]; // ADC結果格納配列
+uint16_t analogValLSoff[NUM_SENSORS+1]; // ADC結果格納配列s
 uint16_t analogVal2[4];			  // ADC結果格納配列
 float batteryVoltage_V = 0.0f;	// DWT初期化後に取得したバッテリ電圧[V]を保持
 

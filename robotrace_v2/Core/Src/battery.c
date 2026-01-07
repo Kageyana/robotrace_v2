@@ -2,11 +2,13 @@
 // インクルード
 //====================================//
 #include "battery.h"
+#include <stdint.h>
 //====================================//
 // グローバル変数の宣言
 //====================================//
-uint16_t batteryAD;
-uint8_t batteryLevel;
+uint16_t batteryAD;		// バッテリ残量(AD値)
+uint8_t batteryLevel;	// バッテリ残量レベル
+float adcVref = 0.0f;	// ADC基準電圧[V]
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getBatteryAD
@@ -128,4 +130,20 @@ void showBatMark(void)
 	// 電池マーク
 	ssd1306_DrawRectangle(95, 1, 124, 12, White);
 	ssd1306_FillRectangle(125, 3, 127, 10, White);
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 getVref
+// 処理概要     ADC基準電圧を取得
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void getVref(void)
+{
+	const uint8_t phase = lineSensorState ? 1U : 0U; // 1: LED on, 0: LED off
+	const uint16_t *sample = (phase == 1U) ? analogValLSon : analogValLSoff;
+	uint16_t VrefValue;
+	__IO uint16_t *VrefCal = (__IO uint16_t*)0x1FFF7A2A; // VREFINT_CALアドレス
+
+	VrefValue = sample[NUM_SENSORS];
+	adcVref = MCU_VOLTAGE * ((float)*VrefCal / (float)VrefValue);
 }

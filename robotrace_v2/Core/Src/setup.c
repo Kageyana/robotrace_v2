@@ -203,13 +203,13 @@ static void test_motor(void)
 	ssd1306_SetCursor(0, 42);
 	ssd1306_printf(Font_6x8, "enc:%5.0f", encTotalL / PALSE_MILLIMETER); // Encoder
 	ssd1306_SetCursor(0, 52);
-	ssd1306_printf(Font_6x8, "Cur:%5.2f", motorCurrentL); // Current
+	ssd1306_printf(Font_6x8, "Cur:%d", motorCADL); // Current
 
 	// // Right
 	ssd1306_SetCursor(70, 42);
 	ssd1306_printf(Font_6x8, "enc:%5.0f", encTotalR / PALSE_MILLIMETER); // Encoder
 	ssd1306_SetCursor(70, 52);
-	ssd1306_printf(Font_6x8, "Cur:%5.2f", motorCurrentR); // Current
+	ssd1306_printf(Font_6x8, "Cur:%f", motorCurrentR); // Current
 
 	dataTuningUD(&motorTestPwm, 100, -500, 500); // PWM値を調整
 	data_select(&testFlags.motor_test, SW_PUSH); // モータテストの開始/停止
@@ -374,6 +374,7 @@ static void test_battery(void)
 
 	ssd1306_SetCursor(0, 42);
 	ssd1306_printf(Font_7x10, "batteryAD:%4.2f", AD2VOLTAGE(batteryAD));
+	// ssd1306_printf(Font_7x10, "batteryAD:%4.2f", adcVref);
 
 	ssd1306_SetCursor(0, 54);
 	ssd1306_printf(Font_7x10, "BatteryLv:%d", batteryLevel);

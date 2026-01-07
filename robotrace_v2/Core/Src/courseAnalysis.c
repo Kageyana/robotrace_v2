@@ -286,12 +286,12 @@ int16_t readLogDistance(int logNumber)
 			i++;
 		}
 
-		DWORD pos, size;
-		int32_t eof, error;
-		pos = f_tell(&fil_Read); // ファイル終端に到達したか確認
-		size = f_size(&fil_Read);
-		eof = f_eof(&fil_Read);
-		error = f_error(&fil_Read);
+		// DWORD pos, size;
+		// int32_t eof, error;
+		// pos = f_tell(&fil_Read); // ファイル終端に到達したか確認
+		// size = f_size(&fil_Read);
+		// eof = f_eof(&fil_Read);
+		// error = f_error(&fil_Read);
 
 		if (!errorDetected)
 		{

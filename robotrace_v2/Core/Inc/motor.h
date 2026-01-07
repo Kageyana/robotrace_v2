@@ -14,10 +14,8 @@
 #define MOTOR_TIM_CH_R TIM_CHANNEL_3
 #define MOTOR_SUCTION_TIM_CH TIM_CHANNEL_4
 
-#define VREF_L 1.696F  // 基準出圧
-#define VREF_R 1.697F  // 基準出圧
-#define RREF_L 1930.0F // 抵抗値
-#define RREF_R 1940.0F // 抵抗値
+#define RREF_L 2700.0F // 抵抗値
+#define RREF_R 2700.0F // 抵抗値
 
 #define MOTOR_AD_WINDOW 64
 // MOTOR_AD_WINDOW は2の冪である必要があるため、変更時は注意
@@ -30,6 +28,7 @@
 //====================================//
 extern int16_t motorpwmL, motorpwmR;
 extern float motorCurrentL, motorCurrentR;
+extern uint16_t motorCADL, motorCADR;
 //====================================//
 // プロトタイプ宣言
 //====================================//
