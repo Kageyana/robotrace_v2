@@ -338,7 +338,7 @@ void calibrationIMU(void)
 		acceleInt[0] += accelVal[0];
 		acceleInt[1] += accelVal[1];
 		acceleInt[2] += accelVal[2];
-	#endif
+#endif
 		i++;
 	}
 	else
@@ -349,7 +349,7 @@ void calibrationIMU(void)
 		angleInt[0] = 0;
 		angleInt[1] = 0;
 		angleInt[2] = 0;
-	#ifdef USE_ACCELE
+#ifdef USE_ACCELE
 		// 加速度オフセットの平均値を算出（重力成分を保持したままバイアスのみ補正）
 		float acceleAvgX = (float)acceleInt[0] / i;
 		float acceleAvgY = (float)acceleInt[1] / i;
@@ -374,7 +374,7 @@ void calibrationIMU(void)
 		acceleInt[0] = 0;
 		acceleInt[1] = 0;
 		acceleInt[2] = 0;
-	#endif
+#endif
 		i = 0;
 		calibratIMU = false;
 	}

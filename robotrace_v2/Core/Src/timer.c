@@ -232,7 +232,14 @@ void Interrupt1ms(void)
 	switch (cnt10)
 	{
 	case 1:
-		getMotorCurrent();
+		if(!calibrateMotorCurrent)
+		{
+			getMotorCurrent();
+		}
+		else
+		{
+			calibrationMotorCurrent();
+		}
 		break;
 	case 2:
 		getVref();

@@ -422,11 +422,12 @@ void loopSystem(void)
 				ssd1306_SetCursor(56, 28);
 				ssd1306_printf(Font_16x26, "1");
 				calibratIMU = true;		// IMUキャリブレーションを開始
+				calibrateMotorCurrent = true; // 電流センサキャリブレーションを開始
 			}
 		}
 
 		// IMUのキャリブレーションが終了したら走行開始
-		if (!calibratIMU && countdown == 0)
+		if (!calibratIMU && !calibrateMotorCurrent && countdown == 0)
 		{
 			powerLineSensors(1);   // ラインセンサ点灯
 

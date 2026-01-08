@@ -2,6 +2,8 @@
 // インクルード
 //====================================//
 #include "setup.h"
+#include "battery.h"
+#include "motor.h"
 #include <stdint.h>
 //====================================//
 // グローバル変数の宣言
@@ -203,13 +205,14 @@ static void test_motor(void)
 	ssd1306_SetCursor(0, 42);
 	ssd1306_printf(Font_6x8, "enc:%5.0f", encTotalL / PALSE_MILLIMETER); // Encoder
 	ssd1306_SetCursor(0, 52);
-	ssd1306_printf(Font_6x8, "Cur:%d", motorCADL); // Current
+	ssd1306_printf(Font_6x8, "Cur:%5.2f", motorCurrentL); // Current
 
 	// // Right
 	ssd1306_SetCursor(70, 42);
 	ssd1306_printf(Font_6x8, "enc:%5.0f", encTotalR / PALSE_MILLIMETER); // Encoder
 	ssd1306_SetCursor(70, 52);
-	ssd1306_printf(Font_6x8, "Cur:%f", motorCurrentR); // Current
+	// ssd1306_printf(Font_6x8, "Cur:%f", motorCurrentR); // Current
+	ssd1306_printf(Font_6x8, "Cur:%5.2f", motorCurrentR); // Current
 
 	dataTuningUD(&motorTestPwm, 100, -500, 500); // PWM値を調整
 	data_select(&testFlags.motor_test, SW_PUSH); // モータテストの開始/停止
@@ -277,6 +280,7 @@ static void test_imu_deg(void)
 		ssd1306_UpdateScreen();
 
 		calibratIMU = true;
+		calibrateMotorCurrent =true;
 		HAL_Delay(1000);
 	}
 }

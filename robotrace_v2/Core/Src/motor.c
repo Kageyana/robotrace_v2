@@ -10,12 +10,12 @@
 //====================================//
 int16_t motorpwmL = 0;
 int16_t motorpwmR = 0;
-uint16_t motorCurrentADL, motorCurrentADR;
-uint16_t motorCurrentADLInt[MOTOR_AD_WINDOW], motorCurrentADRInt[MOTOR_AD_WINDOW];
+int16_t motorCurrentADL, motorCurrentADR;
+int16_t motorCurrentADLInt[MOTOR_AD_WINDOW], motorCurrentADRInt[MOTOR_AD_WINDOW];
 uint32_t cntMotorAD = 0;
 float motorCurrentL, motorCurrentR;
-
-uint16_t motorCADL, motorCADR;
+bool calibrateMotorCurrent = false;
+int16_t motorCurrentADLoffset = 4096/2, motorCurrentADRoffset = 4096/2; // キャリブレーション用オフセット値
 /////////////////////////////////////////////////////////////////////
 // モジュール名 motorPwmOut
 // 処理概要     左右のモータにPWMを出力する
@@ -111,8 +111,6 @@ void getMotorAD(uint16_t LAD, uint16_t RAD)
 	motorCurrentADLInt[cntMotorAD & (MOTOR_AD_WINDOW - 1)] = LAD; // リングバッファに格納
 	motorCurrentADRInt[cntMotorAD & (MOTOR_AD_WINDOW - 1)] = RAD; // リングバッファに格納
 	cntMotorAD++; // 次回の格納位置を更新
-	motorCADL = LAD;
-	motorCADR = RAD;
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 getMotorCurrent
@@ -122,9 +120,8 @@ void getMotorAD(uint16_t LAD, uint16_t RAD)
 ///////////////////////////////////////////////////////////////////////////
 void getMotorCurrent(void)
 {
-	float vL, vR;
+	float dvL, dvR;
 	uint32_t Lint = 0, Rint = 0;
-	float vref = adcVref*0.5f; // 分圧比1:1での基準電圧
 
 	// リングバッファの総和を計算
 	for (uint16_t i = 0; i < MOTOR_AD_WINDOW; i++)
@@ -138,11 +135,51 @@ void getMotorCurrent(void)
 	motorCurrentADR = Rint / MOTOR_AD_WINDOW;
 
 	// AD値を電圧[V]に変換
-	vL = (float)(motorCurrentADL) / 4095 * adcVref;
-	vR = (float)(motorCurrentADR) / 4095 * adcVref;
+	dvL = (float)((int32_t)motorCurrentADL - (int32_t)motorCurrentADLoffset) / 4095 * adcVref;
+	dvR = (float)((int32_t)motorCurrentADR - (int32_t)motorCurrentADRoffset) / 4095 * adcVref;
 
-	motorCurrentL = 10000.0 * (vL - vref) / RREF_L;
-	motorCurrentR = 10000.0 * (vR - vref) / RREF_R;
+	motorCurrentL = 10000.0 * (dvL) / RREF;
+	motorCurrentR = 10000.0 * (dvR) / RREF;
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 calibrationMotorCurrent
+// 処理概要     電流センサのキャリブレーション
+// 引数         なし
+// 戻り値       なしs
+///////////////////////////////////////////////////////////////////////////
+void calibrationMotorCurrent(void)
+{
+	static uint16_t i = 0;
+	uint32_t Lint = 0, Rint = 0;
+	static int32_t motorCurrentADLInt2 = 0, motorCurrentADRInt2 = 0;
+
+	if(i < 100)
+	{
+		// リングバッファの総和を計算
+		for (uint16_t i = 0; i < MOTOR_AD_WINDOW; i++)
+		{
+			Lint += motorCurrentADLInt[i];
+			Rint += motorCurrentADRInt[i];
+		}
+
+		// 移動平均を計算
+		motorCurrentADL = Lint / MOTOR_AD_WINDOW;
+		motorCurrentADR = Rint / MOTOR_AD_WINDOW;
+
+		motorCurrentADLInt2 += motorCurrentADL;
+		motorCurrentADRInt2 += motorCurrentADR;
+
+		i++;
+	}
+	else
+	{
+		motorCurrentADLoffset = motorCurrentADLInt2 / 100;
+		motorCurrentADRoffset = motorCurrentADRInt2 / 100;
+		motorCurrentADLInt2 = 0;
+		motorCurrentADRInt2 = 0;
+		i=0;
+		calibrateMotorCurrent = false;
+	}
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 MotorFanPwmOut
