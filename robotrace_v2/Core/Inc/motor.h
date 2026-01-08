@@ -16,7 +16,7 @@
 
 #define RREF 2700.0F // 抵抗値[Ω]
 
-#define MOTOR_AD_WINDOW 64
+#define MOTOR_AD_WINDOW 32
 // MOTOR_AD_WINDOW は2の冪である必要があるため、変更時は注意
 // ビット演算で2の冪かを静的に検証し、条件を満たさない場合はコンパイルエラー
 #if (MOTOR_AD_WINDOW & (MOTOR_AD_WINDOW - 1)) != 0

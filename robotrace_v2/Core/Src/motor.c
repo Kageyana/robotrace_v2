@@ -10,11 +10,14 @@
 //====================================//
 int16_t motorpwmL = 0;
 int16_t motorpwmR = 0;
+
 int16_t motorCurrentADL, motorCurrentADR;
 int16_t motorCurrentADLInt[MOTOR_AD_WINDOW], motorCurrentADRInt[MOTOR_AD_WINDOW];
+static uint32_t motorCurrentADLSum = 0;
+static uint32_t motorCurrentADRSum = 0;
 uint32_t cntMotorAD = 0;
-float motorCurrentL, motorCurrentR;
-bool calibrateMotorCurrent = false;
+float motorCurrentL, motorCurrentR; // モーター電流値[A]
+bool calibrateMotorCurrent = false; // 電流センサキャリブレーションフラグ
 int16_t motorCurrentADLoffset = 4096/2, motorCurrentADRoffset = 4096/2; // キャリブレーション用オフセット値
 /////////////////////////////////////////////////////////////////////
 // モジュール名 motorPwmOut
@@ -108,8 +111,20 @@ void getMotorAD(uint16_t LAD, uint16_t RAD)
 {
 	// MOTOR_AD_WINDOW は2の冪であることを前提にインデックスをマスク
 	// 値を変更する場合はこの前提が崩れないよう注意する
-	motorCurrentADLInt[cntMotorAD & (MOTOR_AD_WINDOW - 1)] = LAD; // リングバッファに格納
-	motorCurrentADRInt[cntMotorAD & (MOTOR_AD_WINDOW - 1)] = RAD; // リングバッファに格納
+	uint16_t idx = (uint16_t)(cntMotorAD & (MOTOR_AD_WINDOW - 1)); // インデックス計算
+
+    // 古い値を総和から除去（配列がint16_tなので符号影響を避けてuint16_t化してから引く）
+    motorCurrentADLSum -= (uint32_t)(uint16_t)motorCurrentADLInt[idx];
+    motorCurrentADRSum -= (uint32_t)(uint16_t)motorCurrentADRInt[idx];
+
+    // 新しい値を格納
+    motorCurrentADLInt[idx] = (int16_t)LAD;
+    motorCurrentADRInt[idx] = (int16_t)RAD;
+
+    // 新しい値を総和へ追加
+    motorCurrentADLSum += (uint32_t)LAD;
+    motorCurrentADRSum += (uint32_t)RAD;
+
 	cntMotorAD++; // 次回の格納位置を更新
 }
 ///////////////////////////////////////////////////////////////////////////
@@ -121,18 +136,10 @@ void getMotorAD(uint16_t LAD, uint16_t RAD)
 void getMotorCurrent(void)
 {
 	float dvL, dvR;
-	uint32_t Lint = 0, Rint = 0;
 
-	// リングバッファの総和を計算
-	for (uint16_t i = 0; i < MOTOR_AD_WINDOW; i++)
-	{
-		Lint += motorCurrentADLInt[i];
-		Rint += motorCurrentADRInt[i];
-	}
-
-	// 移動平均を計算
-	motorCurrentADL = Lint / MOTOR_AD_WINDOW;
-	motorCurrentADR = Rint / MOTOR_AD_WINDOW;
+	// リングバッファの総和から移動平均を計算
+	motorCurrentADL = (int16_t)(motorCurrentADLSum / MOTOR_AD_WINDOW);
+    motorCurrentADR = (int16_t)(motorCurrentADRSum / MOTOR_AD_WINDOW);
 
 	// AD値を電圧[V]に変換
 	dvL = (float)((int32_t)motorCurrentADL - (int32_t)motorCurrentADLoffset) / 4095 * adcVref;
@@ -149,37 +156,25 @@ void getMotorCurrent(void)
 ///////////////////////////////////////////////////////////////////////////
 void calibrationMotorCurrent(void)
 {
-	static uint16_t i = 0;
-	uint32_t Lint = 0, Rint = 0;
-	static int32_t motorCurrentADLInt2 = 0, motorCurrentADRInt2 = 0;
+	static uint16_t n = 0;
+    static int32_t accL = 0, accR = 0;
 
-	if(i < 100)
-	{
-		// リングバッファの総和を計算
-		for (uint16_t i = 0; i < MOTOR_AD_WINDOW; i++)
-		{
-			Lint += motorCurrentADLInt[i];
-			Rint += motorCurrentADRInt[i];
-		}
+    if (n < 100) {
+        motorCurrentADL = (int16_t)(motorCurrentADLSum / MOTOR_AD_WINDOW);
+        motorCurrentADR = (int16_t)(motorCurrentADRSum / MOTOR_AD_WINDOW);
 
-		// 移動平均を計算
-		motorCurrentADL = Lint / MOTOR_AD_WINDOW;
-		motorCurrentADR = Rint / MOTOR_AD_WINDOW;
+        accL += motorCurrentADL;
+        accR += motorCurrentADR;
+        n++;
+    } else {
+        motorCurrentADLoffset = (int16_t)(accL / 100);
+        motorCurrentADRoffset = (int16_t)(accR / 100);
 
-		motorCurrentADLInt2 += motorCurrentADL;
-		motorCurrentADRInt2 += motorCurrentADR;
-
-		i++;
-	}
-	else
-	{
-		motorCurrentADLoffset = motorCurrentADLInt2 / 100;
-		motorCurrentADRoffset = motorCurrentADRInt2 / 100;
-		motorCurrentADLInt2 = 0;
-		motorCurrentADRInt2 = 0;
-		i=0;
-		calibrateMotorCurrent = false;
-	}
+        accL = 0;
+		accR = 0;
+        n = 0;
+        calibrateMotorCurrent = false;
+    }
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 MotorFanPwmOut
