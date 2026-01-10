@@ -5,6 +5,7 @@
 #include "BMI088.h"
 #include "PIDcontrol.h"
 #include "BMI088.h"
+#include "motor.h"
 #include "fatfs.h"
 #include "battery.h"
 #include <math.h>
@@ -977,6 +978,9 @@ void updateSlipDetection(void)
 	// ---- 信号LPF（ノイズ低減）----
 	static float imuAxF = 0.0f, imuAyF = 0.0f;
 	static float encAxF = 0.0f, encAyF = 0.0f;
+#if SLIP_CUR_ENABLE
+	static float motorCurMagF = 0.0f; // |IL|+|IR| のLPF
+#endif
 
 	// ---- 旋回状態検出 ----
 	static bool turningState = false;
@@ -1002,6 +1006,10 @@ void updateSlipDetection(void)
 			turningState = false;
 			slipFlag = false;
 			slipFlagLat = false;
+			// ---- 電流LPFリセット ----
+#if SLIP_CUR_ENABLE
+			motorCurMagF = 0.0f;
+#endif
 
 			// 微分・フィルタ系リセット
 			axBias = ayBias = 0.0f;
@@ -1045,6 +1053,10 @@ void updateSlipDetection(void)
 			turningState = false;
 			slipFlag = false;
 			slipFlagLat = false;
+			// ---- 電流LPFリセット ----
+#if SLIP_CUR_ENABLE
+			motorCurMagF = 0.0f;
+#endif
 
 			for (uint16_t i = 0; i < SLIP_WINDOW_SAMPLES; i++) {
 				slipEncSpeedHist[i] = 0.0f;
@@ -1169,6 +1181,25 @@ void updateSlipDetection(void)
 	float absDx = fabsf(dx);
 	float absDy = fabsf(dy);
 
+#if SLIP_CUR_ENABLE
+	//==========================================================
+    // モータ電流によるノイズ補正スケール
+	//==========================================================
+	float motorCurMag = fabsf(motorCurrentL) + fabsf(motorCurrentR);
+	motorCurMagF += SLIP_CUR_LPF_COEF * (motorCurMag - motorCurMagF);
+
+    float curScale = 1.0f;
+    if (!calibrateMotorCurrent && (motorCurMagF > SLIP_CUR_MIN_A)) {
+        float dI = motorCurMagF - SLIP_CUR_BASE_A;
+        if (dI > 0.0f) {
+            curScale = 1.0f + SLIP_CUR_K * dI;
+            if (curScale > SLIP_CUR_MAX_SCALE) curScale = SLIP_CUR_MAX_SCALE;
+        }
+    }
+#else
+    float curScale = 1.0f;
+#endif
+
 	//==========================================================
 	// 低加速度ゲート（誤検出抑制）
 	//==========================================================
@@ -1178,7 +1209,11 @@ void updateSlipDetection(void)
 	);
 
 	// 横スリップ判定の有効化条件（直進ノイズ抑制）
-	bool latEnabled = turningState && (fabsf(encAyF) > SLIP_LAT_ENCAY_MIN);
+	bool latEnabled = turningState && (fabsf(encAyF) > SLIP_LAT_ENCAY_MIN)
+#if SLIP_CUR_ENABLE
+			&& (motorCurMagF > SLIP_CUR_MIN_A)
+#endif
+			;
 
 	// 低加速度では見ない（縦/横の誤検出抑制）
 	if (accMag < 0.8f) {
@@ -1217,6 +1252,9 @@ void updateSlipDetection(void)
 		slipThresholdHigh *= SLIP_MISMATCH_HIGH_TURN;
 		slipThresholdLow  *= SLIP_MISMATCH_LOW_TURN;
 	}
+    // 電流が大きい（=振動/ノイズが増えやすい）ときは閾値を少し上げて誤検知を抑える
+    slipThresholdHigh *= curScale;
+    slipThresholdLow  *= curScale;
 
 	// ---- 縦スリップ ヒステリシス判定（absDxのみ）----
 	if (!slipFlag) {
@@ -1240,8 +1278,10 @@ void updateSlipDetection(void)
 	}
 
 	// ---- 横スリップ判定（旋回中のみ）----
-	if (!slipFlagLat) {
-		if (latEnabled && slipIndicatorFiltered > SLIP_LAT_HIGH) {
+    float slipLatHigh = SLIP_LAT_HIGH * curScale;
+    float slipLatLow  = SLIP_LAT_LOW  * curScale;
+    if (!slipFlagLat) {
+        if (latEnabled && slipIndicatorFiltered > slipLatHigh) {
 			if (++slipHighCountLat >= SLIP_HIGH_COUNT_REQ) {
 				slipFlagLat = true;
 				slipHighCountLat = 0;
@@ -1251,7 +1291,7 @@ void updateSlipDetection(void)
 		}
 		slipLowCountLat = 0;
 	} else {
-		if (!latEnabled || slipIndicatorFiltered < SLIP_LAT_LOW) {
+		if (!latEnabled || slipIndicatorFiltered < slipLatLow) {
 			if (++slipLowCountLat >= SLIP_LOW_COUNT_REQ) {
 				slipFlagLat = false;
 				slipLowCountLat = 0;

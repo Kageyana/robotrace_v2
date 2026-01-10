@@ -28,6 +28,7 @@
 #define PARAM_BOOST_100 1.1F
 
 #define PARAM_UP_STEP 1.02F
+
 // スリップ検出パラメータ（1ms割り込みで使用するのでマクロで管理）
 #define SLIP_WINDOW_SAMPLES		15U    // Δvを取る時間窓長[ms]（リングバッファ長）
 #define SLIP_SAMPLE_PERIOD_S	DEFF_TIME // サンプリング周期[s]（1ms）
@@ -53,6 +54,13 @@
 #define SLIP_LAT_LOW			4.5f   // [m/s^2] 横滑りOFF（ヒステリシス）
 // 横滑り判定を有効にする最小横G（小さい旋回やノイズで反応しないため）
 #define SLIP_LAT_ENCAY_MIN		3.0f   // [m/s^2]
+
+#define SLIP_CUR_ENABLE            1
+#define SLIP_CUR_LPF_COEF          0.02f   // 電流LPF（0〜1）
+#define SLIP_CUR_BASE_A            0.20f   // ここまでは補正しない基準電流[A]
+#define SLIP_CUR_K                 0.60f   // 補正ゲイン [1/A]
+#define SLIP_CUR_MAX_SCALE         1.60f   // 閾値スケール上限
+#define SLIP_CUR_MIN_A             0.05f   // ほぼ惰性/停止時は補正を無効化
 
 // ゴール
 #define COUNT_GOAL 5 // ゴールマーカーを読む回数

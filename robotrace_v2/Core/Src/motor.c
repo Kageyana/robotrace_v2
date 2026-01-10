@@ -12,9 +12,9 @@ int16_t motorpwmL = 0;
 int16_t motorpwmR = 0;
 
 int16_t motorCurrentADL, motorCurrentADR;
-int16_t motorCurrentADLInt[MOTOR_AD_WINDOW], motorCurrentADRInt[MOTOR_AD_WINDOW];
-static uint32_t motorCurrentADLSum = 0;
-static uint32_t motorCurrentADRSum = 0;
+uint16_t motorCurrentADLInt[MOTOR_AD_WINDOW], motorCurrentADRInt[MOTOR_AD_WINDOW];
+static volatile uint32_t motorCurrentADLSum = 0;
+static volatile uint32_t motorCurrentADRSum = 0;
 uint32_t cntMotorAD = 0;
 float motorCurrentL, motorCurrentR; // モーター電流値[A]
 bool calibrateMotorCurrent = false; // 電流センサキャリブレーションフラグ
@@ -114,16 +114,16 @@ void getMotorAD(uint16_t LAD, uint16_t RAD)
 	uint16_t idx = (uint16_t)(cntMotorAD & (MOTOR_AD_WINDOW - 1)); // インデックス計算
 
     // 古い値を総和から除去（配列がint16_tなので符号影響を避けてuint16_t化してから引く）
-    motorCurrentADLSum -= (uint32_t)(uint16_t)motorCurrentADLInt[idx];
-    motorCurrentADRSum -= (uint32_t)(uint16_t)motorCurrentADRInt[idx];
+    motorCurrentADLSum -= motorCurrentADLInt[idx];
+    motorCurrentADRSum -= motorCurrentADRInt[idx];
 
     // 新しい値を格納
-    motorCurrentADLInt[idx] = (int16_t)LAD;
-    motorCurrentADRInt[idx] = (int16_t)RAD;
+    motorCurrentADLInt[idx] = LAD;
+    motorCurrentADRInt[idx] = RAD;
 
     // 新しい値を総和へ追加
-    motorCurrentADLSum += (uint32_t)LAD;
-    motorCurrentADRSum += (uint32_t)RAD;
+    motorCurrentADLSum += LAD;
+    motorCurrentADRSum += RAD;
 
 	cntMotorAD++; // 次回の格納位置を更新
 }
@@ -160,15 +160,15 @@ void calibrationMotorCurrent(void)
     static int32_t accL = 0, accR = 0;
 
     if (n < 100) {
-        motorCurrentADL = (int16_t)(motorCurrentADLSum / MOTOR_AD_WINDOW);
-        motorCurrentADR = (int16_t)(motorCurrentADRSum / MOTOR_AD_WINDOW);
+        motorCurrentADL = motorCurrentADLSum / MOTOR_AD_WINDOW;
+        motorCurrentADR = motorCurrentADRSum / MOTOR_AD_WINDOW;
 
         accL += motorCurrentADL;
         accR += motorCurrentADR;
         n++;
     } else {
-        motorCurrentADLoffset = (int16_t)(accL / 100);
-        motorCurrentADRoffset = (int16_t)(accR / 100);
+        motorCurrentADLoffset = accL / 100;
+        motorCurrentADRoffset = accR / 100;
 
         accL = 0;
 		accR = 0;
