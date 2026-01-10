@@ -981,6 +981,9 @@ void updateSlipDetection(void)
 #if SLIP_CUR_ENABLE
 	static float motorCurMagF = 0.0f; // |IL|+|IR| のLPF
 #endif
+	// ---- PWM/電流の簡易LPF（惰性判定用）----
+	static float pwmSumF = 0.0f;
+	static float iSumF = 0.0f;
 
 	// ---- 旋回状態検出 ----
 	static bool turningState = false;
@@ -1010,6 +1013,9 @@ void updateSlipDetection(void)
 #if SLIP_CUR_ENABLE
 			motorCurMagF = 0.0f;
 #endif
+			// ---- PWM/電流LPFリセット ----
+			pwmSumF = 0.0f;
+			iSumF = 0.0f;
 
 			// 微分・フィルタ系リセット
 			axBias = ayBias = 0.0f;
@@ -1057,6 +1063,9 @@ void updateSlipDetection(void)
 #if SLIP_CUR_ENABLE
 			motorCurMagF = 0.0f;
 #endif
+			// ---- PWM/電流LPFリセット ----
+			pwmSumF = 0.0f;
+			iSumF = 0.0f;
 
 			for (uint16_t i = 0; i < SLIP_WINDOW_SAMPLES; i++) {
 				slipEncSpeedHist[i] = 0.0f;
@@ -1118,6 +1127,10 @@ void updateSlipDetection(void)
 		ayBias = ay0;
 		float wz0 = BMI088val.gyro.z * DEG2RAD;
 		turningState = (fabsf(wz0) > SLIP_GYRO_ON_RADS);
+
+		// ---- PWM/電流LPF初期化 ----
+		pwmSumF = 0.0f;
+		iSumF = 0.0f;
 
 		slipPrimed = true;
 		return; // 初回は判定しない
@@ -1181,6 +1194,14 @@ void updateSlipDetection(void)
 	float absDx = fabsf(dx);
 	float absDy = fabsf(dy);
 
+	//==========================================================
+	// PWM/電流の合計（惰性/低トルク判定用）
+	//==========================================================
+	float pwmSum = fabsf((float)motorpwmL) + fabsf((float)motorpwmR);
+	float iSum = fabsf(motorCurrentL) + fabsf(motorCurrentR);
+	pwmSumF += SLIP_CUR_LPF_COEF * (pwmSum - pwmSumF);
+	iSumF += SLIP_CUR_LPF_COEF * (iSum - iSumF);
+
 #if SLIP_CUR_ENABLE
 	//==========================================================
     // モータ電流によるノイズ補正スケール
@@ -1209,11 +1230,13 @@ void updateSlipDetection(void)
 	);
 
 	// 横スリップ判定の有効化条件（直進ノイズ抑制）
-	bool latEnabled = turningState && (fabsf(encAyF) > SLIP_LAT_ENCAY_MIN)
-#if SLIP_CUR_ENABLE
-			&& (motorCurMagF > SLIP_CUR_MIN_A)
-#endif
-			;
+	bool latEnabled = turningState && (fabsf(encAyF) > SLIP_LAT_ENCAY_MIN);
+	// 横判定のカウントを許可する条件（PWMが小さい区間は止める）
+	bool latCountEnabled = latEnabled && (pwmSumF > SLIP_PWM_LAT_COUNT_MIN);
+	// 惰性/低トルク時は横判定を強制クリアする
+	bool latCoastHardClear = (!calibrateMotorCurrent)
+			&& (pwmSumF < SLIP_PWM_COAST_MAX)
+			&& (iSumF < SLIP_ISUM_COAST_MAX);
 
 	// 低加速度では見ない（縦/横の誤検出抑制）
 	if (accMag < 0.8f) {
@@ -1226,13 +1249,30 @@ void updateSlipDetection(void)
 		slipHighCountLat = 0;
 		// フィルタ値は0へ収束させる（縦/横）
 		slipIndicatorRaw += SLIP_LPF_COEF * (0.0f - slipIndicatorRaw);
-		slipIndicatorFiltered += SLIP_LPF_COEF * (0.0f - slipIndicatorFiltered);
+		if (latCoastHardClear) {
+			// 惰性時は横指標を強制的にクリアして誤検知を抑制
+			slipIndicatorFiltered += SLIP_LAT_CLEAR_COEF * (0.0f - slipIndicatorFiltered);
+			slipHighCountLat = 0;
+			slipLowCountLat = 0;
+			slipFlagLat = false;
+		} else {
+			slipIndicatorFiltered += SLIP_LPF_COEF * (0.0f - slipIndicatorFiltered);
+		}
 	} else {
 		// 縦スリップ指標（absDxをLPF）
 		slipIndicatorRaw += SLIP_LPF_COEF * (absDx - slipIndicatorRaw);
 		// 横スリップ指標（absDyをLPF、slipRatio相当）
-		if (latEnabled) {
+		if (latCoastHardClear) {
+			// 惰性時は横指標を強制的にクリアして誤検知を抑制
+			slipIndicatorFiltered += SLIP_LAT_CLEAR_COEF * (0.0f - slipIndicatorFiltered);
+			slipHighCountLat = 0;
+			slipLowCountLat = 0;
+			slipFlagLat = false;
+		} else if (latCountEnabled) {
 			slipIndicatorFiltered += SLIP_LPF_COEF * (absDy - slipIndicatorFiltered);
+		} else if (latEnabled) {
+			// 旋回中だがPWMが小さい区間は0へ収束させる
+			slipIndicatorFiltered += SLIP_LPF_COEF * (0.0f - slipIndicatorFiltered);
 		} else {
 			slipIndicatorFiltered += SLIP_LPF_COEF * (0.0f - slipIndicatorFiltered);
 		}
@@ -1281,7 +1321,7 @@ void updateSlipDetection(void)
     float slipLatHigh = SLIP_LAT_HIGH * curScale;
     float slipLatLow  = SLIP_LAT_LOW  * curScale;
     if (!slipFlagLat) {
-        if (latEnabled && slipIndicatorFiltered > slipLatHigh) {
+        if (latCountEnabled && slipIndicatorFiltered > slipLatHigh) {
 			if (++slipHighCountLat >= SLIP_HIGH_COUNT_REQ) {
 				slipFlagLat = true;
 				slipHighCountLat = 0;
@@ -1291,7 +1331,7 @@ void updateSlipDetection(void)
 		}
 		slipLowCountLat = 0;
 	} else {
-		if (!latEnabled || slipIndicatorFiltered < slipLatLow) {
+		if (!latEnabled || pwmSumF <= SLIP_PWM_LAT_COUNT_MIN || slipIndicatorFiltered < slipLatLow) {
 			if (++slipLowCountLat >= SLIP_LOW_COUNT_REQ) {
 				slipFlagLat = false;
 				slipLowCountLat = 0;
