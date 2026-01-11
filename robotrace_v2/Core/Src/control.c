@@ -1015,19 +1015,23 @@ static void updateHysFlag(bool *flag, uint16_t *highCount, uint16_t *lowCount,
 {
 	// ヒステリシス判定（縦スリップ等の汎用）
 	if (!*flag) {
+		*lowCount = 0; // ★追加：OFF中は解除側カウントを必ず0に
 		if (value > highTh) {
 			if (++(*highCount) >= highReq) {
 				*flag = true;
 				*highCount = 0;
+				*lowCount  = 0; // ★追加：ON遷移時も念のため
 			}
 		} else {
 			*highCount = 0;
 		}
 	} else {
+		*highCount = 0; // ★追加：ON中はON側カウントを必ず0に
 		if (value < lowTh) {
 			if (++(*lowCount) >= lowReq) {
 				*flag = false;
 				*lowCount = 0;
+				*highCount = 0; // ★追加：OFF遷移時も念のため
 			}
 		} else {
 			*lowCount = 0;
