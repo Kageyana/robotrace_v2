@@ -66,6 +66,25 @@ static bool slipFlag = false;							// 縦スリップ判定フラグ（slipFlag
 static bool slipFlagLat = false;						// 横スリップ判定フラグ
 static float slipThresholdHigh;							// スリップ検出高閾値
 static float slipThresholdLow;							// スリップ検出低閾値
+// スリップ検出用の内部状態（RAM節約のためSLIP_CUR_ENABLEでメンバ切り替え）
+typedef struct {
+	bool prevRunning;
+	bool prevMoving;
+	float axBias;
+	float ayBias;
+	float imuAxF;
+	float imuAyF;
+	float encAxF;
+	float encAyF;
+	bool turningState;
+	bool slipPrimed;
+#if SLIP_CUR_ENABLE
+	float pwmSumF;
+	float iSumF;
+#endif
+} SlipDetState;
+
+static SlipDetState slipDetState = {0};
 // タイマ関連
 uint32_t cntRun = 0;
 int16_t countdown;
@@ -954,6 +973,158 @@ void getADC2(void)
 	getSwitchAD(analogVal2[3]);
 }
 ///////////////////////////////////////////////////////////////////////////
+// モジュール名 lpf1
+// 処理概要     1次LPF
+// 引数         current: 現在値, input: 入力, coef: LPF係数
+// 戻り値       更新後の値
+///////////////////////////////////////////////////////////////////////////
+static float lpf1(float current, float input, float coef)
+{
+	return current + coef * (input - current);
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 updateTurningHysteresis
+// 処理概要     旋回状態のヒステリシス更新
+// 引数         st: スリップ検出状態, absWz: yaw角速度絶対値
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+static void updateTurningHysteresis(SlipDetState *st, float absWz)
+{
+	// ヒステリシスによる旋回状態更新
+	if (!st->turningState) {
+		if (absWz > SLIP_GYRO_ON_RADS) {
+			st->turningState = true;
+		}
+	} else {
+		if (absWz < SLIP_GYRO_OFF_RADS) {
+			st->turningState = false;
+		}
+	}
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 updateHysFlag
+// 処理概要     ヒステリシス付きフラグ更新
+// 引数         flag: 対象フラグ, highCount/lowCount: 連続カウンタ
+//              value: 判定値, highTh/lowTh: 閾値
+//              highReq/lowReq: 連続回数
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+static void updateHysFlag(bool *flag, uint16_t *highCount, uint16_t *lowCount,
+	float value, float highTh, float lowTh,
+	uint16_t highReq, uint16_t lowReq)
+{
+	// ヒステリシス判定（縦スリップ等の汎用）
+	if (!*flag) {
+		if (value > highTh) {
+			if (++(*highCount) >= highReq) {
+				*flag = true;
+				*highCount = 0;
+			}
+		} else {
+			*highCount = 0;
+		}
+	} else {
+		if (value < lowTh) {
+			if (++(*lowCount) >= lowReq) {
+				*flag = false;
+				*lowCount = 0;
+			}
+		} else {
+			*lowCount = 0;
+		}
+	}
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 slipResetAll
+// 処理概要     スリップ検出の内部状態をリセット
+// 引数         st: スリップ検出状態
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+static void slipResetAll(SlipDetState *st)
+{
+	// 主要指標/カウンタを初期化
+	slipDeltaImu = 0.0f;
+	slipDeltaEnc = 0.0f;
+	slipIndicatorRaw = 0.0f;
+	slipIndicatorFiltered = 0.0f;
+	slipHighCount = 0;
+	slipLowCount = 0;
+	slipHighCountLat = 0;
+	slipLowCountLat = 0;
+	slipFlag = false;
+	slipFlagLat = false;
+	st->slipPrimed = false;
+	st->turningState = false;
+#if SLIP_CUR_ENABLE
+	// PWM/電流LPFのリセット
+	st->pwmSumF = 0.0f;
+	st->iSumF = 0.0f;
+#endif
+
+	// 微分・フィルタ系リセット
+	st->axBias = 0.0f;
+	st->ayBias = 0.0f;
+	st->imuAxF = 0.0f;
+	st->imuAyF = 0.0f;
+	st->encAxF = 0.0f;
+	st->encAyF = 0.0f;
+
+	// 既存バッファをクリア
+	for (uint16_t i = 0; i < SLIP_WINDOW_SAMPLES; i++) {
+		slipEncSpeedHist[i] = 0.0f;
+	}
+	slipBufIndex = 0;
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 slipPrimeSpeedHist
+// 処理概要     リングバッファと各種LPFを初期化
+// 引数         st: スリップ検出状態, encSpeed: 現在速度
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+static void slipPrimeSpeedHist(SlipDetState *st, float encSpeed)
+{
+	// バッファ初期化（0ではなく現在値で埋める）
+	for (uint16_t i = 0; i < SLIP_WINDOW_SAMPLES; i++) {
+		slipEncSpeedHist[i] = encSpeed;
+	}
+	slipBufIndex = 0;
+
+	// フィルタ初期化
+	st->imuAxF = 0.0f;
+	st->imuAyF = 0.0f;
+	st->encAxF = 0.0f;
+	st->encAyF = 0.0f;
+
+	// 指標初期化
+	slipIndicatorRaw = 0.0f;
+	slipIndicatorFiltered = 0.0f;
+	slipHighCount = 0;
+	slipLowCount = 0;
+	slipHighCountLat = 0;
+	slipLowCountLat = 0;
+	slipDeltaImu = 0.0f;
+	slipDeltaEnc = 0.0f;
+	slipFlag = false;
+	slipFlagLat = false;
+
+	float ax0 = BMI088val.accele.y * 9.81f;
+	float ay0 = BMI088val.accele.x * 9.81f;
+	st->axBias = ax0;
+	st->ayBias = ay0;
+	float wz0 = BMI088val.gyro.z * DEG2RAD;
+	st->turningState = (fabsf(wz0) > SLIP_GYRO_ON_RADS);
+
+#if SLIP_CUR_ENABLE
+	// PWM/電流LPF初期化（開始直後のゲート鈍化を防止）
+	float pwmSum = fabsf((float)motorpwmL) + fabsf((float)motorpwmR);
+	float iSum = fabsf(motorCurrentL) + fabsf(motorCurrentR);
+	st->pwmSumF = pwmSum;
+	st->iSumF = iSum;
+#endif
+
+	st->slipPrimed = true;
+}
+///////////////////////////////////////////////////////////////////////////
 // モジュール名 updateSlipDetection
 // 処理概要     時間窓でΔv_encとΔv_imuを比率化し、ヒステリシス付きでスリップ判定する
 // 引数         なし
@@ -966,24 +1137,8 @@ void updateSlipDetection(void)
 		return;
 	}
 
-	// ---- 状態遷移検出用 ----
-	static bool prevRunning = false;
-	static bool prevMoving  = false;
-
-	// ---- IMUバイアス推定（DC成分除去）----
-	static float axBias = 0.0f;
-	static float ayBias = 0.0f;
-
-	// ---- 信号LPF（ノイズ低減）----
-	static float imuAxF = 0.0f, imuAyF = 0.0f;
-	static float encAxF = 0.0f, encAyF = 0.0f;
-	// ---- PWM/電流の簡易LPF（惰性判定用）----
-	static float pwmSumF = 0.0f;
-	static float iSumF = 0.0f;
-
-	// ---- 旋回状態検出 ----
-	static bool turningState = false;
-	static bool slipPrimed = false;
+	// ---- 状態管理 ----
+	SlipDetState *st = &slipDetState;
 
 	// patternTrace=11(走行開始)でもスリップ検出を行う
 	bool running = (patternTrace >= 11 && patternTrace < 100);
@@ -992,39 +1147,15 @@ void updateSlipDetection(void)
 	// 走行外：遷移時だけリセット
 	//==========================================================
 	if (!running) {
-		if (prevRunning) {
-			slipDeltaImu = 0.0f;
-			slipDeltaEnc = 0.0f;
-			slipIndicatorRaw = 0.0f;
-			slipIndicatorFiltered = 0.0f;
-			slipHighCount = 0;
-			slipLowCount = 0;
-			slipHighCountLat = 0;
-			slipLowCountLat = 0;
-			slipPrimed = false;
-			turningState = false;
-			slipFlag = false;
-			slipFlagLat = false;
-			// ---- PWM/電流LPFリセット ----
-			pwmSumF = 0.0f;
-			iSumF = 0.0f;
-
-			// 微分・フィルタ系リセット
-			axBias = ayBias = 0.0f;
-			imuAxF = imuAyF = 0.0f;
-			encAxF = encAyF = 0.0f;
-
-			// 既存バッファがあるなら一応クリア（使わなくてもOK）
-			for (uint16_t i = 0; i < SLIP_WINDOW_SAMPLES; i++) {
-				slipEncSpeedHist[i] = 0.0f;
-			}
-			slipBufIndex = 0;
+		if (st->prevRunning) {
+			// 走行終了時の全リセット
+			slipResetAll(st);
 		}
-		prevRunning = false;
-		prevMoving  = false;
+		st->prevRunning = false;
+		st->prevMoving  = false;
 		return;
 	}
-	prevRunning = true;
+	st->prevRunning = true;
 
 	// ---- エンコーダ速度 ----
 	float encSpeed = (float)encCurrentN / PALSE_MILLIMETER;
@@ -1034,95 +1165,38 @@ void updateSlipDetection(void)
 	//==========================================================
 	if (fabsf(encSpeed) < SLIP_SPEED_SKIP_MPS) {
 
-		if (prevMoving) {
-			axBias = ayBias = 0.0f;
-			imuAxF = imuAyF = 0.0f;
-			encAxF = encAyF = 0.0f;
-
-			slipDeltaImu = 0.0f;
-			slipDeltaEnc = 0.0f;
-			slipIndicatorRaw = 0.0f;
-			slipIndicatorFiltered = 0.0f;
-			slipHighCount = 0;
-			slipLowCount = 0;
-			slipHighCountLat = 0;
-			slipLowCountLat = 0;
-			slipPrimed = false;
-			turningState = false;
-			slipFlag = false;
-			slipFlagLat = false;
-			// ---- PWM/電流LPFリセット ----
-			pwmSumF = 0.0f;
-			iSumF = 0.0f;
-
-			for (uint16_t i = 0; i < SLIP_WINDOW_SAMPLES; i++) {
-				slipEncSpeedHist[i] = 0.0f;
-			}
-			slipBufIndex = 0;
+		if (st->prevMoving) {
+			// 低速遷移時の全リセット
+			slipResetAll(st);
 		}
 
-		prevMoving = false;
+		st->prevMoving = false;
 
 		float ax = BMI088val.accele.y * 9.81f;
 		float ay = BMI088val.accele.x * 9.81f;
 		float wz = BMI088val.gyro.z * DEG2RAD;
 		float absWz = fabsf(wz);
-		if (!turningState) {
-			if (absWz > SLIP_GYRO_ON_RADS) turningState = true;
-		} else {
-			if (absWz < SLIP_GYRO_OFF_RADS) turningState = false;
-		}
+		updateTurningHysteresis(st, absWz);
 		// 旋回していない時だけバイアス更新(横Gの影響を受けないようにするため)
-		if (!turningState) {
-			axBias += SLIP_ACC_BIAS_COEF * (ax - axBias);
-			ayBias += SLIP_ACC_BIAS_COEF * (ay - ayBias);
+		if (!st->turningState) {
+			st->axBias = lpf1(st->axBias, ax, SLIP_ACC_BIAS_COEF);
+			st->ayBias = lpf1(st->ayBias, ay, SLIP_ACC_BIAS_COEF);
 		}
 
 		// ログ残差は停止中に残らないようゼロ化
 		slipDeltaEnc = 0.0f;
 		slipDeltaImu = 0.0f;
 		// フィルタ値だけはゼロへ軽く収束
-		slipIndicatorRaw += SLIP_LPF_COEF * (0.0f - slipIndicatorRaw);
-		slipIndicatorFiltered += SLIP_LPF_COEF * (0.0f - slipIndicatorFiltered);
+		slipIndicatorRaw = lpf1(slipIndicatorRaw, 0.0f, SLIP_LPF_COEF);
+		slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF);
 		return;
 	}
-	prevMoving = true;
+	st->prevMoving = true;
 
 	// リングバッファ初期化スパイク対策
-	if (!slipPrimed) {
-		for (uint16_t i=0; i<SLIP_WINDOW_SAMPLES; i++) {
-			slipEncSpeedHist[i] = encSpeed;   // 0じゃなく現在値で埋める
-		}
-		slipBufIndex = 0;
-
-		// フィルタも初期化（必要なら）
-		imuAxF = imuAyF = 0.0f;
-		encAxF = encAyF = 0.0f;
-
-		// 指標もリセット
-		slipIndicatorRaw = 0.0f;
-		slipIndicatorFiltered = 0.0f;
-		slipHighCount = slipLowCount = 0;
-		slipHighCountLat = slipLowCountLat = 0;
-		slipDeltaImu = 0.0f;
-		slipDeltaEnc = 0.0f;
-		slipFlag = false;
-		slipFlagLat = false;
-
-		float ax0 = BMI088val.accele.y * 9.81f;
-		float ay0 = BMI088val.accele.x * 9.81f;
-		axBias = ax0;
-		ayBias = ay0;
-		float wz0 = BMI088val.gyro.z * DEG2RAD;
-		turningState = (fabsf(wz0) > SLIP_GYRO_ON_RADS);
-
-		// ---- PWM/電流LPF初期化（開始直後のゲート鈍化を防止）----
-		float pwmSum = fabsf((float)motorpwmL) + fabsf((float)motorpwmR);
-		float iSum = fabsf(motorCurrentL) + fabsf(motorCurrentR);
-		pwmSumF = pwmSum;
-		iSumF = iSum;
-
-		slipPrimed = true;
+	if (!st->slipPrimed) {
+		// 開始直後のバッファ初期化
+		slipPrimeSpeedHist(st, encSpeed);
 		return; // 初回は判定しない
 	}
 
@@ -1154,76 +1228,82 @@ void updateSlipDetection(void)
 	// IMUのDC成分（バイアス/傾き由来の重力漏れ等）を除去
 	//==========================================================
 	// 旋回していない時だけバイアス更新(横Gの影響を受けないようにするため)
-	if (!turningState) {
-		if (fabsf(wz) > SLIP_GYRO_ON_RADS) turningState = true;
+	updateTurningHysteresis(st, fabsf(wz));
+	if (!st->turningState) {
+		st->axBias = lpf1(st->axBias, ax, SLIP_ACC_BIAS_COEF);
+		st->ayBias = lpf1(st->ayBias, ay, SLIP_ACC_BIAS_COEF);
 	}
-	else
-	{
-		if (fabsf(wz) < SLIP_GYRO_OFF_RADS) turningState = false;
-	}
-	if (!turningState) {
-		axBias += SLIP_ACC_BIAS_COEF * (ax - axBias);
-		ayBias += SLIP_ACC_BIAS_COEF * (ay - ayBias);
-	}
-	float imuAx = ax - axBias;
-	float imuAy = ay - ayBias;
+	float imuAx = ax - st->axBias;
+	float imuAy = ay - st->ayBias;
 
 	//==========================================================
 	// ノイズ低減LPF
 	//==========================================================
-	imuAxF += SLIP_ACC_LPF_COEF * (imuAx - imuAxF);
-	imuAyF += SLIP_ACC_LPF_COEF * (imuAy - imuAyF);
-	encAxF += SLIP_ACC_LPF_COEF * (encAx - encAxF);
-	encAyF += SLIP_ACC_LPF_COEF * (encAy - encAyF);
+	st->imuAxF = lpf1(st->imuAxF, imuAx, SLIP_ACC_LPF_COEF);
+	st->imuAyF = lpf1(st->imuAyF, imuAy, SLIP_ACC_LPF_COEF);
+	st->encAxF = lpf1(st->encAxF, encAx, SLIP_ACC_LPF_COEF);
+	st->encAyF = lpf1(st->encAyF, encAy, SLIP_ACC_LPF_COEF);
 
 	//==========================================================
 	// 縦・横残差（判定/ログ用）
 	//==========================================================
-	float dx = encAxF - imuAxF;	// 縦方向(前後)残差
-	float dy = encAyF - imuAyF;	// 横方向(左右)残差
+	float dx = st->encAxF - st->imuAxF;	// 縦方向(前後)残差
+	float dy = st->encAyF - st->imuAyF;	// 横方向(左右)残差
 	float absDx = fabsf(dx);
 	float absDy = fabsf(dy);
 
 	//==========================================================
 	// PWM/電流の合計（惰性/低トルク判定用）
 	//==========================================================
+#if SLIP_CUR_ENABLE
+	// PWM/電流のLPF更新（SLIP_CUR_ENABLE=1のみ）
 	float pwmSum = fabsf((float)motorpwmL) + fabsf((float)motorpwmR);
 	float iSum = fabsf(motorCurrentL) + fabsf(motorCurrentR);
-	pwmSumF += SLIP_PWM_LPF_COEF * (pwmSum - pwmSumF);
-	iSumF += SLIP_CUR_LPF_COEF * (iSum - iSumF);
+	st->pwmSumF = lpf1(st->pwmSumF, pwmSum, SLIP_PWM_LPF_COEF);
+	st->iSumF = lpf1(st->iSumF, iSum, SLIP_CUR_LPF_COEF);
+#endif
 
 #if SLIP_CUR_ENABLE
 	//==========================================================
-    // モータ電流によるノイズ補正スケール
+	// モータ電流によるノイズ補正スケール
 	//==========================================================
-    float curScale = 1.0f;
-    if (!calibrateMotorCurrent && (iSumF > SLIP_CUR_MIN_A)) {
-        float dI = iSumF - SLIP_CUR_BASE_A;
-        if (dI > 0.0f) {
-            curScale = 1.0f + SLIP_CUR_K * dI;
-            if (curScale > SLIP_CUR_MAX_SCALE) curScale = SLIP_CUR_MAX_SCALE;
-        }
-    }
+	float curScale = 1.0f;
+	if (!calibrateMotorCurrent && (st->iSumF > SLIP_CUR_MIN_A)) {
+		float dI = st->iSumF - SLIP_CUR_BASE_A;
+		if (dI > 0.0f) {
+			curScale = 1.0f + SLIP_CUR_K * dI;
+			if (curScale > SLIP_CUR_MAX_SCALE) {
+				curScale = SLIP_CUR_MAX_SCALE;
+			}
+		}
+	}
 #else
-    float curScale = 1.0f;
+	// SLIP_CUR_ENABLE=0では電流スケールを固定
+	float curScale = 1.0f;
 #endif
 
 	//==========================================================
 	// 低加速度ゲート（誤検出抑制）
 	//==========================================================
 	float accMag = fmaxf(
-		fmaxf(fabsf(encAxF), fabsf(encAyF)),
-		fmaxf(fabsf(imuAxF), fabsf(imuAyF))
+		fmaxf(fabsf(st->encAxF), fabsf(st->encAyF)),
+		fmaxf(fabsf(st->imuAxF), fabsf(st->imuAyF))
 	);
 
 	// 横スリップ判定の有効化条件（直進ノイズ抑制）
-	bool latEnabled = turningState && (fabsf(encAyF) > SLIP_LAT_ENCAY_MIN);
+	bool latEnabled = st->turningState && (fabsf(st->encAyF) > SLIP_LAT_ENCAY_MIN);
 	// 横判定のカウントを許可する条件（PWMが小さい区間は止める）
-	bool latCountEnabled = latEnabled && (pwmSumF > SLIP_PWM_LAT_COUNT_MIN);
+#if SLIP_CUR_ENABLE
+	bool latCountEnabled = latEnabled && (st->pwmSumF > SLIP_PWM_LAT_COUNT_MIN);
 	// 惰性/低トルク時は横判定を強制クリアする
 	bool latCoastHardClear = (!calibrateMotorCurrent)
-			&& (pwmSumF < SLIP_PWM_COAST_MAX)
-			&& (iSumF < SLIP_ISUM_COAST_MAX);
+			&& (st->pwmSumF < SLIP_PWM_COAST_MAX)
+			&& (st->iSumF < SLIP_ISUM_COAST_MAX);
+#else
+	// SLIP_CUR_ENABLE=0ではPWM/電流ゲートを使わない
+	bool latCountEnabled = latEnabled;
+	bool latCoastHardClear = false;
+#endif
 
 	// 低加速度では見ない（縦/横の誤検出抑制）
 	if (accMag < 0.8f) {
@@ -1235,33 +1315,33 @@ void updateSlipDetection(void)
 		// 解除カウントは維持して張り付き防止
 		slipHighCountLat = 0;
 		// フィルタ値は0へ収束させる（縦/横）
-		slipIndicatorRaw += SLIP_LPF_COEF * (0.0f - slipIndicatorRaw);
+		slipIndicatorRaw = lpf1(slipIndicatorRaw, 0.0f, SLIP_LPF_COEF);
 		if (latCoastHardClear) {
 			// 惰性時は横指標を強制的にクリアして誤検知を抑制
-			slipIndicatorFiltered += SLIP_LAT_CLEAR_COEF * (0.0f - slipIndicatorFiltered);
+			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LAT_CLEAR_COEF);
 			slipHighCountLat = 0;
 			slipLowCountLat = 0;
 			slipFlagLat = false;
 		} else {
-			slipIndicatorFiltered += SLIP_LPF_COEF * (0.0f - slipIndicatorFiltered);
+			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF);
 		}
 	} else {
 		// 縦スリップ指標（absDxをLPF）
-		slipIndicatorRaw += SLIP_LPF_COEF * (absDx - slipIndicatorRaw);
+		slipIndicatorRaw = lpf1(slipIndicatorRaw, absDx, SLIP_LPF_COEF);
 		// 横スリップ指標（absDyをLPF、slipRatio相当）
 		if (latCoastHardClear) {
 			// 惰性時は横指標を強制的にクリアして誤検知を抑制
-			slipIndicatorFiltered += SLIP_LAT_CLEAR_COEF * (0.0f - slipIndicatorFiltered);
+			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LAT_CLEAR_COEF);
 			slipHighCountLat = 0;
 			slipLowCountLat = 0;
 			slipFlagLat = false;
 		} else if (latCountEnabled) {
-			slipIndicatorFiltered += SLIP_LPF_COEF * (absDy - slipIndicatorFiltered);
+			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, absDy, SLIP_LPF_COEF);
 		} else if (latEnabled) {
 			// 旋回中だがPWMが小さい区間は0へ収束させる
-			slipIndicatorFiltered += SLIP_LPF_COEF * (0.0f - slipIndicatorFiltered);
+			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF);
 		} else {
-			slipIndicatorFiltered += SLIP_LPF_COEF * (0.0f - slipIndicatorFiltered);
+			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF);
 		}
 	}
 
@@ -1275,40 +1355,24 @@ void updateSlipDetection(void)
 	slipThresholdHigh = SLIP_MISMATCH_HIGH;
 	slipThresholdLow= SLIP_MISMATCH_LOW;
 
-	if (turningState) {
+	if (st->turningState) {
 		slipThresholdHigh *= SLIP_MISMATCH_HIGH_TURN;
 		slipThresholdLow  *= SLIP_MISMATCH_LOW_TURN;
 	}
-    // 電流が大きい（=振動/ノイズが増えやすい）ときは閾値を少し上げて誤検知を抑える
-    slipThresholdHigh *= curScale;
-    slipThresholdLow  *= curScale;
+	// 電流が大きい（=振動/ノイズが増えやすい）ときは閾値を少し上げて誤検知を抑える
+	slipThresholdHigh *= curScale;
+	slipThresholdLow  *= curScale;
 
 	// ---- 縦スリップ ヒステリシス判定（absDxのみ）----
-	if (!slipFlag) {
-		if (slipIndicatorRaw > slipThresholdHigh) {
-			if (++slipHighCount >= SLIP_HIGH_COUNT_REQ) {
-				slipFlag = true;
-				slipHighCount = 0;
-			}
-		} else {
-			slipHighCount = 0;
-		}
-	} else {
-		if (slipIndicatorRaw < slipThresholdLow) {
-			if (++slipLowCount >= SLIP_LOW_COUNT_REQ) {
-				slipFlag = false;
-				slipLowCount = 0;
-			}
-		} else {
-			slipLowCount = 0;
-		}
-	}
+	updateHysFlag(&slipFlag, &slipHighCount, &slipLowCount,
+		slipIndicatorRaw, slipThresholdHigh, slipThresholdLow,
+		SLIP_HIGH_COUNT_REQ, SLIP_LOW_COUNT_REQ);
 
 	// ---- 横スリップ判定（旋回中のみ）----
-    float slipLatHigh = SLIP_LAT_HIGH * curScale;
-    float slipLatLow  = SLIP_LAT_LOW  * curScale;
-    if (!slipFlagLat) {
-        if (latCountEnabled && slipIndicatorFiltered > slipLatHigh) {
+	float slipLatHigh = SLIP_LAT_HIGH * curScale;
+	float slipLatLow  = SLIP_LAT_LOW  * curScale;
+	if (!slipFlagLat) {
+		if (latCountEnabled && slipIndicatorFiltered > slipLatHigh) {
 			if (++slipHighCountLat >= SLIP_HIGH_COUNT_REQ) {
 				slipFlagLat = true;
 				slipHighCountLat = 0;
@@ -1318,7 +1382,11 @@ void updateSlipDetection(void)
 		}
 		slipLowCountLat = 0;
 	} else {
-		if (!latEnabled || pwmSumF <= SLIP_PWM_LAT_COUNT_MIN || slipIndicatorFiltered < slipLatLow) {
+#if SLIP_CUR_ENABLE
+		if (!latEnabled || st->pwmSumF <= SLIP_PWM_LAT_COUNT_MIN || slipIndicatorFiltered < slipLatLow) {
+#else
+		if (!latEnabled || slipIndicatorFiltered < slipLatLow) {
+#endif
 			if (++slipLowCountLat >= SLIP_LOW_COUNT_REQ) {
 				slipFlagLat = false;
 				slipLowCountLat = 0;
