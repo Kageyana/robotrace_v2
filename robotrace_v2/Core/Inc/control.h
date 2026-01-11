@@ -54,6 +54,12 @@
 #define SLIP_LAT_LOW			4.5f   // [m/s^2] 横滑りOFF（ヒステリシス）
 // 横滑り判定を有効にする最小横G（小さい旋回やノイズで反応しないため）
 #define SLIP_LAT_ENCAY_MIN		3.0f   // [m/s^2]
+// 横滑りの誤検知抑制用（PWM/電流で惰性を判定）
+#define SLIP_PWM_LAT_COUNT_MIN	150.0f // 横追従・カウントを許可する最低PWM合計
+#define SLIP_PWM_COAST_MAX		150.0f // 惰性判定PWM合計
+#define SLIP_ISUM_COAST_MAX		0.12f  // 惰性判定電流合計[A]
+#define SLIP_LAT_CLEAR_COEF		0.10f  // 惰性時に横指標を0へ戻す係数（SLIP_LPF_COEFより強め）
+#define SLIP_PWM_LPF_COEF		0.02f  // PWM合計のLPF係数
 
 #define SLIP_CUR_ENABLE            1
 #define SLIP_CUR_LPF_COEF          0.02f   // 電流LPF（0〜1）
