@@ -978,9 +978,6 @@ void updateSlipDetection(void)
 	// ---- 信号LPF（ノイズ低減）----
 	static float imuAxF = 0.0f, imuAyF = 0.0f;
 	static float encAxF = 0.0f, encAyF = 0.0f;
-#if SLIP_CUR_ENABLE
-	static float motorCurMagF = 0.0f; // |IL|+|IR| のLPF
-#endif
 	// ---- PWM/電流の簡易LPF（惰性判定用）----
 	static float pwmSumF = 0.0f;
 	static float iSumF = 0.0f;
@@ -990,7 +987,7 @@ void updateSlipDetection(void)
 	static bool slipPrimed = false;
 
 	// patternTrace=11(走行開始)でもスリップ検出を行う
-	bool running = (patternTrace >= 12 && patternTrace < 100);
+	bool running = (patternTrace >= 11 && patternTrace < 100);
 
 	//==========================================================
 	// 走行外：遷移時だけリセット
@@ -1009,10 +1006,6 @@ void updateSlipDetection(void)
 			turningState = false;
 			slipFlag = false;
 			slipFlagLat = false;
-			// ---- 電流LPFリセット ----
-#if SLIP_CUR_ENABLE
-			motorCurMagF = 0.0f;
-#endif
 			// ---- PWM/電流LPFリセット ----
 			pwmSumF = 0.0f;
 			iSumF = 0.0f;
@@ -1059,10 +1052,6 @@ void updateSlipDetection(void)
 			turningState = false;
 			slipFlag = false;
 			slipFlagLat = false;
-			// ---- 電流LPFリセット ----
-#if SLIP_CUR_ENABLE
-			motorCurMagF = 0.0f;
-#endif
 			// ---- PWM/電流LPFリセット ----
 			pwmSumF = 0.0f;
 			iSumF = 0.0f;
@@ -1128,9 +1117,11 @@ void updateSlipDetection(void)
 		float wz0 = BMI088val.gyro.z * DEG2RAD;
 		turningState = (fabsf(wz0) > SLIP_GYRO_ON_RADS);
 
-		// ---- PWM/電流LPF初期化 ----
-		pwmSumF = 0.0f;
-		iSumF = 0.0f;
+		// ---- PWM/電流LPF初期化（開始直後のゲート鈍化を防止）----
+		float pwmSum = fabsf((float)motorpwmL) + fabsf((float)motorpwmR);
+		float iSum = fabsf(motorCurrentL) + fabsf(motorCurrentR);
+		pwmSumF = pwmSum;
+		iSumF = iSum;
 
 		slipPrimed = true;
 		return; // 初回は判定しない
@@ -1206,12 +1197,9 @@ void updateSlipDetection(void)
 	//==========================================================
     // モータ電流によるノイズ補正スケール
 	//==========================================================
-	float motorCurMag = fabsf(motorCurrentL) + fabsf(motorCurrentR);
-	motorCurMagF += SLIP_CUR_LPF_COEF * (motorCurMag - motorCurMagF);
-
     float curScale = 1.0f;
-    if (!calibrateMotorCurrent && (motorCurMagF > SLIP_CUR_MIN_A)) {
-        float dI = motorCurMagF - SLIP_CUR_BASE_A;
+    if (!calibrateMotorCurrent && (iSumF > SLIP_CUR_MIN_A)) {
+        float dI = iSumF - SLIP_CUR_BASE_A;
         if (dI > 0.0f) {
             curScale = 1.0f + SLIP_CUR_K * dI;
             if (curScale > SLIP_CUR_MAX_SCALE) curScale = SLIP_CUR_MAX_SCALE;
