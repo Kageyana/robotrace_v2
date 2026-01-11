@@ -1293,16 +1293,16 @@ void updateSlipDetection(void)
 	// 横スリップ判定の有効化条件（直進ノイズ抑制）
 	bool latEnabled = st->turningState && (fabsf(st->encAyF) > SLIP_LAT_ENCAY_MIN);
 	// 横判定のカウントを許可する条件（PWMが小さい区間は止める）
-#if SLIP_CUR_ENABLE
-	bool latCountEnabled = latEnabled && (st->pwmSumF > SLIP_PWM_LAT_COUNT_MIN);
-	// 惰性/低トルク時は横判定を強制クリアする
-	bool latCoastHardClear = (!calibrateMotorCurrent)
-			&& (st->pwmSumF < SLIP_PWM_COAST_MAX)
-			&& (st->iSumF < SLIP_ISUM_COAST_MAX);
-#else
-	// SLIP_CUR_ENABLE=0ではPWM/電流ゲートを使わない
+	// デフォルトはPWM/電流ゲートなしの条件
 	bool latCountEnabled = latEnabled;
 	bool latCoastHardClear = false;
+#if SLIP_CUR_ENABLE
+	// SLIP_CUR_ENABLE=1ではPWM/電流ゲートを適用
+	latCountEnabled = latEnabled && (st->pwmSumF > SLIP_PWM_LAT_COUNT_MIN);
+	// 惰性/低トルク時は横判定を強制クリアする
+	latCoastHardClear = (!calibrateMotorCurrent)
+			&& (st->pwmSumF < SLIP_PWM_COAST_MAX)
+			&& (st->iSumF < SLIP_ISUM_COAST_MAX);
 #endif
 
 	// 低加速度では見ない（縦/横の誤検出抑制）
