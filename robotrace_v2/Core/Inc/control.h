@@ -62,10 +62,10 @@
 #define SLIP_PWM_LPF_COEF		0.02f  // PWM合計のLPF係数
 
 #define SLIP_CUR_ENABLE            1
-#define SLIP_CUR_LPF_COEF          0.02f   // 電流LPF（0〜1）
+#define SLIP_CUR_LPF_COEF          0.05f   // 電流LPF（0〜1）
 #define SLIP_CUR_BASE_A            0.20f   // ここまでは補正しない基準電流[A]
-#define SLIP_CUR_K                 0.60f   // 補正ゲイン [1/A]
-#define SLIP_CUR_MAX_SCALE         1.60f   // 閾値スケール上限
+#define SLIP_CUR_K                 0.90f   // 補正ゲイン [1/A]
+#define SLIP_CUR_MAX_SCALE         1.80f   // 閾値スケール上限
 #define SLIP_CUR_MIN_A             0.05f   // ほぼ惰性/停止時は補正を無効化
 
 // ゴール
