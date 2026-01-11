@@ -59,6 +59,7 @@
 #define SLIP_PWM_COAST_MAX		150.0f // 惰性判定PWM合計
 #define SLIP_ISUM_COAST_MAX		0.12f  // 惰性判定電流合計[A]
 #define SLIP_LAT_CLEAR_COEF		0.10f  // 惰性時に横指標を0へ戻す係数（SLIP_LPF_COEFより強め）
+#define SLIP_PWM_LPF_COEF		0.02f  // PWM合計のLPF係数
 
 #define SLIP_CUR_ENABLE            1
 #define SLIP_CUR_LPF_COEF          0.02f   // 電流LPF（0〜1）

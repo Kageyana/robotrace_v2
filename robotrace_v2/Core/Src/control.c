@@ -4,7 +4,6 @@
 #include "control.h"
 #include "BMI088.h"
 #include "PIDcontrol.h"
-#include "BMI088.h"
 #include "motor.h"
 #include "fatfs.h"
 #include "battery.h"
@@ -1190,7 +1189,7 @@ void updateSlipDetection(void)
 	//==========================================================
 	float pwmSum = fabsf((float)motorpwmL) + fabsf((float)motorpwmR);
 	float iSum = fabsf(motorCurrentL) + fabsf(motorCurrentR);
-	pwmSumF += SLIP_CUR_LPF_COEF * (pwmSum - pwmSumF);
+	pwmSumF += SLIP_PWM_LPF_COEF * (pwmSum - pwmSumF);
 	iSumF += SLIP_CUR_LPF_COEF * (iSum - iSumF);
 
 #if SLIP_CUR_ENABLE
