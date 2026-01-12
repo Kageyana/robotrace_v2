@@ -154,5 +154,9 @@ bool getSlipFlag(void);
 bool getSlipFlagLat(void);
 float getSlipthresholdHigh(void);
 float getSlipthresholdLow(void);
+float Control_GetDistEncRaw_m(void);
+float Control_GetDistCorr_m(void);
+float Control_GetSlipDistScale(void);
+float Control_GetSlipDistScaleRaw(void);
 
 #endif // CONTROL_H_

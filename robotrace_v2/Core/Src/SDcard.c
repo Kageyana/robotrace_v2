@@ -188,6 +188,11 @@ void createLog(void)
 	setLogStr("slipFlagLat", "%d");
 	setLogStr("motorCurrentL", "%f");
 	setLogStr("motorCurrentR", "%f");
+	setLogStr("slipDistScaleRaw", "%f");
+	setLogStr("slipDistScaleF", "%f");
+	setLogStr("distEncRaw_m", "%f");
+	setLogStr("distCorr_m", "%f");
+	setLogStr("distSlipLoss_m", "%f");
 	setLogStr("x", "%f");
 	setLogStr("y", "%f");
 
@@ -511,10 +516,10 @@ void endLog(void)
 		uint32_t i;
 	} ftoi;
 
-	uint8_t logval8[15];
-	uint16_t logval16[15];
-	uint32_t logval32[15];
-	float logvalf[15];
+	uint8_t logval8[20];
+	uint16_t logval16[20];
+	uint32_t logval32[20];
+	float logvalf[20];
 
 	while (sendSD) // 溜まったバッファをすべて書き出す
 		writeLogPuts(); // 未処理バッファを書き込む
@@ -596,7 +601,7 @@ void endLog(void)
 			zg,
 			marker,
 			distance,
-			logvalf[8],		// ROC
+			logvalf[13],	// ROC
 
 			logval8[1],		// targetSpeed
 			logval16[2],	// optimalIndex
@@ -614,9 +619,14 @@ void endLog(void)
 			logval8[3],		// slipFlagLat
 			logvalf[6],		// motorCurrentL
 			logvalf[7],		// motorCurrentR
+			logvalf[8],		// slipDistScaleRaw
+			logvalf[9],		// slipDistScaleF
+			logvalf[10],	// distEncRaw_m
+			logvalf[11],	// distCorr_m
+			logvalf[12],	// distSlipLoss_m
 
-			logvalf[9],		// x
-			logvalf[10]		// y
+			logvalf[14],	// x
+			logvalf[15]		// y
 		);
 
 		// 文字列をSDカードに送信

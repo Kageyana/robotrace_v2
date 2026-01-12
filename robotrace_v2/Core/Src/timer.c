@@ -136,6 +136,11 @@ void Interrupt1ms(void)
 
 			if (modeLOG)
 			{
+				// 距離補正ログ用の値を取得
+				float distEncRaw_m = Control_GetDistEncRaw_m();
+				float distCorr_m = Control_GetDistCorr_m();
+				float distSlipLoss_m = distEncRaw_m - distCorr_m;
+
 				// CALCDISTANCEごとにログを保存
 #ifdef LOG_RUNNING_WRITE
 				writeLogBufferPuts(
@@ -166,7 +171,13 @@ void Interrupt1ms(void)
 					getSlipDeltaEnc(),
 					getSlipIndicatorFiltered(),	// slipRatioLat(LPF後)
 					motorCurrentL,
-					motorCurrentR
+					motorCurrentR,
+					// 距離補正ログ
+					Control_GetSlipDistScaleRaw(),
+					Control_GetSlipDistScale(),
+					distEncRaw_m,
+					distCorr_m,
+					distSlipLoss_m
 				);
 #else
 				writeLogBufferPrint(); // バッファにログを保存

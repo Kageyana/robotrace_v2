@@ -11,6 +11,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 //====================================//
+// スリップ距離補正パラメータ
+//====================================//
+#define SLIP_DIST_MIN_SCALE			0.60f	// 要調整
+#define SLIP_DIST_MIN_SCALE_LAT		0.70f	// 要調整
+#define SLIP_DIST_LPF_COEF_DOWN		0.20f	// 悪化追従
+#define SLIP_DIST_LPF_COEF_UP		0.05f	// 回復追従
+//====================================//
 // グローバル変数の宣言
 //====================================//
 // モード関連
@@ -66,6 +73,12 @@ static bool slipFlag = false;							// 縦スリップ判定フラグ（slipFlag
 static bool slipFlagLat = false;						// 横スリップ判定フラグ
 static float slipThresholdHigh;							// スリップ検出高閾値
 static float slipThresholdLow;							// スリップ検出低閾値
+// スリップ距離補正用の状態
+static float slipDistScaleRaw = 1.0f;					// 距離補正スケール（生）
+static float slipDistScaleF = 1.0f;						// 距離補正スケール（LPF後）
+static float distEncRaw_m = 0.0f;						// エンコーダ積算距離[m]（生）
+static float distCorr_m = 0.0f;							// 補正後距離[m]
+static float distSlipLoss_m = 0.0f;						// スリップ損失距離[m]
 // スリップ検出用の内部状態（RAM節約のためSLIP_CUR_ENABLEでメンバ切り替え）
 typedef struct {
 	bool prevRunning;
@@ -1080,6 +1093,41 @@ static void slipResetAll(SlipDetState *st)
 	slipBufIndex = 0;
 }
 ///////////////////////////////////////////////////////////////////////////
+// モジュール名 slipDistReset
+// 処理概要     距離補正の内部状態をリセット
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+static void slipDistReset(void)
+{
+	// 距離補正スケールと積算距離を初期化
+	slipDistScaleRaw = 1.0f;
+	slipDistScaleF = 1.0f;
+	distEncRaw_m = 0.0f;
+	distCorr_m = 0.0f;
+	distSlipLoss_m = 0.0f;
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 slipDistUpdate
+// 処理概要     距離補正スケールのLPF更新と距離積算
+// 引数         rawScale: 距離補正スケール（生）
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+static void slipDistUpdate(float rawScale)
+{
+	// 距離補正スケールをLPFで平滑化（悪化は速く/回復は遅く）
+	float coef = (rawScale < slipDistScaleF) ? SLIP_DIST_LPF_COEF_DOWN : SLIP_DIST_LPF_COEF_UP;
+	slipDistScaleF = lpf1(slipDistScaleF, rawScale, coef);
+
+	// 1msごとの距離を積算
+	float dEnc_m = (float)encCurrentN / (float)PALSE_METER;
+	distEncRaw_m += dEnc_m;
+
+	float dCorr_m = dEnc_m * slipDistScaleF;
+	distCorr_m += dCorr_m;
+	distSlipLoss_m += (dEnc_m - dCorr_m);
+}
+///////////////////////////////////////////////////////////////////////////
 // モジュール名 slipPrimeSpeedHist
 // 処理概要     リングバッファと各種LPFを初期化
 // 引数         st: スリップ検出状態, encSpeed: 現在速度
@@ -1154,6 +1202,8 @@ void updateSlipDetection(void)
 		if (st->prevRunning) {
 			// 走行終了時の全リセット
 			slipResetAll(st);
+			// 距離補正の状態もリセット
+			slipDistReset();
 		}
 		st->prevRunning = false;
 		st->prevMoving  = false;
@@ -1193,6 +1243,9 @@ void updateSlipDetection(void)
 		// フィルタ値だけはゼロへ軽く収束
 		slipIndicatorRaw = lpf1(slipIndicatorRaw, 0.0f, SLIP_LPF_COEF);
 		slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF);
+		// 低速スキップ領域では距離補正スケールを1.0へ寄せる
+		slipDistScaleRaw = 1.0f;
+		slipDistUpdate(slipDistScaleRaw);
 		return;
 	}
 	st->prevMoving = true;
@@ -1201,6 +1254,9 @@ void updateSlipDetection(void)
 	if (!st->slipPrimed) {
 		// 開始直後のバッファ初期化
 		slipPrimeSpeedHist(st, encSpeed);
+		// 初回は距離補正スケールを1.0で積算
+		slipDistScaleRaw = 1.0f;
+		slipDistUpdate(slipDistScaleRaw);
 		return; // 初回は判定しない
 	}
 
@@ -1399,6 +1455,32 @@ void updateSlipDetection(void)
 			slipLowCountLat = 0;
 		}
 	}
+
+	//==========================================================
+	// 距離補正スケール算出（既存指標と閾値のみ使用）
+	//==========================================================
+	float scaleLong = 1.0f;
+	float scaleLat = 1.0f;
+
+	if (slipThresholdHigh > slipThresholdLow) {
+		float sevLong = (slipIndicatorRaw - slipThresholdLow) / (slipThresholdHigh - slipThresholdLow);
+		sevLong = fminf(fmaxf(sevLong, 0.0f), 1.0f);
+		scaleLong = 1.0f - sevLong * (1.0f - SLIP_DIST_MIN_SCALE);
+	}
+
+	if (latCountEnabled && (slipLatHigh > slipLatLow)) {
+		float sevLat = (slipIndicatorFiltered - slipLatLow) / (slipLatHigh - slipLatLow);
+		sevLat = fminf(fmaxf(sevLat, 0.0f), 1.0f);
+		scaleLat = 1.0f - sevLat * (1.0f - SLIP_DIST_MIN_SCALE_LAT);
+	}
+
+	// 縦/横のうち厳しい方を採用し、[MIN, 1]にクランプ
+	slipDistScaleRaw = fminf(scaleLong, scaleLat);
+	float minScale = fminf(SLIP_DIST_MIN_SCALE, SLIP_DIST_MIN_SCALE_LAT);
+	slipDistScaleRaw = fminf(fmaxf(slipDistScaleRaw, minScale), 1.0f);
+
+	// 距離補正スケールをLPFで更新し、距離を積算
+	slipDistUpdate(slipDistScaleRaw);
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名	getSlipDeltaImu
@@ -1437,6 +1519,22 @@ float getSlipthresholdHigh(void)
 float getSlipthresholdLow(void)
 {
 	return slipThresholdLow;
+}
+float Control_GetDistEncRaw_m(void)
+{
+	return distEncRaw_m;
+}
+float Control_GetDistCorr_m(void)
+{
+	return distCorr_m;
+}
+float Control_GetSlipDistScale(void)
+{
+	return slipDistScaleF;
+}
+float Control_GetSlipDistScaleRaw(void)
+{
+	return slipDistScaleRaw;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setEncoderVal
