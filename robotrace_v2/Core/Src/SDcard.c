@@ -13,7 +13,7 @@ FIL fil_W;
 FIL fil_R;
 
 // ログヘッダー
-char columnTitle[1024] = "", formatLog[256] = "";
+char columnTitle[2048] = "", formatLog[256] = "";
 
 // ログバッファ
 #ifdef LOG_RUNNING_WRITE

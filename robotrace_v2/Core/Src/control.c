@@ -13,10 +13,10 @@
 //====================================//
 // スリップ距離補正パラメータ
 //====================================//
-#define SLIP_DIST_MIN_SCALE			0.60f	// 要調整
-#define SLIP_DIST_MIN_SCALE_LAT		0.70f	// 要調整
-#define SLIP_DIST_LPF_COEF_DOWN		0.20f	// 悪化追従
-#define SLIP_DIST_LPF_COEF_UP		0.05f	// 回復追従
+#define SLIP_DIST_MIN_SCALE			0.6f	// 要調整
+#define SLIP_DIST_MIN_SCALE_LAT		0.7f	// 要調整
+#define SLIP_DIST_LPF_COEF_DOWN		0.2f	// 悪化追従
+#define SLIP_DIST_LPF_COEF_UP		0.09f	// 回復追従
 //====================================//
 // グローバル変数の宣言
 //====================================//
@@ -1575,7 +1575,7 @@ void writeTgtspeeds(void)
 	{
 		for (i = 0; i < sizeof(speedParam) / sizeof(float); i++)
 		{
-			strcat(format, "%03d,");
+			strcat(format, "%04d,");
 		}
 
 		f_printf(&fil, format, (int32_t)(round(tgtParam.search * 100)),
@@ -1623,8 +1623,8 @@ void readTgtspeeds(void)
 	{
 		for (i = 0; i < sizeof(speedParam) / sizeof(float); i++)
 		{
-			f_gets(paramStr, 5, &fil);			// 文字列取得 カンマ含む
-			sscanf(paramStr, "%d,", &param[i]); // 文字列→数値
+			f_gets(paramStr, 6, &fil);			// 文字列取得 カンマ含む
+			sscanf(paramStr, "%04d,", &param[i]); // 文字列→数値
 		}
 		i=0;
 		tgtParam.search = (float)param[i++] / 100;

@@ -18,7 +18,7 @@
 #define MAGPLSB 16.0F
 
 #define DEFF_TIME 0.001F
-#define COEFF_DPD -1.0F
+#define COEFF_DPD -0.996F
 #define COEFF_COMPFILTER 0.96F
 #define IMU_TRANSMIT true
 #define IMU_STOP false

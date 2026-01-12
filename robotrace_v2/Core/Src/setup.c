@@ -126,8 +126,8 @@ static const SpeedParamInfo speedParamTable[] = {
 	{"BST 300", &tgtParam.bst300, 0.1, 0.0, 10.0, "m/s"},
 	{"BST 200", &tgtParam.bst200, 0.1, 0.0, 10.0, "m/s"},
 	{"BST 100", &tgtParam.bst100, 0.1, 0.0, 10.0, "m/s"},
-	{"BST acceleF", &tgtParam.acceleF, 0.1, 0.0, 10.0, "m/ss"},
-	{"BST acceleD", &tgtParam.acceleD, 0.1, 0.0, 10.0, "m/ss"},
+	{"BST acceleF", &tgtParam.acceleF, 0.1, 0.0, 20.0, "m/ss"},
+	{"BST acceleD", &tgtParam.acceleD, 0.1, 0.0, 20.0, "m/ss"},
 	{"BST shortCut", &tgtParam.shortCut, 0.1, 0.0, 10.0, "m/s"}
 }; // 速度パラメータの対応テーブル
 ///////////////////////////////////////////////////////////////////////////////////////
