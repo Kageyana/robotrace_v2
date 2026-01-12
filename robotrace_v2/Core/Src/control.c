@@ -13,7 +13,6 @@
 //====================================//
 // スリップ距離補正パラメータ
 //====================================//
-#define SLIP_DIST_CORRECTION_ENABLE	1
 #define SLIP_DIST_MIN_SCALE			0.60f	// 要調整
 #define SLIP_DIST_MIN_SCALE_LAT		0.70f	// 要調整
 #define SLIP_DIST_LPF_COEF_DOWN		0.20f	// 悪化追従
@@ -1203,10 +1202,8 @@ void updateSlipDetection(void)
 		if (st->prevRunning) {
 			// 走行終了時の全リセット
 			slipResetAll(st);
-#if SLIP_DIST_CORRECTION_ENABLE
 			// 距離補正の状態もリセット
 			slipDistReset();
-#endif
 		}
 		st->prevRunning = false;
 		st->prevMoving  = false;
@@ -1246,11 +1243,9 @@ void updateSlipDetection(void)
 		// フィルタ値だけはゼロへ軽く収束
 		slipIndicatorRaw = lpf1(slipIndicatorRaw, 0.0f, SLIP_LPF_COEF);
 		slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF);
-#if SLIP_DIST_CORRECTION_ENABLE
 		// 低速スキップ領域では距離補正スケールを1.0へ寄せる
 		slipDistScaleRaw = 1.0f;
 		slipDistUpdate(slipDistScaleRaw);
-#endif
 		return;
 	}
 	st->prevMoving = true;
@@ -1259,11 +1254,9 @@ void updateSlipDetection(void)
 	if (!st->slipPrimed) {
 		// 開始直後のバッファ初期化
 		slipPrimeSpeedHist(st, encSpeed);
-#if SLIP_DIST_CORRECTION_ENABLE
 		// 初回は距離補正スケールを1.0で積算
 		slipDistScaleRaw = 1.0f;
 		slipDistUpdate(slipDistScaleRaw);
-#endif
 		return; // 初回は判定しない
 	}
 
@@ -1463,7 +1456,6 @@ void updateSlipDetection(void)
 		}
 	}
 
-#if SLIP_DIST_CORRECTION_ENABLE
 	//==========================================================
 	// 距離補正スケール算出（既存指標と閾値のみ使用）
 	//==========================================================
@@ -1489,7 +1481,6 @@ void updateSlipDetection(void)
 
 	// 距離補正スケールをLPFで更新し、距離を積算
 	slipDistUpdate(slipDistScaleRaw);
-#endif
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名	getSlipDeltaImu
