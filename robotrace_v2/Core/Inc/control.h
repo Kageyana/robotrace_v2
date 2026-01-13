@@ -5,6 +5,8 @@
 //====================================//
 #include "main.h"
 #include "SDcard.h"
+#include <stdbool.h>
+#include <stdint.h>
 //====================================//
 // シンボル定義
 //====================================//
@@ -146,6 +148,9 @@ void setEncoderVal(void);
 void writeTgtspeeds(void);
 void readTgtspeeds(void);
 void checkCrossLine(void);
+// スリップ距離補正（パルス版）
+void Control_RequestStartReset(void);
+bool Control_ConsumeStartResetIn1ms(void);
 void updateSlipDetection(void);
 float getSlipDeltaImu(void);
 float getSlipDeltaEnc(void);
@@ -156,6 +161,10 @@ float getSlipthresholdHigh(void);
 float getSlipthresholdLow(void);
 float Control_GetDistEncRaw_m(void);
 float Control_GetDistCorr_m(void);
+// スリップ距離補正（パルス版）
+int32_t Control_GetDistEncRaw_p(void);
+int32_t Control_GetDistCorr_p(void);
+int32_t Control_GetDistSlipLoss_p(void);
 float Control_GetSlipDistScale(void);
 float Control_GetSlipDistScaleRaw(void);
 

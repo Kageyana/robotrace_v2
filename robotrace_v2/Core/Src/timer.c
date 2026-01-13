@@ -26,10 +26,22 @@ void Interrupt1ms(void)
 {
 
 	// Interrupt 1ms
-	cntRun++;
-	cnt5++;
-	cnt10++;
-	cntLog++;
+	// スリップ距離補正（パルス版）
+	if (Control_ConsumeStartResetIn1ms())
+	{
+		cntRun = 0;
+		cnt5 = 0;
+		cnt10 = 0;
+		cntLog = 0;
+		encPulse5ms = 0;
+	}
+	else
+	{
+		cntRun++;
+		cnt5++;
+		cnt10++;
+		cntLog++;
+	}
 
 	// 割り込み時間計測
 	uint32_t freqCount = getCycleCounter();
@@ -50,6 +62,7 @@ void Interrupt1ms(void)
 			BMI088getAccele();	// 加速度取得
 			calcDegrees();		// コンプリメンタリフィルタで角度算出
 			calcVelocity();		// 加速度から速度算出
+			// スリップ距離補正（パルス版）
 			updateSlipDetection(); // スリップ検出（Δv比率とフラグ更新を1msで実行）
 			// motorControlYawRate();	// 角速度制御
 			// motorControlYaw();		// 角度制御
