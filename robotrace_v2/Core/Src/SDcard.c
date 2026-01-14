@@ -190,9 +190,6 @@ void createLog(void)
 	setLogStr("motorCurrentR", "%f");
 	setLogStr("slipDistScaleRaw", "%f");
 	setLogStr("slipDistScaleF", "%f");
-	setLogStr("distEncRaw_m", "%f");
-	setLogStr("distCorr_m", "%f");
-	setLogStr("distSlipLoss_m", "%f");
 	setLogStr("distEncRaw_p", "%d");
 	setLogStr("distCorr_p", "%d");
 	setLogStr("distSlipLoss_p", "%d");
@@ -513,6 +510,9 @@ void endLog(void)
 	uint16_t marker, time, beforeTime = 0, speed, beforeSpeed = 0;
 	uint32_t distance;
 	float dt, zg;
+	uint8_t rocIdx = LOG_NUM_FLOAT;
+	uint8_t xIdx = LOG_NUM_FLOAT + 1;
+	uint8_t yIdx = LOG_NUM_FLOAT + 2;
 	static union
 	{
 		float f;
@@ -604,7 +604,7 @@ void endLog(void)
 			zg,
 			marker,
 			distance,
-			logvalf[13],	// ROC
+			logvalf[rocIdx],	// ROC
 
 			logval8[1],		// targetSpeed
 			logval16[2],	// optimalIndex
@@ -624,15 +624,12 @@ void endLog(void)
 			logvalf[7],		// motorCurrentR
 			logvalf[8],		// slipDistScaleRaw
 			logvalf[9],		// slipDistScaleF
-			logvalf[10],	// distEncRaw_m
-			logvalf[11],	// distCorr_m
-			logvalf[12],	// distSlipLoss_m
 			logval32[1],	// distEncRaw_p
 			logval32[2],	// distCorr_p
 			logval32[3],	// distSlipLoss_p
 
-			logvalf[14],	// x
-			logvalf[15]		// y
+			logvalf[xIdx],	// x
+			logvalf[yIdx]	// y
 		);
 
 		// 文字列をSDカードに送信

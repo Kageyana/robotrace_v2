@@ -152,11 +152,6 @@ void Interrupt1ms(void)
 
 			if (modeLOG)
 			{
-				// 距離補正ログ用の値を取得
-				float distEncRaw_m = Control_GetDistEncRaw_m();
-				float distCorr_m = Control_GetDistCorr_m();
-				float distSlipLoss_m = distEncRaw_m - distCorr_m;
-
 				// CALCDISTANCEごとにログを保存
 #ifdef LOG_RUNNING_WRITE
 				writeLogBufferPuts(
@@ -180,9 +175,9 @@ void Interrupt1ms(void)
 					// 32bit
 					encTotalOptimal,
 					// スリップ距離補正（パルス版）
-					Control_GetDistEncRaw_p(),
-					Control_GetDistCorr_p(),
-					Control_GetDistSlipLoss_p(),
+					(uint32_t)Control_GetDistEncRaw_p(),
+					(uint32_t)Control_GetDistCorr_p(),
+					(uint32_t)Control_GetDistSlipLoss_p(),
 					// float型
 					BMI088val.gyro.z,
 					BMI088val.accele.x,
@@ -194,10 +189,7 @@ void Interrupt1ms(void)
 					motorCurrentR,
 					// 距離補正ログ
 					Control_GetSlipDistScaleRaw(),
-					Control_GetSlipDistScale(),
-					distEncRaw_m,
-					distCorr_m,
-					distSlipLoss_m
+					Control_GetSlipDistScale()
 				);
 #else
 				writeLogBufferPrint(); // バッファにログを保存
