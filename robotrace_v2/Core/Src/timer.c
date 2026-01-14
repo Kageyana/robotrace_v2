@@ -176,6 +176,10 @@ void Interrupt1ms(void)
 					veloCtrlR.pwm,
 					// 32bit
 					encTotalOptimal,
+					// スリップ距離補正（パルス版）
+					Control_GetDistEncRaw_p(),
+					Control_GetDistCorr_p(),
+					Control_GetDistSlipLoss_p(),
 					// float型
 					BMI088val.gyro.z,
 					BMI088val.accele.x,

@@ -193,6 +193,9 @@ void createLog(void)
 	setLogStr("distEncRaw_m", "%f");
 	setLogStr("distCorr_m", "%f");
 	setLogStr("distSlipLoss_m", "%f");
+	setLogStr("distEncRaw_p", "%d");
+	setLogStr("distCorr_p", "%d");
+	setLogStr("distSlipLoss_p", "%d");
 	setLogStr("x", "%f");
 	setLogStr("y", "%f");
 
@@ -624,6 +627,9 @@ void endLog(void)
 			logvalf[10],	// distEncRaw_m
 			logvalf[11],	// distCorr_m
 			logvalf[12],	// distSlipLoss_m
+			logval32[1],	// distEncRaw_p
+			logval32[2],	// distCorr_p
+			logval32[3],	// distSlipLoss_p
 
 			logvalf[14],	// x
 			logvalf[15]		// y
