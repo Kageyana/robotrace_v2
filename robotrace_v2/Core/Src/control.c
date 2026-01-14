@@ -87,6 +87,7 @@ static float distCorrFrac_p = 0.0f;					// 補正後パルスの小数残差
 // スリップ距離補正（パルス版）
 static volatile uint8_t s_startResetReq = 0;			// スタート地点リセット要求
 static volatile uint8_t s_startResetDone = 0;			// スタート地点リセット完了
+static volatile uint8_t s_startResetAck = 0;			// スタート地点リセットACK
 // スリップ検出用の内部状態（RAM節約のためSLIP_CUR_ENABLEでメンバ切り替え）
 typedef struct {
 	bool prevRunning;
@@ -557,27 +558,47 @@ void loopSystem(void)
 			distCtrl.Int = 0.0;
 
 			clearXYcie(); // 座標計算変数初期化
-			if (!Control_IsStartResetPending() && !Control_IsStartResetDone())
+			if (!Control_IsStartResetPending())
 			{
 				Control_RequestStartReset();
 			}
 			// スリップ距離補正（パルス版）
-			if (!Control_IsStartResetDone())
-			{
-				break;
-			}
-			Control_ClearStartResetDone();
-
-			if (initMSD)
-			{
-				modeLOG = true; // log start
-			}
-			
-			patternTrace = 12;
+			patternTrace = 111;
 			break;
 		}
 		break;
 
+	case 111:
+		// スタートリセット待ち
+		if(optimalTrace == BOOST_DISTANCE)
+		{
+			if(PPAD[0].boostSpeed/2 > 1.5F)
+			{
+				setTargetSpeed(1.5F); // 目標速度
+			}
+			else
+			{
+				setTargetSpeed(PPAD[0].boostSpeed/2); // 目標速度
+			}
+			
+		}
+		else
+		{
+			setTargetSpeed(tgtParam.search); // 目標速度
+		}
+		// ライントレース
+		motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+
+		// スリップ距離補正（パルス版）
+		if (Control_ConsumeStartResetAck())
+		{
+			if (initMSD)
+			{
+				modeLOG = true; // log start
+			}
+			patternTrace = 12;
+		}
+		break;
 	case 12:
 		// 目標速度設定
 		if (optimalTrace == BOOST_NONE)
@@ -1175,6 +1196,7 @@ bool Control_ConsumeStartResetIn1ms(void)
 	slipDistReset();
 
 	s_startResetDone = 1U;
+	s_startResetAck = 1U;
 	return true;
 }
 ///////////////////////////////////////////////////////////////////////////
@@ -1209,6 +1231,22 @@ void Control_ClearStartResetDone(void)
 {
 	// スリップ距離補正（パルス版）
 	s_startResetDone = 0U;
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 Control_ConsumeStartResetAck
+// 処理概要     スタート地点リセットACKを消費
+// 引数         なし
+// 戻り値       true: ACK消費, false: なし
+///////////////////////////////////////////////////////////////////////////
+bool Control_ConsumeStartResetAck(void)
+{
+	// スリップ距離補正（パルス版）
+	if (s_startResetAck == 0U)
+	{
+		return false;
+	}
+	s_startResetAck = 0U;
+	return true;
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 slipDistUpdate

@@ -154,6 +154,7 @@ bool Control_ConsumeStartResetIn1ms(void);
 bool Control_IsStartResetPending(void);
 bool Control_IsStartResetDone(void);
 void Control_ClearStartResetDone(void);
+bool Control_ConsumeStartResetAck(void);
 void updateSlipDetection(void);
 float getSlipDeltaImu(void);
 float getSlipDeltaEnc(void);
