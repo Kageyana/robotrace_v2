@@ -151,6 +151,9 @@ void checkCrossLine(void);
 // スリップ距離補正（パルス版）
 void Control_RequestStartReset(void);
 bool Control_ConsumeStartResetIn1ms(void);
+bool Control_IsStartResetPending(void);
+bool Control_IsStartResetDone(void);
+void Control_ClearStartResetDone(void);
 void updateSlipDetection(void);
 float getSlipDeltaImu(void);
 float getSlipDeltaEnc(void);
