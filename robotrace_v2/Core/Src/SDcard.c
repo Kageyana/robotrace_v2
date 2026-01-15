@@ -168,7 +168,7 @@ void createLog(void)
 	setLogStr("encCurrentN", "%d");
 	setLogStr("gyroVal_Z", "%f");
 	setLogStr("courseMarker", "%d");
-	setLogStr("encTotalN", "%d");
+	setLogStr("encTotalOptimal", "%d");
 	setLogStr("ROC", "%f");
 
 	setLogStr("targetSpeed", "%d");

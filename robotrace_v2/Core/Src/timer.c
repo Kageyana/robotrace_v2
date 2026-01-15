@@ -165,7 +165,7 @@ void Interrupt1ms(void)
 					(uint8_t)getSlipFlag(),
 					(uint8_t)getSlipFlagLat(),
 					// 16bit
-					cntRun,
+					(uint16_t)cntRun,
 					encCurrentN,
 					optimalIndex,
 					lineTraceOmegaFBCtrl.pwm,
