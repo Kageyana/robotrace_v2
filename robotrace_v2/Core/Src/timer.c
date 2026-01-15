@@ -173,7 +173,7 @@ void Interrupt1ms(void)
 					veloCtrlL.pwm,
 					veloCtrlR.pwm,
 					// 32bit
-					encTotalOptimal,
+					(uint32_t)encTotalOptimal,
 					// スリップ距離補正（パルス版）
 					(uint32_t)Control_GetDistEncRaw_p(),
 					(uint32_t)Control_GetDistCorr_p(),

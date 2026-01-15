@@ -352,10 +352,10 @@ void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
 		va_start(args, f);
 		// 8bitデータをバッファへ送る
 		for (cnt = 0; cnt < c; cnt++)
-			send8bit(va_arg(args, unsigned int)); // 可変長引数の型昇格に合わせる
+			send8bit((uint8_t)va_arg(args, int)); // 可変長引数の型昇格に合わせる
 		// 16bitデータをバッファへ送る
 		for (cnt = 0; cnt < s; cnt++)
-			send16bit(va_arg(args, unsigned int)); // 可変長引数の型昇格に合わせる
+			send16bit((uint16_t)va_arg(args, int)); // 可変長引数の型昇格に合わせる
 		// 32bitデータをバッファへ送る
 		for (cnt = 0; cnt < i; cnt++)
 			send32bit(va_arg(args, uint32_t));

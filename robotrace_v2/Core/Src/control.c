@@ -1159,8 +1159,9 @@ static void slipDistReset(void)
 void Control_RequestStartReset(void)
 {
 	// スリップ距離補正（パルス版）
-	s_startResetReq = 1U;
+	s_startResetAck = 0U;
 	s_startResetDone = 0U;
+	s_startResetReq = 1U;
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 Control_ConsumeStartResetIn1ms
