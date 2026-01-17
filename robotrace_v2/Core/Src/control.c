@@ -84,10 +84,6 @@ static int32_t distEncRaw_p = 0;						// 生パルス積算
 static int32_t distCorr_p = 0;							// 補正後パルス積算
 static int32_t distSlipLoss_p = 0;						// 生 - 補正 の積算
 static float distCorrFrac_p = 0.0f;					// 補正後パルスの小数残差
-// スリップ距離補正（パルス版）
-static volatile uint8_t s_startResetReq = 0;			// スタート地点リセット要求
-static volatile uint8_t s_startResetDone = 0;			// スタート地点リセット完了
-static volatile uint8_t s_startResetAck = 0;			// スタート地点リセットACK
 // スリップ検出用の内部状態（RAM節約のためSLIP_CUR_ENABLEでメンバ切り替え）
 typedef struct {
 	bool prevRunning;
@@ -1135,105 +1131,6 @@ static void slipDistReset(void)
 	distCorr_p = 0;
 	distSlipLoss_p = 0;
 	distCorrFrac_p = 0.0f;
-}
-///////////////////////////////////////////////////////////////////////////
-// モジュール名 Control_RequestStartReset
-// 処理概要     スタート地点リセット要求を通知
-// 引数         なし
-// 戻り値       なし
-///////////////////////////////////////////////////////////////////////////
-void Control_RequestStartReset(void)
-{
-	// スリップ距離補正（パルス版）
-	s_startResetAck = 0U;
-	s_startResetDone = 0U;
-	s_startResetReq = 1U;
-}
-///////////////////////////////////////////////////////////////////////////
-// モジュール名 Control_ConsumeStartResetIn1ms
-// 処理概要     1ms割り込みでリセット要求を消費し初期化を実行
-// 引数         なし
-// 戻り値       true: リセット実行, false: なし
-///////////////////////////////////////////////////////////////////////////
-bool Control_ConsumeStartResetIn1ms(void)
-{
-	// スリップ距離補正（パルス版）
-	if (s_startResetReq == 0U)
-	{
-		return false;
-	}
-	s_startResetReq = 0U;
-
-	// エンコーダ積算値をリセット
-	encTotalR = 0;
-	encTotalL = 0;
-	encTotalN = 0;
-	enc1 = 0;
-	encRightMarker = 0;
-	encCurve = 0;
-	encTotalOptimal = 0;
-	encLog = 0;
-	encPID = 0;
-	encClick = 0;
-
-	// スリップ距離補正（パルス版）
-	slipDetState.prevRunning = false;
-	slipDetState.prevMoving = false;
-	slipResetAll(&slipDetState);
-	slipDistReset();
-
-	s_startResetDone = 1U;
-	s_startResetAck = 1U;
-	return true;
-}
-///////////////////////////////////////////////////////////////////////////
-// モジュール名 Control_IsStartResetPending
-// 処理概要     スタート地点リセット要求の有無を確認
-// 引数         なし
-// 戻り値       true: 要求あり, false: なし
-///////////////////////////////////////////////////////////////////////////
-bool Control_IsStartResetPending(void)
-{
-	// スリップ距離補正（パルス版）
-	return (s_startResetReq != 0U);
-}
-///////////////////////////////////////////////////////////////////////////
-// モジュール名 Control_IsStartResetDone
-// 処理概要     スタート地点リセット完了を確認
-// 引数         なし
-// 戻り値       true: 完了済み, false: 未完了
-///////////////////////////////////////////////////////////////////////////
-bool Control_IsStartResetDone(void)
-{
-	// スリップ距離補正（パルス版）
-	return (s_startResetDone != 0U);
-}
-///////////////////////////////////////////////////////////////////////////
-// モジュール名 Control_ClearStartResetDone
-// 処理概要     スタート地点リセット完了フラグをクリア
-// 引数         なし
-// 戻り値       なし
-///////////////////////////////////////////////////////////////////////////
-void Control_ClearStartResetDone(void)
-{
-	// スリップ距離補正（パルス版）
-	s_startResetDone = 0U;
-}
-///////////////////////////////////////////////////////////////////////////
-// モジュール名 Control_ConsumeStartResetAck
-// 処理概要     スタート地点リセットACKを消費
-// 引数         なし
-// 戻り値       true: ACK消費, false: なし
-///////////////////////////////////////////////////////////////////////////
-bool Control_ConsumeStartResetAck(void)
-{
-	// スリップ距離補正（パルス版）
-	if (s_startResetAck == 0U)
-	{
-		return false;
-	}
-	s_startResetAck = 0U;
-	return true;
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 slipDistUpdate

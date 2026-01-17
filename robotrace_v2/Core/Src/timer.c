@@ -26,22 +26,10 @@ void Interrupt1ms(void)
 {
 
 	// Interrupt 1ms
-	// スリップ距離補正（パルス版）
-	if (Control_ConsumeStartResetIn1ms())
-	{
-		cntRun = 0;
-		cnt5 = 0;
-		cnt10 = 0;
-		cntLog = 0;
-		encPulse5ms = 0;
-	}
-	else
-	{
-		cntRun++;
-		cnt5++;
-		cnt10++;
-		cntLog++;
-	}
+	cntRun++;
+	cnt5++;
+	cnt10++;
+	cntLog++;
 
 	// 割り込み時間計測
 	uint32_t freqCount = getCycleCounter();
