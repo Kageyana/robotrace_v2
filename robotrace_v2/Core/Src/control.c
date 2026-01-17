@@ -63,6 +63,7 @@ static uint16_t slipHighCount = 0;						// スリップ立ち上がり判定用�
 static uint16_t slipLowCount = 0;						// スリップ解除判定用の連続カウンタ
 static uint16_t slipHighCountLat = 0;					// 横スリップ立ち上がり判定用の連続カウンタ
 static uint16_t slipLowCountLat = 0;					// 横スリップ解除判定用の連続カウンタ
+static uint16_t slipISumOkCount = 0;					// Lat ON用の瞬時電流連続カウンタ
 static bool slipFlag = false;							// 縦スリップ判定フラグ
 static bool slipFlagLat = false;						// 横スリップ判定フラグ
 // スリップ距離補正用の状態
@@ -1079,6 +1080,7 @@ static void slipResetAll(SlipDetState *st)
 	slipLowCount = 0;
 	slipHighCountLat = 0;
 	slipLowCountLat = 0;
+	slipISumOkCount = 0;
 	slipFlag = false;
 	slipFlagLat = false;
 	st->slipPrimed = false;
@@ -1381,19 +1383,26 @@ void updateSlipDetection(void)
 #if SLIP_CUR_ENABLE
 	// SLIP_CUR_ENABLE=1ではPWM/電流ゲートを適用
 	latCountEnabled = latEnabled && (st->pwmSumF > SLIP_PWM_LAT_COUNT_MIN);
-	// LatのON判定は瞬時PWM/電流の閾値も満たす場合のみ進める
-	latOnCountEnabled = latEnabled
-			&& (pwmSum > SLIP_PWM_LAT_COUNT_MIN)
-			&& (iSum > SLIP_ISUM_LAT_COUNT_MIN);
 	// 惰性/低トルク時は横判定を強制クリアする
 	latCoastHardClear = (!calibrateMotorCurrent)
 			&& (st->pwmSumF < SLIP_PWM_COAST_MAX)
 			&& (st->iSumF < SLIP_ISUM_COAST_MAX);
-#else
-	// SLIP_CUR_ENABLE=0でも瞬時PWMでゲート判定する
-	(void)iSum;
-	latOnCountEnabled = latEnabled && (pwmSum > SLIP_PWM_LAT_COUNT_MIN);
 #endif
+	// LatのON判定は瞬時電流が連続で閾値以上の時だけ許可する
+	bool iSumOk = (iSum > SLIP_ISUM_LAT_COUNT_MIN);
+	if (!latEnabled || latCoastHardClear) {
+		slipISumOkCount = 0;
+	} else if (iSumOk) {
+		if (slipISumOkCount < SLIP_ISUM_LAT_COUNT_N) {
+			slipISumOkCount++;
+		}
+	} else {
+		slipISumOkCount = 0;
+	}
+	// LatのON判定は瞬時PWM/電流の閾値も満たす場合のみ進める
+	latOnCountEnabled = latEnabled
+			&& (pwmSum > SLIP_PWM_LAT_COUNT_MIN)
+			&& (slipISumOkCount >= SLIP_ISUM_LAT_COUNT_N);
 
 	// 低加速度では見ない（縦/横の誤検出抑制）
 	if (accMag < 0.8f) {

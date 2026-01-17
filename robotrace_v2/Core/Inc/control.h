@@ -63,7 +63,8 @@
 #define SLIP_PWM_LAT_COUNT_MIN	150.0f // 横判定カウントを許可する最低PWM合計（LPF後）
 #define SLIP_PWM_COAST_MAX		150.0f // 惰性判定PWM合計（LPF後）
 #define SLIP_ISUM_COAST_MAX		0.12f  // 惰性判定電流合計[A]（LPF後）
-#define SLIP_ISUM_LAT_COUNT_MIN	0.25f  // [A] Lat ONカウント最低電流（瞬時の電流和）
+#define SLIP_ISUM_LAT_COUNT_MIN	0.25f  // [A] Lat ON判定に使う瞬時電流和の下限（要ログで再調整）
+#define SLIP_ISUM_LAT_COUNT_N	3U     // [count] iSumが閾値以上である連続サンプル数（短スパイク除去）
 #define SLIP_LAT_CLEAR_COEF		0.10f  // 惰性時に横指標を0へ戻す係数（SLIP_LPF_COEFより強め）
 #define SLIP_PWM_LPF_COEF		0.02f  // PWM合計のLPF係数
 
