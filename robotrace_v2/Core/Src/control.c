@@ -10,13 +10,7 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
-//====================================//
-// スリップ距離補正パラメータ
-//====================================//
-#define SLIP_DIST_MIN_SCALE			0.6f	// 要調整
-#define SLIP_DIST_MIN_SCALE_LAT		0.7f	// 要調整
-#define SLIP_DIST_LPF_COEF_DOWN		0.2f	// 悪化追従
-#define SLIP_DIST_LPF_COEF_UP		0.09f	// 回復追従
+
 //====================================//
 // グローバル変数の宣言
 //====================================//
@@ -76,14 +70,11 @@ static float slipThresholdLow;							// スリップ検出低閾値
 // スリップ距離補正用の状態
 static float slipDistScaleRaw = 1.0f;					// 距離補正スケール（生）
 static float slipDistScaleF = 1.0f;						// 距離補正スケール（LPF後）
-static float distEncRaw_m = 0.0f;						// エンコーダ積算距離[m]（生）
-static float distCorr_m = 0.0f;							// 補正後距離[m]
-static float distSlipLoss_m = 0.0f;						// スリップ損失距離[m]
 // スリップ距離補正（パルス版）
 static int32_t distEncRaw_p = 0;						// 生パルス積算
 static int32_t distCorr_p = 0;							// 補正後パルス積算
 static int32_t distSlipLoss_p = 0;						// 生 - 補正 の積算
-static float distCorrFrac_p = 0.0f;					// 補正後パルスの小数残差
+static float distCorrFrac_p = 0.0f;						// 補正後パルスの小数残差
 // スリップ検出用の内部状態（RAM節約のためSLIP_CUR_ENABLEでメンバ切り替え）
 typedef struct {
 	bool prevRunning;
@@ -1125,9 +1116,6 @@ static void slipDistReset(void)
 	// 距離補正スケールと積算距離を初期化
 	slipDistScaleRaw = 1.0f;
 	slipDistScaleF = 1.0f;
-	distEncRaw_m = 0.0f;
-	distCorr_m = 0.0f;
-	distSlipLoss_m = 0.0f;
 	// スリップ距離補正（パルス版）
 	distEncRaw_p = 0;
 	distCorr_p = 0;
@@ -1145,14 +1133,6 @@ static void slipDistUpdate(float rawScale)
 	// 距離補正スケールをLPFで平滑化（悪化は速く/回復は遅く）
 	float coef = (rawScale < slipDistScaleF) ? SLIP_DIST_LPF_COEF_DOWN : SLIP_DIST_LPF_COEF_UP;
 	slipDistScaleF = lpf1(slipDistScaleF, rawScale, coef);
-
-	// 1msごとの距離を積算
-	float dEnc_m = (float)encCurrentN / (float)PALSE_METER;
-	distEncRaw_m += dEnc_m;
-
-	float dCorr_m = dEnc_m * slipDistScaleF;
-	distCorr_m += dCorr_m;
-	distSlipLoss_m += (dEnc_m - dCorr_m);
 
 	// スリップ距離補正（パルス版）
 	int32_t dEnc_p = (int32_t)encCurrentN;
@@ -1557,14 +1537,6 @@ float getSlipthresholdHigh(void)
 float getSlipthresholdLow(void)
 {
 	return slipThresholdLow;
-}
-float Control_GetDistEncRaw_m(void)
-{
-	return distEncRaw_m;
-}
-float Control_GetDistCorr_m(void)
-{
-	return distCorr_m;
 }
 // スリップ距離補正（パルス版）
 int32_t Control_GetDistEncRaw_p(void)

@@ -70,6 +70,12 @@
 #define SLIP_CUR_MAX_SCALE         1.80f   // 閾値スケール上限
 #define SLIP_CUR_MIN_A             0.05f   // ほぼ惰性/停止時は補正を無効化
 
+// スリップ距離補正パラメータ
+#define SLIP_DIST_MIN_SCALE			0.6f	// 要調整
+#define SLIP_DIST_MIN_SCALE_LAT		0.7f	// 要調整
+#define SLIP_DIST_LPF_COEF_DOWN		0.2f	// 悪化追従
+#define SLIP_DIST_LPF_COEF_UP		0.09f	// 回復追従
+
 // ゴール
 #define COUNT_GOAL 5 // ゴールマーカーを読む回数
 
@@ -156,8 +162,6 @@ bool getSlipFlag(void);
 bool getSlipFlagLat(void);
 float getSlipthresholdHigh(void);
 float getSlipthresholdLow(void);
-float Control_GetDistEncRaw_m(void);
-float Control_GetDistCorr_m(void);
 // スリップ距離補正（パルス版）
 int32_t Control_GetDistEncRaw_p(void);
 int32_t Control_GetDistCorr_p(void);
