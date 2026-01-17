@@ -1260,7 +1260,8 @@ void updateSlipDetection(void)
 		slipDeltaImu = 0.0f;
 		// フィルタ値だけはゼロへ軽く収束
 		slipIndicatorRaw = lpf1(slipIndicatorRaw, 0.0f, SLIP_LPF_COEF);
-		slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF);
+		// Latは専用LPFで0へ収束させる
+		slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF_LAT);
 		// 低速スキップ領域では距離補正スケールを1.0へ寄せる
 		slipDistScaleRaw = 1.0f;
 		slipDistUpdate(slipDistScaleRaw);
@@ -1401,7 +1402,8 @@ void updateSlipDetection(void)
 			slipLowCountLat = 0;
 			slipFlagLat = false;
 		} else {
-			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF);
+			// Latは専用LPFで0へ収束させる
+			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF_LAT);
 		}
 	} else {
 		// 縦スリップ指標（absDxをLPF）
@@ -1413,13 +1415,12 @@ void updateSlipDetection(void)
 			slipHighCountLat = 0;
 			slipLowCountLat = 0;
 			slipFlagLat = false;
-		} else if (latCountEnabled) {
-			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, absDy, SLIP_LPF_COEF);
 		} else if (latEnabled) {
-			// 旋回中だがPWMが小さい区間は0へ収束させる
-			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF);
+			// 旋回中はPWM/電流ゲートに関係なくLat指標を追従させる
+			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, absDy, SLIP_LPF_COEF_LAT);
 		} else {
-			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF);
+			// 旋回外はLat指標を0へ収束させる
+			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF_LAT);
 		}
 	}
 
@@ -1451,22 +1452,25 @@ void updateSlipDetection(void)
 	float slipLatHigh = SLIP_LAT_HIGH * curScale;
 	float slipLatLow  = SLIP_LAT_LOW  * curScale;
 	if (!slipFlagLat) {
-		if (latCountEnabled && slipIndicatorFiltered > slipLatHigh) {
-			if (++slipHighCountLat >= SLIP_HIGH_COUNT_REQ) {
-				slipFlagLat = true;
+		if (latCountEnabled) {
+			// LatのON判定はゲート許可時のみ進める
+			if (slipIndicatorFiltered > slipLatHigh) {
+				if (++slipHighCountLat >= SLIP_HIGH_COUNT_REQ_LAT) {
+					slipFlagLat = true;
+					slipHighCountLat = 0;
+				}
+			} else {
 				slipHighCountLat = 0;
 			}
 		} else {
+			// ゲート未達時はON側カウントを進めない
 			slipHighCountLat = 0;
 		}
 		slipLowCountLat = 0;
 	} else {
-#if SLIP_CUR_ENABLE
-		if (!latEnabled || st->pwmSumF <= SLIP_PWM_LAT_COUNT_MIN || slipIndicatorFiltered < slipLatLow) {
-#else
-		if (!latEnabled || slipIndicatorFiltered < slipLatLow) {
-#endif
-			if (++slipLowCountLat >= SLIP_LOW_COUNT_REQ) {
+		// LatのOFF判定はゲート未達でも進めて解除できるようにする
+		if (slipIndicatorFiltered < slipLatLow) {
+			if (++slipLowCountLat >= SLIP_LOW_COUNT_REQ_LAT) {
 				slipFlagLat = false;
 				slipLowCountLat = 0;
 			}

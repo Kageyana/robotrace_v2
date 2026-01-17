@@ -43,6 +43,9 @@
 #define SLIP_HIGH_COUNT_REQ			6U		// 上側しきい値を超え続ける必要サンプル数
 #define SLIP_LOW_COUNT_REQ			6U		// 下側しきい値を下回り続ける必要サンプル数
 #define SLIP_LPF_COEF				0.015f	// スリップ指標に掛ける一次LPF係数
+#define SLIP_LPF_COEF_LAT			0.05f	// Lat指標は速め（~20ms程度を想定）
+#define SLIP_HIGH_COUNT_REQ_LAT		5U		// Lat ONは5ms連続で良い
+#define SLIP_LOW_COUNT_REQ_LAT		5U		// Lat OFFも5ms連続（まずは同じ）
 
 #define SLIP_ACC_BIAS_COEF		0.001f   // ≒ dt/1s（1秒時定数くらい）
 #define SLIP_ACC_LPF_COEF		0.03f    // ≒ 20ms前後のLPF
