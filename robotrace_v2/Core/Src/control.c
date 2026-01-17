@@ -1334,10 +1334,11 @@ void updateSlipDetection(void)
 	//==========================================================
 	// PWM/電流の合計（惰性/低トルク判定用）
 	//==========================================================
-#if SLIP_CUR_ENABLE
-	// PWM/電流のLPF更新（SLIP_CUR_ENABLE=1のみ）
+	// 瞬時値はON判定ゲートでも使用する
 	float pwmSum = fabsf((float)motorpwmL) + fabsf((float)motorpwmR);
 	float iSum = fabsf(motorCurrentL) + fabsf(motorCurrentR);
+#if SLIP_CUR_ENABLE
+	// PWM/電流のLPF更新（SLIP_CUR_ENABLE=1のみ）
 	st->pwmSumF = lpf1(st->pwmSumF, pwmSum, SLIP_PWM_LPF_COEF);
 	st->iSumF = lpf1(st->iSumF, iSum, SLIP_CUR_LPF_COEF);
 #endif
@@ -1388,6 +1389,10 @@ void updateSlipDetection(void)
 	latCoastHardClear = (!calibrateMotorCurrent)
 			&& (st->pwmSumF < SLIP_PWM_COAST_MAX)
 			&& (st->iSumF < SLIP_ISUM_COAST_MAX);
+#else
+	// SLIP_CUR_ENABLE=0でも瞬時PWMでゲート判定する
+	(void)iSum;
+	latOnCountEnabled = latEnabled && (pwmSum > SLIP_PWM_LAT_COUNT_MIN);
 #endif
 
 	// 低加速度では見ない（縦/横の誤検出抑制）
