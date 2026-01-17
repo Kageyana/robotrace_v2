@@ -160,8 +160,6 @@ float getSlipDeltaEnc(void);
 float getSlipIndicatorFiltered(void);
 bool getSlipFlag(void);
 bool getSlipFlagLat(void);
-float getSlipthresholdHigh(void);
-float getSlipthresholdLow(void);
 // スリップ距離補正（パルス版）
 int32_t Control_GetDistEncRaw_p(void);
 int32_t Control_GetDistCorr_p(void);
