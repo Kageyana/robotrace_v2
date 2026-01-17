@@ -550,6 +550,23 @@ void loopSystem(void)
 			// 変数初期化
 			// スリップ距離補正（パルス版）
 			// スタート地点基準で状態を初期化
+			// スリップ距離補正（パルス版）
+			uint32_t pm = __get_PRIMASK();
+			__disable_irq();
+			encTotalN = 0;
+			encTotalOptimal = 0;
+			encLog = 0;
+			encPID = 0;
+			enc1 = 0;
+			encRightMarker = 0;
+			encCurve = 0;
+			encClick = 0;
+			slipResetAll(&slipDetState);
+			slipDistReset();
+			if (pm == 0U)
+			{
+				__enable_irq();
+			}
 			DistanceOptimal = 0;
 			optimalIndex = 0;
 			clearIMUval(); // IMU値初期化
@@ -558,45 +575,14 @@ void loopSystem(void)
 			distCtrl.Int = 0.0;
 
 			clearXYcie(); // 座標計算変数初期化
-			if (!Control_IsStartResetPending())
-			{
-				Control_RequestStartReset();
-			}
-			// スリップ距離補正（パルス版）
-			patternTrace = 111;
-			break;
-		}
-		break;
 
-	case 111:
-		// スタートリセット待ち
-		if(optimalTrace == BOOST_DISTANCE)
-		{
-			if(PPAD[0].boostSpeed/2 > 1.5F)
-			{
-				setTargetSpeed(1.5F); // 目標速度
-			}
-			else
-			{
-				setTargetSpeed(PPAD[0].boostSpeed/2); // 目標速度
-			}
-			
-		}
-		else
-		{
-			setTargetSpeed(tgtParam.search); // 目標速度
-		}
-		// ライントレース
-		motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
-
-		// スリップ距離補正（パルス版）
-		if (Control_ConsumeStartResetAck())
-		{
 			if (initMSD)
 			{
 				modeLOG = true; // log start
 			}
+			
 			patternTrace = 12;
+			break;
 		}
 		break;
 	case 12:
