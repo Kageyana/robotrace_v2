@@ -1374,10 +1374,14 @@ void updateSlipDetection(void)
 	// 横判定のカウントを許可する条件（PWMが小さい区間は止める）
 	// デフォルトはPWM/電流ゲートなしの条件
 	bool latCountEnabled = latEnabled;
+	// LatのON判定は電流ゲートも満たした時だけ進める
+	bool latOnCountEnabled = latCountEnabled;
 	bool latCoastHardClear = false;
 #if SLIP_CUR_ENABLE
 	// SLIP_CUR_ENABLE=1ではPWM/電流ゲートを適用
 	latCountEnabled = latEnabled && (st->pwmSumF > SLIP_PWM_LAT_COUNT_MIN);
+	// LatのON判定は電流和の閾値も満たす場合のみ進める
+	latOnCountEnabled = latCountEnabled && (st->iSumF > SLIP_ISUM_LAT_COUNT_MIN);
 	// 惰性/低トルク時は横判定を強制クリアする
 	latCoastHardClear = (!calibrateMotorCurrent)
 			&& (st->pwmSumF < SLIP_PWM_COAST_MAX)
@@ -1452,8 +1456,8 @@ void updateSlipDetection(void)
 	float slipLatHigh = SLIP_LAT_HIGH * curScale;
 	float slipLatLow  = SLIP_LAT_LOW  * curScale;
 	if (!slipFlagLat) {
-		if (latCountEnabled) {
-			// LatのON判定はゲート許可時のみ進める
+		if (latOnCountEnabled) {
+			// LatのON判定はPWM/電流ゲート許可時のみ進める
 			if (slipIndicatorFiltered > slipLatHigh) {
 				if (++slipHighCountLat >= SLIP_HIGH_COUNT_REQ_LAT) {
 					slipFlagLat = true;
@@ -1491,7 +1495,7 @@ void updateSlipDetection(void)
 		scaleLong = 1.0f - sevLong * (1.0f - SLIP_DIST_MIN_SCALE);
 	}
 
-	if (latCountEnabled && (slipLatHigh > slipLatLow)) {
+	if (latOnCountEnabled && (slipLatHigh > slipLatLow)) {
 		float sevLat = (slipIndicatorFiltered - slipLatLow) / (slipLatHigh - slipLatLow);
 		sevLat = fminf(fmaxf(sevLat, 0.0f), 1.0f);
 		scaleLat = 1.0f - sevLat * (1.0f - SLIP_DIST_MIN_SCALE_LAT);
