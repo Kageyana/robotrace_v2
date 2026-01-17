@@ -171,7 +171,7 @@ void Interrupt1ms(void)
 					BMI088val.accele.x,
 					BMI088val.accele.y,
 					getSlipIndicatorRaw(),
-					getSlipIndicatorFiltered(),	// slipRatioLat(LPF後)
+					getSlipIndicatorFiltered(),
 					motorCurrentL,
 					motorCurrentR,
 					// 距離補正ログ

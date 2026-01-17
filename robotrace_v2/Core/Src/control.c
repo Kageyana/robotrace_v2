@@ -58,12 +58,12 @@ static uint16_t slipBufIndex = 0;						// リングバッファの書き込み�
 static float slipDeltaImu = 0.0f;						// 窓内の横方向残差[m/s^2]
 static float slipDeltaEnc = 0.0f;						// 窓内の縦方向残差[m/s^2]
 static float slipIndicatorRaw = 0.0f;					// 縦スリップ指標の一次LPF後の値
-static float slipIndicatorFiltered = 0.0f;				// 横スリップ指標の一次LPF後の値（slipRatio相当）
+static float slipIndicatorFiltered = 0.0f;				// 横スリップ指標の一次LPF後の値
 static uint16_t slipHighCount = 0;						// スリップ立ち上がり判定用の連続カウンタ
 static uint16_t slipLowCount = 0;						// スリップ解除判定用の連続カウンタ
 static uint16_t slipHighCountLat = 0;					// 横スリップ立ち上がり判定用の連続カウンタ
 static uint16_t slipLowCountLat = 0;					// 横スリップ解除判定用の連続カウンタ
-static bool slipFlag = false;							// 縦スリップ判定フラグ（slipFlagLong互換）
+static bool slipFlag = false;							// 縦スリップ判定フラグ
 static bool slipFlagLat = false;						// 横スリップ判定フラグ
 // スリップ距離補正用の状態
 static float slipDistScaleRaw = 1.0f;					// 距離補正スケール（生）
@@ -1406,7 +1406,7 @@ void updateSlipDetection(void)
 	} else {
 		// 縦スリップ指標（absDxをLPF）
 		slipIndicatorRaw = lpf1(slipIndicatorRaw, absDx, SLIP_LPF_COEF);
-		// 横スリップ指標（absDyをLPF、slipRatio相当）
+		// 横スリップ指標（absDyをLPF）
 		if (latCoastHardClear) {
 			// 惰性時は横指標を強制的にクリアして誤検知を抑制
 			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LAT_CLEAR_COEF);
@@ -1502,8 +1502,7 @@ void updateSlipDetection(void)
 	slipDistUpdate(slipDistScaleRaw);
 }
 ///////////////////////////////////////////////////////////////////////////
-// モジュール名	getSlipDeltaImu
-// 				getSlipDeltaEnc
+// モジュール名	getSlipIndicatorRaw
 // 				getSlipIndicatorFiltered
 // 				getSlipFlag
 // 				getSlipFlagLat
