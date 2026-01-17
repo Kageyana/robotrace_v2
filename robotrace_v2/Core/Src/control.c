@@ -65,8 +65,6 @@ static uint16_t slipHighCountLat = 0;					// 横スリップ立ち上がり判�
 static uint16_t slipLowCountLat = 0;					// 横スリップ解除判定用の連続カウンタ
 static bool slipFlag = false;							// 縦スリップ判定フラグ（slipFlagLong互換）
 static bool slipFlagLat = false;						// 横スリップ判定フラグ
-static float slipThresholdHigh;							// スリップ検出高閾値
-static float slipThresholdLow;							// スリップ検出低閾値
 // スリップ距離補正用の状態
 static float slipDistScaleRaw = 1.0f;					// 距離補正スケール（生）
 static float slipDistScaleF = 1.0f;						// 距離補正スケール（LPF後）
@@ -1430,8 +1428,9 @@ void updateSlipDetection(void)
 	//==============================
 	// 旋回が強い時だけ閾値を上げる
 	//==============================
-	slipThresholdHigh = SLIP_MISMATCH_HIGH;
-	slipThresholdLow= SLIP_MISMATCH_LOW;
+	// 閾値は毎回算出し、状態として保持しない
+	float slipThresholdHigh = SLIP_MISMATCH_HIGH;
+	float slipThresholdLow = SLIP_MISMATCH_LOW;
 
 	if (st->turningState) {
 		slipThresholdHigh *= SLIP_MISMATCH_HIGH_TURN;
@@ -1506,8 +1505,6 @@ void updateSlipDetection(void)
 // 				getSlipIndicatorFiltered
 // 				getSlipFlag
 // 				getSlipFlagLat
-// 				getSlipthresholdHigh
-// 				getSlipthresholdLow
 // 処理概要     割り込み外からスリップ検出結果を参照するためのアクセサ
 ///////////////////////////////////////////////////////////////////////////
 float getSlipDeltaImu(void)
@@ -1529,14 +1526,6 @@ bool getSlipFlag(void)
 bool getSlipFlagLat(void)
 {
 	return slipFlagLat;
-}
-float getSlipthresholdHigh(void)
-{
-	return slipThresholdHigh;
-}
-float getSlipthresholdLow(void)
-{
-	return slipThresholdLow;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 Control_ApplyMarkerCorrection_p
