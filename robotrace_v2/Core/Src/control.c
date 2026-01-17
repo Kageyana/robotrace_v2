@@ -557,6 +557,8 @@ void loopSystem(void)
 			encRightMarker = 0;
 			encCurve = 0;
 			encClick = 0;
+			cntRun = 0;
+			cntLog = 0;
 			slipResetAll(&slipDetState);
 			slipDistReset();
 			if (pm == 0U)
