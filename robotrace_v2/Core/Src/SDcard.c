@@ -181,14 +181,12 @@ void createLog(void)
 
 	setLogStr("acceleVal_X", "%f");
 	setLogStr("acceleVal_Y", "%f");
-	setLogStr("slipDeltaImu", "%f");
-	setLogStr("slipDeltaEnc", "%f");
+	setLogStr("slipRatio", "%f");
 	setLogStr("slipRatioLat", "%f");
 	setLogStr("slipFlag", "%d");
 	setLogStr("slipFlagLat", "%d");
 	setLogStr("motorCurrentL", "%f");
 	setLogStr("motorCurrentR", "%f");
-	setLogStr("slipDistScaleRaw", "%f");
 	setLogStr("slipDistScaleF", "%f");
 	setLogStr("distEncRaw_p", "%d");
 	setLogStr("distCorr_p", "%d");
@@ -615,15 +613,13 @@ void endLog(void)
 
 			logvalf[1],		// acceleVal_X
 			logvalf[2],		// acceleVal_Y
-			logvalf[3],		// slipDeltaImu
-			logvalf[4],		// slipDeltaEnc
-			logvalf[5],		// slipRatioLat(LPF後)
+			logvalf[3],		// slipRatio(LPF後)
+			logvalf[4],		// slipRatioLat(LPF後)
 			logval8[2],		// slipFlag
 			logval8[3],		// slipFlagLat
-			logvalf[6],		// motorCurrentL
-			logvalf[7],		// motorCurrentR
-			logvalf[8],		// slipDistScaleRaw
-			logvalf[9],		// slipDistScaleF
+			logvalf[5],		// motorCurrentL
+			logvalf[6],		// motorCurrentR
+			logvalf[7],		// slipDistScaleF
 			logval32[1],	// distEncRaw_p
 			logval32[2],	// distCorr_p
 			logval32[3],	// distSlipLoss_p

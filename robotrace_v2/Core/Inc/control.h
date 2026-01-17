@@ -71,6 +71,7 @@
 #define SLIP_CUR_MIN_A             0.05f   // ほぼ惰性/停止時は補正を無効化
 
 // スリップ距離補正パラメータ
+#define SLIP_DIST_CORRECTION_ENABLE	0		// encTotalOptimal補正の有効/無効
 #define SLIP_DIST_MIN_SCALE			0.6f	// 要調整
 #define SLIP_DIST_MIN_SCALE_LAT		0.7f	// 要調整
 #define SLIP_DIST_LPF_COEF_DOWN		0.2f	// 悪化追従
@@ -155,8 +156,7 @@ void writeTgtspeeds(void);
 void readTgtspeeds(void);
 void checkCrossLine(void);
 void updateSlipDetection(void);
-float getSlipDeltaImu(void);
-float getSlipDeltaEnc(void);
+float getSlipIndicatorRaw(void);
 float getSlipIndicatorFiltered(void);
 bool getSlipFlag(void);
 bool getSlipFlagLat(void);

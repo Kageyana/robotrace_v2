@@ -191,7 +191,7 @@ void BMI088getAccele(void)
 	accelVal[2] = ((rawData[6] << 8) | rawData[5]) - acceleOffset[2];
 
 	BMI088val.accele.x = (float)accelVal[0] / ACCELELSB; // x軸加速度[g]
-	BMI088val.accele.y = (float)accelVal[1] / ACCELELSB; // y軸加速度[g]
+	BMI088val.accele.y = (float)accelVal[1] / ACCELELSB * -1; // y軸加速度[g]
 	BMI088val.accele.z = (float)accelVal[2] / ACCELELSB; // z軸加速度[g]
 #endif
 }

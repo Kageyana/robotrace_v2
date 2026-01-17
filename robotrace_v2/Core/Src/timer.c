@@ -170,13 +170,11 @@ void Interrupt1ms(void)
 					BMI088val.gyro.z,
 					BMI088val.accele.x,
 					BMI088val.accele.y,
-					getSlipDeltaImu(),
-					getSlipDeltaEnc(),
+					getSlipIndicatorRaw(),
 					getSlipIndicatorFiltered(),	// slipRatioLat(LPF後)
 					motorCurrentL,
 					motorCurrentR,
 					// 距離補正ログ
-					Control_GetSlipDistScaleRaw(),
 					Control_GetSlipDistScale()
 				);
 #else

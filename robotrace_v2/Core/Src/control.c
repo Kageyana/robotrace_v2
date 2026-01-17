@@ -1141,7 +1141,9 @@ static void slipDistUpdate(float rawScale)
 	distCorr_p += dCorr_i;
 	int32_t dLoss_p = dEnc_p - dCorr_i;
 	distSlipLoss_p += dLoss_p;
+#if SLIP_DIST_CORRECTION_ENABLE
 	encTotalOptimal -= dLoss_p;
+#endif
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 slipPrimeSpeedHist
@@ -1507,13 +1509,9 @@ void updateSlipDetection(void)
 // 				getSlipFlagLat
 // 処理概要     割り込み外からスリップ検出結果を参照するためのアクセサ
 ///////////////////////////////////////////////////////////////////////////
-float getSlipDeltaImu(void)
+float getSlipIndicatorRaw(void)
 {
-	return slipDeltaImu;
-}
-float getSlipDeltaEnc(void)
-{
-	return slipDeltaEnc;
+	return slipIndicatorRaw;
 }
 float getSlipIndicatorFiltered(void)
 {
@@ -1555,10 +1553,6 @@ int32_t Control_GetDistSlipLoss_p(void)
 float Control_GetSlipDistScale(void)
 {
 	return slipDistScaleF;
-}
-float Control_GetSlipDistScaleRaw(void)
-{
-	return slipDistScaleRaw;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setEncoderVal
