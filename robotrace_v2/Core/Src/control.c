@@ -1566,6 +1566,18 @@ float Control_GetDistCorr_m(void)
 {
 	return distCorr_m;
 }
+/////////////////////////////////////////////////////////////////////
+// モジュール名 Control_ApplyMarkerCorrection_p
+// 処理概要     マーカー補正値をスリップ補正後パルスへ反映する
+// 引数         diff_p: 補正量[パルス]
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void Control_ApplyMarkerCorrection_p(int32_t diff_p)
+{
+	encTotalOptimal -= diff_p;	// 走行距離の補正反映
+	distCorr_p -= diff_p;		// 補正後パルスを同期
+	distCorrFrac_p = 0.0f;		// 端数を破棄して一致性を安定化
+}
 // スリップ距離補正（パルス版）
 int32_t Control_GetDistEncRaw_p(void)
 {

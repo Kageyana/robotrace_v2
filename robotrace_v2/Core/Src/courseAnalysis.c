@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "courseAnalysis.h"
+#include "control.h"
 #include "fatfs.h"
 #include "PIDcontrol.h"
 #include "markerSensor.h"
@@ -919,7 +920,7 @@ void processMarkerEvent(void) {
 							diff = -stepLimit;
 						}
 						int32_t errorDistance = encTotalOptimal - DistanceOptimal;	// 補正前の距離誤差を保持
-						encTotalOptimal -= diff;	// 実距離を段階補正
+						Control_ApplyMarkerCorrection_p(diff);	// マーカー補正をスリップ補正後パルスへ反映
 						DistanceOptimal = encTotalOptimal - errorDistance;	// 誤差を維持したまま目標距離を更新
 						int32_t markerIndex = markerPos[nearestIdx].indexPPAD;	// PPAD側の対応インデックス
 						if (markerIndex >= 0 && markerIndex < numPPADarry) {
