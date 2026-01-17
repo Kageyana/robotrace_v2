@@ -1374,14 +1374,16 @@ void updateSlipDetection(void)
 	// 横判定のカウントを許可する条件（PWMが小さい区間は止める）
 	// デフォルトはPWM/電流ゲートなしの条件
 	bool latCountEnabled = latEnabled;
-	// LatのON判定は電流ゲートも満たした時だけ進める
-	bool latOnCountEnabled = latCountEnabled;
+	// LatのON判定は瞬時電流ゲートも満たした時だけ進める
+	bool latOnCountEnabled = latEnabled;
 	bool latCoastHardClear = false;
 #if SLIP_CUR_ENABLE
 	// SLIP_CUR_ENABLE=1ではPWM/電流ゲートを適用
 	latCountEnabled = latEnabled && (st->pwmSumF > SLIP_PWM_LAT_COUNT_MIN);
-	// LatのON判定は電流和の閾値も満たす場合のみ進める
-	latOnCountEnabled = latCountEnabled && (st->iSumF > SLIP_ISUM_LAT_COUNT_MIN);
+	// LatのON判定は瞬時PWM/電流の閾値も満たす場合のみ進める
+	latOnCountEnabled = latEnabled
+			&& (pwmSum > SLIP_PWM_LAT_COUNT_MIN)
+			&& (iSum > SLIP_ISUM_LAT_COUNT_MIN);
 	// 惰性/低トルク時は横判定を強制クリアする
 	latCoastHardClear = (!calibrateMotorCurrent)
 			&& (st->pwmSumF < SLIP_PWM_COAST_MAX)
