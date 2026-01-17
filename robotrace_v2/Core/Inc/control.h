@@ -158,6 +158,8 @@ float getSlipthresholdHigh(void);
 float getSlipthresholdLow(void);
 float Control_GetDistEncRaw_m(void);
 float Control_GetDistCorr_m(void);
+// マーカー補正をスリップ補正後パルスへ反映
+void Control_ApplyMarkerCorrection_p(int32_t diff_p);
 // スリップ距離補正（パルス版）
 int32_t Control_GetDistEncRaw_p(void);
 int32_t Control_GetDistCorr_p(void);
