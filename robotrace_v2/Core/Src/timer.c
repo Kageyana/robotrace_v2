@@ -50,7 +50,11 @@ void Interrupt1ms(void)
 			BMI088getAccele();	// 加速度取得
 			calcDegrees();		// コンプリメンタリフィルタで角度算出
 			calcVelocity();		// 加速度から速度算出
-			updateSlipDetection(); // スリップ検出（Δv比率とフラグ更新を1msで実行）
+			// スリップ距離補正（パルス版）
+			if (patternTrace >= 12 && patternTrace < 100)
+			{
+				updateSlipDetection(); // スリップ検出（Δv比率とフラグ更新を1msで実行）
+			}
 			// motorControlYawRate();	// 角速度制御
 			// motorControlYaw();		// 角度制御
 		}
@@ -136,11 +140,6 @@ void Interrupt1ms(void)
 
 			if (modeLOG)
 			{
-				// 距離補正ログ用の値を取得
-				float distEncRaw_m = Control_GetDistEncRaw_m();
-				float distCorr_m = Control_GetDistCorr_m();
-				float distSlipLoss_m = distEncRaw_m - distCorr_m;
-
 				// CALCDISTANCEごとにログを保存
 #ifdef LOG_RUNNING_WRITE
 				writeLogBufferPuts(
@@ -154,7 +153,7 @@ void Interrupt1ms(void)
 					(uint8_t)getSlipFlag(),
 					(uint8_t)getSlipFlagLat(),
 					// 16bit
-					cntRun,
+					(uint16_t)cntRun,
 					encCurrentN,
 					optimalIndex,
 					lineTraceOmegaFBCtrl.pwm,
@@ -162,7 +161,11 @@ void Interrupt1ms(void)
 					veloCtrlL.pwm,
 					veloCtrlR.pwm,
 					// 32bit
-					encTotalOptimal,
+					(uint32_t)encTotalOptimal,
+					// スリップ距離補正（パルス版）
+					(uint32_t)Control_GetDistEncRaw_p(),
+					(uint32_t)Control_GetDistCorr_p(),
+					(uint32_t)Control_GetDistSlipLoss_p(),
 					// float型
 					BMI088val.gyro.z,
 					BMI088val.accele.x,
@@ -174,10 +177,7 @@ void Interrupt1ms(void)
 					motorCurrentR,
 					// 距離補正ログ
 					Control_GetSlipDistScaleRaw(),
-					Control_GetSlipDistScale(),
-					distEncRaw_m,
-					distCorr_m,
-					distSlipLoss_m
+					Control_GetSlipDistScale()
 				);
 #else
 				writeLogBufferPrint(); // バッファにログを保存

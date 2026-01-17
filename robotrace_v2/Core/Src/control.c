@@ -79,6 +79,11 @@ static float slipDistScaleF = 1.0f;						// 距離補正スケール（LPF後）
 static float distEncRaw_m = 0.0f;						// エンコーダ積算距離[m]（生）
 static float distCorr_m = 0.0f;							// 補正後距離[m]
 static float distSlipLoss_m = 0.0f;						// スリップ損失距離[m]
+// スリップ距離補正（パルス版）
+static int32_t distEncRaw_p = 0;						// 生パルス積算
+static int32_t distCorr_p = 0;							// 補正後パルス積算
+static int32_t distSlipLoss_p = 0;						// 生 - 補正 の積算
+static float distCorrFrac_p = 0.0f;					// 補正後パルスの小数残差
 // スリップ検出用の内部状態（RAM節約のためSLIP_CUR_ENABLEでメンバ切り替え）
 typedef struct {
 	bool prevRunning;
@@ -96,8 +101,10 @@ typedef struct {
 	float iSumF;
 #endif
 } SlipDetState;
-
 static SlipDetState slipDetState = {0};
+// スリップ距離補正（パルス版）
+static void slipResetAll(SlipDetState *st);
+static void slipDistReset(void);
 // タイマ関連
 uint32_t cntRun = 0;
 int16_t countdown;
@@ -537,12 +544,28 @@ void loopSystem(void)
 		if (SGmarker > 0)
 		{
 			// 変数初期化
+			// スリップ距離補正（パルス版）
+			// スタート地点基準で状態を初期化
+			// スリップ距離補正（パルス版）
+			uint32_t pm = __get_PRIMASK();
+			__disable_irq();
 			encTotalN = 0;
 			encTotalOptimal = 0;
 			encLog = 0;
-			DistanceOptimal = 0;
+			encPID = 0;
+			enc1 = 0;
+			encRightMarker = 0;
+			encCurve = 0;
+			encClick = 0;
 			cntRun = 0;
 			cntLog = 0;
+			slipResetAll(&slipDetState);
+			slipDistReset();
+			if (pm == 0U)
+			{
+				__enable_irq();
+			}
+			DistanceOptimal = 0;
 			optimalIndex = 0;
 			clearIMUval(); // IMU値初期化
 			optimalIndex = 0;
@@ -560,7 +583,6 @@ void loopSystem(void)
 			break;
 		}
 		break;
-
 	case 12:
 		// 目標速度設定
 		if (optimalTrace == BOOST_NONE)
@@ -1106,6 +1128,11 @@ static void slipDistReset(void)
 	distEncRaw_m = 0.0f;
 	distCorr_m = 0.0f;
 	distSlipLoss_m = 0.0f;
+	// スリップ距離補正（パルス版）
+	distEncRaw_p = 0;
+	distCorr_p = 0;
+	distSlipLoss_p = 0;
+	distCorrFrac_p = 0.0f;
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 slipDistUpdate
@@ -1126,6 +1153,17 @@ static void slipDistUpdate(float rawScale)
 	float dCorr_m = dEnc_m * slipDistScaleF;
 	distCorr_m += dCorr_m;
 	distSlipLoss_m += (dEnc_m - dCorr_m);
+
+	// スリップ距離補正（パルス版）
+	int32_t dEnc_p = (int32_t)encCurrentN;
+	distEncRaw_p += dEnc_p;
+	float tmp_p = ((float)dEnc_p * slipDistScaleF) + distCorrFrac_p;
+	int32_t dCorr_i = (int32_t)tmp_p;
+	distCorrFrac_p = tmp_p - (float)dCorr_i;
+	distCorr_p += dCorr_i;
+	int32_t dLoss_p = dEnc_p - dCorr_i;
+	distSlipLoss_p += dLoss_p;
+	encTotalOptimal -= dLoss_p;
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 slipPrimeSpeedHist
@@ -1527,6 +1565,19 @@ float Control_GetDistEncRaw_m(void)
 float Control_GetDistCorr_m(void)
 {
 	return distCorr_m;
+}
+// スリップ距離補正（パルス版）
+int32_t Control_GetDistEncRaw_p(void)
+{
+	return distEncRaw_p;
+}
+int32_t Control_GetDistCorr_p(void)
+{
+	return distCorr_p;
+}
+int32_t Control_GetDistSlipLoss_p(void)
+{
+	return distSlipLoss_p;
 }
 float Control_GetSlipDistScale(void)
 {
