@@ -74,6 +74,7 @@ static int32_t distEncRaw_p = 0;						// 生パルス積算
 static int32_t distCorr_p = 0;							// 補正後パルス積算
 static int32_t distSlipLoss_p = 0;						// 生 - 補正 の積算
 static float distCorrFrac_p = 0.0f;						// 補正後パルスの小数残差
+static int32_t encCurrentCorr_p = 0;					// 補正後の現在速度[pulse/1ms]
 // スリップ検出用の内部状態（RAM節約のためSLIP_CUR_ENABLEでメンバ切り替え）
 typedef struct {
 	bool prevRunning;
@@ -95,6 +96,7 @@ static SlipDetState slipDetState = {0};
 // スリップ距離補正（パルス版）
 static void slipResetAll(SlipDetState *st);
 static void slipDistReset(void);
+static int32_t slipDistUpdateAndApply_p(float rawScale, int32_t dEncRaw_p);
 // タイマ関連
 uint32_t cntRun = 0;
 int16_t countdown;
@@ -1116,29 +1118,29 @@ static void slipDistReset(void)
 	distCorrFrac_p = 0.0f;
 }
 ///////////////////////////////////////////////////////////////////////////
-// モジュール名 slipDistUpdate
-// 処理概要     距離補正スケールのLPF更新と距離積算
+// モジュール名 slipDistUpdateAndApply_p
+// 処理概要     距離補正スケールのLPF更新とパルス補正
 // 引数         rawScale: 距離補正スケール（生）
-// 戻り値       なし
+//              dEncRaw_p: 生パルス[1ms]
+// 戻り値       補正後パルス[1ms]
 ///////////////////////////////////////////////////////////////////////////
-static void slipDistUpdate(float rawScale)
+static int32_t slipDistUpdateAndApply_p(float rawScale, int32_t dEncRaw_p)
 {
 	// 距離補正スケールをLPFで平滑化（悪化は速く/回復は遅く）
 	float coef = (rawScale < slipDistScaleF) ? SLIP_DIST_LPF_COEF_DOWN : SLIP_DIST_LPF_COEF_UP;
 	slipDistScaleF = lpf1(slipDistScaleF, rawScale, coef);
 
 	// スリップ距離補正（パルス版）
-	int32_t dEnc_p = (int32_t)encCurrentN;
-	distEncRaw_p += dEnc_p;
-	float tmp_p = ((float)dEnc_p * slipDistScaleF) + distCorrFrac_p;
+	distEncRaw_p += dEncRaw_p;
+	float tmp_p = ((float)dEncRaw_p * slipDistScaleF) + distCorrFrac_p;
 	int32_t dCorr_i = (int32_t)tmp_p;
 	distCorrFrac_p = tmp_p - (float)dCorr_i;
 	distCorr_p += dCorr_i;
-	int32_t dLoss_p = dEnc_p - dCorr_i;
+	int32_t dLoss_p = dEncRaw_p - dCorr_i;
 	distSlipLoss_p += dLoss_p;
-#if SLIP_DIST_CORRECTION_ENABLE
-	encTotalOptimal -= dLoss_p;
-#endif
+
+	encCurrentCorr_p = dCorr_i;
+	return dCorr_i;
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 slipPrimeSpeedHist
@@ -1259,7 +1261,6 @@ void updateSlipDetection(void)
 		slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF_LAT);
 		// 低速スキップ領域では距離補正スケールを1.0へ寄せる
 		slipDistScaleRaw = 1.0f;
-		slipDistUpdate(slipDistScaleRaw);
 		return;
 	}
 	st->prevMoving = true;
@@ -1270,7 +1271,6 @@ void updateSlipDetection(void)
 		slipPrimeSpeedHist(st, encSpeed);
 		// 初回は距離補正スケールを1.0で積算
 		slipDistScaleRaw = 1.0f;
-		slipDistUpdate(slipDistScaleRaw);
 		return; // 初回は判定しない
 	}
 
@@ -1514,9 +1514,6 @@ void updateSlipDetection(void)
 	slipDistScaleRaw = fminf(scaleLong, scaleLat);
 	float minScale = fminf(SLIP_DIST_MIN_SCALE, SLIP_DIST_MIN_SCALE_LAT);
 	slipDistScaleRaw = fminf(fmaxf(slipDistScaleRaw, minScale), 1.0f);
-
-	// 距離補正スケールをLPFで更新し、距離を積算
-	slipDistUpdate(slipDistScaleRaw);
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名	getSlipIndicatorRaw
@@ -1553,6 +1550,10 @@ void Control_ApplyMarkerCorrection_p(int32_t diff_p)
 	distCorr_p -= diff_p;		// 補正後パルスを同期
 	distCorrFrac_p = 0.0f;		// 端数を破棄して一致性を安定化
 }
+int32_t Control_GetEncCurrentCorr_p(void)
+{
+	return encCurrentCorr_p;
+}
 // スリップ距離補正（パルス版）
 int32_t Control_GetDistEncRaw_p(void)
 {
@@ -1570,6 +1571,10 @@ float Control_GetSlipDistScale(void)
 {
 	return slipDistScaleF;
 }
+float Control_GetSlipDistScaleRaw(void)
+{
+	return slipDistScaleRaw;
+}
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setEncoderVal
 // 処理概要     エンコーダ値を変数に加算する
@@ -1578,13 +1583,33 @@ float Control_GetSlipDistScale(void)
 /////////////////////////////////////////////////////////////////////
 void setEncoderVal(void)
 {
+	static bool prevRunning = false;
+	int32_t dEncRaw_p = (int32_t)encCurrentN;
+	bool running = (patternTrace >= 11 && patternTrace < 100);
+	int32_t dEncCorr_p = dEncRaw_p;
+	int32_t dEncUse_p = dEncRaw_p;
+
+	if (running) {
+		dEncCorr_p = slipDistUpdateAndApply_p(slipDistScaleRaw, dEncRaw_p);
+	} else {
+		if (prevRunning) {
+			slipDistReset();
+		}
+		encCurrentCorr_p = dEncRaw_p;
+	}
+	prevRunning = running;
+
+#if SLIP_DIST_CORRECTION_ENABLE
+	dEncUse_p = dEncCorr_p;
+#endif
+
 	// 外部変数
-	enc1 += encCurrentN;			// 通常トレース用
-	encRightMarker += encCurrentN;	// ゴールマーカ判定用
-	encCurve += encCurrentN;		// カーブ処理用
-	encTotalOptimal += encCurrentN; // 2次走行用
-	encLog += encCurrentN;			// 一定距離ごとにログを保存する用
-	encPID += encCurrentN;			// 距離制御用
+	enc1 += dEncUse_p;			// 通常トレース用
+	encRightMarker += dEncUse_p;	// ゴールマーカ判定用
+	encCurve += dEncUse_p;		// カーブ処理用
+	encTotalOptimal += dEncUse_p; // 2次走行用
+	encLog += dEncUse_p;			// 一定距離ごとにログを保存する用
+	encPID += dEncUse_p;			// 距離制御用
 	encClick += encCurrentL;		// ホイールクリック用
 }
 ///////////////////////////////////////////////////////////////////////////

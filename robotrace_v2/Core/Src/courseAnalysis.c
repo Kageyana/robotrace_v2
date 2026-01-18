@@ -724,16 +724,16 @@ int16_t calcXYcies(int logNumber)
 // 引数         encpulse:エンコーダパルス angVelo:角速度[deg/s]
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void calcXYcie(float encpulse, float angVelo, float dt)
+void calcXYcie(int16_t encpulse, float angVelo, float dt)
 {
 	static float velocity, degzR;
 
 	xydegz = xydegz + (angVelo * dt);		// 角度
 	degzR = xydegz * (M_PI / 180.0F);		// [rad]に変換
-	velocity = encpulse / PALSE_MILLIMETER; // 速度
+	velocity = (float)encpulse / PALSE_MILLIMETER * 1000; // 速度
 
-	xycie.x = xycie.x + (velocity * sin(degzR));
-	xycie.y = xycie.y + (velocity * cos(degzR));
+	xycie.x = xycie.x + (velocity * sin(degzR) * dt);
+	xycie.y = xycie.y + (velocity * cos(degzR) * dt);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 clearXYcie (cie=Coordinate)

@@ -191,6 +191,7 @@ void createLog(void)
 	setLogStr("distEncRaw_p", "%d");
 	setLogStr("distCorr_p", "%d");
 	setLogStr("distSlipLoss_p", "%d");
+	setLogStr("encCurrentCorr_p", "%d");
 	setLogStr("x", "%f");
 	setLogStr("y", "%f");
 
@@ -584,13 +585,12 @@ void endLog(void)
 		}
 		beforeSpeed = speed;
 
-		dt = (float)(time - beforeTime) / 1000; // 経過時間
+		dt = (float)(time - beforeTime) / 1000.0f; // 経過時間
 
 		cnt = LOG_NUM_FLOAT;	// float型のログの続きを使用する
 		logvalf[cnt++] = calcROC(speed, zg, dt); // 曲率半径を計算
 
-		dt = (float)(time - beforeTime) / 1000;			// 経過時間
-		calcXYcie(speed, zg, dt);	// xy座標を計算
+		calcXYcie((int16_t)logval32[4], zg, dt);	// xy座標を計算
 		logvalf[cnt++] = xycie.x;
 		logvalf[cnt++] = xycie.y;
 		beforeTime = time; // 時間を更新
@@ -623,6 +623,7 @@ void endLog(void)
 			logval32[1],	// distEncRaw_p
 			logval32[2],	// distCorr_p
 			logval32[3],	// distSlipLoss_p
+			logval32[4],	// encCurrentCorr_p
 
 			logvalf[xIdx],	// x
 			logvalf[yIdx]	// y

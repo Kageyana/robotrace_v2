@@ -77,9 +77,9 @@
 
 // スリップ距離補正パラメータ
 #define SLIP_DIST_CORRECTION_ENABLE	0		// encTotalOptimal補正の有効/無効
-#define SLIP_DIST_MIN_SCALE			0.6f	// 要調整
-#define SLIP_DIST_MIN_SCALE_LAT		0.8f	// 要調整
-#define SLIP_DIST_LPF_COEF_DOWN		0.12f	// 悪化追従
+#define SLIP_DIST_MIN_SCALE			0.8f	// 要調整
+#define SLIP_DIST_MIN_SCALE_LAT		0.9f	// 要調整
+#define SLIP_DIST_LPF_COEF_DOWN		0.15f	// 悪化追従
 #define SLIP_DIST_LPF_COEF_UP		0.06f	// 回復追従
 
 // ゴール
@@ -167,6 +167,7 @@ float getSlipIndicatorFiltered(void);
 bool getSlipFlag(void);
 bool getSlipFlagLat(void);
 // スリップ距離補正（パルス版）
+int32_t Control_GetEncCurrentCorr_p(void);
 int32_t Control_GetDistEncRaw_p(void);
 int32_t Control_GetDistCorr_p(void);
 int32_t Control_GetDistSlipLoss_p(void);

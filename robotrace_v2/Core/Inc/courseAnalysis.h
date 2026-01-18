@@ -88,7 +88,7 @@ float asignVelocity(int16_t ROC);
 int cmpfloat(const void *n1, const void *n2);
 int16_t readLogTest(int logNumber);
 int16_t calcXYcies(int logNumber);
-void calcXYcie(float encpulse, float angVelo, float dt);
+void calcXYcie(int16_t encpulse, float angVelo, float dt);
 void clearXYcie(void);
 void setShortCutTarget(void);
 void processMarkerEvent(void);

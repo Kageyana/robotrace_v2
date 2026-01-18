@@ -294,9 +294,15 @@ void motorControlSpeed(void)
 	static int16_t feedForwardPwm = 0;	/* フィードフォワードPWM値を保持して再利用 */
 	float targetSpeed_mm_s;
 	float crr;
+	int32_t dEncSpeed_p;
 
 	// 駆動モーター用PWM値計算
-	Dev = (int16_t)targetSpeed - encCurrentN; // 偏差
+#if SLIP_DIST_CORRECTION_ENABLE
+	dEncSpeed_p = Control_GetEncCurrentCorr_p();
+#else
+	dEncSpeed_p = encCurrentN;
+#endif
+	Dev = (int16_t)targetSpeed - dEncSpeed_p; // 偏差
 	// 目標値を変更したタイミングで積分項リセットとフィードフォワード更新を同時に実施
 	if (targetSpeed != speedTargetBefore)
 	{

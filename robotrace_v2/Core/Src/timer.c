@@ -166,6 +166,7 @@ void Interrupt1ms(void)
 					(uint32_t)Control_GetDistEncRaw_p(),
 					(uint32_t)Control_GetDistCorr_p(),
 					(uint32_t)Control_GetDistSlipLoss_p(),
+					(uint32_t)Control_GetEncCurrentCorr_p(),
 					// float型
 					BMI088val.gyro.z,
 					BMI088val.accele.x,
