@@ -63,6 +63,7 @@ static uint16_t slipHighCount = 0;						// スリップ立ち上がり判定用�
 static uint16_t slipLowCount = 0;						// スリップ解除判定用の連続カウンタ
 static uint16_t slipHighCountLat = 0;					// 横スリップ立ち上がり判定用の連続カウンタ
 static uint16_t slipLowCountLat = 0;					// 横スリップ解除判定用の連続カウンタ
+static uint16_t slipISumOkCount = 0;					// Lat ON用の瞬時電流連続カウンタ
 static bool slipFlag = false;							// 縦スリップ判定フラグ
 static bool slipFlagLat = false;						// 横スリップ判定フラグ
 // スリップ距離補正用の状態
@@ -1079,6 +1080,7 @@ static void slipResetAll(SlipDetState *st)
 	slipLowCount = 0;
 	slipHighCountLat = 0;
 	slipLowCountLat = 0;
+	slipISumOkCount = 0;
 	slipFlag = false;
 	slipFlagLat = false;
 	st->slipPrimed = false;
@@ -1260,7 +1262,8 @@ void updateSlipDetection(void)
 		slipDeltaImu = 0.0f;
 		// フィルタ値だけはゼロへ軽く収束
 		slipIndicatorRaw = lpf1(slipIndicatorRaw, 0.0f, SLIP_LPF_COEF);
-		slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF);
+		// Latは専用LPFで0へ収束させる
+		slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF_LAT);
 		// 低速スキップ領域では距離補正スケールを1.0へ寄せる
 		slipDistScaleRaw = 1.0f;
 		slipDistUpdate(slipDistScaleRaw);
@@ -1333,10 +1336,11 @@ void updateSlipDetection(void)
 	//==========================================================
 	// PWM/電流の合計（惰性/低トルク判定用）
 	//==========================================================
-#if SLIP_CUR_ENABLE
-	// PWM/電流のLPF更新（SLIP_CUR_ENABLE=1のみ）
+	// 瞬時値はON判定ゲートでも使用する
 	float pwmSum = fabsf((float)motorpwmL) + fabsf((float)motorpwmR);
 	float iSum = fabsf(motorCurrentL) + fabsf(motorCurrentR);
+#if SLIP_CUR_ENABLE
+	// PWM/電流のLPF更新（SLIP_CUR_ENABLE=1のみ）
 	st->pwmSumF = lpf1(st->pwmSumF, pwmSum, SLIP_PWM_LPF_COEF);
 	st->iSumF = lpf1(st->iSumF, iSum, SLIP_CUR_LPF_COEF);
 #endif
@@ -1373,6 +1377,8 @@ void updateSlipDetection(void)
 	// 横判定のカウントを許可する条件（PWMが小さい区間は止める）
 	// デフォルトはPWM/電流ゲートなしの条件
 	bool latCountEnabled = latEnabled;
+	// LatのON判定は瞬時電流ゲートも満たした時だけ進める
+	bool latOnCountEnabled = latEnabled;
 	bool latCoastHardClear = false;
 #if SLIP_CUR_ENABLE
 	// SLIP_CUR_ENABLE=1ではPWM/電流ゲートを適用
@@ -1382,6 +1388,21 @@ void updateSlipDetection(void)
 			&& (st->pwmSumF < SLIP_PWM_COAST_MAX)
 			&& (st->iSumF < SLIP_ISUM_COAST_MAX);
 #endif
+	// LatのON判定は瞬時電流が連続で閾値以上の時だけ許可する
+	bool iSumOk = (iSum > SLIP_ISUM_LAT_COUNT_MIN);
+	if (!latEnabled || latCoastHardClear) {
+		slipISumOkCount = 0;
+	} else if (iSumOk) {
+		if (slipISumOkCount < SLIP_ISUM_LAT_COUNT_N) {
+			slipISumOkCount++;
+		}
+	} else {
+		slipISumOkCount = 0;
+	}
+	// LatのON判定は瞬時PWM/電流の閾値も満たす場合のみ進める
+	latOnCountEnabled = latEnabled
+			&& (pwmSum > SLIP_PWM_LAT_COUNT_MIN)
+			&& (slipISumOkCount >= SLIP_ISUM_LAT_COUNT_N);
 
 	// 低加速度では見ない（縦/横の誤検出抑制）
 	if (accMag < 0.8f) {
@@ -1401,7 +1422,8 @@ void updateSlipDetection(void)
 			slipLowCountLat = 0;
 			slipFlagLat = false;
 		} else {
-			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF);
+			// Latは専用LPFで0へ収束させる
+			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF_LAT);
 		}
 	} else {
 		// 縦スリップ指標（absDxをLPF）
@@ -1413,13 +1435,12 @@ void updateSlipDetection(void)
 			slipHighCountLat = 0;
 			slipLowCountLat = 0;
 			slipFlagLat = false;
-		} else if (latCountEnabled) {
-			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, absDy, SLIP_LPF_COEF);
 		} else if (latEnabled) {
-			// 旋回中だがPWMが小さい区間は0へ収束させる
-			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF);
+			// 旋回中はPWM/電流ゲートに関係なくLat指標を追従させる
+			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, absDy, SLIP_LPF_COEF_LAT);
 		} else {
-			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF);
+			// 旋回外はLat指標を0へ収束させる
+			slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF_LAT);
 		}
 	}
 
@@ -1451,22 +1472,25 @@ void updateSlipDetection(void)
 	float slipLatHigh = SLIP_LAT_HIGH * curScale;
 	float slipLatLow  = SLIP_LAT_LOW  * curScale;
 	if (!slipFlagLat) {
-		if (latCountEnabled && slipIndicatorFiltered > slipLatHigh) {
-			if (++slipHighCountLat >= SLIP_HIGH_COUNT_REQ) {
-				slipFlagLat = true;
+		if (latOnCountEnabled) {
+			// LatのON判定はPWM/電流ゲート許可時のみ進める
+			if (slipIndicatorFiltered > slipLatHigh) {
+				if (++slipHighCountLat >= SLIP_HIGH_COUNT_REQ_LAT) {
+					slipFlagLat = true;
+					slipHighCountLat = 0;
+				}
+			} else {
 				slipHighCountLat = 0;
 			}
 		} else {
+			// ゲート未達時はON側カウントを進めない
 			slipHighCountLat = 0;
 		}
 		slipLowCountLat = 0;
 	} else {
-#if SLIP_CUR_ENABLE
-		if (!latEnabled || st->pwmSumF <= SLIP_PWM_LAT_COUNT_MIN || slipIndicatorFiltered < slipLatLow) {
-#else
-		if (!latEnabled || slipIndicatorFiltered < slipLatLow) {
-#endif
-			if (++slipLowCountLat >= SLIP_LOW_COUNT_REQ) {
+		// LatのOFF判定はゲート未達でも進めて解除できるようにする
+		if (slipIndicatorFiltered < slipLatLow) {
+			if (++slipLowCountLat >= SLIP_LOW_COUNT_REQ_LAT) {
 				slipFlagLat = false;
 				slipLowCountLat = 0;
 			}
@@ -1487,7 +1511,7 @@ void updateSlipDetection(void)
 		scaleLong = 1.0f - sevLong * (1.0f - SLIP_DIST_MIN_SCALE);
 	}
 
-	if (latCountEnabled && (slipLatHigh > slipLatLow)) {
+	if (latOnCountEnabled && (slipLatHigh > slipLatLow)) {
 		float sevLat = (slipIndicatorFiltered - slipLatLow) / (slipLatHigh - slipLatLow);
 		sevLat = fminf(fmaxf(sevLat, 0.0f), 1.0f);
 		scaleLat = 1.0f - sevLat * (1.0f - SLIP_DIST_MIN_SCALE_LAT);

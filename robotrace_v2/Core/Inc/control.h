@@ -43,6 +43,9 @@
 #define SLIP_HIGH_COUNT_REQ			6U		// 上側しきい値を超え続ける必要サンプル数
 #define SLIP_LOW_COUNT_REQ			6U		// 下側しきい値を下回り続ける必要サンプル数
 #define SLIP_LPF_COEF				0.015f	// スリップ指標に掛ける一次LPF係数
+#define SLIP_LPF_COEF_LAT			0.05f	// Lat指標は速め（~20ms程度を想定）
+#define SLIP_HIGH_COUNT_REQ_LAT		5U		// Lat ONは5ms連続で良い
+#define SLIP_LOW_COUNT_REQ_LAT		5U		// Lat OFFも5ms連続（まずは同じ）
 
 #define SLIP_ACC_BIAS_COEF		0.001f   // ≒ dt/1s（1秒時定数くらい）
 #define SLIP_ACC_LPF_COEF		0.03f    // ≒ 20ms前後のLPF
@@ -60,6 +63,8 @@
 #define SLIP_PWM_LAT_COUNT_MIN	150.0f // 横判定カウントを許可する最低PWM合計（LPF後）
 #define SLIP_PWM_COAST_MAX		150.0f // 惰性判定PWM合計（LPF後）
 #define SLIP_ISUM_COAST_MAX		0.12f  // 惰性判定電流合計[A]（LPF後）
+#define SLIP_ISUM_LAT_COUNT_MIN	0.25f  // [A] Lat ON判定に使う瞬時電流和の下限（要ログで再調整）
+#define SLIP_ISUM_LAT_COUNT_N	3U     // [count] iSumが閾値以上である連続サンプル数（短スパイク除去）
 #define SLIP_LAT_CLEAR_COEF		0.10f  // 惰性時に横指標を0へ戻す係数（SLIP_LPF_COEFより強め）
 #define SLIP_PWM_LPF_COEF		0.02f  // PWM合計のLPF係数
 
