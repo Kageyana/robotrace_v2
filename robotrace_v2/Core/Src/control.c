@@ -537,8 +537,6 @@ void loopSystem(void)
 			// スリップ距離補正（パルス版）
 			// スタート地点基準で状態を初期化
 			// スリップ距離補正（パルス版）
-			uint32_t pm = __get_PRIMASK();
-			__disable_irq();
 			encTotalN = 0;
 			encTotalOptimal = 0;
 			encLog = 0;
@@ -551,10 +549,6 @@ void loopSystem(void)
 			cntLog = 0;
 			slipResetAll(&slipDetState);
 			slipDistReset();
-			if (pm == 0U)
-			{
-				__enable_irq();
-			}
 			DistanceOptimal = 0;
 			optimalIndex = 0;
 			clearIMUval(); // IMU値初期化
