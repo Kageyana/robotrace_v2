@@ -75,6 +75,10 @@ static int32_t distCorr_p = 0;							// 補正後パルス積算
 static int32_t distSlipLoss_p = 0;						// 生 - 補正 の積算
 static float distCorrFrac_p = 0.0f;						// 補正後パルスの小数残差
 static int32_t encCurrentCorr_p = 0;					// 補正後の現在速度[pulse/1ms]
+// 前後方向の融合速度推定
+static float fusedVel_m_s = 0.0f;						// 前後方向の推定速度[m/s]
+static float fusedAccBias_m_s2 = 0.0f;					// 前後加速度のバイアス[m/s^2]
+static float fusedDistFrac_p = 0.0f;					// 融合距離パルスの小数残差
 // スリップ検出用の内部状態（RAM節約のためSLIP_CUR_ENABLEでメンバ切り替え）
 typedef struct {
 	bool prevRunning;
@@ -1116,6 +1120,7 @@ static void slipDistReset(void)
 	distCorr_p = 0;
 	distSlipLoss_p = 0;
 	distCorrFrac_p = 0.0f;
+	fusedDistFrac_p = 0.0f;
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 slipDistUpdateAndApply_p
@@ -1220,6 +1225,8 @@ void updateSlipDetection(void)
 			// 距離補正の状態もリセット
 			slipDistReset();
 		}
+		// 融合速度は停止時にクリア
+		fusedVel_m_s = 0.0f;
 		st->prevRunning = false;
 		st->prevMoving  = false;
 		return;
@@ -1228,6 +1235,8 @@ void updateSlipDetection(void)
 
 	// ---- エンコーダ速度 ----
 	float encSpeed = (float)encCurrentN / PALSE_MILLIMETER;
+	float dt = SLIP_SAMPLE_PERIOD_S;
+	const float alpha = 0.98f;	// コンプリメンタリフィルタ係数（エンコーダ側を重視）
 
 	//==========================================================
 	// 超低速：遷移時だけリセット（微分スパイク防止）
@@ -1251,6 +1260,10 @@ void updateSlipDetection(void)
 			st->axBias = lpf1(st->axBias, ax, SLIP_ACC_BIAS_COEF);
 			st->ayBias = lpf1(st->ayBias, ay, SLIP_ACC_BIAS_COEF);
 		}
+		// 静止時の前後加速度バイアスを更新
+		fusedAccBias_m_s2 = lpf1(fusedAccBias_m_s2, ax, SLIP_ACC_BIAS_COEF);
+		// 静止時は速度推定を0へ収束
+		fusedVel_m_s = lpf1(fusedVel_m_s, 0.0f, 0.2f);
 
 		// ログ残差は停止中に残らないようゼロ化
 		slipDeltaEnc = 0.0f;
@@ -1265,6 +1278,17 @@ void updateSlipDetection(void)
 	}
 	st->prevMoving = true;
 
+	// ---- IMU加速度（ボディ座標）----
+	float ax = BMI088val.accele.y * 9.81f;  // 前後
+	float ay = BMI088val.accele.x * 9.81f;  // 左右
+
+	// ---- yaw角速度（rad/s）----
+	float wz = BMI088val.gyro.z * DEG2RAD;
+	// ---- 前後方向の速度融合 ----
+	float imuAcc_m_s2 = ax - fusedAccBias_m_s2;
+	fusedVel_m_s += imuAcc_m_s2 * dt;
+	fusedVel_m_s = (alpha * encSpeed) + ((1.0f - alpha) * fusedVel_m_s);
+
 	// リングバッファ初期化スパイク対策
 	if (!st->slipPrimed) {
 		// 開始直後のバッファ初期化
@@ -1273,15 +1297,6 @@ void updateSlipDetection(void)
 		slipDistScaleRaw = 1.0f;
 		return; // 初回は判定しない
 	}
-
-	// ---- IMU加速度（ボディ座標）----
-	float ax = BMI088val.accele.y * 9.81f;  // 前後
-	float ay = BMI088val.accele.x * 9.81f;  // 左右
-
-	// ---- yaw角速度（rad/s）----
-	float wz = BMI088val.gyro.z * DEG2RAD;
-
-	float dt = SLIP_SAMPLE_PERIOD_S;
 
 	//==========================================================
 	// ENC加速度（微分）
@@ -1538,6 +1553,10 @@ bool getSlipFlagLat(void)
 {
 	return slipFlagLat;
 }
+float Control_GetFusedVel_m_s(void)
+{
+	return fusedVel_m_s;
+}
 /////////////////////////////////////////////////////////////////////
 // モジュール名 Control_ApplyMarkerCorrection_p
 // 処理概要     マーカー補正値をスリップ補正後パルスへ反映する
@@ -1586,21 +1605,47 @@ void setEncoderVal(void)
 	static bool prevRunning = false;
 	int32_t dEncRaw_p = (int32_t)encCurrentN;
 	bool running = (patternTrace >= 11 && patternTrace < 100);
-	int32_t dEncCorr_p = dEncRaw_p;
+	bool useFused = running && initIMU && !calibratIMU;
 	int32_t dEncUse_p = dEncRaw_p;
+	int32_t fusedDist_pulse = dEncRaw_p;
 
-	if (running) {
-		dEncCorr_p = slipDistUpdateAndApply_p(slipDistScaleRaw, dEncRaw_p);
+	if (useFused) {
+		// 前後方向の融合速度から距離パルスを算出
+		float fusedDist_mm = fusedVel_m_s * DEFF_TIME * 1000.0f;
+		float fusedDist_pulse_f = (fusedDist_mm * PALSE_MILLIMETER) + fusedDistFrac_p;
+		fusedDist_pulse = (int32_t)fusedDist_pulse_f;
+		fusedDistFrac_p = fusedDist_pulse_f - (float)fusedDist_pulse;
+
+		// 距離積算の基準を融合後パルスに置換
+		encCurrentCorr_p = fusedDist_pulse;
+		dEncUse_p = fusedDist_pulse;
+
+		// ログ用に生/補正パルスを更新
+		distEncRaw_p += dEncRaw_p;
+		distCorr_p += fusedDist_pulse;
+		distSlipLoss_p = distEncRaw_p - distCorr_p;
+
+		// encTotalNの増分を融合パルスに置き換える
+		encTotalN += (fusedDist_pulse - dEncRaw_p);
 	} else {
+		encCurrentCorr_p = dEncRaw_p;
+		if (running) {
+			// IMU未使用時は生パルスを利用
+			dEncUse_p = dEncRaw_p;
+			// ログ用に生パルスを積算
+			distEncRaw_p += dEncRaw_p;
+			distCorr_p += dEncRaw_p;
+			distSlipLoss_p = distEncRaw_p - distCorr_p;
+		}
 		if (prevRunning) {
 			slipDistReset();
 		}
-		encCurrentCorr_p = dEncRaw_p;
+		fusedDistFrac_p = 0.0f;
 	}
 	prevRunning = running;
 
 #if SLIP_DIST_CORRECTION_ENABLE
-	dEncUse_p = dEncCorr_p;
+	dEncUse_p = fusedDist_pulse;
 #endif
 
 	// 外部変数
