@@ -567,7 +567,7 @@ int16_t readLogDistanceSlip(int logNumber)
 		}
 
 		// 追加: 集計(サンプル数/最大速度/ROC平均/スリップ回数)
-		float targetSpeedMps = targetSpeedLog / PALSE_MILLIMETER;	// 追加: ログの速度[pulse]を[m/s]へ戻す
+		float targetSpeedMps = encPulse((int32_t)targetSpeedLog);	// 追加: ログの速度[pulse]を[m/s]へ戻す
 		sampleCnt[optimalIdx]++;
 		if (targetSpeedMps > v2Max[optimalIdx])
 		{
