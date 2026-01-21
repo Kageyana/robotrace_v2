@@ -364,29 +364,42 @@ void loopSystem(void)
 
 	switch (patternTrace)
 	{
-	case 0:
-		if (autoStart > 1)
-		{
-			// 2次走行
-			motorPwmOut(0, 0);
-
-			// 目標速度調整
-			// コース解析
-			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-			ssd1306_SetCursor(0, 25);
-			ssd1306_printf(Font_11x18, "Analizing");
-
-			ret = readLogDistance(autoStartAnalize);	// 1次走行のログ番号を使用してコース解析
-			if(ret > 0)
+		case 0:
+			if (autoStart > 1)
 			{
-				// コース解析成功
-				countdown = 2000;							  // カウントダウンスタート
-				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-				ssd1306_SetCursor(56, 28);
-				ssd1306_printf(Font_16x26, "2");
+				// 2次走行
+				motorPwmOut(0, 0);
 
-				patternTrace = 1;
-			}
+				// 目標速度調整
+				// コース解析
+				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+				ssd1306_SetCursor(0, 25);
+				ssd1306_printf(Font_11x18, "Analizing");
+				ssd1306_SetCursor(0, 50);
+				ssd1306_printf(Font_6x8, "log %d", autoStartAnalize);	// 追加: 解析対象ログ番号を表示
+
+				if (autoStart == 2)
+				{
+					ret = readLogDistance(autoStartAnalize);	// 追加: 2走目は1走目ログを解析
+				}
+				else
+				{
+					ret = readLogDistanceSlip(autoStartAnalize);	// 追加: 3走目以降は直前ログをスリップ解析
+					if (ret < 0)
+					{
+						ret = readLogDistance(autoStartAnalize);	// 追加: 解析失敗時は距離解析へフォールバック
+					}
+				}
+				if(ret > 0)
+				{
+					// コース解析成功
+					countdown = 2000;							  // カウントダウンスタート
+					ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+					ssd1306_SetCursor(56, 28);
+					ssd1306_printf(Font_16x26, "%d", autoStart);	// 追加: 走行回数を表示
+
+					patternTrace = 1;
+				}
 			else
 			{
 				// コース解析失敗
@@ -682,15 +695,16 @@ void loopSystem(void)
 		}
 		break;
 
-	case 102:
-		setTargetSpeed(0);
-		motorPwmOutSynth(0, 0, 0, 0);
+		case 102:
+			setTargetSpeed(0);
+			motorPwmOutSynth(0, 0, 0, 0);
 
-		if (modeLOG)
-		{
-			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-			ssd1306_SetCursor(0, 25);
-			ssd1306_printf(Font_11x18, "log %d",fileNumbers[endFileIndex]+1);
+			int16_t savedLogNo = fileNumbers[endFileIndex] + 1;	// 追加: この走行で保存するログ番号
+			if (modeLOG)
+			{
+				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+				ssd1306_SetCursor(0, 25);
+				ssd1306_printf(Font_11x18, "log %d", savedLogNo);
 			ssd1306_SetCursor(0, 45);
 			ssd1306_printf(Font_11x18, "Writing");
 
@@ -700,34 +714,27 @@ void loopSystem(void)
 			ssd1306_printf(Font_11x18, "Written");
 		}
 
-		if (autoStart > 0)
-		{
-			// 自動走行モードのときは再度走行準備へ
-			autoStart++;
-			if(autoStart == 2)
-			{
-				autoStartAnalize = fileNumbers[endFileIndex]+1; // 1次走行のログ番号を保存
-			}
-			else if (autoStart >= 3)
-			{
-				if(autoStart == 3)
+				if (autoStart > 0)
 				{
-					autoStartAnalize++; // 2次走行のログを解析するためにログ番号をインクリメント
+					// 自動走行モードのときは再度走行準備へ
+					autoStart++;
+					autoStartAnalize = savedLogNo;	// 追加: 直前走行ログを次回解析対象にする
+					if (autoStart >= 3)
+					{
+						// 3走目以降は速度を上げる
+						tgtParam.bstStraight *= PARAM_UP_STEP;
+					tgtParam.bst1500 *= PARAM_UP_STEP;
+					tgtParam.bst1300 *= PARAM_UP_STEP;
+					tgtParam.bst1000 *= PARAM_UP_STEP;
+					tgtParam.bst800 *= PARAM_UP_STEP;
+					tgtParam.bst700 *= PARAM_UP_STEP;
+					tgtParam.bst600 *= PARAM_UP_STEP;
+					tgtParam.bst500 *= PARAM_UP_STEP;
+					// tgtParam.bst400			*= PARAM_UP_STEP;
+					// tgtParam.bst300			*= PARAM_UP_STEP;
+					// tgtParam.bst200			*= PARAM_UP_STEP;
+					// tgtParam.bst100			*= PARAM_UP_STEP;
 				}
-				// 3走目以降は速度を上げる
-				tgtParam.bstStraight *= PARAM_UP_STEP;
-				tgtParam.bst1500 *= PARAM_UP_STEP;
-				tgtParam.bst1300 *= PARAM_UP_STEP;
-				tgtParam.bst1000 *= PARAM_UP_STEP;
-				tgtParam.bst800 *= PARAM_UP_STEP;
-				tgtParam.bst700 *= PARAM_UP_STEP;
-				tgtParam.bst600 *= PARAM_UP_STEP;
-				tgtParam.bst500 *= PARAM_UP_STEP;
-				// tgtParam.bst400			*= PARAM_UP_STEP;
-				// tgtParam.bst300			*= PARAM_UP_STEP;
-				// tgtParam.bst200			*= PARAM_UP_STEP;
-				// tgtParam.bst100			*= PARAM_UP_STEP;
-			}
 
 			if (autoStart > 5)
 			{

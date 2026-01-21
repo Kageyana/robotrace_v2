@@ -60,3 +60,13 @@ int32_t encMM(int16_t mm)
 {
 	return PALSE_MILLIMETER * abs(mm);
 }
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 encPulse
+// 処理概要     エンコーダのパルス数をmmに変換して返す
+// 引数         pulse:変換するパルス数
+// 戻り値       変換した長さ[mm]
+///////////////////////////////////////////////////////////////////////////
+float encPulse(int32_t pulse)
+{
+	return (float)abs(pulse) / PALSE_MILLIMETER;
+}

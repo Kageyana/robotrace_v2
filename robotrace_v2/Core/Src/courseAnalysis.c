@@ -416,6 +416,389 @@ int16_t readLogDistance(int logNumber)
 	return ret;
 }
 /////////////////////////////////////////////////////////////////////
+// ローカル関数 parseSecondLogLine
+// 処理概要	 2次走行ログの必要列のみを抽出する
+// 引数	 line: 1行文字列, 各出力先ポインタ
+// 戻り値	 解析成功ならtrue
+/////////////////////////////////////////////////////////////////////
+static bool parseSecondLogLine(const char *line, uint8_t *courseMarker, int32_t *encTotal,
+		int16_t *roc, float *targetSpeedLog, int16_t *optimalIdx, uint8_t *slipLong, uint8_t *slipLat)
+{
+	// 追加: ヘッダ/空行判定のため先頭の有効文字を確認する
+	const char *p = line;
+	while (*p == ' ' || *p == '\t')
+	{
+		p++;
+	}
+	if (!((*p >= '0' && *p <= '9') || *p == '-' || *p == '+'))
+	{
+		return false;	// 数値で始まらない行はスキップ
+	}
+
+	// 追加: カンマを数えながら必要列だけを抽出する
+	int col = 0;
+	const char *field = p;
+	bool gotOptimal = false;
+	while (1)
+	{
+		// 追加: 区切り文字(カンマ/改行/終端)でフィールドを確定する
+		if (*p == ',' || *p == '\n' || *p == '\r' || *p == '\0')
+		{
+			char *endptr = NULL;
+			switch (col)
+			{
+			case 3:
+				*courseMarker = (uint8_t)strtol(field, &endptr, 10);
+				break;
+			case 4:
+				*encTotal = (int32_t)strtol(field, &endptr, 10);
+				break;
+			case 5:
+				*roc = (int16_t)strtol(field, &endptr, 10);
+				break;
+			case 6:
+				*targetSpeedLog = strtof(field, &endptr);
+				break;
+			case 7:
+				*optimalIdx = (int16_t)strtol(field, &endptr, 10);
+				gotOptimal = true;
+				break;
+			case 16:
+				*slipLong = (uint8_t)strtol(field, &endptr, 10);
+				break;
+			case 17:
+				*slipLat = (uint8_t)strtol(field, &endptr, 10);
+				break;
+			default:
+				break;
+			}
+			if (*p == ',')
+			{
+				col++;
+				if (col > 17)
+				{
+					break;	// 追加: 必要列を超えたら早期終了
+				}
+				p++;
+				field = p;
+				continue;
+			}
+			break;
+		}
+		p++;
+	}
+
+	return gotOptimal;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 readLogDistanceSlip
+// 処理概要     2次走行ログからスリップを考慮した3次走行用速度計画を作成する
+// 引数         ログ番号(ファイル名)
+// 戻り値       最適速度配列の最大要素数
+/////////////////////////////////////////////////////////////////////
+int16_t readLogDistanceSlip(int logNumber)
+{
+	FIL fil_Read;
+	FRESULT fresult;
+	char fileName[16];
+	int16_t ret = 0;
+
+	// 追加: 解析用バッファ・配列は静的領域で確保してスタックを節約
+	static uint16_t sampleCnt[OPT_BUFF_SIZE];
+	static float v2Max[OPT_BUFF_SIZE];
+	static float rocAbsSum[OPT_BUFF_SIZE];
+	static uint16_t rocCnt[OPT_BUFF_SIZE];
+	static uint16_t slipLongCnt[OPT_BUFF_SIZE];
+	static uint16_t slipLatCnt[OPT_BUFF_SIZE];
+	static float risk[OPT_BUFF_SIZE];
+	static float riskExpanded[OPT_BUFF_SIZE];
+	static float v3[OPT_BUFF_SIZE];
+
+	snprintf(fileName, sizeof(fileName), "%d", logNumber);			   // 数値を文字列に変換
+	strcat(fileName, ".csv");										   // 拡張子を追加
+	fresult = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // csvファイルを開く
+	if (fresult != FR_OK)
+	{
+		return -4; // ログファイルのオープン失敗
+	}
+
+	memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE); // 追加: 出力先を初期化
+	memset(markerPos, 0, sizeof(EventPos) * OPT_BUFF_SIZE); // 追加: マーカー配列をクリア
+	memset(sampleCnt, 0, sizeof(sampleCnt));
+	memset(v2Max, 0, sizeof(v2Max));
+	memset(rocAbsSum, 0, sizeof(rocAbsSum));
+	memset(rocCnt, 0, sizeof(rocCnt));
+	memset(slipLongCnt, 0, sizeof(slipLongCnt));
+	memset(slipLatCnt, 0, sizeof(slipLatCnt));
+	memset(risk, 0, sizeof(risk));
+	memset(riskExpanded, 0, sizeof(riskExpanded));
+	memset(v3, 0, sizeof(v3));
+
+	static TCHAR log[CA_SECOND_LOG_LINE_BUFSIZE];
+	int16_t maxOptimalIndex = -1;
+	int16_t numM = 0;
+	int32_t prevDist = 0;
+	bool hasPrevDist = false;
+	int32_t straightMeterLocal = 0;	// 追加: 直線判定はローカルで管理
+	bool straightStateLocal = false;	// 追加: 直線判定はローカルで管理
+
+	// 1行目はヘッダなので読み飛ばす
+	f_gets(log, sizeof(log), &fil_Read);
+
+	while (f_gets(log, sizeof(log), &fil_Read))
+	{
+		uint8_t courseMarker = 0;
+		int32_t encTotal = 0;
+		int16_t roc = 0;
+		float targetSpeedLog = 0.0f;
+		int16_t optimalIdx = 0;
+		uint8_t slipLong = 0;
+		uint8_t slipLat = 0;
+
+		if (!parseSecondLogLine((const char *)log, &courseMarker, &encTotal, &roc,
+				&targetSpeedLog, &optimalIdx, &slipLong, &slipLat))
+		{
+			continue;	// 追加: ヘッダ/空行は解析しない
+		}
+		if (optimalIdx < 0 || optimalIdx >= OPT_BUFF_SIZE)
+		{
+			ret = -1;	// 追加: 解析用配列の上限超過
+			break;
+		}
+
+		// 追加: 集計(サンプル数/最大速度/ROC平均/スリップ回数)
+		sampleCnt[optimalIdx]++;
+		if (targetSpeedLog > v2Max[optimalIdx])
+		{
+			v2Max[optimalIdx] = targetSpeedLog;
+		}
+		rocAbsSum[optimalIdx] += fabsf((float)roc);
+		rocCnt[optimalIdx]++;
+		if (slipLong > 0)
+		{
+			slipLongCnt[optimalIdx]++;
+		}
+		if (slipLat > 0)
+		{
+			slipLatCnt[optimalIdx]++;
+		}
+
+		if (optimalIdx > maxOptimalIndex)
+		{
+			maxOptimalIndex = optimalIdx;
+		}
+
+		// 追加: 2次ログからマーカー位置を再構築する
+		if (hasPrevDist)
+		{
+			int32_t diffPulse = encTotal - prevDist;
+			diffPulse = (diffPulse < 0) ? -diffPulse : diffPulse;
+			float diffMm = encPulse(diffPulse);	// 追加: パルス差分をmmへ換算
+			if (abs(roc) >= 700)
+			{
+				straightMeterLocal += (int32_t)(diffMm + 0.5f);	// 追加: mm単位で直線距離を加算
+				if (straightMeterLocal >= 100)
+				{
+					straightStateLocal = true;
+				}
+			}
+			else
+			{
+				straightMeterLocal = 0;
+				straightStateLocal = false;
+			}
+		}
+
+		if (courseMarker == 3 || (courseMarker == 2 && straightStateLocal))
+		{
+			if (numM < OPT_BUFF_SIZE)
+			{
+				markerPos[numM].distance = encTotal;
+				markerPos[numM].indexPPAD = optimalIdx;
+				numM++;
+			}
+			else
+			{
+				ret = -1;	// 追加: マーカー配列の上限超過
+				break;
+			}
+			if (courseMarker == 2 && straightStateLocal)
+			{
+				straightStateLocal = false;
+				straightMeterLocal = 0;
+			}
+		}
+
+		prevDist = encTotal;
+		hasPrevDist = true;
+	}
+
+	f_close(&fil_Read);
+
+	if (ret < 0)
+	{
+		return ret;
+	}
+	if (maxOptimalIndex < 0)
+	{
+		return -2;	// 追加: 解析対象が無い
+	}
+
+	// 追加: 欠番optimalIndexは前値で埋める(前方埋め)
+	for (int16_t i = 0; i <= maxOptimalIndex; i++)
+	{
+		if (sampleCnt[i] == 0 && i > 0)
+		{
+			v2Max[i] = v2Max[i - 1];
+			rocAbsSum[i] = rocAbsSum[i - 1];	// 追加: ROC平均用の前方埋め
+			rocCnt[i] = rocCnt[i - 1];			// 追加: ROC平均用の前方埋め
+		}
+	}
+
+	// 追加: risk(0..1)を作る
+	for (int16_t i = 0; i <= maxOptimalIndex; i++)
+	{
+		if (sampleCnt[i] == 0)
+		{
+			risk[i] = 0.0f;
+			continue;
+		}
+		uint16_t longCnt = (slipLongCnt[i] >= CA_SLIP_CNT_MIN) ? slipLongCnt[i] : 0;
+		uint16_t latCnt = (slipLatCnt[i] >= CA_SLIP_CNT_MIN) ? slipLatCnt[i] : 0;
+		float fracLong = (float)longCnt / (float)sampleCnt[i];
+		float fracLat = (float)latCnt / (float)sampleCnt[i];
+		float riskLong = fracLong / CA_SLIP_FRAC_FULL;
+		float riskLat = fracLat / CA_SLIP_FRAC_FULL;
+		if (riskLong > 1.0f)
+		{
+			riskLong = 1.0f;
+		}
+		if (riskLat > 1.0f)
+		{
+			riskLat = 1.0f;
+		}
+		risk[i] = (riskLong > riskLat) ? riskLong : riskLat;
+	}
+
+	// 追加: 近傍へリスク拡張
+	for (int16_t i = 0; i <= maxOptimalIndex; i++)
+	{
+		float expanded = risk[i];
+		if (i - 1 >= 0)
+		{
+			float cand = risk[i - 1] * CA_SLIP_EXPAND_1;
+			if (cand > expanded)
+			{
+				expanded = cand;
+			}
+		}
+		if (i - 2 >= 0)
+		{
+			float cand = risk[i - 2] * CA_SLIP_EXPAND_2;
+			if (cand > expanded)
+			{
+				expanded = cand;
+			}
+		}
+		if (i + 1 <= maxOptimalIndex)
+		{
+			float cand = risk[i + 1] * CA_SLIP_EXPAND_1;
+			if (cand > expanded)
+			{
+				expanded = cand;
+			}
+		}
+		if (i + 2 <= maxOptimalIndex)
+		{
+			float cand = risk[i + 2] * CA_SLIP_EXPAND_2;
+			if (cand > expanded)
+			{
+				expanded = cand;
+			}
+		}
+		riskExpanded[i] = expanded;
+	}
+
+	// 追加: v3を更新(減速/増速)
+	for (int16_t i = 0; i <= maxOptimalIndex; i++)
+	{
+		float v = v2Max[i];
+		if (riskExpanded[i] > 0.0f)
+		{
+			float scale = 1.0f - (CA_SLIP_DOWN_RISK * riskExpanded[i]);
+			if (slipLongCnt[i] >= CA_SLIP_CNT_MIN)
+			{
+				scale -= CA_SLIP_DOWN_LONG_EXTRA;
+			}
+			if (slipLatCnt[i] >= CA_SLIP_CNT_MIN)
+			{
+				scale -= CA_SLIP_DOWN_LAT_EXTRA;
+			}
+			if (scale < CA_SLIP_MIN_SCALE)
+			{
+				scale = CA_SLIP_MIN_SCALE;
+			}
+			v3[i] = v * scale;
+		}
+		else
+		{
+			float avgRoc = (rocCnt[i] > 0) ? (rocAbsSum[i] / (float)rocCnt[i]) : ROC_STRAIGHTTH;
+			float up = (avgRoc >= ROC_STRAIGHTTH) ? CA_SLIP_UP_STRAIGHT : CA_SLIP_UP_CURVE;
+			v3[i] = v * (1.0f + up);
+		}
+	}
+
+	// 追加: 2次の速度変化量以内に収める(前後パス)
+	for (int16_t i = 0; i < maxOptimalIndex; i++)
+	{
+		float dvUp = v2Max[i + 1] - v2Max[i];
+		if (dvUp < 0.0f)
+		{
+			dvUp = 0.0f;
+		}
+		float limit = v3[i] + dvUp;
+		if (v3[i + 1] > limit)
+		{
+			v3[i + 1] = limit;
+		}
+	}
+	for (int32_t i = maxOptimalIndex - 1; i >= 0; i--)
+	{
+		float dvDown = v2Max[i] - v2Max[i + 1];
+		if (dvDown < 0.0f)
+		{
+			dvDown = 0.0f;
+		}
+		float limit = v3[i + 1] + dvDown;
+		if (v3[i] > limit)
+		{
+			v3[i] = limit;
+		}
+	}
+
+	// 追加: PPADへ反映
+	for (int16_t i = 0; i <= maxOptimalIndex; i++)
+	{
+		PPAD[i].boostSpeed = v3[i];
+		PPAD[i].ROC = (rocCnt[i] > 0) ? (int16_t)(rocAbsSum[i] / (float)rocCnt[i]) : 0;
+	}
+
+	numPPADarry = maxOptimalIndex + 1;
+	if (numM > 0)
+	{
+		numM--;	// 追加: readLogDistance() と同じく末尾を除外
+	}
+	numPPAMarry = numM;
+	ret = numPPADarry;
+
+	// 追加: 解析済み情報を更新
+	saveLogNumber(logNumber);
+	analizedNumber = logNumber;
+	optimalTrace = BOOST_DISTANCE;
+
+	return ret;
+}
+/////////////////////////////////////////////////////////////////////
 // モジュール名 asignVelocity
 // 処理概要     曲率半径ごとの最適速度を割り当てる
 // 引数
@@ -973,6 +1356,7 @@ void processMarkerEvent(void) {
 void clearMarkerProcessState(void) {
 	beforeCourseMarker = 0;
 	cntMarker = 0;
+	straightMeter = 0;	// 追加: 直線判定距離を初期化
 	straightState = false;
 	pathedMarker = 0;
 	lastCorrectedMarker = 0;
