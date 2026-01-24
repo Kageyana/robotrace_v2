@@ -364,42 +364,42 @@ void loopSystem(void)
 
 	switch (patternTrace)
 	{
-		case 0:
-			if (autoStart > 1)
+	case 0:
+		if (autoStart > 1)
+		{
+			// 2次走行
+			motorPwmOut(0, 0);
+
+			// 目標速度調整
+			// コース解析
+			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+			ssd1306_SetCursor(0, 25);
+			ssd1306_printf(Font_11x18, "Analizing");
+			ssd1306_SetCursor(0, 50);
+			ssd1306_printf(Font_6x8, "log %d", autoStartAnalize);	// 追加: 解析対象ログ番号を表示
+
+			if (autoStart == 2)
 			{
-				// 2次走行
-				motorPwmOut(0, 0);
-
-				// 目標速度調整
-				// コース解析
+				ret = readLogDistance(autoStartAnalize);	// 追加: 2走目は1走目ログを解析
+			}
+			else
+			{
+				ret = readLogDistanceSlip(autoStartAnalize);	// 追加: 3走目以降は直前ログをスリップ解析
+				if (ret < 0)
+				{
+					ret = readLogDistance(autoStartAnalize);	// 追加: 解析失敗時は距離解析へフォールバック
+				}
+			}
+			if(ret > 0)
+			{
+				// コース解析成功
+				countdown = 2000;							  // カウントダウンスタート
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-				ssd1306_SetCursor(0, 25);
-				ssd1306_printf(Font_11x18, "Analizing");
-				ssd1306_SetCursor(0, 50);
-				ssd1306_printf(Font_6x8, "log %d", autoStartAnalize);	// 追加: 解析対象ログ番号を表示
+				ssd1306_SetCursor(56, 28);
+				ssd1306_printf(Font_16x26, "%d", autoStart);	// 追加: 走行回数を表示
 
-				if (autoStart == 2)
-				{
-					ret = readLogDistance(autoStartAnalize);	// 追加: 2走目は1走目ログを解析
-				}
-				else
-				{
-					ret = readLogDistanceSlip(autoStartAnalize);	// 追加: 3走目以降は直前ログをスリップ解析
-					if (ret < 0)
-					{
-						ret = readLogDistance(autoStartAnalize);	// 追加: 解析失敗時は距離解析へフォールバック
-					}
-				}
-				if(ret > 0)
-				{
-					// コース解析成功
-					countdown = 2000;							  // カウントダウンスタート
-					ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-					ssd1306_SetCursor(56, 28);
-					ssd1306_printf(Font_16x26, "%d", autoStart);	// 追加: 走行回数を表示
-
-					patternTrace = 1;
-				}
+				patternTrace = 1;
+			}
 			else
 			{
 				// コース解析失敗
@@ -428,7 +428,7 @@ void loopSystem(void)
 				setupNonDisp();
 			}
 
-            if (setupFlags.start || autoStart)
+			if (setupFlags.start || autoStart)
 			{
 				motorPwmOut(0, 0);
 				countdown = 5000;							  // カウントダウンスタート
@@ -557,7 +557,6 @@ void loopSystem(void)
 			encLog = 0;
 			encPID = 0;
 			enc1 = 0;
-			encRightMarker = 0;
 			encCurve = 0;
 			encClick = 0;
 			cntRun = 0;
@@ -679,7 +678,7 @@ void loopSystem(void)
 			ssd1306_UpdateScreen_DMA();        // 停止していた画面更新を再開
 		}
 		// 停止速度まで減速
-		if (enc1 >= encMM(200))
+		if (enc1 >= encMM(10))
 		{
 			setTargetSpeed(0);
 		}
@@ -748,7 +747,6 @@ void loopSystem(void)
 				// tgtParam.bst200			*= PARAM_UP_STEP;
 				// tgtParam.bst100			*= PARAM_UP_STEP;
 			}
-		}
 
 			if (autoStart > 5)
 			{

@@ -146,23 +146,27 @@ uint8_t checkMarker(void)
 }
 /////////////////////////////////////////////////////////////
 // モジュール名 checkStartGoalMarker
-// 処理概要     スートマーカーとゴールマーカーの検出
+// 処理概要     スタートマーカーとゴールマーカーの検出
 // 引数         なし
-// 戻り値       0:マーカなし 0x1:右 0x2:左 0x3:クロスライン
+// 戻り値       なし
 /////////////////////////////////////////////////////////////
 void checkStartGoalMarker(void)
 {
-	if (courseMarker == RIGHTMARKER && SGmarker > 0)
+	if(SGmarker > 0) // スタートマーカー通過後
 	{
-		if (encRightMarker > encMM(1000))
+		if (courseMarker == RIGHTMARKER && encRightMarker > encMM(1000))
 		{ // 1000mm以上離れたらゴールマーカー検出可能
 			SGmarker++;
 			encRightMarker = 0;
 		}
-	} else if(courseMarker == RIGHTMARKER && SGmarker == 0) {
-		// スタートマーカー検出
-		SGmarker++;
-		encRightMarker = 0;
+	}
+	else // スタートマーカー通過前
+	{
+		if(markerSensor == RIGHTMARKER)
+		{
+			SGmarker++;
+			encRightMarker = 0;
+		}
 	}
 }
 /////////////////////////////////////////////////////////////////////
