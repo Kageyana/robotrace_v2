@@ -36,16 +36,16 @@
 // 3次走行用スリップ解析(2次ログ)の調整用定数
 //====================================//
 #define CA_SECOND_LOG_LINE_BUFSIZE 1600	// 2次ログ1行バッファサイズ
-#define CA_SLIP_CNT_MIN 3					// スリップ回数のノイズ除外閾値
-#define CA_SLIP_FRAC_FULL 0.30f			// risk=1.0とみなすスリップ割合
-#define CA_SLIP_EXPAND_1 0.70f				// 近傍拡張係数(±1)
-#define CA_SLIP_EXPAND_2 0.40f				// 近傍拡張係数(±2)
-#define CA_SLIP_DOWN_RISK 0.40f			// riskに応じた基本減速ゲイン
-#define CA_SLIP_DOWN_LONG_EXTRA 0.05f		// 縦スリップ追加減速
-#define CA_SLIP_DOWN_LAT_EXTRA 0.05f		// 横スリップ追加減速
-#define CA_SLIP_MIN_SCALE 0.70f			// 最小スケール(減速下限)
-#define CA_SLIP_UP_STRAIGHT 0.02f			// 直線での微増速
-#define CA_SLIP_UP_CURVE 0.01f				// カーブでの微増速
+#define CA_SLIP_CNT_MIN 5					// スリップ回数のノイズ除外閾値
+#define CA_SLIP_FRAC_FULL 0.60f			// risk=1.0とみなすスリップ割合
+#define CA_SLIP_EXPAND_1 0.30f				// 近傍拡張係数(±1)
+#define CA_SLIP_EXPAND_2 0.10f				// 近傍拡張係数(±2)
+#define CA_SLIP_DOWN_RISK 0.22f			// riskに応じた基本減速ゲイン
+#define CA_SLIP_DOWN_LONG_EXTRA 0.02f		// 縦スリップ追加減速
+#define CA_SLIP_DOWN_LAT_EXTRA 0.03f		// 横スリップ追加減速
+#define CA_SLIP_MIN_SCALE 0.90f			// 最小スケール(減速下限)
+#define CA_SLIP_UP_STRAIGHT 0.055f			// 直線での微増速
+#define CA_SLIP_UP_CURVE 0.032f				// カーブでの微増速
 
 // #define WRITE_BOOSTSPEED_LOG 	 // 速度計画ログを書き出すかどうかのフラグ
 
