@@ -203,11 +203,11 @@ void createLog(void)
 	setLogStr("slipFlagLat", "%d");
 	setLogStr("motorCurrentL", "%f");
 	setLogStr("motorCurrentR", "%f");
-	setLogStr("slipDistScaleF", "%f");
+	setLogStr("fusedVel_m_s", "%f");
 	setLogStr("distEncRaw_p", "%d");
 	setLogStr("distCorr_p", "%d");
 	setLogStr("distSlipLoss_p", "%d");
-	setLogStr("encCurrentCorr_p", "%d");
+	setLogStr("fusedDist_pulse", "%d");
 	setLogStr("x", "%f");
 	setLogStr("y", "%f");
 
@@ -635,11 +635,11 @@ void endLog(void)
 			logval8[3],		// slipFlagLat
 			logvalf[5],		// motorCurrentL
 			logvalf[6],		// motorCurrentR
-			logvalf[7],		// slipDistScaleF
+			logvalf[7],		// fusedVel_m_s
 			logval32[1],	// distEncRaw_p
 			logval32[2],	// distCorr_p
 			logval32[3],	// distSlipLoss_p
-			logval32[4],	// encCurrentCorr_p
+			logval32[4],	// fusedDist_pulse
 
 			logvalf[xIdx],	// x
 			logvalf[yIdx]	// y

@@ -38,8 +38,6 @@ void Interrupt1ms(void)
 
 	// Encoder
 	getEncoder();
-	setEncoderVal();
-	encPulse5ms += encCurrentN; // 5ms間のエンコーダパルスを累積
 
 	// IMU処理
 	if (initIMU)
@@ -51,7 +49,7 @@ void Interrupt1ms(void)
 			calcDegrees();		// コンプリメンタリフィルタで角度算出
 			calcVelocity();		// 加速度から速度算出
 			// スリップ距離補正（パルス版）
-			if (patternTrace >= 12 && patternTrace < 100)
+			if (patternTrace >= 11 && patternTrace < 100)
 			{
 				updateSlipDetection(); // スリップ検出（Δv比率とフラグ更新を1msで実行）
 			}
@@ -63,6 +61,9 @@ void Interrupt1ms(void)
 			calibrationIMU();
 		}
 	}
+	setEncoderVal();
+	// 融合後パルスを5ms累積に使用
+	encPulse5ms += Control_GetEncCurrentCorr_p();
 
 	// PID制御処理
 	if(patternTrace < 12 || patternTrace > 100)
@@ -162,7 +163,7 @@ void Interrupt1ms(void)
 					veloCtrlR.pwm,
 					// 32bit
 					(uint32_t)encTotalOptimal,
-					// スリップ距離補正（パルス版）
+					// 融合距離（パルス版）
 					(uint32_t)Control_GetDistEncRaw_p(),
 					(uint32_t)Control_GetDistCorr_p(),
 					(uint32_t)Control_GetDistSlipLoss_p(),
@@ -175,8 +176,8 @@ void Interrupt1ms(void)
 					getSlipIndicatorFiltered(),
 					motorCurrentL,
 					motorCurrentR,
-					// 距離補正ログ
-					Control_GetSlipDistScale()
+					// 融合速度ログ
+					Control_GetFusedVel_m_s()
 				);
 #else
 				writeLogBufferPrint(); // バッファにログを保存

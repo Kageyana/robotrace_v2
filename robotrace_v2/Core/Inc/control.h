@@ -166,6 +166,7 @@ float getSlipIndicatorRaw(void);
 float getSlipIndicatorFiltered(void);
 bool getSlipFlag(void);
 bool getSlipFlagLat(void);
+float Control_GetFusedVel_m_s(void);
 // スリップ距離補正（パルス版）
 int32_t Control_GetEncCurrentCorr_p(void);
 int32_t Control_GetDistEncRaw_p(void);
