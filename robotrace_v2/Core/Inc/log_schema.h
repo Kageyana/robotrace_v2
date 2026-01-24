@@ -22,6 +22,8 @@
 	DERIVED(F32, ROC, "%f", log_roc) \
 	STORED(U8, targetSpeed, "%d", targetSpeed) \
 	STORED(U16, optimalIndex, "%d", (uint16_t)optimalIndex) \
+	STORED(U8, slipFlag, "%d", (uint8_t)getSlipFlag()) \
+	STORED(U8, slipFlagLat, "%d", (uint8_t)getSlipFlagLat()) \
 	STORED(S16, lineTraceCtrl, "%d", (int16_t)lineTraceOmegaFBCtrl.pwm) \
 	STORED(S16, targetAngularvelo, "%d", (int16_t)log_targetAngularVelocity) \
 	STORED(S16, motorpwmL, "%d", (int16_t)veloCtrlL.pwm) \
@@ -30,8 +32,6 @@
 	STORED(F32, acceleVal_Y, "%f", BMI088val.accele.y) \
 	STORED(F32, slipRatio, "%f", getSlipIndicatorRaw()) \
 	STORED(F32, slipRatioLat, "%f", getSlipIndicatorFiltered()) \
-	STORED(U8, slipFlag, "%d", (uint8_t)getSlipFlag()) \
-	STORED(U8, slipFlagLat, "%d", (uint8_t)getSlipFlagLat()) \
 	STORED(F32, motorCurrentL, "%f", motorCurrentL) \
 	STORED(F32, motorCurrentR, "%f", motorCurrentR) \
 	STORED(F32, slipDistScaleF, "%f", Control_GetSlipDistScale()) \

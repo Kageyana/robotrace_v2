@@ -463,10 +463,10 @@ static bool parseSecondLogLine(const char *line, uint8_t *courseMarker, int32_t 
 				*optimalIdx = (int16_t)strtol(field, &endptr, 10);
 				gotOptimal = true;
 				break;
-			case 16:
+			case 8:
 				*slipLong = (uint8_t)strtol(field, &endptr, 10);
 				break;
-			case 17:
+			case 9:
 				*slipLat = (uint8_t)strtol(field, &endptr, 10);
 				break;
 			default:
@@ -475,7 +475,7 @@ static bool parseSecondLogLine(const char *line, uint8_t *courseMarker, int32_t 
 			if (*p == ',')
 			{
 				col++;
-				if (col > 17)
+				if (col > 9)
 				{
 					break;	// 追加: 必要列を超えたら早期終了
 				}
