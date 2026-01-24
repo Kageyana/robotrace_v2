@@ -720,7 +720,7 @@ void loopSystem(void)
 		if (autoStart > 0)
 		{
 			// 追加: 保存成功時のみ解析対象を更新し、失敗時は自動走行を停止
-			if (modeLOG && endFileIndex > endIdxBefore)
+			if (endFileIndex > endIdxBefore)
 			{
 				savedLogNo = fileNumbers[endFileIndex];	// 追加: 実際に保存されたログ番号を採用
 				autoStartAnalize = savedLogNo;
