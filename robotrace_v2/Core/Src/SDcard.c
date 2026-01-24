@@ -139,9 +139,17 @@ void createLog(void)
 	char fileName[10];
 	static uint16_t fileNumber = 0;
 
-	if(fileNumber == 0)
+	if (fileNumber == 0)
 	{
-		fileNumber = fileNumbers[endFileIndex]+1; // 最新ログ番号+1に設定
+		// 追加: ログが1つも無いSDでも落ちないようにガード
+		if (endFileIndex >= 0)
+		{
+			fileNumber = (uint16_t)(fileNumbers[endFileIndex] + 1);
+		}
+		else
+		{
+			fileNumber = 1;
+		}
 	}
 	else
 	{
@@ -157,6 +165,14 @@ void createLog(void)
 	{
 		// ファイルオープンに失敗した場合はログ作成を中止する
 		return; // エラーが発生したため処理を終了
+	}
+	// 追加: 作成したログ番号を一覧に反映（savedLogNo 計算の整合を取る）
+	const int16_t maxN = (int16_t)(sizeof(fileNumbers) / sizeof(fileNumbers[0]));
+	if (endFileIndex < (maxN - 1))
+	{
+		endFileIndex++;
+		fileNumbers[endFileIndex] = (int16_t)fileNumber;
+		fileIndexLog = endFileIndex;
 	}
 
 	columnTitle[0] = 0; // バッファを安全に初期化
