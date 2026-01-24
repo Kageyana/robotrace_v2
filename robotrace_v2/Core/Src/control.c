@@ -695,16 +695,19 @@ void loopSystem(void)
 		}
 		break;
 
-		case 102:
-			setTargetSpeed(0);
-			motorPwmOutSynth(0, 0, 0, 0);
+	case 102:
+		setTargetSpeed(0);
+		motorPwmOutSynth(0, 0, 0, 0);
 
-			int16_t savedLogNo = fileNumbers[endFileIndex] + 1;	// 追加: この走行で保存するログ番号
-			if (modeLOG)
-			{
-				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-				ssd1306_SetCursor(0, 25);
-				ssd1306_printf(Font_11x18, "log %d", savedLogNo);
+		int16_t savedLogNo = 0;	// 追加: 保存実績ログ番号
+		int16_t endIdxBefore = endFileIndex;	// 追加: endLog前のログ末尾を保持
+		// 追加: 表示用の予測ログ番号はSD空でも落ちないようガード
+		int16_t predictedLogNo = (endFileIndex >= 0) ? (int16_t)(fileNumbers[endFileIndex] + 1) : 1;
+		if (modeLOG)
+		{
+			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
+			ssd1306_SetCursor(0, 25);
+			ssd1306_printf(Font_11x18, "log %d", predictedLogNo);
 			ssd1306_SetCursor(0, 45);
 			ssd1306_printf(Font_11x18, "Writing");
 
@@ -714,27 +717,38 @@ void loopSystem(void)
 			ssd1306_printf(Font_11x18, "Written");
 		}
 
-				if (autoStart > 0)
-				{
-					// 自動走行モードのときは再度走行準備へ
-					autoStart++;
-					autoStartAnalize = savedLogNo;	// 追加: 直前走行ログを次回解析対象にする
-					if (autoStart >= 3)
-					{
-						// 3走目以降は速度を上げる
-						tgtParam.bstStraight *= PARAM_UP_STEP;
-					tgtParam.bst1500 *= PARAM_UP_STEP;
-					tgtParam.bst1300 *= PARAM_UP_STEP;
-					tgtParam.bst1000 *= PARAM_UP_STEP;
-					tgtParam.bst800 *= PARAM_UP_STEP;
-					tgtParam.bst700 *= PARAM_UP_STEP;
-					tgtParam.bst600 *= PARAM_UP_STEP;
-					tgtParam.bst500 *= PARAM_UP_STEP;
-					// tgtParam.bst400			*= PARAM_UP_STEP;
-					// tgtParam.bst300			*= PARAM_UP_STEP;
-					// tgtParam.bst200			*= PARAM_UP_STEP;
-					// tgtParam.bst100			*= PARAM_UP_STEP;
-				}
+		if (autoStart > 0)
+		{
+			// 追加: 保存成功時のみ解析対象を更新し、失敗時は自動走行を停止
+			if (modeLOG && endFileIndex > endIdxBefore)
+			{
+				savedLogNo = fileNumbers[endFileIndex];	// 追加: 実際に保存されたログ番号を採用
+				autoStartAnalize = savedLogNo;
+				// 自動走行モードのときは再度走行準備へ
+				autoStart++;
+			}
+			else
+			{
+				autoStart = 0;
+				autoStartAnalize = 0;
+			}
+			if (autoStart >= 3)
+			{
+				// 3走目以降は速度を上げる
+				tgtParam.bstStraight *= PARAM_UP_STEP;
+				tgtParam.bst1500 *= PARAM_UP_STEP;
+				tgtParam.bst1300 *= PARAM_UP_STEP;
+				tgtParam.bst1000 *= PARAM_UP_STEP;
+				tgtParam.bst800 *= PARAM_UP_STEP;
+				tgtParam.bst700 *= PARAM_UP_STEP;
+				tgtParam.bst600 *= PARAM_UP_STEP;
+				tgtParam.bst500 *= PARAM_UP_STEP;
+				// tgtParam.bst400			*= PARAM_UP_STEP;
+				// tgtParam.bst300			*= PARAM_UP_STEP;
+				// tgtParam.bst200			*= PARAM_UP_STEP;
+				// tgtParam.bst100			*= PARAM_UP_STEP;
+			}
+		}
 
 			if (autoStart > 5)
 			{
