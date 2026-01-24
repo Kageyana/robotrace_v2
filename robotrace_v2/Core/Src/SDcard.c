@@ -61,6 +61,28 @@ uint8_t cntLog = 0;
 int32_t encLog = 0;
 bool getFileNumbersError = false; // getFileNumbersでエラーが発生した際のフラグ
 
+#ifdef LOG_RUNNING_WRITE
+// スキーマ順で生成するレコード配置。
+typedef struct
+{
+#define LOG_STRUCT_FIELD(type, name, fmt, expr) LOG_CTYPE_##type name;
+#define LOG_STRUCT_SKIP(type, name, fmt, expr)
+	LOG_FIELD_LIST(LOG_STRUCT_FIELD, LOG_STRUCT_SKIP)
+#undef LOG_STRUCT_FIELD
+#undef LOG_STRUCT_SKIP
+} LogRecord;
+
+// スキーマ関連のヘルパー宣言。
+static void logSendFloat(float value);
+static uint8_t logReadU8(void);
+static uint16_t logReadU16(void);
+static int16_t logReadS16(void);
+static uint32_t logReadU32(void);
+static float logReadF32(void);
+static void logReadRecord(LogRecord *rec);
+static void logBuildColumns(void);
+#endif
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 insertSD
 // 処理概要     SDカード挿入状況確認
@@ -180,37 +202,7 @@ void createLog(void)
 
 	// ログヘッダー
 #ifdef LOG_RUNNING_WRITE
-	setLogStr("cntlog", "%d");
-	setLogStr("encCurrentN", "%d");
-	setLogStr("gyroVal_Z", "%f");
-	setLogStr("courseMarker", "%d");
-	setLogStr("encTotalOptimal", "%d");
-	setLogStr("ROC", "%f");
-
-	setLogStr("targetSpeed", "%d");
-	setLogStr("optimalIndex", "%d");
-	setLogStr("lineTraceCtrl", "%d");
-	// setLogStr("velocity", "%f");
-	setLogStr("targetAngularvelo", "%d");
-	setLogStr("motorpwmL", "%d");
-	setLogStr("motorpwmR", "%d");
-
-	setLogStr("acceleVal_X", "%f");
-	setLogStr("acceleVal_Y", "%f");
-	setLogStr("slipRatio", "%f");
-	setLogStr("slipRatioLat", "%f");
-	setLogStr("slipFlag", "%d");
-	setLogStr("slipFlagLat", "%d");
-	setLogStr("motorCurrentL", "%f");
-	setLogStr("motorCurrentR", "%f");
-	setLogStr("slipDistScaleF", "%f");
-	setLogStr("distEncRaw_p", "%d");
-	setLogStr("distCorr_p", "%d");
-	setLogStr("distSlipLoss_p", "%d");
-	setLogStr("encCurrentCorr_p", "%d");
-	setLogStr("x", "%f");
-	setLogStr("y", "%f");
-
+	logBuildColumns();
 #else
 	setLogStr("cntlog", "%d");
 	setLogStr("encCurrentN", "%d");
@@ -329,59 +321,50 @@ void initLog(void)
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 #ifdef LOG_RUNNING_WRITE
-void writeLogBufferPuts(uint8_t c, uint8_t s, uint8_t i, uint8_t f, ...)
+void writeLogBufferPuts(void)
 {
-	va_list args;
-	uint8_t cnt = 0;
-	static union
-	{
-		float f;
-		uint32_t i;
-	} ftoi;
-
 	if (modeLOG)
 	{
-		uint16_t requiredSize = c + (s * sizeof(uint16_t)) + (i * sizeof(uint32_t)) + (f * sizeof(float)); // 引数数に応じたバッファ必要量を算出
+		// スキーマから固定レコードサイズを算出。
+		const uint16_t requiredSize = (uint16_t)LOG_RECORD_SIZE_BYTES;
 
-		// 追記するデータ量でバッファがあふれる場合は事前に入れ替えを行う
 		if (logBuffIndex + requiredSize > BUFFER_SIZE_LOG)
 		{
 			if (sendSD)
 			{
-				writeLogPuts();			// flushBufが書き込み中なら即時書き込みを促して空きを確保する
+				writeLogPuts();
 				if (sendSD)
 				{
-					logOverflow = true;		// 空き確保に失敗したことを記録して後段で検知する
-					return;				// 空きができるまで追記を保留し、バッファ破壊を防ぐ
+					logOverflow = true;
+					return;
 				}
 			}
-			logBuffSendIndex = logBuffIndex; // 書き込み待ちバッファのサイズを記録
-			uint8_t *tmp = flushBuf; // flushBufのポインタを退避
-			flushBuf = activeBuf; // 現在のバッファをflushBufに切り替え
-			activeBuf = tmp; // 退避したバッファを新たなactiveに
-			logBuffIndex = 0; // 新バッファの書込位置をリセット
-			sendSD = true; // SD書き込みを要求
+			logBuffSendIndex = logBuffIndex;
+			uint8_t *tmp = flushBuf;
+			flushBuf = activeBuf;
+			activeBuf = tmp;
+			logBuffIndex = 0;
+			sendSD = true;
 		}
 
-		// バッファ配列に保存
-		va_start(args, f);
-		// 8bitデータをバッファへ送る
-		for (cnt = 0; cnt < c; cnt++)
-			send8bit((uint8_t)va_arg(args, int)); // 可変長引数の型昇格に合わせる
-		// 16bitデータをバッファへ送る
-		for (cnt = 0; cnt < s; cnt++)
-			send16bit((uint16_t)va_arg(args, int)); // 可変長引数の型昇格に合わせる
-		// 32bitデータをバッファへ送る
-		for (cnt = 0; cnt < i; cnt++)
-			send32bit(va_arg(args, uint32_t));
-		// floatデータをバッファへ送る
-		for (cnt = 0; cnt < f; cnt++)
-		{
-			ftoi.f = va_arg(args, double); // 共用体を使用してfloat型のビット操作をできるようにする
-			send32bit(ftoi.i);
-		}
-		va_end(args);
-		cntSend++; // 書き込み回数をカウント
+		// スキーマ順でバイナリ書き込みを展開。
+#define LOG_SEND_U8(value) send8bit((uint8_t)(value))
+#define LOG_SEND_U16(value) send16bit((uint16_t)(value))
+#define LOG_SEND_S16(value) send16bit((uint16_t)(int16_t)(value))
+#define LOG_SEND_U32(value) send32bit((uint32_t)(value))
+#define LOG_SEND_F32(value) logSendFloat((float)(value))
+#define LOG_SEND_FIELD(type, name, fmt, expr) LOG_SEND_##type(expr);
+#define LOG_SEND_SKIP(type, name, fmt, expr)
+		LOG_FIELD_LIST(LOG_SEND_FIELD, LOG_SEND_SKIP)
+#undef LOG_SEND_FIELD
+#undef LOG_SEND_SKIP
+#undef LOG_SEND_U8
+#undef LOG_SEND_U16
+#undef LOG_SEND_S16
+#undef LOG_SEND_U32
+#undef LOG_SEND_F32
+
+		cntSend++;
 	}
 }
 
@@ -520,24 +503,12 @@ void endLog(void)
 	FIL fil;
 	uint8_t log[LOG_SIZE];
 	char logStr[256];
-	UINT readByte, writtenlog; // FatFsの読み書きサイズ
-	uint16_t j, cnt;
-	uint16_t marker, time, beforeTime = 0, speed, beforeSpeed = 0;
-	uint32_t distance;
+	UINT readByte, writtenlog;
+	uint16_t j;
+	uint16_t time, beforeTime = 0, speed, beforeSpeed = 0;
 	float dt, zg;
-	uint8_t rocIdx = LOG_NUM_FLOAT;
-	uint8_t xIdx = LOG_NUM_FLOAT + 1;
-	uint8_t yIdx = LOG_NUM_FLOAT + 2;
-	static union
-	{
-		float f;
-		uint32_t i;
-	} ftoi;
-
-	uint8_t logval8[20];
-	uint16_t logval16[20];
-	uint32_t logval32[20];
-	float logvalf[20];
+	float log_roc, log_x, log_y;
+	LogRecord rec;
 
 	while (sendSD) // 溜まったバッファをすべて書き出す
 		writeLogPuts(); // 未処理バッファを書き込む
@@ -571,81 +542,47 @@ void endLog(void)
 			f_close(&fil); // 一時ファイルを閉じる
 			return; // データが読めないと解析不能なため中断
 		}
-		logaddress = log; // 読み込んだ配列の先頭アドレスを取得
+		logaddress = log;
 
-		// 型ごとに変数を復元
-		for (cnt = 0; cnt < LOG_NUM_8BIT; cnt++)
-			logval8[cnt] = logPut8bit();
-		for (cnt = 0; cnt < LOG_NUM_16BIT; cnt++)
-			logval16[cnt] = logPut16bit();
-		for (cnt = 0; cnt < LOG_NUM_32BIT; cnt++)
-			logval32[cnt] = logPut32bit();
-		for (cnt = 0; cnt < LOG_NUM_FLOAT; cnt++)
-		{
-			ftoi.i = logPut32bit(); // 共用体を使用してfloat型のビット操作をできるようにする
-			logvalf[cnt] = ftoi.f;
-		}
+		// 派生値計算の前にパック済みレコードを復元。
+		logReadRecord(&rec);
 
-		// コース解析に使用する変数を取得
-		marker = logval8[0];
-		time = logval16[0];
-		speed = logval16[1];
-		distance = logval32[0];
-		zg = logvalf[0];
+		time = rec.cntlog;
+		speed = rec.encCurrentN;
+		zg = rec.gyroVal_Z;
 
-		// 異常値補正
 		if (abs(speed - beforeSpeed) > 500)
 		{
 			speed = beforeSpeed;
-			logval16[1] = beforeSpeed;
+			rec.encCurrentN = beforeSpeed;
 		}
 		beforeSpeed = speed;
 
-		dt = (float)(time - beforeTime) / 1000.0f; // 経過時間
+		dt = (float)(time - beforeTime) / 1000.0f;
+		log_roc = calcROC(speed, zg, dt);
 
-		cnt = LOG_NUM_FLOAT;	// float型のログの続きを使用する
-		logvalf[cnt++] = calcROC(speed, zg, dt); // 曲率半径を計算
+		calcXYcie((int16_t)rec.encCurrentCorr_p, zg, dt);
+		log_x = xycie.x;
+		log_y = xycie.y;
+		beforeTime = time;
 
-		calcXYcie((int16_t)logval32[4], zg, dt);	// xy座標を計算
-		logvalf[cnt++] = xycie.x;
-		logvalf[cnt++] = xycie.y;
-		beforeTime = time; // 時間を更新
+		// ヘッダと同じ順でsnprintf引数を展開。
+#define LOG_FORMAT_VALUE_U8(value) (value)
+#define LOG_FORMAT_VALUE_U16(value) (value)
+#define LOG_FORMAT_VALUE_S16(value) (value)
+#define LOG_FORMAT_VALUE_U32(value) ((int32_t)(value))
+#define LOG_FORMAT_VALUE_F32(value) (value)
+#define LOG_CSV_ARG_STORED(type, name, fmt, expr) , LOG_FORMAT_VALUE_##type(rec.name)
+#define LOG_CSV_ARG_DERIVED(type, name, fmt, expr) , LOG_FORMAT_VALUE_##type(expr)
+		snprintf((char *)logStr, sizeof(logStr), (char *)formatLog LOG_FIELD_LIST(LOG_CSV_ARG_STORED, LOG_CSV_ARG_DERIVED));
+#undef LOG_CSV_ARG_STORED
+#undef LOG_CSV_ARG_DERIVED
+#undef LOG_FORMAT_VALUE_U8
+#undef LOG_FORMAT_VALUE_U16
+#undef LOG_FORMAT_VALUE_S16
+#undef LOG_FORMAT_VALUE_U32
+#undef LOG_FORMAT_VALUE_F32
 
-		// 文字列に変換
-        snprintf((char *)logStr, sizeof(logStr), (char *)formatLog, // バッファサイズを指定して安全に文字列化
-			time,
-			speed,
-			zg,
-			marker,
-			distance,
-			logvalf[rocIdx],	// ROC
-
-			logval8[1],		// targetSpeed
-			logval16[2],	// optimalIndex
-			(int16_t)logval16[3],	// lineTraceCtrl
-			(int16_t)logval16[4],	// targetAngularvelo
-			(int16_t)logval16[5],	// motorpwmL
-			(int16_t)logval16[6],	// motorpwmR
-
-			logvalf[1],		// acceleVal_X
-			logvalf[2],		// acceleVal_Y
-			logvalf[3],		// slipRatio(LPF後)
-			logvalf[4],		// slipRatioLat(LPF後)
-			logval8[2],		// slipFlag
-			logval8[3],		// slipFlagLat
-			logvalf[5],		// motorCurrentL
-			logvalf[6],		// motorCurrentR
-			logvalf[7],		// slipDistScaleF
-			logval32[1],	// distEncRaw_p
-			logval32[2],	// distCorr_p
-			logval32[3],	// distSlipLoss_p
-			logval32[4],	// encCurrentCorr_p
-
-			logvalf[xIdx],	// x
-			logvalf[yIdx]	// y
-		);
-
-		// 文字列をSDカードに送信
 		f_puts(logStr, &fil_W);
 	}
 
@@ -828,39 +765,35 @@ void createDir(char *dirName)
 	}
 	f_closedir(&dir); // 関数を抜ける前に必ずディレクトリを閉じる
 }
+#ifdef LOG_RUNNING_WRITE
 /////////////////////////////////////////////////////////////////////
 // モジュール名 send8bit
 // 処理概要     8bit変数をアクティブバッファに送る
 // 引数         変換する8bit変数
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-#ifdef LOG_RUNNING_WRITE
 void send8bit(uint8_t data)
 {
 	// アクティブバッファに値を格納し、書き込み位置を進める
 	activeBuf[logBuffIndex++] = data;
 }
-#endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 send16bit
 // 処理概要     16bit変数を1バイトごとに分割してアクティブバッファに送る
 // 引数         変換する16bit変数
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-#ifdef LOG_RUNNING_WRITE
 void send16bit(uint16_t data)
 {
 	activeBuf[logBuffIndex++] = (data >> 8); // 上位バイトをバッファに格納
 	activeBuf[logBuffIndex++] = data;        // 下位バイトをバッファに格納
 }
-#endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 send32bit
 // 処理概要     32bit変数を1バイトごとに分割してアクティブバッファに送る
 // 引数         変換する32bit変数
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-#ifdef LOG_RUNNING_WRITE
 void send32bit(uint32_t data)
 {
 	activeBuf[logBuffIndex++] = (data >> 24); // 最上位バイトをバッファに格納
@@ -868,51 +801,110 @@ void send32bit(uint32_t data)
 	activeBuf[logBuffIndex++] = (data >> 8);  // 上位から3番目のバイトをバッファに格納
 	activeBuf[logBuffIndex++] = data;         // 最下位バイトをバッファに格納
 }
-#endif
 /////////////////////////////////////////////////////////////////////
-// モジュール名 logPut8bit
-// 処理概要     8bit変数を16bitに変換する
+// モジュール名 logSendFloat
+// 処理概要     floatをIEEE-754の生ビットとして32bit送信する
+// 引数         送信するfloat値
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void logSendFloat(float value)
+{
+	union
+	{
+		float f;
+		uint32_t i;
+	} ftoi;
+
+	ftoi.f = value;
+	send32bit(ftoi.i);
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logReadU8
+// 処理概要     logaddressから1バイト読み出してポインタを進める
 // 引数         なし
-// 戻り値       変換したuint8_t型
+// 戻り値       読み出した8bit値
 /////////////////////////////////////////////////////////////////////
-#ifdef LOG_RUNNING_WRITE
-uint8_t logPut8bit(void)
+static uint8_t logReadU8(void)
 {
 	return *logaddress++;
 }
-#endif
 /////////////////////////////////////////////////////////////////////
-// モジュール名 logPut16bit
-// 処理概要     8bit変数を16bitに変換する
+// モジュール名 logReadU16
+// 処理概要     logaddressから16bitをビッグエンディアンで読み出す
 // 引数         なし
-// 戻り値       変換したuint16_t型
+// 戻り値       読み出した16bit値
 /////////////////////////////////////////////////////////////////////
-#ifdef LOG_RUNNING_WRITE
-uint16_t logPut16bit(void)
+static uint16_t logReadU16(void)
 {
-	uint16_t s;
-
-	s = (uint16_t)((uint8_t)*logaddress++ * 0x100 +	(uint8_t)*logaddress++);
-
-	return s;
+	return (uint16_t)(((uint16_t)*logaddress++ << 8) | (uint16_t)*logaddress++);
 }
-#endif
 /////////////////////////////////////////////////////////////////////
-// モジュール名 logPut32bit
-// 処理概要     8bit変数を32bitに変換する
+// モジュール名 logReadS16
+// 処理概要     16bitを読み出して符号付きへ変換する
 // 引数         なし
-// 戻り値       変換したuint32_t型
+// 戻り値       読み出した16bitの符号付き値
 /////////////////////////////////////////////////////////////////////
-#ifdef LOG_RUNNING_WRITE
-uint32_t logPut32bit(void)
+static int16_t logReadS16(void)
 {
-	uint32_t i;
+	return (int16_t)logReadU16();
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logReadU32
+// 処理概要     logaddressから32bitをビッグエンディアンで読み出す
+// 引数         なし
+// 戻り値       読み出した32bit値
+/////////////////////////////////////////////////////////////////////
+static uint32_t logReadU32(void)
+{
+	uint32_t value = 0;
 
-	i = (uint32_t)(uint8_t)*logaddress++ * 0x1000000;
-	i += (uint32_t)(uint8_t)*logaddress++ * 0x10000;
-	i += (uint32_t)(uint8_t)*logaddress++ * 0x100;
-	i += (uint32_t)(uint8_t)*logaddress++;
+	value = (uint32_t)*logaddress++ << 24;
+	value |= (uint32_t)*logaddress++ << 16;
+	value |= (uint32_t)*logaddress++ << 8;
+	value |= (uint32_t)*logaddress++;
+	return value;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logReadF32
+// 処理概要     32bitの生ビットをfloatへ変換する
+// 引数         なし
+// 戻り値       読み出したfloat値
+/////////////////////////////////////////////////////////////////////
+static float logReadF32(void)
+{
+	union
+	{
+		float f;
+		uint32_t i;
+	} ftoi;
 
-	return i;
+	ftoi.i = logReadU32();
+	return ftoi.f;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logReadRecord
+// 処理概要     LOG_FIELD_LISTの順で1レコードを復元する
+// 引数         rec: 復元先のレコード
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void logReadRecord(LogRecord *rec)
+{
+#define LOG_READ_FIELD(type, name, fmt, expr) rec->name = logRead##type();
+#define LOG_READ_SKIP(type, name, fmt, expr)
+	LOG_FIELD_LIST(LOG_READ_FIELD, LOG_READ_SKIP)
+#undef LOG_READ_FIELD
+#undef LOG_READ_SKIP
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logBuildColumns
+// 処理概要     LOG_FIELD_LISTからCSVヘッダーとprintf形式を生成する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void logBuildColumns(void)
+{
+#define LOG_HEADER_FIELD(type, name, fmt, expr) setLogStr(#name, fmt);
+	LOG_FIELD_LIST(LOG_HEADER_FIELD, LOG_HEADER_FIELD)
+#undef LOG_HEADER_FIELD
 }
 #endif

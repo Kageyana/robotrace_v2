@@ -142,42 +142,7 @@ void Interrupt1ms(void)
 			{
 				// CALCDISTANCEごとにログを保存
 #ifdef LOG_RUNNING_WRITE
-				writeLogBufferPuts(
-					LOG_NUM_8BIT,
-					LOG_NUM_16BIT,
-					LOG_NUM_32BIT,
-					LOG_NUM_FLOAT,
-					// 8bit
-					courseMarkerLog,
-					targetSpeed,
-					(uint8_t)getSlipFlag(),
-					(uint8_t)getSlipFlagLat(),
-					// 16bit
-					(uint16_t)cntRun,
-					encCurrentN,
-					optimalIndex,
-					lineTraceOmegaFBCtrl.pwm,
-					(int16_t)log_targetAngularVelocity,
-					veloCtrlL.pwm,
-					veloCtrlR.pwm,
-					// 32bit
-					(uint32_t)encTotalOptimal,
-					// スリップ距離補正（パルス版）
-					(uint32_t)Control_GetDistEncRaw_p(),
-					(uint32_t)Control_GetDistCorr_p(),
-					(uint32_t)Control_GetDistSlipLoss_p(),
-					(uint32_t)Control_GetEncCurrentCorr_p(),
-					// float型
-					BMI088val.gyro.z,
-					BMI088val.accele.x,
-					BMI088val.accele.y,
-					getSlipIndicatorRaw(),
-					getSlipIndicatorFiltered(),
-					motorCurrentL,
-					motorCurrentR,
-					// 距離補正ログ
-					Control_GetSlipDistScale()
-				);
+				writeLogBufferPuts();
 #else
 				writeLogBufferPrint(); // バッファにログを保存
 #endif
