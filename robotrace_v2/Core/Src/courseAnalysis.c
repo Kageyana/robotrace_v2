@@ -792,6 +792,30 @@ int16_t readLogDistanceSlip(int logNumber)
 	numPPAMarry = numM;
 	ret = numPPADarry;
 
+#ifdef WRITE_BOOSTSPEED_LOG
+	// 平滑化後の目標速度配列をSDカードへ記録する
+	FIL fil_Boost;
+	FRESULT fresult_Boost;
+	char boostFileName[32];
+	snprintf(boostFileName, sizeof(boostFileName), "%sboost_%05d.csv", PATH_SETTING, logNumber);
+	fresult_Boost = f_open(&fil_Boost, boostFileName, FA_CREATE_ALWAYS | FA_WRITE);
+	if (fresult_Boost == FR_OK)
+	{
+		// CSVヘッダを書き込み、平滑化済みのboostSpeedを順番に保存する
+		UINT bytesWritten;
+		f_printf(&fil_Boost, "index,boost_speed\n");
+		for (int32_t idx = 0; idx < maxOptimalIndex; idx++)
+		{
+			char boostLine[48];
+
+			// f_printfは%f非対応のため、1行分を文字列に整形してから書き込む
+			snprintf(boostLine, sizeof(boostLine), "%ld,%.3f\n", (long)idx, PPAD[idx].boostSpeed);
+			f_write(&fil_Boost, boostLine, strlen(boostLine), &bytesWritten);
+		}
+		f_close(&fil_Boost);
+	}
+#endif
+
 	// 追加: 解析済み情報を更新
 	saveLogNumber(logNumber);
 	analizedNumber = logNumber;

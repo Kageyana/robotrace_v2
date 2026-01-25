@@ -137,6 +137,7 @@ uint8_t checkMarker(void)
 		ret = LEFTMARKER;
 	}
 
+	// 左右のマーカーを検出してから10~20mm走行後かつ左右走行距離が同じ時
 	if (distL > encMM(10) && distL <= encMM(20) && distR == distL)
 	{
 		ret = CROSSLINE;

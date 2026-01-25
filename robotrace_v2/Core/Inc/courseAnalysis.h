@@ -47,7 +47,7 @@
 #define CA_SLIP_UP_STRAIGHT 0.060f			// 直線での微増速
 #define CA_SLIP_UP_CURVE 0.032f				// カーブでの微増速
 
-// #define WRITE_BOOSTSPEED_LOG 	 // 速度計画ログを書き出すかどうかのフラグ
+#define WRITE_BOOSTSPEED_LOG 	 // 速度計画ログを書き出すかどうかのフラグ
 
 // ファイル名
 #define FILENAME_ANALIZENUMBER "analize"
