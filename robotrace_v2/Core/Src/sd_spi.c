@@ -18,6 +18,8 @@
 #include <string.h>
 #include <stdio.h>
 
+extern volatile int g_sd_last_read_multi_status;
+
 /***************************************************************
  * 🔧 USER-MODIFIABLE SECTION
  * You are free to edit anything below this line
@@ -205,12 +207,16 @@ SD_Status SD_ReadBlocks(uint8_t *buff, uint32_t sector, uint32_t count) {
 }
 
 SD_Status SD_ReadMultiBlocks(uint8_t *buff, uint32_t sector, uint32_t count) {
-    if (!count) return SD_ERROR;
+    if (!count) {
+        g_sd_last_read_multi_status = (int)SD_ERROR;
+        return SD_ERROR;
+    }
     if (!sdhc) sector *= 512;
 
     SD_CS_LOW();
     if (SD_SendCommand(18, sector, 0xFF) != 0x00) {
         SD_CS_HIGH();
+        g_sd_last_read_multi_status = (int)SD_ERROR;
         return SD_ERROR;
     }
 
@@ -225,6 +231,7 @@ SD_Status SD_ReadMultiBlocks(uint8_t *buff, uint32_t sector, uint32_t count) {
 
         if (token != 0xFE) {
             SD_CS_HIGH();
+            g_sd_last_read_multi_status = (int)SD_ERROR;
             return SD_ERROR;
         }
 
@@ -239,6 +246,7 @@ SD_Status SD_ReadMultiBlocks(uint8_t *buff, uint32_t sector, uint32_t count) {
     SD_CS_HIGH();
     SD_TransmitByte(0xFF); // Extra 8 clocks
 
+    g_sd_last_read_multi_status = (int)SD_OK;
     return SD_OK;
 }
 

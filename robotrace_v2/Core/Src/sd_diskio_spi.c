@@ -18,6 +18,11 @@
 #include "sd_spi.h"
 #include "ff_gen_drv.h"
 
+// Debug: last SD read request/status for f_gets error logs
+volatile DWORD g_sd_last_read_sector = 0;
+volatile UINT g_sd_last_read_count = 0;
+volatile int g_sd_last_read_blocks_status = -1;
+volatile int g_sd_last_read_multi_status = -1;
 
 DSTATUS SD_disk_status(BYTE drv) {
     if (drv != 0)
@@ -33,10 +38,19 @@ DSTATUS SD_disk_initialize(BYTE drv) {
 }
 
 DRESULT SD_disk_read(BYTE pdrv, BYTE *buff, DWORD sector, UINT count) {
+    g_sd_last_read_sector = sector;
+    g_sd_last_read_count = count;
+    g_sd_last_read_blocks_status = -1;
+    g_sd_last_read_multi_status = -1;
+
     if (pdrv != 0 || count == 0)
         return RES_PARERR;
     if (!card_initialized) return RES_NOTRDY;
-    return (SD_ReadBlocks(buff, sector, count) == SD_OK) ? RES_OK : RES_ERROR;
+
+    SD_Status status = SD_ReadBlocks(buff, sector, count);
+    g_sd_last_read_blocks_status = (int)status;
+
+    return (status == SD_OK) ? RES_OK : RES_ERROR;
 }
 
 DRESULT SD_disk_write(BYTE pdrv,  BYTE *buff, DWORD sector, UINT count) {

@@ -332,12 +332,12 @@ void writeLogBufferPuts(void)
 		{
 			if (sendSD)
 			{
-				writeLogPuts();
-				if (sendSD)
-				{
-					logOverflow = true;
-					return;
-				}
+				// writeLogPuts();
+				// if (sendSD)
+				// {
+				// 	logOverflow = true;
+				// 	return;
+				// }
 			}
 			logBuffSendIndex = logBuffIndex;
 			uint8_t *tmp = flushBuf;
@@ -586,6 +586,8 @@ void endLog(void)
 		f_puts(logStr, &fil_W);
 	}
 
+	f_sync(&fil_W);
+	f_sync(&fil);
 	f_close(&fil_W); // ログファイル(csv)
 	f_close(&fil);	 // 一時ファイル
 

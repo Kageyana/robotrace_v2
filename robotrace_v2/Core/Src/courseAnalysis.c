@@ -7,6 +7,8 @@
 #include "PIDcontrol.h"
 #include "markerSensor.h"
 #include "BMI088.h"
+#include "sd_diskio_spi.h"
+#include <stdint.h>
 //====================================//
 // グローバル変数の宣
 //====================================//
@@ -545,8 +547,38 @@ int16_t readLogDistanceSlip(int logNumber)
 	// 1行目はヘッダなので読み飛ばす
 	f_gets(log, sizeof(log), &fil_Read);
 
-	while (f_gets(log, sizeof(log), &fil_Read))
-	{
+	UINT lineNo = 0;
+
+	while (1) {
+		TCHAR* s = f_gets(log, (int)(sizeof(log)/sizeof(log[0])), &fil_Read);
+		if (!s) break;
+		lineNo++;
+
+		DWORD pos  = f_tell(&fil_Read);
+		DWORD size = f_size(&fil_Read);
+		int eof    = f_eof(&fil_Read);
+		int err    = f_error(&fil_Read);
+
+		if(err > 0)
+		{
+			// fgetデバッグ用ログ
+			FIL fil_Boost;
+			FRESULT fresult_Boost;
+			char boostFileName[32];
+			snprintf(boostFileName, sizeof(boostFileName), "%sboost_%05d.csv", PATH_SETTING, logNumber);
+			fresult_Boost = f_open(&fil_Boost, boostFileName, FA_OPEN_ALWAYS | FA_WRITE);
+			if (fresult_Boost == FR_OK)
+			{
+				// ファイル終端へ移動(ファイル追記の準備)
+				fresult_Boost = f_lseek(&fil_Boost, f_size(&fil_Boost));
+				f_printf(&fil_Boost,"readLogDistanceSlip end: line=%d pos=%d size=%d eof=%d err=%d sd_sector=%lu sd_count=%u sd_rb=%d sd_rm=%d\n",
+					(uint32_t)lineNo, (uint32_t)pos, (uint32_t)size, eof, err,
+					(unsigned long)g_sd_last_read_sector, (unsigned int)g_sd_last_read_count,
+					g_sd_last_read_blocks_status, g_sd_last_read_multi_status);
+				f_close(&fil_Boost);
+			}
+		}
+
 		uint8_t courseMarker = 0;
 		int32_t encTotal = 0;
 		int16_t roc = 0;

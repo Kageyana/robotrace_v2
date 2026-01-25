@@ -23,6 +23,11 @@ extern "C" {
 #endif
 
 extern const Diskio_drvTypeDef SD_Driver;
+// Debug: last SD read request/status for f_gets error logs
+extern volatile DWORD g_sd_last_read_sector;
+extern volatile UINT g_sd_last_read_count;
+extern volatile int g_sd_last_read_blocks_status;
+extern volatile int g_sd_last_read_multi_status;
 DSTATUS SD_disk_status(BYTE drv);
 DSTATUS SD_disk_initialize(BYTE drv);
 DRESULT SD_disk_read(BYTE pdrv, BYTE *buff, DWORD sector, UINT count);
