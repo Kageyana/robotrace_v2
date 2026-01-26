@@ -21,8 +21,12 @@
 
 #define CMD0  (0)
 #define CMD8  (8)
+#define CMD9  (9)
+#define CMD12 (12)
 #define CMD17 (17)
+#define CMD18 (18)
 #define CMD24 (24)
+#define CMD25 (25)
 #define CMD55 (55)
 #define CMD58 (58)
 #define ACMD41 (41)
@@ -39,6 +43,7 @@ SD_Status SD_ReadBlocks(uint8_t *buff, uint32_t sector, uint32_t count);
 SD_Status SD_WriteBlocks(const uint8_t *buff, uint32_t sector, uint32_t count);
 SD_Status SD_ReadMultiBlocks(uint8_t *buff, uint32_t sector, uint32_t count);
 SD_Status SD_WriteMultiBlocks(const uint8_t *buff, uint32_t sector, uint32_t count);
+SD_Status SD_GetSectorCount(uint32_t *sector_count);
 uint8_t sd_is_sdhc(void);
 
 #endif // __SD_SPI_H__

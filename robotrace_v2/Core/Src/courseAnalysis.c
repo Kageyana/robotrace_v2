@@ -7,6 +7,7 @@
 #include "PIDcontrol.h"
 #include "markerSensor.h"
 #include "BMI088.h"
+#include "SDcard.h"
 #include "sd_diskio_spi.h"
 #include <stdint.h>
 //====================================//
@@ -42,6 +43,8 @@ bool straightState;
 static uint8_t missedCorrections = 0;	// 連続補正失敗回数
 static bool failSafeActive = false;	// フェイルセーフ動作中フラグ
 static int16_t lastCorrectedMarker = 0;	// 直近で補正したマーカーインデックス
+
+static void logReadSlipIoError(int logNumber, UINT lineNo, FIL *fil, const char *tag);
 
 AnalysisData PPAD[OPT_BUFF_SIZE];
 EventPos markerPos[OPT_BUFF_SIZE];
@@ -116,7 +119,7 @@ void getLogNumber(void)
 	if (fresult == FR_OK)
 	{
 		// 解析済みのログ番号を取得
-		f_gets(log, sizeof(log), &fil);
+		f_gets(log, (int)(sizeof(log) / sizeof(log[0])), &fil);
 		sscanf(log, "%05d", &analizedNumber);	
 		f_close(&fil);
 	}
@@ -173,6 +176,12 @@ int16_t readLogDistance(int logNumber)
 	int16_t ret = 0;
 	bool fileOpened = false; // f_closeの要否を判断するためのフラグ
 	bool errorDetected = false; // 解析途中のエラー発生を検知するフラグ
+	bool lock_acquired = sd_fatfs_lock(200);
+
+	if (!lock_acquired)
+	{
+		return -9; // SD/FatFs使用中
+	}
 
 	snprintf(fileName, sizeof(fileName), "%d", logNumber);			   // 数値を文字列に変換
 	strcat(fileName, ".csv");										   // 拡張子を追加
@@ -183,6 +192,7 @@ int16_t readLogDistance(int logNumber)
 		fileOpened = true; // 正常に開けた場合のみクローズ処理を有効化
 		// ログデータの取得
 		TCHAR log[512];
+		const int log_len = (int)(sizeof(log) / sizeof(log[0]));
 		int32_t time, marker, velo, distance, roc, i = 0;
 		float angVelo;
 		int32_t numD = 0, numM = 0, cntCurR = 0, numStraight = 0;
@@ -195,10 +205,31 @@ int16_t readLogDistance(int logNumber)
 		// 構造体配列の初期化
 		memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
 
-		f_gets(log, sizeof(log), &fil_Read); // 1行目はヘッダなので読み飛ばす
-		// ログデータ取得開始
-		while (f_gets(log, sizeof(log), &fil_Read))
+		TCHAR *header = f_gets(log, log_len, &fil_Read); // 1行目はヘッダなので読み飛ばす
+		if (!header && f_error(&fil_Read))
 		{
+			ret = -5;
+			errorDetected = true;
+			logReadSlipIoError(logNumber, 0, &fil_Read, "io_fail");
+		}
+
+		UINT lineNo = 0;
+		// ログデータ取得開始
+		while (!errorDetected)
+		{
+			TCHAR *s = f_gets(log, log_len, &fil_Read);
+			if (!s)
+			{
+				if (f_error(&fil_Read))
+				{
+					ret = -5;
+					errorDetected = true;
+					logReadSlipIoError(logNumber, lineNo, &fil_Read, "io_fail");
+				}
+				break;
+			}
+			lineNo++;
+
 			sscanf(log, "%d,%d,%f,%d,%d,%d,", &time, &velo, &angVelo, &marker, &distance, &roc);
 			// 解析処理
 			// marker==3: 交差線マーカー
@@ -398,6 +429,10 @@ int16_t readLogDistance(int logNumber)
 	{
 		f_close(&fil_Read); // オープン成功時のみクローズを実施
 	}
+	if (lock_acquired)
+	{
+		sd_fatfs_unlock();
+	}
 
 	// printf("Analysis distance end\n");
 
@@ -492,6 +527,32 @@ static bool parseSecondLogLine(const char *line, uint8_t *courseMarker, int32_t 
 
 	return gotOptimal;
 }
+
+static void logReadSlipIoError(int logNumber, UINT lineNo, FIL *fil, const char *tag)
+{
+	FIL fil_Boost;
+	FRESULT fresult_Boost;
+	char boostFileName[32];
+	DWORD pos = f_tell(fil);
+	DWORD size = f_size(fil);
+	int eof = f_eof(fil);
+	int err = f_error(fil);
+
+	snprintf(boostFileName, sizeof(boostFileName), "%sboost_%05d.csv", PATH_SETTING, logNumber);
+	fresult_Boost = f_open(&fil_Boost, boostFileName, FA_OPEN_ALWAYS | FA_WRITE);
+	if (fresult_Boost == FR_OK)
+	{
+		// ファイル終端へ移動(ファイル追記の準備)
+		f_lseek(&fil_Boost, f_size(&fil_Boost));
+		f_printf(&fil_Boost,
+			"readLogDistanceSlip %s: line=%lu pos=%lu size=%lu eof=%d err=%d sd_sector=%lu sd_count=%u sd_rb=%d sd_rm=%d\n",
+			(tag != NULL) ? tag : "io",
+			(unsigned long)lineNo, (unsigned long)pos, (unsigned long)size, eof, err,
+			(unsigned long)g_sd_last_read_sector, (unsigned int)g_sd_last_read_count,
+			g_sd_last_read_blocks_status, g_sd_last_read_multi_status);
+		f_close(&fil_Boost);
+	}
+}
 /////////////////////////////////////////////////////////////////////
 // モジュール名 readLogDistanceSlip
 // 処理概要     2次走行ログからスリップを考慮した3次走行用速度計画を作成する
@@ -504,6 +565,13 @@ int16_t readLogDistanceSlip(int logNumber)
 	FRESULT fresult;
 	char fileName[16];
 	int16_t ret = 0;
+	bool lock_acquired = sd_fatfs_lock(200);
+	bool fileOpened = false;
+
+	if (!lock_acquired)
+	{
+		return -9; // SD/FatFs使用中
+	}
 
 	// 追加: 解析用バッファ・配列は静的領域で確保してスタックを節約
 	static uint16_t sampleCnt[OPT_BUFF_SIZE];
@@ -521,8 +589,10 @@ int16_t readLogDistanceSlip(int logNumber)
 	fresult = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // csvファイルを開く
 	if (fresult != FR_OK)
 	{
-		return -4; // ログファイルのオープン失敗
+		ret = -4; // ログファイルのオープン失敗
+		goto cleanup;
 	}
+	fileOpened = true;
 
 	memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE); // 追加: 出力先を初期化
 	memset(markerPos, 0, sizeof(EventPos) * OPT_BUFF_SIZE); // 追加: マーカー配列をクリア
@@ -537,6 +607,7 @@ int16_t readLogDistanceSlip(int logNumber)
 	memset(v3, 0, sizeof(v3));
 
 	static TCHAR log[CA_SECOND_LOG_LINE_BUFSIZE];
+	const int log_len = (int)(sizeof(log) / sizeof(log[0]));
 	int16_t maxOptimalIndex = -1;
 	int16_t numM = 0;
 	int32_t prevDist = 0;
@@ -545,38 +616,38 @@ int16_t readLogDistanceSlip(int logNumber)
 	bool straightStateLocal = false;	// 追加: 直線判定はローカルで管理
 
 	// 1行目はヘッダなので読み飛ばす
-	f_gets(log, sizeof(log), &fil_Read);
+	TCHAR *header = f_gets(log, log_len, &fil_Read);
+	if (!header)
+	{
+		int eof = f_eof(&fil_Read);
+		int err = f_error(&fil_Read);
+		if (!eof && err != 0)
+		{
+			ret = -5; // f_gets I/O error
+			logReadSlipIoError(logNumber, 0, &fil_Read, "io_fail");
+		}
+		else
+		{
+			ret = -2; // 解析対象が無い
+		}
+		goto cleanup;
+	}
 
 	UINT lineNo = 0;
+	bool fgets_null = false;
 
 	while (1) {
-		TCHAR* s = f_gets(log, (int)(sizeof(log)/sizeof(log[0])), &fil_Read);
-		if (!s) break;
+		TCHAR* s = f_gets(log, log_len, &fil_Read);
+		if (!s)
+		{
+			fgets_null = true;
+			break;
+		}
 		lineNo++;
 
-		DWORD pos  = f_tell(&fil_Read);
-		DWORD size = f_size(&fil_Read);
-		int eof    = f_eof(&fil_Read);
-		int err    = f_error(&fil_Read);
-
-		if(err > 0)
+		if (f_error(&fil_Read))
 		{
-			// fgetデバッグ用ログ
-			FIL fil_Boost;
-			FRESULT fresult_Boost;
-			char boostFileName[32];
-			snprintf(boostFileName, sizeof(boostFileName), "%sboost_%05d.csv", PATH_SETTING, logNumber);
-			fresult_Boost = f_open(&fil_Boost, boostFileName, FA_OPEN_ALWAYS | FA_WRITE);
-			if (fresult_Boost == FR_OK)
-			{
-				// ファイル終端へ移動(ファイル追記の準備)
-				fresult_Boost = f_lseek(&fil_Boost, f_size(&fil_Boost));
-				f_printf(&fil_Boost,"readLogDistanceSlip end: line=%d pos=%d size=%d eof=%d err=%d sd_sector=%lu sd_count=%u sd_rb=%d sd_rm=%d\n",
-					(uint32_t)lineNo, (uint32_t)pos, (uint32_t)size, eof, err,
-					(unsigned long)g_sd_last_read_sector, (unsigned int)g_sd_last_read_count,
-					g_sd_last_read_blocks_status, g_sd_last_read_multi_status);
-				f_close(&fil_Boost);
-			}
+			logReadSlipIoError(logNumber, lineNo, &fil_Read, "io_err");
 		}
 
 		uint8_t courseMarker = 0;
@@ -665,8 +736,26 @@ int16_t readLogDistanceSlip(int logNumber)
 		prevDist = encTotal;
 		hasPrevDist = true;
 	}
+	if (ret == 0 && fgets_null)
+	{
+		int eof = f_eof(&fil_Read);
+		int err = f_error(&fil_Read);
+		if (!eof && err != 0)
+		{
+			ret = -5; // f_gets I/O error
+			logReadSlipIoError(logNumber, lineNo, &fil_Read, "io_fail");
+		}
+	}
 
-	f_close(&fil_Read);
+cleanup:
+	if (fileOpened)
+	{
+		f_close(&fil_Read);
+	}
+	if (lock_acquired)
+	{
+		sd_fatfs_unlock();
+	}
 
 	if (ret < 0)
 	{
@@ -922,6 +1011,12 @@ int16_t readLogTest(int logNumber)
 	FRESULT fresult;
 	char fileName[10];
 	int16_t ret = 0;
+	bool lock_acquired = sd_fatfs_lock(200);
+
+	if (!lock_acquired)
+	{
+		return -9; // SD/FatFs使用中
+	}
 
 	snprintf(fileName, sizeof(fileName), "%d", logNumber);			   // 数値を文字列に変換
 	strcat(fileName, ".csv");										   // 拡張子を追加
@@ -930,6 +1025,7 @@ int16_t readLogTest(int logNumber)
 	if (fresult == FR_OK)
 	{
 		TCHAR log[512];
+		const int log_len = (int)(sizeof(log) / sizeof(log[0]));
 		int32_t time, marker, velo, distance;
 		float angVelo;
 		int32_t startEnc = 0, numD = 0, numM = 0, beforeMarker = 0;
@@ -940,7 +1036,7 @@ int16_t readLogTest(int logNumber)
 		memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
 
 		// ログデータ取得開始
-		while (f_gets(log, sizeof(log), &fil_Read))
+		while (f_gets(log, log_len, &fil_Read))
 		{
 			sscanf(log, "%d,%d,%f,%d,%d", &time, &velo, &angVelo, &marker, &distance);
 
@@ -969,6 +1065,10 @@ int16_t readLogTest(int logNumber)
 		ret = -1;
 	}
 	f_close(&fil_Read);
+	if (lock_acquired)
+	{
+		sd_fatfs_unlock();
+	}
 
 	// 解析済みのログ番号を保存
 	// saveLogNumber(logNumber);
@@ -988,6 +1088,12 @@ int16_t calcXYcies(int logNumber)
 	FRESULT fresult1, fresult2;
 	char fileName[10];
 	int16_t ret = 0;
+	bool lock_acquired = sd_fatfs_lock(200);
+
+	if (!lock_acquired)
+	{
+		return -9; // SD/FatFs使用中
+	}
 
 	// ファイル読み込み
 	snprintf(fileName, sizeof(fileName), "%d", logNumber);				// 数値を文字列に変換
@@ -997,6 +1103,10 @@ int16_t calcXYcies(int logNumber)
 	{
 		// ログファイルのオープンに失敗した場合はエラーを返す
 		ret = -5;       // ログファイルオープンエラー
+		if (lock_acquired)
+		{
+			sd_fatfs_unlock();
+		}
 		return ret;
 	}
 	fresult2 = f_open(&fil_Plot, "./plot/plot.csv", FA_CREATE_ALWAYS | FA_WRITE); // csvファイルを開く
@@ -1005,12 +1115,17 @@ int16_t calcXYcies(int logNumber)
 		// プロットファイルのオープンに失敗した場合はエラーを返す
 		f_close(&fil_Read);
 		ret = -6;       // プロットファイルオープンエラー
+		if (lock_acquired)
+		{
+			sd_fatfs_unlock();
+		}
 		return ret;
 	}
 
 	// プロットファイルが開けたので解析を開始
 	// ログデータの取得
 	TCHAR log[512];
+	const int log_len = (int)(sizeof(log) / sizeof(log[0]));
 	uint8_t plotStr[128];
 	int32_t time, marker, velo, distance;
 	float angVelo;
@@ -1035,10 +1150,10 @@ int16_t calcXYcies(int logNumber)
 	// plotファイルのヘッダ書き込み
 	f_printf(&fil_Plot, "xm,ym,degzm\n");
 	
-	f_gets(log, sizeof(log), &fil_Read); // 1行目はヘッダなので読み飛ばす
+	f_gets(log, log_len, &fil_Read); // 1行目はヘッダなので読み飛ばす
 
 	// ログデータ取得開始
-	while (f_gets(log, sizeof(log), &fil_Read) != NULL)
+	while (f_gets(log, log_len, &fil_Read) != NULL)
 	{
 		sscanf(log, "%d,%d,%f,%d,%d", &time, &velo, &angVelo, &marker, &distance);
 
@@ -1144,6 +1259,10 @@ int16_t calcXYcies(int logNumber)
 	// ファイルクローズ
 	f_close(&fil_Read);
 	f_close(&fil_Plot);
+	if (lock_acquired)
+	{
+		sd_fatfs_unlock();
+	}
 
 	// エラー時にはログ番号保存やフラグ設定をスキップする
 	if (ret >= 0)

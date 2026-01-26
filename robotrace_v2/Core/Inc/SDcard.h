@@ -63,4 +63,7 @@ void setLogHeaderStr(char *name, int32_t value);
 void setLogHeaderStrF(char *name, float value);
 void SDtest(void);
 void createDir(char *dirName);
+bool sd_fatfs_lock(uint32_t timeout_ms);
+void sd_fatfs_unlock(void);
+bool sd_fatfs_is_locked(void);
 #endif // SDCARD_H_

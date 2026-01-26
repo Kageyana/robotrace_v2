@@ -61,6 +61,8 @@ uint8_t cntLog = 0;
 int32_t encLog = 0;
 bool getFileNumbersError = false; // getFileNumbersでエラーが発生した際のフラグ
 
+static volatile bool sd_fatfs_locked = false;
+
 #ifdef LOG_RUNNING_WRITE
 // スキーマ順で生成するレコード配置。
 typedef struct
@@ -82,6 +84,30 @@ static float logReadF32(void);
 static void logReadRecord(LogRecord *rec);
 static void logBuildColumns(void);
 #endif
+
+bool sd_fatfs_lock(uint32_t timeout_ms)
+{
+	uint32_t start = HAL_GetTick();
+	while (sd_fatfs_locked)
+	{
+		if ((HAL_GetTick() - start) > timeout_ms)
+		{
+			return false;
+		}
+	}
+	sd_fatfs_locked = true;
+	return true;
+}
+
+void sd_fatfs_unlock(void)
+{
+	sd_fatfs_locked = false;
+}
+
+bool sd_fatfs_is_locked(void)
+{
+	return sd_fatfs_locked;
+}
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 insertSD
@@ -381,6 +407,10 @@ void writeLogPuts(void)
 	FRESULT fresult;		// f_writeの戻り値
 	UINT writtenlog = 0;	// 実際に書き込んだサイズ
 
+	if (sd_fatfs_is_locked())
+	{
+		return; // 解析読み取り中は書き込みをスキップ
+	}
 	if (!modeLOG && !sendSD)
 	{
 		return; // ログ停止中で書き込み要求が無い場合は処理不要
