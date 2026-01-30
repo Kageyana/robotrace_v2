@@ -12,7 +12,6 @@
 // STOREDはバイナリに保存、DERIVEDはendLogで計算。
 // このリストを編集して、CSVログフィールドを追加または削除してください。
 // STORED(type, name, fmt, expr) or DERIVED(type, name, fmt, expr)
-#ifdef LOG_RUNNING_WRITE
 #define LOG_FIELD_LIST(STORED, DERIVED) \
 	STORED(U16, cntlog, "%d", (uint16_t)cntRun) \
 	STORED(U16, encCurrentN, "%d", (uint16_t)encCurrentN) \
@@ -41,9 +40,6 @@
 	STORED(U32, encCurrentCorr_p, "%d", (uint32_t)Control_GetEncCurrentCorr_p()) \
 	DERIVED(F32, x, "%f", log_x) \
 	DERIVED(F32, y, "%f", log_y)
-#else
-#define LOG_FIELD_LIST(STORED, DERIVED)
-#endif
 
 // バイナリログで保存する型の対応表。
 #define LOG_CTYPE_U8  uint8_t

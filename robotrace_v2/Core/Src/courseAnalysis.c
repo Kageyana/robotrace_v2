@@ -1563,12 +1563,6 @@ void processMarkerEvent(void) {
 		} else if(optimalTrace == BOOST_SHORTCUT) {
 			// ショートカット基準2次走行のとき
 		}
-#ifndef LOG_RUNNING_WRITE
-		// マーカーの位置を記録
-		if (courseMarker == 0 && beforeCourseMarker > 0) {
-			writeMarkerPos(encTotalOptimal, beforeCourseMarker);
-		}
-#endif
 	}
 	beforeCourseMarker = courseMarker; // 前回のマーカー状態を更新
 }

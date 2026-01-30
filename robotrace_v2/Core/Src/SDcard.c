@@ -16,7 +16,6 @@ FIL fil_R;
 char columnTitle[2048] = "", formatLog[256] = "";
 
 // ログバッファ
-#ifdef LOG_RUNNING_WRITE
 uint8_t logBuffer[2][BUFFER_SIZE_LOG];	// バッファは2個で固定
 uint8_t *activeBuf = logBuffer[0];		// 書き込み中のバッファ
 uint8_t *flushBuf = logBuffer[1];		// SD書き込み待ちバッファ
@@ -25,30 +24,8 @@ uint32_t logBuffSendIndex = 0;			// flushBufに溜まったバイト数
 volatile bool sendSD = false;			// flushBufをSDへ送るフラグ(割込み共有)
 uint16_t cntSend = 0;
 uint8_t *logaddress;
-#else
-typedef struct
-{
-	uint8_t time;
-	uint8_t speed;
-	float zg;
-	int16_t targetSpeed;
-	int16_t opIndex;
-	int16_t spare;
-} logData;
-logData logVal[BUFFER_SIZE_LOG]; // 綴りの誤りを修正
-#endif
 uint16_t logValIndex = 0;
 bool logOverflow = false; // ログバッファ上限超過フラグ
-#ifndef LOG_RUNNING_WRITE
-typedef struct
-{
-	uint16_t index;
-	int32_t distance;
-	uint8_t marker;
-} markerData;
-markerData markerVal[BUFFER_SIZE_MARKER]; // 綴りの誤りを修正
-uint16_t markerValIndex = 0;
-#endif
 bool markerOverflow = false; // マーカーバッファ上限超過フラグ
 
 // ログファイルナンバー
@@ -64,7 +41,6 @@ bool getFileNumbersError = false; // getFileNumbersでエラーが発生した�
 static volatile bool sd_fatfs_locked = false;
 static volatile bool sd_analysis_active = false;
 
-#ifdef LOG_RUNNING_WRITE
 // スキーマ順で生成するレコード配置。
 typedef struct
 {
@@ -84,7 +60,6 @@ static uint32_t logReadU32(void);
 static float logReadF32(void);
 static void logReadRecord(LogRecord *rec);
 static void logBuildColumns(void);
-#endif
 
 bool sd_fatfs_lock(uint32_t timeout_ms)
 {
@@ -287,22 +262,7 @@ void createLog(void)
 	formatLog[0] = 0;   // バッファを安全に初期化
 
 	// ログヘッダー
-#ifdef LOG_RUNNING_WRITE
 	logBuildColumns();
-#else
-	setLogStr("cntlog", "%d");
-	setLogStr("encCurrentN", "%d");
-	setLogStr("gyroVal_Z", "%f");
-	setLogStr("courseMarker", "%d");
-	setLogStr("encTotalN", "%d");
-	setLogStr("ROC", "%f");
-	setLogStr("x", "%f");
-	setLogStr("y", "%f");
-	setLogStr("CurrentL", "%d");
-	setLogStr("CurrentR", "%d");
-	// setLogStr("courseMarker",  "%d");
-	// setLogStr("encTotalN",    "%d");
-#endif
 	// 制御パラメータ
 	setLogHeaderStrF("batteryVoltage_V", batteryVoltage_V);
 
@@ -350,23 +310,6 @@ void createLog(void)
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-#ifndef LOG_RUNNING_WRITE
-void writeMarkerPos(uint32_t distance, uint8_t marker)
-{
-	// バッファ上限チェック
-    if (markerValIndex < BUFFER_SIZE_MARKER) // 綴りの誤りを修正
-	{
-		markerVal[markerValIndex].index = logValIndex; // ログの位置を記録
-		markerVal[markerValIndex].distance = distance;  // 走行距離を記録
-		markerVal[markerValIndex].marker = marker;      // マーカー種別を記録
-		markerValIndex++;                               // インデックス更新
-	}
-	else
-	{
-		markerOverflow = true; // 上限超過を記録
-	}
-}
-#endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 initLog
 // 処理概要     バイナリ保存用のファイルを作成
@@ -376,7 +319,6 @@ void writeMarkerPos(uint32_t distance, uint8_t marker)
 void initLog(void)
 {
     FRESULT fresult;
-#ifdef LOG_RUNNING_WRITE
 	// CSV変換ループの実行回数を走行ごとに正しく制御するため送信カウンタをリセット
 	cntSend = 0;
 	fresult = f_open(&fil_W, "temp", FA_OPEN_ALWAYS | FA_WRITE); // create file
@@ -392,13 +334,6 @@ void initLog(void)
 	logBuffSendIndex = logBuffIndex;	// バッファのバイト数を記録
 	sendSD = false;						// 書き込み要求をリセット
 	logOverflow = false;				// ログバッファ状態フラグをリセット
-#else
-    // 構造体配列の初期化
-    memset(&logVal, 0, sizeof(logData) * BUFFER_SIZE_LOG);     // 綴りの誤りを修正
-    memset(&markerVal, 0, sizeof(markerData) * BUFFER_SIZE_MARKER); // 綴りの誤りを修正
-	logValIndex = 0;
-	markerValIndex = 0;
-#endif
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogBufferPuts
@@ -406,7 +341,6 @@ void initLog(void)
 // 引数         c:8bit変数の数s:16bit変数の数i:32bit変数の数f:float変数の数
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-#ifdef LOG_RUNNING_WRITE
 void writeLogBufferPuts(void)
 {
 	if (modeLOG)
@@ -458,14 +392,12 @@ void writeLogBufferPuts(void)
 	}
 }
 
-#endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogPuts
 // 処理概要     バッファをSDカードに転送する
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-#ifdef LOG_RUNNING_WRITE
 void writeLogPuts(void)
 {
 	FRESULT fresult;		// f_writeの戻り値
@@ -503,86 +435,6 @@ void writeLogPuts(void)
 		sd_fatfs_unlock();
 	}
 }
-#endif
-////////////////////////////////////////////////////////////////////
-// モジュール名 writeLogBufferPrint
-// 処理概要     保存する変数の値をバッファに転送する
-// 引数         なし
-// 戻り値       なし
-/////////////////////////////////////////////////////////////////////
-#ifndef LOG_RUNNING_WRITE
-void writeLogBufferPrint(void)
-{
-	if (modeLOG)
-	{
-		// バッファ上限チェック
-        if (logValIndex < BUFFER_SIZE_LOG) // 綴りの誤りを修正
-		{
-			logVal[logValIndex].time = cntLog;                        // ログ時刻を記録
-			logVal[logValIndex].speed = encCurrentN;                  // 現在速度を記録
-			logVal[logValIndex].zg = BMI088val.gyro.z;                // 角速度を記録
-			logVal[logValIndex].opIndex = optimalIndex;               // 最適軌道番号を記録
-			logVal[logValIndex].targetSpeed = targetSpeed;           // 目標速度を記録
-			logVal[logValIndex].spare = (int16_t)(motorCurrentL * 10000); // 予備情報を記録
-			logValIndex++;                                           // インデックス更新
-		}
-		else
-		{
-			logOverflow = true; // 上限超過を記録
-		}
-	}
-}
-#endif
-/////////////////////////////////////////////////////////////////////
-// モジュール名 writeLogPrint
-// 処理概要     バッファをSDカードに転送する
-// 引数         なし
-// 戻り値       なし
-/////////////////////////////////////////////////////////////////////
-#ifndef LOG_RUNNING_WRITE
-void writeLogPrint(void)
-{
-	uint8_t logStr[256];
-	uint32_t i, totalTime = 0, distance;
-	uint16_t indexM = 0, marker;
-
-	clearXYcie(); // xy座標クリア
-	for (i = 0; i < logValIndex; i++)
-	{
-		totalTime += logVal[i].time;
-		calcXYcie(logVal[i].speed, logVal[i].zg, (float)logVal[i].time / 1000);
-
-		if (i == markerVal[indexM].index)
-		{
-			marker = markerVal[indexM].marker;
-			distance = markerVal[indexM].distance;
-			indexM++;
-		}
-		else
-		{
-			marker = 0;
-			distance = 0;
-		}
-
-		// 文字列に変換
-        snprintf((char *)logStr, sizeof(logStr), (char *)formatLog, // バッファサイズを指定して安全に文字列化
-			totalTime,
-			logVal[i].speed,
-			logVal[i].zg,
-			marker,
-			distance,
-			calcROC(logVal[i].speed, logVal[i].zg, (float)logVal[i].time / 1000),
-
-			xycie.x,
-			xycie.y,
-			logVal[i].opIndex,
-			logVal[i].targetSpeed);
-
-		// 文字列をSDカードに送信
-		f_puts(logStr, &fil_W);
-	}
-}
-#endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 endTempFile
 // 処理概要     一時ファイル終了処理
@@ -603,7 +455,6 @@ void endLog(void)
 {
 	modeLOG = false; // ログ取得停止
 	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY); // SPIバスが空くまで待つ
-#ifdef LOG_RUNNING_WRITE
 	FRESULT fresult;
 	FIL fil;
 	uint8_t log[LOG_SIZE];
@@ -701,11 +552,6 @@ void endLog(void)
 	// 連続走行時にCSV変換ループが累積しないよう送信カウンタをリセット
 	cntSend = 0;
 
-#else
-	createLog();	 // ログファイル作成
-	writeLogPrint(); // ログ書き込み
-	f_close(&fil_W);
-#endif
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getFileNumbers
@@ -872,7 +718,6 @@ void createDir(char *dirName)
 	}
 	f_closedir(&dir); // 関数を抜ける前に必ずディレクトリを閉じる
 }
-#ifdef LOG_RUNNING_WRITE
 /////////////////////////////////////////////////////////////////////
 // モジュール名 send8bit
 // 処理概要     8bit変数をアクティブバッファに送る
@@ -1014,4 +859,3 @@ static void logBuildColumns(void)
 	LOG_FIELD_LIST(LOG_HEADER_FIELD, LOG_HEADER_FIELD)
 #undef LOG_HEADER_FIELD
 }
-#endif

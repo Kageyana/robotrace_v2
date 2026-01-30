@@ -10,15 +10,10 @@
 //====================================//
 // シンボル定義
 //====================================//
-#define LOG_RUNNING_WRITE
 #include "log_schema.h" // フィールド順とレコードサイズを定義。
 
-#ifdef LOG_RUNNING_WRITE
 #define BUFFER_SIZE_LOG 512
 #define LOG_SIZE LOG_RECORD_SIZE_BYTES // スキーマ由来のレコードサイズ。
-#else
-#define BUFFER_SIZE_LOG 5000 // 綴りの誤りを修正
-#endif
 
 #define BUFFER_SIZE_MARKER 500
 #define FILENUMBER_NUM 1000		// ログファイルナンバーの上限
@@ -46,17 +41,12 @@ void endTempFile(void);
 void endLog(void);
 void writeMarkerPos(uint32_t distance, uint8_t marker);
 void initLog(void);
-#ifdef LOG_RUNNING_WRITE
 // スキーマ順で1レコードを書き込む。
 void writeLogBufferPuts(void);
 void writeLogPuts(void);
 void send8bit(uint8_t data);
 void send16bit(uint16_t data);
 void send32bit(uint32_t data);
-#else
-void writeLogBufferPrint(void);
-void writeLogPrint(void);
-#endif
 int16_t getFileNumbers(void);
 void setLogStr(char *column, char *format);
 void setLogHeaderStr(char *name, int32_t value);

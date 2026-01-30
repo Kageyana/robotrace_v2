@@ -141,11 +141,7 @@ void Interrupt1ms(void)
 			if (modeLOG)
 			{
 				// CALCDISTANCEごとにログを保存
-#ifdef LOG_RUNNING_WRITE
 				writeLogBufferPuts();
-#else
-				writeLogBufferPrint(); // バッファにログを保存
-#endif
 				courseMarkerLog = 0; // ログ用マーカー状態をリセット
 				encLog = 0;	// ログ用エンコーダパルスをリセット
 				cntLog = 0;
@@ -234,9 +230,7 @@ void Interrupt1ms(void)
 /////////////////////////////////////////////////////////////////////
 void Interrupt100us(void)
 {
-#ifdef LOG_RUNNING_WRITE
         logWriteReq = true;
-#endif
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logWriteTask
@@ -246,7 +240,6 @@ void Interrupt100us(void)
 /////////////////////////////////////////////////////////////////////
 void logWriteTask(void)
 {
-#ifdef LOG_RUNNING_WRITE
         if (logWriteReq)
         {
                 if (sd_is_analysis_active())
@@ -257,7 +250,6 @@ void logWriteTask(void)
                 writeLogPuts();        // SD?????????????
                 logWriteReq = false;
         }
-#endif
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 Interrupt300ns
