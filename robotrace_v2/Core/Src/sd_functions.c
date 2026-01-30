@@ -25,6 +25,7 @@
 
 char sd_path[4];
 FATFS fs;
+static int sd_linked = 0;
 
 int sd_format(void) {
 	// Pre-mount required for legacy FatFS
@@ -58,10 +59,13 @@ int sd_mount(void) {
 	FRESULT res;
 	extern uint8_t sd_is_sdhc(void);
 
-	printf("Linking SD driver...\r\n");
-	if (FATFS_LinkDriver(&SD_Driver, sd_path) != 0) {
-		printf("FATFS_LinkDriver failed\n");
-		return FR_DISK_ERR;
+	if (!sd_linked) {
+		printf("Linking SD driver...\r\n");
+		if (FATFS_LinkDriver(&SD_Driver, sd_path) != 0) {
+			printf("FATFS_LinkDriver failed\n");
+			return FR_DISK_ERR;
+		}
+		sd_linked = 1;
 	}
 
 	printf("Initializing disk...\r\n");
@@ -116,6 +120,14 @@ int sd_unmount(void) {
 	FRESULT res = f_mount(NULL, sd_path, 1);
 	printf("SD card unmounted: %s\r\n", (res == FR_OK) ? "OK" : "Failed");
 	return res;
+}
+
+int sd_remount(void) {
+	int res = sd_unmount();
+	if (res != FR_OK) {
+		return res;
+	}
+	return sd_mount();
 }
 
 int sd_write_file(const char *filename, const char *text) {

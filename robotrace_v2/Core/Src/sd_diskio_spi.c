@@ -17,7 +17,6 @@
 #include "diskio.h"
 #include "sd_spi.h"
 #include "ff_gen_drv.h"
-
 // Debug: last SD read request/status for f_gets error logs
 volatile DWORD g_sd_last_read_sector = 0;
 volatile UINT g_sd_last_read_count = 0;
@@ -25,11 +24,11 @@ volatile int g_sd_last_read_blocks_status = -1;
 volatile int g_sd_last_read_multi_status = -1;
 static DWORD sd_cached_sector_count = 0;
 static uint8_t sd_sector_count_valid = 0;
-static DWORD sd_last_fail_sector = 0xFFFFFFFFu;
-static uint8_t sd_last_fail_streak = 0;
 
 DSTATUS SD_disk_status(BYTE drv) {
     if (drv != 0)
+        return STA_NOINIT;
+    if (!card_initialized)
         return STA_NOINIT;
     return 0;
 }
@@ -39,8 +38,6 @@ DSTATUS SD_disk_initialize(BYTE drv) {
         return STA_NOINIT;
 
     sd_sector_count_valid = 0;
-    sd_last_fail_sector = 0xFFFFFFFFu;
-    sd_last_fail_streak = 0;
     return (SD_SPI_Init() == SD_OK) ? 0 : STA_NOINIT;
 }
 
@@ -53,39 +50,81 @@ DRESULT SD_disk_read(BYTE pdrv, BYTE *buff, DWORD sector, UINT count) {
     if (pdrv != 0 || count == 0)
         return RES_PARERR;
     if (!card_initialized) return RES_NOTRDY;
-
-    SD_Status status = SD_ERROR;
-    uint8_t attempt = 0;
-    uint8_t max_attempts = 3;
-
-    if (sector == sd_last_fail_sector && sd_last_fail_streak > 0)
-    {
-        max_attempts = 1;
-    }
-
-    while (attempt < max_attempts) {
-        status = SD_ReadBlocks(buff, sector, count);
-        g_sd_last_read_blocks_status = (int)status;
-        if (status == SD_OK) {
-            sd_last_fail_sector = 0xFFFFFFFFu;
-            sd_last_fail_streak = 0;
-            return RES_OK;
+    if (!sd_sector_count_valid) {
+        uint32_t sector_count = 0;
+        if (SD_GetSectorCount(&sector_count) == SD_OK && sector_count > 0) {
+            sd_cached_sector_count = (DWORD)sector_count;
+            sd_sector_count_valid = 1;
         }
-        attempt++;
+    }
+    if (sd_sector_count_valid) {
+        if (sector >= sd_cached_sector_count || (sector + count) > sd_cached_sector_count) {
+            return RES_PARERR;
+        }
     }
 
-    sd_last_fail_sector = sector;
-    if (sd_last_fail_streak < 0xFF)
     {
-        sd_last_fail_streak++;
+        SD_Status status = SD_ERROR;
+        uint8_t attempt = 0;
+        while (attempt < 1) {
+            if (count == 1) {
+                status = SD_ReadBlocks(buff, sector, 1);
+                g_sd_last_read_blocks_status = (int)status;
+            } else {
+                status = SD_ReadMultiBlocks(buff, sector, count);
+                g_sd_last_read_multi_status = (int)status;
+            }
+            if (status == SD_OK) {
+                break;
+            }
+            attempt++;
+        }
+
+        if (status != SD_OK) {
+            return RES_ERROR;
+        }
     }
-    return RES_ERROR;
+
+    return RES_OK;
 }
 
 DRESULT SD_disk_write(BYTE pdrv,  BYTE *buff, DWORD sector, UINT count) {
     if (pdrv || !count) return RES_PARERR;
     if (!card_initialized) return RES_NOTRDY;
-    return (SD_WriteBlocks(buff, sector, count) == SD_OK) ? RES_OK : RES_ERROR;
+    if (!sd_sector_count_valid) {
+        uint32_t sector_count = 0;
+        if (SD_GetSectorCount(&sector_count) == SD_OK && sector_count > 0) {
+            sd_cached_sector_count = (DWORD)sector_count;
+            sd_sector_count_valid = 1;
+        }
+    }
+    if (sd_sector_count_valid) {
+        if (sector >= sd_cached_sector_count || (sector + count) > sd_cached_sector_count) {
+            return RES_PARERR;
+        }
+    }
+
+    {
+        SD_Status status = SD_ERROR;
+        uint8_t attempt = 0;
+        while (attempt < 1) {
+            if (count == 1) {
+                status = SD_WriteBlocks((const uint8_t *)buff, sector, 1);
+            } else {
+                status = SD_WriteMultiBlocks((const uint8_t *)buff, sector, count);
+            }
+            if (status == SD_OK) {
+                break;
+            }
+            attempt++;
+        }
+
+        if (status != SD_OK) {
+            return RES_ERROR;
+        }
+    }
+
+    return RES_OK;
 }
 
 DRESULT SD_disk_ioctl(BYTE pdrv, BYTE cmd, void *buff) {
@@ -94,7 +133,8 @@ DRESULT SD_disk_ioctl(BYTE pdrv, BYTE cmd, void *buff) {
 
     switch (cmd) {
     case CTRL_SYNC:
-        return RES_OK;
+        if (!card_initialized) return RES_NOTRDY;
+        return (SD_Sync(500) == SD_OK) ? RES_OK : RES_ERROR;
     case GET_SECTOR_SIZE:
         *(WORD *)buff = 512;
         return RES_OK;

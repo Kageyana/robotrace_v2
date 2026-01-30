@@ -249,7 +249,12 @@ void logWriteTask(void)
 #ifdef LOG_RUNNING_WRITE
         if (logWriteReq)
         {
-                writeLogPuts();        // 割り込み外でSD書き込みを実行する
+                if (sd_is_analysis_active())
+                {
+                        logWriteReq = false;
+                        return;
+                }
+                writeLogPuts();        // SD?????????????
                 logWriteReq = false;
         }
 #endif

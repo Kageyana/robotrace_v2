@@ -62,6 +62,7 @@ int32_t encLog = 0;
 bool getFileNumbersError = false; // getFileNumbersでエラーが発生した際のフラグ
 
 static volatile bool sd_fatfs_locked = false;
+static volatile bool sd_analysis_active = false;
 
 #ifdef LOG_RUNNING_WRITE
 // スキーマ順で生成するレコード配置。
@@ -87,6 +88,11 @@ static void logBuildColumns(void);
 
 bool sd_fatfs_lock(uint32_t timeout_ms)
 {
+	if (timeout_ms == 0)
+	{
+		return sd_fatfs_try_lock();
+	}
+
 	uint32_t start = HAL_GetTick();
 	while (sd_fatfs_locked)
 	{
@@ -95,18 +101,72 @@ bool sd_fatfs_lock(uint32_t timeout_ms)
 			return false;
 		}
 	}
+	uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	if (sd_fatfs_locked)
+	{
+		__set_PRIMASK(primask);
+		return false;
+	}
 	sd_fatfs_locked = true;
+	__set_PRIMASK(primask);
 	return true;
 }
 
 void sd_fatfs_unlock(void)
 {
+	uint32_t primask = __get_PRIMASK();
+	__disable_irq();
 	sd_fatfs_locked = false;
+	__set_PRIMASK(primask);
 }
 
 bool sd_fatfs_is_locked(void)
 {
 	return sd_fatfs_locked;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 sd_set_analysis_active
+// 処理概要     解析中フラグを設定する
+// 引数         active: true=解析中 / false=解析終了
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void sd_set_analysis_active(bool active)
+{
+	sd_analysis_active = active;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 sd_is_analysis_active
+// 処理概要     解析中フラグを取得する
+// 引数         なし
+// 戻り値       true=解析中 / false=解析中ではない
+/////////////////////////////////////////////////////////////////////
+bool sd_is_analysis_active(void)
+{
+	return sd_analysis_active;
+}
+
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 sd_fatfs_try_lock
+// 処理概要     FatFsロックをノンブロッキングで取得する
+// 引数         なし
+// 戻り値       true=取得成功 / false=取得失敗
+/////////////////////////////////////////////////////////////////////
+bool sd_fatfs_try_lock(void)
+{
+	uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	if (sd_fatfs_locked)
+	{
+		__set_PRIMASK(primask);
+		return false;
+	}
+	sd_fatfs_locked = true;
+	__set_PRIMASK(primask);
+	return true;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -351,6 +411,10 @@ void writeLogBufferPuts(void)
 {
 	if (modeLOG)
 	{
+		if (sd_is_analysis_active())
+		{
+			return;
+		}
 		// スキーマから固定レコードサイズを算出。
 		const uint16_t requiredSize = (uint16_t)LOG_RECORD_SIZE_BYTES;
 
@@ -405,7 +469,13 @@ void writeLogBufferPuts(void)
 void writeLogPuts(void)
 {
 	FRESULT fresult;		// f_writeの戻り値
-	UINT writtenlog = 0;	// 実際に書き込んだサイズ
+	UINT writtenlog = 0;
+
+	if (sd_is_analysis_active())
+	{
+		return;
+	}
+	// 実際に書き込んだサイズ
 
 	if (sd_fatfs_is_locked())
 	{
@@ -416,15 +486,21 @@ void writeLogPuts(void)
 		return; // ログ停止中で書き込み要求が無い場合は処理不要
 	}
 
-	if (sendSD) // 書き込み要求がある場合
+	if (sendSD) // ????????????????????
 	{
-		fresult = f_write(&fil_W, flushBuf, logBuffSendIndex, &writtenlog); // flushBufをSDへ書き出す
-		if (fresult != FR_OK || writtenlog != logBuffSendIndex)
+		if (!sd_fatfs_try_lock())
 		{
-			sendSD = false; // エラー時は要求を解除
 			return;
 		}
-		sendSD = false; // 書き込み完了フラグをクリア
+		fresult = f_write(&fil_W, flushBuf, logBuffSendIndex, &writtenlog); // flushBuf??D?????????
+		if (fresult != FR_OK || writtenlog != logBuffSendIndex)
+		{
+			sendSD = false; // ??????????????????
+			sd_fatfs_unlock();
+			return;
+		}
+		sendSD = false; // ????????????????????????
+		sd_fatfs_unlock();
 	}
 }
 #endif
@@ -527,7 +603,6 @@ void endLog(void)
 {
 	modeLOG = false; // ログ取得停止
 	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY); // SPIバスが空くまで待つ
-
 #ifdef LOG_RUNNING_WRITE
 	FRESULT fresult;
 	FIL fil;

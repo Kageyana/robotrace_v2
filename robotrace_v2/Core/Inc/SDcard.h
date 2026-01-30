@@ -66,4 +66,7 @@ void createDir(char *dirName);
 bool sd_fatfs_lock(uint32_t timeout_ms);
 void sd_fatfs_unlock(void);
 bool sd_fatfs_is_locked(void);
+bool sd_fatfs_try_lock(void);
+void sd_set_analysis_active(bool active);
+bool sd_is_analysis_active(void);
 #endif // SDCARD_H_

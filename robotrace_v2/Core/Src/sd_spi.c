@@ -33,6 +33,12 @@ extern volatile int g_sd_last_read_multi_status;
 #define SD_CS_LOW()     HAL_GPIO_WritePin(CS_MSD_GPIO_Port, CS_MSD_Pin, GPIO_PIN_RESET)
 #define SD_CS_HIGH()    HAL_GPIO_WritePin(CS_MSD_GPIO_Port, CS_MSD_Pin, GPIO_PIN_SET)
 
+#ifndef SD_SPI_CRC_CHECK
+#define SD_SPI_CRC_CHECK 0
+#endif
+#define SD_SPI_PRESCALER_FAST SPI_BAUDRATEPRESCALER_2
+#define SD_SPI_PRESCALER_SLOW SPI_BAUDRATEPRESCALER_8
+
 /***************************************************************
  * 🚫 DO NOT MODIFY BELOW THIS LINE
  * Auto-generated/system-managed code. Changes may be lost.
@@ -85,8 +91,45 @@ static void SD_ReceiveBuffer(uint8_t *buffer, uint16_t len) {
 #endif
 }
 
-static SD_Status SD_WaitReady(void) {
-    uint32_t timeout = HAL_GetTick() + 500;
+static uint16_t SD_CalcCrc16(const uint8_t *data, uint16_t len) {
+    uint16_t crc = 0;
+    while (len--) {
+        crc ^= (uint16_t)(*data++) << 8;
+        for (uint8_t i = 0; i < 8; i++) {
+            if (crc & 0x8000) {
+                crc = (uint16_t)((crc << 1) ^ 0x1021);
+            } else {
+                crc <<= 1;
+            }
+        }
+    }
+    return crc;
+}
+
+
+bool SD_SetSpiPrescaler(uint32_t prescaler) {
+    bool ok = false;
+    if (HAL_SPI_GetState(&SD_SPI_HANDLE) == HAL_SPI_STATE_BUSY) {
+        return false;
+    }
+    (void)HAL_SPI_DeInit(&SD_SPI_HANDLE);
+    SD_SPI_HANDLE.Init.BaudRatePrescaler = prescaler;
+    if (HAL_SPI_Init(&SD_SPI_HANDLE) == HAL_OK) {
+        ok = true;
+    }
+    return ok;
+}
+
+void SD_SetSpeedFast(void) {
+    (void)SD_SetSpiPrescaler(SD_SPI_PRESCALER_FAST);
+}
+
+void SD_SetSpeedSlow(void) {
+    (void)SD_SetSpiPrescaler(SD_SPI_PRESCALER_SLOW);
+}
+
+static SD_Status SD_WaitReadyInternal(uint32_t timeout_ms) {
+    uint32_t timeout = HAL_GetTick() + timeout_ms;
     uint8_t resp;
     do {
         resp = SD_ReceiveByte();
@@ -95,10 +138,16 @@ static SD_Status SD_WaitReady(void) {
     return SD_ERROR;
 }
 
+static SD_Status SD_WaitReady(void) {
+    return SD_WaitReadyInternal(500);
+}
+
 static uint8_t SD_SendCommand(uint8_t cmd, uint32_t arg, uint8_t crc) {
     uint8_t response, retry = 0xFF;
 
-    SD_WaitReady();
+    if (SD_WaitReady() != SD_OK) {
+        return 0xFF;
+    }
     SD_TransmitByte(0x40 | cmd);
     SD_TransmitByte(arg >> 24);
     SD_TransmitByte(arg >> 16);
@@ -116,6 +165,18 @@ static uint8_t SD_SendCommand(uint8_t cmd, uint32_t arg, uint8_t crc) {
 static uint8_t sdhc = 0;
 uint8_t sd_is_sdhc(void) {
     return sdhc;
+}
+
+SD_Status SD_WaitReadyMs(uint32_t timeout_ms) {
+    return SD_WaitReadyInternal(timeout_ms);
+}
+
+SD_Status SD_Sync(uint32_t timeout_ms) {
+    SD_CS_LOW();
+    SD_Status status = SD_WaitReadyInternal(timeout_ms);
+    SD_CS_HIGH();
+    SD_TransmitByte(0xFF);
+    return status;
 }
 uint8_t card_initialized = 0;
 
@@ -182,7 +243,9 @@ SD_Status SD_SPI_Init(void) {
     uint8_t r7[4];
     uint32_t retry;
 
+    SD_SetSpeedSlow();
     SD_CS_HIGH();
+    SD_TransmitByte(0xFF);
     for (i = 0; i < 10; i++) SD_TransmitByte(0xFF);
 
     SD_CS_LOW();
@@ -215,6 +278,7 @@ SD_Status SD_SPI_Init(void) {
         uint8_t ocr[4];
         for (i = 0; i < 4; i++) ocr[i] = SD_ReceiveByte();
         SD_CS_HIGH();
+        SD_TransmitByte(0xFF);
         if (ocr[0] & 0x40) sdhc = 1;
     } else {
         do {
@@ -228,6 +292,7 @@ SD_Status SD_SPI_Init(void) {
     }
 
     card_initialized = 1;
+    SD_SetSpeedFast();
     return SD_OK;
 }
 
@@ -250,8 +315,16 @@ SD_Status SD_ReadBlocks(uint8_t *buff, uint32_t sector, uint32_t count) {
         }
 
         SD_ReceiveBuffer(buff, 512);
-        SD_ReceiveByte();  // CRC
-        SD_ReceiveByte();
+        uint8_t crc_hi = SD_ReceiveByte();
+        uint8_t crc_lo = SD_ReceiveByte();
+#if SD_SPI_CRC_CHECK
+        uint16_t crc = SD_CalcCrc16(buff, 512);
+        if ((((uint16_t)crc_hi << 8) | crc_lo) != crc) {
+            SD_CS_HIGH();
+            SD_TransmitByte(0xFF);
+            return SD_ERROR;
+        }
+#endif
         SD_CS_HIGH();
         SD_TransmitByte(0xFF);
         return SD_OK;
@@ -285,8 +358,18 @@ SD_Status SD_ReadMultiBlocks(uint8_t *buff, uint32_t sector, uint32_t count) {
         }
 
         SD_ReceiveBuffer(buff, 512);
-        SD_ReceiveByte();  // discard CRC
-        SD_ReceiveByte();
+        uint8_t crc_hi = SD_ReceiveByte();
+        uint8_t crc_lo = SD_ReceiveByte();
+#if SD_SPI_CRC_CHECK
+        uint16_t crc = SD_CalcCrc16(buff, 512);
+        if ((((uint16_t)crc_hi << 8) | crc_lo) != crc) {
+            (void)SD_StopTransmission();
+            SD_CS_HIGH();
+            SD_TransmitByte(0xFF);
+            g_sd_last_read_multi_status = (int)SD_ERROR;
+            return SD_ERROR;
+        }
+#endif
 
         buff += 512;
     }
@@ -298,7 +381,7 @@ SD_Status SD_ReadMultiBlocks(uint8_t *buff, uint32_t sector, uint32_t count) {
         return SD_ERROR;
     }
     SD_CS_HIGH();
-    SD_TransmitByte(0xFF); // Extra 8 clocks
+    SD_TransmitByte(0xFF);
 
     g_sd_last_read_multi_status = (int)SD_OK;
     return SD_OK;
@@ -383,6 +466,7 @@ SD_Status SD_WriteMultiBlocks(const uint8_t *buff, uint32_t sector, uint32_t cou
     }
 
     SD_CS_HIGH();
+
     SD_TransmitByte(0xFF);
 
     return SD_OK;

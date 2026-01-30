@@ -24,6 +24,7 @@ extern char sd_path[];
 // Mount and unmount
 int sd_mount(void);
 int sd_unmount(void);
+int sd_remount(void);
 
 // Basic file operations
 int sd_write_file(const char *filename, const char *text);

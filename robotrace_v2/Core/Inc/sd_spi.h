@@ -44,6 +44,11 @@ SD_Status SD_WriteBlocks(const uint8_t *buff, uint32_t sector, uint32_t count);
 SD_Status SD_ReadMultiBlocks(uint8_t *buff, uint32_t sector, uint32_t count);
 SD_Status SD_WriteMultiBlocks(const uint8_t *buff, uint32_t sector, uint32_t count);
 SD_Status SD_GetSectorCount(uint32_t *sector_count);
+SD_Status SD_WaitReadyMs(uint32_t timeout_ms);
+SD_Status SD_Sync(uint32_t timeout_ms);
 uint8_t sd_is_sdhc(void);
+bool SD_SetSpiPrescaler(uint32_t prescaler);
+void SD_SetSpeedFast(void);
+void SD_SetSpeedSlow(void);
 
 #endif // __SD_SPI_H__

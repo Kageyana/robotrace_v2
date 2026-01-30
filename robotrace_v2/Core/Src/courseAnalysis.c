@@ -9,7 +9,14 @@
 #include "BMI088.h"
 #include "SDcard.h"
 #include "sd_diskio_spi.h"
+#include "sd_functions.h"
+#include "ff.h"
 #include <stdint.h>
+
+static bool sd_remount_for_analysis(void)
+{
+	return (sd_remount() == FR_OK);
+}
 //====================================//
 // グローバル変数の宣
 //====================================//
@@ -174,17 +181,25 @@ int16_t readLogDistance(int logNumber)
 	FRESULT fresult;
 	char fileName[10];
 	int16_t ret = 0;
-	bool fileOpened = false; // f_closeの要否を判断するためのフラグ
+	bool fileOpened = false; // f_close
+	bool retried = false;
 	bool errorDetected = false; // 解析途中のエラー発生を検知するフラグ
 	bool lock_acquired = sd_fatfs_lock(200);
 
 	if (!lock_acquired)
 	{
-		return -9; // SD/FatFs使用中
+		return -9;
 	}
-
+	// 解析中はログ書き込みを抑制する
+	sd_set_analysis_active(true); // SD/FatFs使用中
 	snprintf(fileName, sizeof(fileName), "%d", logNumber);			   // 数値を文字列に変換
 	strcat(fileName, ".csv");										   // 拡張子を追加
+	retry_open:
+	// 解析前に再マウントしてFATの整合を取り直す
+	if (!sd_remount_for_analysis()) {
+		ret = -6;
+		goto cleanup_read;
+	}
 	fresult = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // csvファイルを開く
 
 	if (fresult == FR_OK)
@@ -320,13 +335,6 @@ int16_t readLogDistance(int logNumber)
 			i++;
 		}
 
-		// DWORD pos, size;
-		// int32_t eof, error;
-		// pos = f_tell(&fil_Read); // ファイル終端に到達したか確認
-		// size = f_size(&fil_Read);
-		// eof = f_eof(&fil_Read);
-		// error = f_error(&fil_Read);
-
 		if (!errorDetected)
 		{
 			// インデックスが1多くなるので調整
@@ -425,12 +433,29 @@ int16_t readLogDistance(int logNumber)
 		errorDetected = true; // ファイルオープン失敗時もエラー状態として扱う
 	}
 
+	if (ret == -5 && !retried)
+	{
+		// I/Oエラー時は一度だけ再マウント＆再オープンを試す
+		if (fileOpened)
+		{
+			f_close(&fil_Read);
+			fileOpened = false;
+		}
+		retried = true;
+		ret = 0;
+		errorDetected = false;
+		goto retry_open;
+	}
+
+cleanup_read:
 	if (fileOpened)
 	{
 		f_close(&fil_Read); // オープン成功時のみクローズを実施
 	}
 	if (lock_acquired)
 	{
+		// 解析終了（書き込み抑制解除）
+		sd_set_analysis_active(false);
 		sd_fatfs_unlock();
 	}
 
@@ -567,11 +592,14 @@ int16_t readLogDistanceSlip(int logNumber)
 	int16_t ret = 0;
 	bool lock_acquired = sd_fatfs_lock(200);
 	bool fileOpened = false;
+	bool retried = false;
 
 	if (!lock_acquired)
 	{
 		return -9; // SD/FatFs使用中
 	}
+	// 解析中はログ書き込みを抑制する
+	sd_set_analysis_active(true);
 
 	// 追加: 解析用バッファ・配列は静的領域で確保してスタックを節約
 	static uint16_t sampleCnt[OPT_BUFF_SIZE];
@@ -586,6 +614,12 @@ int16_t readLogDistanceSlip(int logNumber)
 
 	snprintf(fileName, sizeof(fileName), "%d", logNumber);			   // 数値を文字列に変換
 	strcat(fileName, ".csv");										   // 拡張子を追加
+	retry_open_slip:
+	// 解析前に再マウントしてFATの整合を取り直す
+	if (!sd_remount_for_analysis()) {
+		ret = -6;
+		goto cleanup;
+	}
 	fresult = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // csvファイルを開く
 	if (fresult != FR_OK)
 	{
@@ -747,6 +781,19 @@ int16_t readLogDistanceSlip(int logNumber)
 		}
 	}
 
+	if (ret == -5 && !retried)
+	{
+		// I/Oエラー時は一度だけ再マウント＆再オープンを試す
+		if (fileOpened)
+		{
+			f_close(&fil_Read);
+			fileOpened = false;
+		}
+		retried = true;
+		ret = 0;
+		goto retry_open_slip;
+	}
+
 cleanup:
 	if (fileOpened)
 	{
@@ -754,6 +801,8 @@ cleanup:
 	}
 	if (lock_acquired)
 	{
+		// 解析終了（書き込み抑制解除）
+		sd_set_analysis_active(false);
 		sd_fatfs_unlock();
 	}
 
