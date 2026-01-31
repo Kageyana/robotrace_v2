@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "SDcard.h"
+#include "courseAnalysis.h"
 #include "sd_functions.h"
 #include "stdio.h"
 #include <stdint.h>
@@ -17,6 +18,11 @@ char columnTitle[2048] = "", formatLog[256] = "";
 
 // ログバッファ
 // Log buffers
+
+#define ROC_STRAIGHT_MM 2000.0f
+#define CROSS_STRAIGHT_MM 100.0f
+#define CROSS_LOOKAHEAD_MM 120.0f
+#define CROSSBUF_MAX 256
 #define LOG_BUFFER_COUNT 3
 uint8_t logBuffer[LOG_BUFFER_COUNT][BUFFER_SIZE_LOG];
 uint8_t *activeBuf = logBuffer[0];
@@ -56,6 +62,19 @@ typedef struct
 #undef LOG_STRUCT_SKIP
 } LogRecord;
 
+typedef struct
+{
+	uint8_t raw[LOG_SIZE];
+	float roc;
+	float x;
+	float y;
+	float dl_mm;
+	uint16_t speed_corr;
+	bool is_cross;
+} LogPendingRecord;
+
+static LogPendingRecord crossBuf[CROSSBUF_MAX];
+
 // スキーマ関連のヘルパー宣言。
 static void logSendFloat(float value);
 static uint8_t logReadU8(void);
@@ -66,6 +85,10 @@ static float logReadF32(void);
 static void logReadRecord(LogRecord *rec);
 static void logBuildColumns(void);
 static uint8_t *logGetFreeBuffer(void);
+
+static void logOutputPending(FIL *fil, const LogPendingRecord *entry);
+static void logPendingFlushOne(FIL *fil, uint16_t *head, uint16_t *count, float *pending_mm);
+static void logPendingMarkStraight(uint16_t head, uint16_t count, float mark_mm);
 
 bool sd_fatfs_lock(uint32_t timeout_ms)
 {
@@ -93,6 +116,81 @@ bool sd_fatfs_lock(uint32_t timeout_ms)
 	__set_PRIMASK(primask);
 	return true;
 }
+
+static void logOutputPending(FIL *fil, const LogPendingRecord *entry)
+{
+	LogRecord rec;
+	char logStr[256];
+	float log_roc = entry->roc;
+	float log_x = entry->x;
+	float log_y = entry->y;
+
+	logaddress = (uint8_t *)entry->raw;
+	logReadRecord(&rec);
+	rec.encCurrentN = entry->speed_corr;
+
+#define LOG_FORMAT_VALUE_U8(value) (value)
+#define LOG_FORMAT_VALUE_U16(value) (value)
+#define LOG_FORMAT_VALUE_S16(value) (value)
+#define LOG_FORMAT_VALUE_U32(value) ((int32_t)(value))
+#define LOG_FORMAT_VALUE_F32(value) (value)
+#define LOG_CSV_ARG_STORED(type, name, fmt, expr) , LOG_FORMAT_VALUE_##type(rec.name)
+#define LOG_CSV_ARG_DERIVED(type, name, fmt, expr) , LOG_FORMAT_VALUE_##type(expr)
+	snprintf((char *)logStr, sizeof(logStr), (char *)formatLog LOG_FIELD_LIST(LOG_CSV_ARG_STORED, LOG_CSV_ARG_DERIVED));
+#undef LOG_CSV_ARG_STORED
+#undef LOG_CSV_ARG_DERIVED
+#undef LOG_FORMAT_VALUE_U8
+#undef LOG_FORMAT_VALUE_U16
+#undef LOG_FORMAT_VALUE_S16
+#undef LOG_FORMAT_VALUE_U32
+#undef LOG_FORMAT_VALUE_F32
+
+	f_puts(logStr, fil);
+}
+
+static void logPendingFlushOne(FIL *fil, uint16_t *head, uint16_t *count, float *pending_mm)
+{
+	if (*count == 0)
+	{
+		return;
+	}
+	LogPendingRecord *entry = &crossBuf[*head];
+	logOutputPending(fil, entry);
+	if (*pending_mm > entry->dl_mm)
+	{
+		*pending_mm -= entry->dl_mm;
+	}
+	else
+	{
+		*pending_mm = 0.0f;
+	}
+	*head = (uint16_t)((*head + 1U) % CROSSBUF_MAX);
+	(*count)--;
+}
+
+static void logPendingMarkStraight(uint16_t head, uint16_t count, float mark_mm)
+{
+	if (count == 0)
+	{
+		return;
+	}
+	float acc = 0.0f;
+	uint16_t idx = (uint16_t)((head + count - 1U) % CROSSBUF_MAX);
+	for (uint16_t n = 0; n < count && acc < mark_mm; n++)
+	{
+		crossBuf[idx].roc = ROC_STRAIGHT_MM;
+		acc += crossBuf[idx].dl_mm;
+		if (idx == 0)
+		{
+			idx = CROSSBUF_MAX - 1U;
+		}
+		else
+		{
+			idx--;
+		}
+	}
+}
+
 
 void sd_fatfs_unlock(void)
 {
@@ -553,64 +651,71 @@ void endTempFile(void)
 /////////////////////////////////////////////////////////////////////
 void endLog(void)
 {
-	modeLOG = false; // ログ取得停止
-	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY); // SPIバスが空くまで待つ
+	modeLOG = false; // stop logging
+	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY);
 	FRESULT fresult;		// f_write status
 	FIL fil;
 	uint8_t log[LOG_SIZE];
-	char logStr[256];
 	UINT readByte, writtenlog;
 	uint16_t j;
-	uint16_t time, beforeTime = 0, speed, beforeSpeed = 0;
+	uint16_t time, beforeTime = 0;
+	int16_t speed, beforeSpeed = 0;
 	float dt, zg;
 	float log_roc, log_x, log_y;
 	LogRecord rec;
 
-	while (sendSD) // 溜まったバッファをすべて書き出す
-		writeLogPuts(); // 未処理バッファを書き込む
+	uint16_t pending_head = 0;
+	uint16_t pending_count = 0;
+	float pending_mm = 0.0f;
+	bool prev_cross = false;
+	float post_remaining_mm = 0.0f;
 
-	logBuffSendIndex = logBuffIndex;                                         // バッファのバイト数を記録
-	fresult = f_write(&fil_W, activeBuf, logBuffSendIndex, &writtenlog);     // 残りのデータを送信
+	while (sendSD) // drain pending writes before CSV conversion
+		writeLogPuts();
+
+	logBuffSendIndex = logBuffIndex;
+	fresult = f_write(&fil_W, activeBuf, logBuffSendIndex, &writtenlog);
 	if (fresult != FR_OK)
 	{
-		printf("f_write error in endLog\r\n"); // エラー通知
+		printf("f_write error in endLog\r\n");
 	}
-	f_close(&fil_W); // 一時ファイルを閉じる
+	f_close(&fil_W);
 
-	createLog(); // ログファイル(csv)を作成
+	createLog();
 
-	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ); // 一時ファイルファイルを開く
+	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ);
 	if (fresult != FR_OK)
 	{
-		printf("f_open error in endLog\r\n"); // エラー通知
-		f_close(&fil_W); // 作成したログファイルを閉じる
-		return; // 一時ファイルが読めないと変換できないため中断
+		printf("f_open error in endLog\r\n");
+		f_close(&fil_W);
+		return;
 	}
 
-	clearXYcie(); // xy座標クリア
+	clearXYcie();
+	// Crossline pre/post 100mm straightening via delayed CSV output.
 	for (j = 0; j < cntSend; j++)
 	{
-		fresult = f_read(&fil, log, sizeof(log), &readByte); // 読み込んだバイト数を取得するためポインタを渡す
+		fresult = f_read(&fil, log, sizeof(log), &readByte);
 		if (fresult != FR_OK)
 		{
-			printf("f_read error in endLog\r\n"); // エラー通知
-			f_close(&fil_W); // CSVファイルを閉じる
-			f_close(&fil); // 一時ファイルを閉じる
-			return; // データが読めないと解析不能なため中断
+			printf("f_read error in endLog\r\n");
+			f_close(&fil_W);
+			f_close(&fil);
+			return;
 		}
 		logaddress = log;
-
-		// 派生値計算の前にパック済みレコードを復元。
+		LogPendingRecord entry;
+		memcpy(entry.raw, logaddress, LOG_SIZE);
 		logReadRecord(&rec);
 
 		time = rec.cntlog;
-		speed = rec.encCurrentN;
+		speed = (int16_t)rec.encCurrentN;
 		zg = rec.gyroVal_Z;
 
-		if (abs(speed - beforeSpeed) > 500)
+		if (abs((int32_t)speed - (int32_t)beforeSpeed) > 500)
 		{
 			speed = beforeSpeed;
-			rec.encCurrentN = beforeSpeed;
+			rec.encCurrentN = (uint16_t)beforeSpeed;
 		}
 		beforeSpeed = speed;
 
@@ -622,36 +727,80 @@ void endLog(void)
 		log_y = xycie.y;
 		beforeTime = time;
 
-		// ヘッダと同じ順でsnprintf引数を展開。
-#define LOG_FORMAT_VALUE_U8(value) (value)
-#define LOG_FORMAT_VALUE_U16(value) (value)
-#define LOG_FORMAT_VALUE_S16(value) (value)
-#define LOG_FORMAT_VALUE_U32(value) ((int32_t)(value))
-#define LOG_FORMAT_VALUE_F32(value) (value)
-#define LOG_CSV_ARG_STORED(type, name, fmt, expr) , LOG_FORMAT_VALUE_##type(rec.name)
-#define LOG_CSV_ARG_DERIVED(type, name, fmt, expr) , LOG_FORMAT_VALUE_##type(expr)
-		snprintf((char *)logStr, sizeof(logStr), (char *)formatLog LOG_FIELD_LIST(LOG_CSV_ARG_STORED, LOG_CSV_ARG_DERIVED));
-#undef LOG_CSV_ARG_STORED
-#undef LOG_CSV_ARG_DERIVED
-#undef LOG_FORMAT_VALUE_U8
-#undef LOG_FORMAT_VALUE_U16
-#undef LOG_FORMAT_VALUE_S16
-#undef LOG_FORMAT_VALUE_U32
-#undef LOG_FORMAT_VALUE_F32
+		float dl_mm = calcDlMm(speed);
+		if (dl_mm < 0.0f)
+		{
+			dl_mm = -dl_mm;
+		}
 
-		f_puts(logStr, &fil_W);
+		bool is_cross = (rec.courseMarker == 3);
+		if (!prev_cross && is_cross)
+		{
+			logPendingMarkStraight(pending_head, pending_count, CROSS_STRAIGHT_MM);
+		}
+		if (prev_cross && !is_cross)
+		{
+			post_remaining_mm = CROSS_STRAIGHT_MM;
+		}
+
+		if (is_cross)
+		{
+			log_roc = ROC_STRAIGHT_MM;
+		}
+		else if (post_remaining_mm > 0.0f)
+		{
+			log_roc = ROC_STRAIGHT_MM;
+			if (dl_mm > 0.0f)
+			{
+				if (post_remaining_mm > dl_mm)
+				{
+					post_remaining_mm -= dl_mm;
+				}
+				else
+				{
+					post_remaining_mm = 0.0f;
+				}
+			}
+		}
+
+		entry.roc = log_roc;
+		entry.x = log_x;
+		entry.y = log_y;
+		entry.dl_mm = dl_mm;
+		entry.speed_corr = (uint16_t)speed;
+		entry.is_cross = is_cross;
+
+		if (pending_count >= CROSSBUF_MAX)
+		{
+			logPendingFlushOne(&fil_W, &pending_head, &pending_count, &pending_mm);
+		}
+
+		uint16_t idx = (uint16_t)((pending_head + pending_count) % CROSSBUF_MAX);
+		crossBuf[idx] = entry;
+		pending_count++;
+		pending_mm += dl_mm;
+
+		while (pending_count > 0 && pending_mm > CROSS_LOOKAHEAD_MM)
+		{
+			logPendingFlushOne(&fil_W, &pending_head, &pending_count, &pending_mm);
+		}
+
+		prev_cross = is_cross;
+	}
+
+	while (pending_count > 0)
+	{
+		logPendingFlushOne(&fil_W, &pending_head, &pending_count, &pending_mm);
 	}
 
 	f_sync(&fil_W);
 	f_sync(&fil);
-	f_close(&fil_W); // ログファイル(csv)
-	f_close(&fil);	 // 一時ファイル
+	f_close(&fil_W);
+	f_close(&fil);
 
-	f_unlink("temp"); // 一時ファイルを削除
+	f_unlink("temp");
 
-	// 連続走行時にCSV変換ループが累積しないよう送信カウンタをリセット
 	cntSend = 0;
-
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getFileNumbers

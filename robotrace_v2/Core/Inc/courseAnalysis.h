@@ -97,6 +97,7 @@ extern Courseplot shortCutxycie[OPT_SHORT_BUFF_SIZE];
 // プロトタイプ宣言
 //====================================//
 float calcROC(int16_t velo, float angvelo, float dt);
+float calcDlMm(int16_t velo);
 void saveLogNumber(int16_t fileNumber);
 void getLogNumber(void);
 int16_t readLogDistance(int logNumber);
