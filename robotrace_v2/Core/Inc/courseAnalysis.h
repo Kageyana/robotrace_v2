@@ -30,7 +30,7 @@
 
 #define SHORTCUTWINDOW 4			// ショートカットコース生成時の移動平均サンプル数
 
-#define ROC_STRAIGHTTH 1500.0F		// 直線とみなす曲率半径の閾値[mm]
+#define ROC_STRAIGHTTH 1300.0F		// 直線とみなす曲率半径の閾値[mm]
 
 //====================================//
 // 3次走行用スリップ解析(2次ログ)の調整用定数
@@ -97,7 +97,6 @@ extern Courseplot shortCutxycie[OPT_SHORT_BUFF_SIZE];
 // プロトタイプ宣言
 //====================================//
 float calcROC(int16_t velo, float angvelo, float dt);
-float calcDlMm(int16_t velo);
 void saveLogNumber(int16_t fileNumber);
 void getLogNumber(void);
 int16_t readLogDistance(int logNumber);

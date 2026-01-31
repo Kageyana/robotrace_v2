@@ -70,3 +70,14 @@ float encPulse(int32_t pulse)
 {
 	return (float)abs(pulse) / PALSE_MILLIMETER;
 }
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 calcDlMm
+// 処理概要     速度と経過時間から移動距離[mm]を算出する
+// 引数         velo:エンコーダ速度(10msあたりのパルス数), dt:経過時間[s]
+// 戻り値       移動距離[mm]
+///////////////////////////////////////////////////////////////////////////
+float calcDlMm(int16_t velo, float dt)
+{
+	return encPulse((int32_t)velo) * dt * 1000.0f;
+}
+

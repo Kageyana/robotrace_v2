@@ -59,13 +59,6 @@ Courseplot xycie;							   // xy座標値(走行中計算、ログ保存用)
 Courseplot shortCutxycie[OPT_SHORT_BUFF_SIZE]; // xy座標値(目標値、ログ保存用)
 
 /////////////////////////////////////////////////////////////////////
-// calcDlMm: velocity -> distance [mm]
-float calcDlMm(int16_t velo)
-{
-	return encPulse((int32_t)velo * 10);
-}
-/////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////
 // モジュール名 calcROC
 // 処理概要     曲率半径の計算
 // 引数         velo: エンコーダカウント angvelo: 角速度[rad/s]
@@ -74,7 +67,7 @@ float calcDlMm(int16_t velo)
 float calcROC(int16_t velo, float angvelo, float dt)
 {
 	// 移動距離 [pulse] → [mm]
-    float dl = calcDlMm(velo);  // [mm]
+    float dl = calcDlMm(velo, dt);  // [mm]
     // 角度変化量 [rad] = ω[deg/s] → rad/s × dt[s]
     float drad = angvelo * DEG2RAD * dt;
 
@@ -89,9 +82,11 @@ float calcROC(int16_t velo, float angvelo, float dt)
     }
 
     // カーブの場合のみ除算実行
-    float R = dl / drad;
-    float absR = (R < 0.0f) ? -R : R;
-    return (absR > ROC_STRAIGHTTH) ? 2000.0f : R;
+    float R = absDl / absDrad;
+    // float absR = (R < 0.0f) ? -R : R;
+    // return (absR > ROC_STRAIGHTTH) ? 2000.0f : R;
+
+	return R;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 saveLogNumber

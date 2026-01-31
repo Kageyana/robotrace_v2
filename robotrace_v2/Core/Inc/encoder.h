@@ -38,5 +38,7 @@ extern int32_t encCurve;
 void getEncoder(void);
 int32_t encMM(int16_t mm);
 float encPulse(int32_t pulse);
+float calcDlMm(int16_t velo, float dt);
+
 
 #endif // ENCODER_H_
