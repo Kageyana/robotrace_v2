@@ -260,7 +260,6 @@ void initSystem(void)
 		resultHAL[10] = HAL_TIM_Base_Start_IT(&htim6);
 		resultHAL[11] = HAL_TIM_Base_Start_IT(&htim7);
 
-		ssd1306_SetCursor(0, 52);
 		uint8_t j = 0;
 		for (uint8_t i = 0; i < 10; i++)
 		{
@@ -377,6 +376,8 @@ void loopSystem(void)
 			ssd1306_printf(Font_11x18, "Analizing");
 			ssd1306_SetCursor(0, 50);
 			ssd1306_printf(Font_6x8, "log %d", autoStartAnalize);	// 追加: 解析対象ログ番号を表示
+			// Ensure SD write buffers are flushed before analysis
+			sd_flush_log();
 
 			if (autoStart == 2)
 			{
@@ -752,9 +753,9 @@ void loopSystem(void)
 			{
 				// 5走終了
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-				ssd1306_SetCursor(0, 25);
+				ssd1306_SetCursor(0, 15);
 				ssd1306_printf(Font_11x18, "Auto run");
-				ssd1306_SetCursor(0, 45);
+				ssd1306_SetCursor(0, 35);
 				ssd1306_printf(Font_11x18, "Finish!");
 
 				patternTrace = 103;
@@ -786,11 +787,11 @@ void loopSystem(void)
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				if (logOverflow || markerOverflow)
 				{
-					// バッファ上限エラー表示
-					ssd1306_SetCursor(0, 25);						// 1行目の表示位置
-					ssd1306_printf(Font_11x18, "buff overflow");	// エラーメッセージ1行目
-					ssd1306_SetCursor(0, 45);						// 2行目の表示位置
-					ssd1306_printf(Font_11x18, "error");			// エラーメッセージ2行目
+					// buffer overflow display
+					ssd1306_SetCursor(0, 25);
+					ssd1306_printf(Font_11x18, "buff overflow");
+					ssd1306_SetCursor(0, 45);
+					ssd1306_printf(Font_11x18, "error");
 				}
 				else
 				{
@@ -884,10 +885,10 @@ void emargencyStop(void)
 	{
 		ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 
-		ssd1306_SetCursor(0, 25);
+		ssd1306_SetCursor(0, 15);
 		ssd1306_printf(Font_11x18, "EMS!! %d", autoStartAnalize);
 
-		ssd1306_SetCursor(0, 45);
+		ssd1306_SetCursor(0, 35);
 		switch (emcStop)
 		{
 		case STOP_ANGLE_X:

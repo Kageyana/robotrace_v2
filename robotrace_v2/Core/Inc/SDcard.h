@@ -30,6 +30,7 @@ extern int32_t encLog;
 extern bool logOverflow;     // ログバッファ上限超過フラグ
 extern bool markerOverflow;  // マーカーバッファ上限超過フラグ
 extern bool getFileNumbersError; // getFileNumbersでエラーが発生した際のフラグ
+extern volatile uint32_t dbg_overflow;
 //====================================//
 // プロトタイプ宣言
 //====================================//
@@ -59,4 +60,5 @@ bool sd_fatfs_is_locked(void);
 bool sd_fatfs_try_lock(void);
 void sd_set_analysis_active(bool active);
 bool sd_is_analysis_active(void);
+void sd_flush_log(void);
 #endif // SDCARD_H_

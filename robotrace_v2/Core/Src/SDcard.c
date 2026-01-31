@@ -16,19 +16,24 @@ FIL fil_R;
 char columnTitle[2048] = "", formatLog[256] = "";
 
 // ログバッファ
-uint8_t logBuffer[2][BUFFER_SIZE_LOG];	// バッファは2個で固定
-uint8_t *activeBuf = logBuffer[0];		// 書き込み中のバッファ
-uint8_t *flushBuf = logBuffer[1];		// SD書き込み待ちバッファ
-int16_t logBuffIndex = 0;				// 一時記録バッファ書込アドレス
-uint32_t logBuffSendIndex = 0;			// flushBufに溜まったバイト数
-volatile bool sendSD = false;			// flushBufをSDへ送るフラグ(割込み共有)
+// Log buffers
+#define LOG_BUFFER_COUNT 3
+uint8_t logBuffer[LOG_BUFFER_COUNT][BUFFER_SIZE_LOG];
+uint8_t *activeBuf = logBuffer[0];
+uint8_t *flushBuf = logBuffer[1];
+uint8_t *pendingBuf = logBuffer[2];
+int16_t logBuffIndex = 0;
+uint32_t logBuffSendIndex = 0;
+uint32_t logBuffPendingIndex = 0;
+volatile bool sendSD = false;
+volatile bool sendSD_pending = false;
 uint16_t cntSend = 0;
 uint8_t *logaddress;
 uint16_t logValIndex = 0;
-bool logOverflow = false; // ログバッファ上限超過フラグ
-bool markerOverflow = false; // マーカーバッファ上限超過フラグ
+bool logOverflow = false;
+bool markerOverflow = false;
+volatile uint32_t dbg_overflow = 0;
 
-// ログファイルナンバー
 int16_t fileNumbers[FILENUMBER_NUM];
 int16_t fileIndexLog = 0; // 現在使用しているログ番号
 int16_t endFileIndex = 0; // ログの最終番号
@@ -60,6 +65,7 @@ static uint32_t logReadU32(void);
 static float logReadF32(void);
 static void logReadRecord(LogRecord *rec);
 static void logBuildColumns(void);
+static uint8_t *logGetFreeBuffer(void);
 
 bool sd_fatfs_lock(uint32_t timeout_ms)
 {
@@ -122,6 +128,38 @@ bool sd_is_analysis_active(void)
 {
 	return sd_analysis_active;
 }
+void sd_flush_log(void)
+{
+	if (sd_is_analysis_active())
+	{
+		return;
+	}
+
+	// drain pending writes before analysis
+	while (sendSD)
+	{
+		writeLogPuts();
+	}
+	if (sendSD_pending)
+	{
+		uint32_t primask = __get_PRIMASK();
+		__disable_irq();
+		sendSD = true;
+		__set_PRIMASK(primask);
+		writeLogPuts();
+		while (sendSD)
+		{
+			writeLogPuts();
+		}
+	}
+
+	if (sd_fatfs_try_lock())
+	{
+		f_sync(&fil_W);
+		sd_fatfs_unlock();
+	}
+}
+
 
 
 /////////////////////////////////////////////////////////////////////
@@ -170,7 +208,7 @@ bool insertSD(void)
 bool initMicroSD(void)
 {
 	FATFS *pfs;
-	FRESULT fresult;
+	FRESULT fresult;		// f_write status
 	DWORD fre_clust;
 	uint32_t total, free_space;
 
@@ -218,7 +256,7 @@ bool initMicroSD(void)
 /////////////////////////////////////////////////////////////////////
 void createLog(void)
 {
-	FRESULT fresult;
+	FRESULT fresult;		// f_write status
 	char fileName[10];
 	static uint16_t fileNumber = 0;
 
@@ -318,7 +356,7 @@ void createLog(void)
 /////////////////////////////////////////////////////////////////////
 void initLog(void)
 {
-    FRESULT fresult;
+	FRESULT fresult;		// f_write status
 	// CSV変換ループの実行回数を走行ごとに正しく制御するため送信カウンタをリセット
 	cntSend = 0;
 	fresult = f_open(&fil_W, "temp", FA_OPEN_ALWAYS | FA_WRITE); // create file
@@ -331,9 +369,35 @@ void initLog(void)
 	logBuffIndex = 0;					// 書込位置を初期化
 	activeBuf = logBuffer[0];			// アクティブバッファを初期化
 	flushBuf = logBuffer[1];			// フラッシュバッファを初期化
+	pendingBuf = logBuffer[2];
 	logBuffSendIndex = logBuffIndex;	// バッファのバイト数を記録
+	logBuffPendingIndex = 0;
 	sendSD = false;						// 書き込み要求をリセット
+	sendSD_pending = false;
+	dbg_overflow = 0;
 	logOverflow = false;				// ログバッファ状態フラグをリセット
+}
+
+static uint8_t *logGetFreeBuffer(void)
+{
+	for (uint32_t i = 0; i < LOG_BUFFER_COUNT; i++)
+	{
+		uint8_t *buf = logBuffer[i];
+		if (buf == activeBuf)
+		{
+			continue;
+		}
+		if (sendSD && buf == flushBuf)
+		{
+			continue;
+		}
+		if (sendSD_pending && buf == pendingBuf)
+		{
+			continue;
+		}
+		return buf;
+	}
+	return NULL;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogBufferPuts
@@ -354,21 +418,36 @@ void writeLogBufferPuts(void)
 
 		if (logBuffIndex + requiredSize > BUFFER_SIZE_LOG)
 		{
+			if (sendSD && sendSD_pending)
+			{
+				logOverflow = true;
+				dbg_overflow++;
+				return;
+			}
+
+			uint8_t *newBuf = logGetFreeBuffer();
+			if (newBuf == NULL)
+			{
+				logOverflow = true;
+				dbg_overflow++;
+				return;
+			}
+
 			if (sendSD)
 			{
-				// writeLogPuts();
-				// if (sendSD)
-				// {
-				// 	logOverflow = true;
-				// 	return;
-				// }
+				logBuffPendingIndex = logBuffIndex;
+				pendingBuf = activeBuf;
+				sendSD_pending = true;
 			}
-			logBuffSendIndex = logBuffIndex;
-			uint8_t *tmp = flushBuf;
-			flushBuf = activeBuf;
-			activeBuf = tmp;
+			else
+			{
+				logBuffSendIndex = logBuffIndex;
+				flushBuf = activeBuf;
+				sendSD = true;
+			}
+
+			activeBuf = newBuf;
 			logBuffIndex = 0;
-			sendSD = true;
 		}
 
 		// スキーマ順でバイナリ書き込みを展開。
@@ -400,41 +479,62 @@ void writeLogBufferPuts(void)
 /////////////////////////////////////////////////////////////////////
 void writeLogPuts(void)
 {
-	FRESULT fresult;		// f_writeの戻り値
+	FRESULT fresult;		// f_write status
 	UINT writtenlog = 0;
 
 	if (sd_is_analysis_active())
 	{
-		return;
+		return; // avoid writes during analysis
 	}
-	// 実際に書き込んだサイズ
 
 	if (sd_fatfs_is_locked())
 	{
-		return; // 解析読み取り中は書き込みをスキップ
+		return; // skip while SD is locked
 	}
 	if (!modeLOG && !sendSD)
 	{
-		return; // ログ停止中で書き込み要求が無い場合は処理不要
+		return; // skip if no pending write
 	}
 
-	if (sendSD) // ????????????????????
+	if (sendSD)
 	{
 		if (!sd_fatfs_try_lock())
 		{
 			return;
 		}
-		fresult = f_write(&fil_W, flushBuf, logBuffSendIndex, &writtenlog); // flushBuf??D?????????
+		fresult = f_write(&fil_W, flushBuf, logBuffSendIndex, &writtenlog);
 		if (fresult != FR_OK || writtenlog != logBuffSendIndex)
 		{
-			sendSD = false; // ??????????????????
+			uint32_t primask = __get_PRIMASK();
+			__disable_irq();
+			sendSD = false;
+			sendSD_pending = false;
+			__set_PRIMASK(primask);
 			sd_fatfs_unlock();
 			return;
 		}
-		sendSD = false; // ????????????????????????
+
+		{
+			uint32_t primask = __get_PRIMASK();
+			__disable_irq();
+			if (sendSD_pending)
+			{
+				flushBuf = pendingBuf;
+				logBuffSendIndex = logBuffPendingIndex;
+				sendSD_pending = false;
+				sendSD = true;
+			}
+			else
+			{
+				sendSD = false;
+			}
+			__set_PRIMASK(primask);
+		}
 		sd_fatfs_unlock();
 	}
 }
+
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 endTempFile
 // 処理概要     一時ファイル終了処理
@@ -455,7 +555,7 @@ void endLog(void)
 {
 	modeLOG = false; // ログ取得停止
 	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY); // SPIバスが空くまで待つ
-	FRESULT fresult;
+	FRESULT fresult;		// f_write status
 	FIL fil;
 	uint8_t log[LOG_SIZE];
 	char logStr[256];
@@ -548,7 +648,7 @@ void endLog(void)
 	f_close(&fil);	 // 一時ファイル
 
 	f_unlink("temp"); // 一時ファイルを削除
-	
+
 	// 連続走行時にCSV変換ループが累積しないよう送信カウンタをリセット
 	cntSend = 0;
 
@@ -563,7 +663,7 @@ int16_t getFileNumbers(void)
 {
 	DIR dir;		// Directory
 	FILINFO fno;	// File Info
-	FRESULT fresult;
+	FRESULT fresult;		// f_write status
 	uint8_t *tp;
 
 	for(uint16_t j=0;j<FILENUMBER_NUM;j++){
@@ -671,7 +771,7 @@ void setLogHeaderStrF(char *name, float value)
 void SDtest(void)
 {
 	FIL fil_T; // テスト用ファイル
-	FRESULT fresult;
+	FRESULT fresult;		// f_write status
 
 	fresult = f_open(&fil_T, "test.csv", FA_OPEN_ALWAYS | FA_WRITE); // create file
 	uint32_t start = HAL_GetTick(); // SPI待ちにタイムアウトを設定
@@ -692,7 +792,7 @@ void SDtest(void)
 /////////////////////////////////////////////////////////////////////
 void createDir(char *dirName)
 {
-	FRESULT fresult;
+	FRESULT fresult;		// f_write status
 	DIR dir;         // Directory
 	FILINFO fno; // File Info
 	uint8_t exist = 0;
