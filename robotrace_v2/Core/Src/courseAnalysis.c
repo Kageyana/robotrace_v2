@@ -46,6 +46,8 @@ int32_t encPID = 0;			 // 距離制御用の距離変数
 float xydegz = 0;
 int32_t straightMeter;
 bool straightState;
+bool straightMarkerPending;
+uint8_t straightMarkerPendingLog;
 
 static uint8_t missedCorrections = 0;	// 連続補正失敗回数
 static bool failSafeActive = false;	// フェイルセーフ動作中フラグ
@@ -975,10 +977,10 @@ cleanup:
 	{
 		// CSVヘッダを書き込み、平滑化済みのboostSpeedを順番に保存する
 		UINT bytesWritten;
-		f_printf(&fil_Boost, "index,boost_speed\n");
-		for (int32_t idx = 0; idx < maxOptimalIndex; idx++)
-		{
-			char boostLine[48];
+	f_printf(&fil_Boost, "index,boost_speed\n");
+	for (int32_t idx = 0; idx < maxOptimalIndex; idx++)
+	{
+		char boostLine[48];
 
 			// f_printfは%f非対応のため、1行分を文字列に整形してから書き込む
 			snprintf(boostLine, sizeof(boostLine), "%ld,%.3f\n", (long)idx, PPAD[idx].boostSpeed);
@@ -1512,8 +1514,13 @@ void processMarkerEvent(void) {
 		if (optimalTrace == BOOST_DISTANCE) {
 			if (numPPAMarry > 0) {
 				bool isCross = (courseMarker == CROSSLINE);	// クロスラインなら無条件補正
-				bool straightLike = straightState || isStraightBeforeMarker(encTotalOptimal, STRAIGHT_WINDOW_MM, STRAIGHT_RATIO_THRESHOLD);	// 直線成立または直線率判定
-				if (straightLike || isCross) {
+				bool straightLike = isStraightBeforeMarker(encTotalOptimal, STRAIGHT_WINDOW_MM, STRAIGHT_RATIO_THRESHOLD);	// 直線率判定
+				bool straightPending = straightMarkerPending;	// first marker after straight detection
+				bool usedStraightPending = straightPending;
+				if (straightLike || isCross || straightPending) {
+					if (straightPending) {
+						straightMarkerPending = false;
+					}
 					int16_t nearestIdx = findNearestMarkerIndex(encTotalOptimal);	// 近傍から最適マーカーを取得
 					int32_t rawDiff = encTotalOptimal - markerPos[nearestIdx].distance;	// 現在距離との差分[パルス]
 					int32_t absDiff = (rawDiff < 0) ? -rawDiff : rawDiff;
@@ -1521,6 +1528,9 @@ void processMarkerEvent(void) {
 					bool canCorrect = isCross || (absDiff <= allowDiff);	// クロスは即補正、それ以外は閾値判定
 					pathedMarker = clampMarkerIndex(nearestIdx);	// ヒント位置を更新
 					if (canCorrect) {
+						if (usedStraightPending) {
+							straightMarkerPendingLog = 1;
+						}
 						int32_t stepLimit = encMM(CORR_STEP_MAX_MM);	// 段階補正の上限量[パルス]
 						int32_t diff = rawDiff;
 						if (diff > stepLimit) {
@@ -1546,7 +1556,6 @@ void processMarkerEvent(void) {
 						int16_t newPathed = nearestIdx - 2;	// 次回探索は少し手前から
 						pathedMarker = clampMarkerIndex(newPathed);
 						lastCorrectedMarker = nearestIdx;	// 直近補正位置を記録
-						straightState = false;	// 多重補正防止
 						missedCorrections = 0;	// 失敗カウンタをリセット
 						failSafeActive = false;	// フェイルセーフ解除
 					} else {
@@ -1579,6 +1588,8 @@ void clearMarkerProcessState(void) {
 	cntMarker = 0;
 	straightMeter = 0;	// 追加: 直線判定距離を初期化
 	straightState = false;
+	straightMarkerPending = false;
+	straightMarkerPendingLog = 0;
 	pathedMarker = 0;
 	lastCorrectedMarker = 0;
 	missedCorrections = 0;

@@ -135,7 +135,15 @@ void Interrupt1ms(void)
 
 			if (straightMeter >= STRAIGHT_STATE_THRESHOLD_MM) // 直線が閾値以上のとき
 			{
+				if (!straightState)
+				{
+					straightMarkerPending = true;
+				}
 				straightState = true;
+			}
+			else
+			{
+				straightState = false;
 			}
 
 			if (modeLOG)
@@ -143,6 +151,7 @@ void Interrupt1ms(void)
 				// CALCDISTANCEごとにログを保存
 				writeLogBufferPuts();
 				courseMarkerLog = 0; // ログ用マーカー状態をリセット
+				straightMarkerPendingLog = 0;
 				encLog = 0;	// ログ用エンコーダパルスをリセット
 				cntLog = 0;
 			}

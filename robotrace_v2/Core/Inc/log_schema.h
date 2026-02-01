@@ -38,6 +38,7 @@
 	STORED(U32, distCorr_p, "%d", (uint32_t)Control_GetDistCorr_p()) \
 	STORED(U32, distSlipLoss_p, "%d", (uint32_t)Control_GetDistSlipLoss_p()) \
 	STORED(U32, encCurrentCorr_p, "%d", (uint32_t)Control_GetEncCurrentCorr_p()) \
+	STORED(U8, straightPendingAttempt, "%d", (uint8_t)straightMarkerPendingLog) \
 	DERIVED(F32, x, "%f", log_x) \
 	DERIVED(F32, y, "%f", log_y)
 

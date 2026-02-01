@@ -87,6 +87,8 @@ extern int32_t encTotalOptimal;
 extern int32_t encPID;
 extern int32_t straightMeter;
 extern bool straightState;
+extern bool straightMarkerPending;
+extern uint8_t straightMarkerPendingLog;
 
 // 解析関係
 extern AnalysisData PPAD[OPT_BUFF_SIZE];
