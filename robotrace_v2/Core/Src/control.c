@@ -732,22 +732,6 @@ void loopSystem(void)
 				autoStart = 0;
 				autoStartAnalize = 0;
 			}
-			if (autoStart >= 3)
-			{
-				// 3走目以降は速度を上げる
-				tgtParam.bstStraight *= PARAM_UP_STEP;
-				tgtParam.bst1500 *= PARAM_UP_STEP;
-				tgtParam.bst1300 *= PARAM_UP_STEP;
-				tgtParam.bst1000 *= PARAM_UP_STEP;
-				tgtParam.bst800 *= PARAM_UP_STEP;
-				tgtParam.bst700 *= PARAM_UP_STEP;
-				tgtParam.bst600 *= PARAM_UP_STEP;
-				tgtParam.bst500 *= PARAM_UP_STEP;
-				// tgtParam.bst400			*= PARAM_UP_STEP;
-				// tgtParam.bst300			*= PARAM_UP_STEP;
-				// tgtParam.bst200			*= PARAM_UP_STEP;
-				// tgtParam.bst100			*= PARAM_UP_STEP;
-			}
 
 			if (autoStart > 5)
 			{

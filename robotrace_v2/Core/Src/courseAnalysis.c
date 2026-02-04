@@ -20,7 +20,6 @@ static bool sd_remount_for_analysis(void)
 //====================================//
 // グローバル変数の宣
 //====================================//
-static const float invPulseConst = 10.0F / PALSE_MILLIMETER;	// エンコーダパルスをミリメートル換算する係数
 #define STRAIGHT_WINDOW_MM		150	// 直線判定に用いる距離窓[mm]
 #define STRAIGHT_RATIO_THRESHOLD	0.80f	// 直線率の閾値
 #define CORR_THRESH_MIN_MM		120	// 補正許容誤差の下限[mm]
@@ -590,6 +589,24 @@ static void logReadSlipIoError(int logNumber, UINT lineNo, FIL *fil, const char 
 /////////////////////////////////////////////////////////////////////
 int16_t readLogDistanceSlip(int logNumber)
 {
+	int16_t baseLogNumber = analizedNumber;
+	if (baseLogNumber <= 0)
+	{
+		baseLogNumber = logNumber; // 追加: 1走目ログが無ければ直前ログを使用
+	}
+
+	// 追加: 1走目ログをreadLogDistance相当で解析して速度計画とマーカー配列を作成
+	int16_t baseRet = readLogDistance(baseLogNumber);
+	if (baseRet < 0)
+	{
+		return baseRet;
+	}
+	int16_t baseCount = numPPADarry;
+	if (baseCount <= 0)
+	{
+		return -2; // 解析対象が無い
+	}
+
 	FIL fil_Read;
 	FRESULT fresult;
 	char fileName[16];
@@ -632,8 +649,6 @@ int16_t readLogDistanceSlip(int logNumber)
 	}
 	fileOpened = true;
 
-	memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE); // 追加: 出力先を初期化
-	memset(markerPos, 0, sizeof(EventPos) * OPT_BUFF_SIZE); // 追加: マーカー配列をクリア
 	memset(sampleCnt, 0, sizeof(sampleCnt));
 	memset(v2Max, 0, sizeof(v2Max));
 	memset(rocAbsSum, 0, sizeof(rocAbsSum));
@@ -643,15 +658,14 @@ int16_t readLogDistanceSlip(int logNumber)
 	memset(risk, 0, sizeof(risk));
 	memset(riskExpanded, 0, sizeof(riskExpanded));
 	memset(v3, 0, sizeof(v3));
+	for (int16_t i = 0; i < baseCount && i < OPT_BUFF_SIZE; i++)
+	{
+		v2Max[i] = PPAD[i].boostSpeed;
+	}
 
 	static TCHAR log[CA_SECOND_LOG_LINE_BUFSIZE];
 	const int log_len = (int)(sizeof(log) / sizeof(log[0]));
 	int16_t maxOptimalIndex = -1;
-	int16_t numM = 0;
-	int32_t prevDist = 0;
-	bool hasPrevDist = false;
-	int32_t straightMeterLocal = 0;	// 追加: 直線判定はローカルで管理
-	bool straightStateLocal = false;	// 追加: 直線判定はローカルで管理
 
 	// 1行目はヘッダなので読み飛ばす
 	TCHAR *header = f_gets(log, log_len, &fil_Read);
@@ -701,19 +715,18 @@ int16_t readLogDistanceSlip(int logNumber)
 		{
 			continue;	// 追加: ヘッダ/空行は解析しない
 		}
-		if (optimalIdx < 0 || optimalIdx >= OPT_BUFF_SIZE)
+		if (optimalIdx < 0 || optimalIdx >= baseCount)
 		{
 			ret = -1;	// 追加: 解析用配列の上限超過
 			break;
 		}
 
 		// 追加: 集計(サンプル数/最大速度/ROC平均/スリップ回数)
-		float targetSpeedMps = encPulse((int32_t)targetSpeedLog);	// 追加: ログの速度[pulse]を[m/s]へ戻す
+		(void)courseMarker;
+		(void)targetSpeedLog;
+		(void)encTotal;
+
 		sampleCnt[optimalIdx]++;
-		if (targetSpeedMps > v2Max[optimalIdx])
-		{
-			v2Max[optimalIdx] = targetSpeedMps;
-		}
 		rocAbsSum[optimalIdx] += fabsf((float)roc);
 		rocCnt[optimalIdx]++;
 		if (slipLong > 0)
@@ -731,48 +744,6 @@ int16_t readLogDistanceSlip(int logNumber)
 		}
 
 		// 追加: 2次ログからマーカー位置を再構築する
-		if (hasPrevDist)
-		{
-			int32_t diffPulse = encTotal - prevDist;
-			diffPulse = (diffPulse < 0) ? -diffPulse : diffPulse;
-			float diffMm = encPulse(diffPulse);	// 追加: パルス差分をmmへ換算
-			if (abs(roc) >= 700)
-			{
-				straightMeterLocal += (int32_t)(diffMm + 0.5f);	// 追加: mm単位で直線距離を加算
-				if (straightMeterLocal >= 100)
-				{
-					straightStateLocal = true;
-				}
-			}
-			else
-			{
-				straightMeterLocal = 0;
-				straightStateLocal = false;
-			}
-		}
-
-		if (courseMarker == 3 || (courseMarker == 2 && straightStateLocal))
-		{
-			if (numM < OPT_BUFF_SIZE)
-			{
-				markerPos[numM].distance = encTotal;
-				markerPos[numM].indexPPAD = optimalIdx;
-				numM++;
-			}
-			else
-			{
-				ret = -1;	// 追加: マーカー配列の上限超過
-				break;
-			}
-			if (courseMarker == 2 && straightStateLocal)
-			{
-				straightStateLocal = false;
-				straightMeterLocal = 0;
-			}
-		}
-
-		prevDist = encTotal;
-		hasPrevDist = true;
 	}
 	if (ret == 0 && fgets_null)
 	{
@@ -824,7 +795,6 @@ cleanup:
 	{
 		if (sampleCnt[i] == 0 && i > 0)
 		{
-			v2Max[i] = v2Max[i - 1];
 			rocAbsSum[i] = rocAbsSum[i - 1];	// 追加: ROC平均用の前方埋め
 			rocCnt[i] = rocCnt[i - 1];			// 追加: ROC平均用の前方埋め
 		}
@@ -955,15 +925,8 @@ cleanup:
 	for (int16_t i = 0; i <= maxOptimalIndex; i++)
 	{
 		PPAD[i].boostSpeed = v3[i];
-		PPAD[i].ROC = (rocCnt[i] > 0) ? (int16_t)(rocAbsSum[i] / (float)rocCnt[i]) : 0;
 	}
 
-	numPPADarry = maxOptimalIndex + 1;
-	if (numM > 0)
-	{
-		numM--;	// 追加: readLogDistance() と同じく末尾を除外
-	}
-	numPPAMarry = numM;
 	ret = numPPADarry;
 
 #ifdef WRITE_BOOSTSPEED_LOG
@@ -991,8 +954,6 @@ cleanup:
 #endif
 
 	// 追加: 解析済み情報を更新
-	saveLogNumber(logNumber);
-	analizedNumber = logNumber;
 	optimalTrace = BOOST_DISTANCE;
 
 	return ret;
@@ -1423,7 +1384,7 @@ static bool isStraightBeforeMarker(int32_t encNow, int16_t window_mm, float rati
 /////////////////////////////////////////////////////////////////////
 static int32_t calcDynamicThresholdPulse(void)
 {
-	float speed_mm = fabsf((float)targetSpeed) * invPulseConst;	// 速度[pulse]をmm/sへ変換
+	float speed_mm = encPulse(targetSpeed) * 1000;	// 速度[pulse]をmm/sへ変換
 	float mm = 100.0f + (CORR_DYN_COEFF_SPEED * speed_mm) + (CORR_DYN_COEFF_ANG * fabsf(BMI088val.gyro.z));	// 基本値100mmに速度・角速度の補正を加算
 	if (mm < (float)CORR_THRESH_MIN_MM)
 	{
