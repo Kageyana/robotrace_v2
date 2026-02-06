@@ -312,7 +312,7 @@ void initSystem(void)
 	}
 	else
 	{
-		if(cntFiles > FILENUMBER_LIMIT)
+		if(cntFiles > FILENUMBER_ALARM)
 		{
 			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 			ssd1306_SetCursor(20, 16);
@@ -702,7 +702,7 @@ void loopSystem(void)
 		int16_t savedLogNo = 0;	// 追加: 保存実績ログ番号
 		int16_t endIdxBefore = endFileIndex;	// 追加: endLog前のログ末尾を保持
 		// 追加: 表示用の予測ログ番号はSD空でも落ちないようガード
-		int16_t predictedLogNo = (endFileIndex >= 0) ? (int16_t)(fileNumbers[endFileIndex] + 1) : 1;
+		int16_t predictedLogNo = getNextLogNumber();
 		if (modeLOG)
 		{
 			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め

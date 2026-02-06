@@ -40,6 +40,7 @@ bool markerOverflow = false;
 volatile uint32_t dbg_overflow = 0;
 
 int16_t fileNumbers[FILENUMBER_NUM];
+static uint16_t logFileNumber = 0; // log file number sequence
 int16_t fileIndexLog = 0; // 現在使用しているログ番号
 int16_t endFileIndex = 0; // ログの最終番号
 
@@ -72,6 +73,9 @@ static float logReadF32(void);
 static void logReadRecord(LogRecord *rec);
 static void logBuildColumns(void);
 static uint8_t *logGetFreeBuffer(void);
+static bool readSavedLogNumber(int16_t *outNumber);
+static void writeSavedLogNumber(int16_t fileNumber);
+static int16_t calcNextLogNumber(void);
 
 
 bool sd_fatfs_lock(uint32_t timeout_ms)
@@ -256,8 +260,126 @@ bool initMicroSD(void)
 	}
 }
 /////////////////////////////////////////////////////////////////////
+// モジュール名 readSavedLogNumber
+// 処理概要     保存済みログ番号ファイルを読み込み、取得できた番号を返す
+// 引数         outNumber: 取得先ポインタ
+// 戻り値       true: 読み込み成功 / false: ファイル無し・不正値・エラー
+/////////////////////////////////////////////////////////////////////
+static bool readSavedLogNumber(int16_t *outNumber)
+{
+	FRESULT fresult;
+	FIL fil;
+	char fileName[32] = PATH_SETTING;
+	char buf[16] = {0};
+	int value = 0;
+
+	// 引数が無効なら失敗扱い
+	if (outNumber == NULL)
+	{
+		return false;
+	}
+
+	// ログ番号保存ファイル名を組み立て（読込）
+	strncat(fileName, FILENAME_LOGNUMBER, sizeof(fileName) - strlen(fileName) - 1);
+	strncat(fileName, ".txt", sizeof(fileName) - strlen(fileName) - 1);
+
+	// ファイルが無ければ失敗
+	fresult = f_open(&fil, fileName, FA_OPEN_EXISTING | FA_READ);
+	if (fresult != FR_OK)
+	{
+		return false;
+	}
+
+	// 1行読み込み
+	if (f_gets(buf, (int)sizeof(buf), &fil) == NULL)
+	{
+		f_close(&fil);
+		return false;
+	}
+
+	// 数値に変換。0以下は無効
+	if (sscanf(buf, "%d", &value) != 1 || value <= 0)
+	{
+		f_close(&fil);
+		return false;
+	}
+
+	// 正常値を返す
+	*outNumber = (int16_t)value;
+	f_close(&fil);
+	return true;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 writeSavedLogNumber
+// 処理概要     保存ログ番号ファイルへ番号を書き込む（上書き保存）
+// 引数         fileNumber: 保存するログ番号
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void writeSavedLogNumber(int16_t fileNumber)
+{
+	FRESULT fresult;
+	FIL fil;
+	char fileName[32] = PATH_SETTING;
+
+	// ログ番号保存ファイル名を組み立て（保存）
+	strncat(fileName, FILENAME_LOGNUMBER, sizeof(fileName) - strlen(fileName) - 1);
+	strncat(fileName, ".txt", sizeof(fileName) - strlen(fileName) - 1);
+
+	fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_WRITE);
+	if (fresult == FR_OK)
+	{
+		// 先頭から書き込み、古い残りを削除
+		f_lseek(&fil, 0);
+		// 5桁ゼロ埋めで保存
+		f_printf(&fil, "%05d", fileNumber);
+		f_truncate(&fil);
+	}
+	f_close(&fil);
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 calcNextLogNumber
+// 処理概要     次のログ番号を決定する（保存値優先→SD内最大→1）
+// 引数         なし
+// 戻り値       次のログ番号
+/////////////////////////////////////////////////////////////////////
+static int16_t calcNextLogNumber(void)
+{
+	int16_t savedNumber = 0;
+
+	// 保存値があればその次の番号
+	if (readSavedLogNumber(&savedNumber))
+	{
+		return (int16_t)(savedNumber + 1);
+	}
+
+	// SD内ログがあれば最大+1
+	if (endFileIndex >= 0)
+	{
+		return (int16_t)(fileNumbers[endFileIndex] + 1);
+	}
+
+	// どちらも無ければ1から開始
+	return 1;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 getNextLogNumber
+// 処理概要     画面表示用の次ログ番号を取得する
+// 引数         なし
+// 戻り値       次のログ番号
+/////////////////////////////////////////////////////////////////////
+int16_t getNextLogNumber(void)
+{
+	// まだ採番前なら計算値のみ返す
+	if (logFileNumber == 0)
+	{
+		return calcNextLogNumber();
+	}
+	// 直前採番の次を返す
+	return (int16_t)(logFileNumber + 1);
+}
+/////////////////////////////////////////////////////////////////////
 // モジュール名 createLog
-// 処理概要     ログファイルを作成する
+// 処理概要     ログファイルを作成し、ヘッダ情報を出力する
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
@@ -265,27 +387,20 @@ void createLog(void)
 {
 	FRESULT fresult;		// f_write status
 	char fileName[10];
-	static uint16_t fileNumber = 0;
 
-	if (fileNumber == 0)
+	// 初回は保存値/SD内最大から次番号を決定
+	if (logFileNumber == 0)
 	{
-		// 追加: ログが1つも無いSDでも落ちないようにガード
-		if (endFileIndex >= 0)
-		{
-			fileNumber = (uint16_t)(fileNumbers[endFileIndex] + 1);
-		}
-		else
-		{
-			fileNumber = 1;
-		}
+		logFileNumber = (uint16_t)calcNextLogNumber();
 	}
 	else
 	{
-		fileNumber++; // 次のログ番号に更新
+		// 2回目以降は連番で増加
+		logFileNumber++; // next log number
 	}
 
 	// 最新ログ番号+1にして絵尾久ファイル名を生成 (バッファサイズを指定して安全に文字列化)
-	snprintf((char *)fileName, sizeof(fileName), "%d", fileNumber);
+	snprintf((char *)fileName, sizeof(fileName), "%d", logFileNumber);
 	// バッファサイズを指定して安全に拡張子を追加
 	strncat((char *)fileName, ".csv", sizeof(fileName) - strlen((char *)fileName) - 1);
 	fresult = f_open(&fil_W, fileName, FA_OPEN_ALWAYS | FA_WRITE); // create file
@@ -294,12 +409,14 @@ void createLog(void)
 		// ファイルオープンに失敗した場合はログ作成を中止する
 		return; // エラーが発生したため処理を終了
 	}
+	// 作成できた番号を保存ファイルへ反映
+	writeSavedLogNumber((int16_t)logFileNumber);
 	// 追加: 作成したログ番号を一覧に反映（savedLogNo 計算の整合を取る）
 	const int16_t maxN = (int16_t)(sizeof(fileNumbers) / sizeof(fileNumbers[0]));
 	if (endFileIndex < (maxN - 1))
 	{
 		endFileIndex++;
-		fileNumbers[endFileIndex] = (int16_t)fileNumber;
+		fileNumbers[endFileIndex] = (int16_t)logFileNumber;
 		fileIndexLog = endFileIndex;
 	}
 
@@ -349,12 +466,6 @@ void createLog(void)
     strncat((char *)formatLog, "\n", sizeof(formatLog) - strlen((char *)formatLog) - 1);       // バッファサイズを指定して安全に改行を追加
 	f_printf(&fil_W, columnTitle);
 }
-/////////////////////////////////////////////////////////////////////
-// モジュール名 initLog
-// 処理概要     バイナリ保存用のファイルを作成
-// 引数         なし
-// 戻り値       なし
-/////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////
 // モジュール名 initLog
 // 処理概要     バイナリ保存用のファイルを作成
@@ -816,6 +927,32 @@ int16_t getFileNumbers(void)
 				}
 			}
 		}
+		// ログ数が上限を超えたら、FILENUMBER_ALARMの半分まで古いログを削除
+		if (fileCount > FILENUMBER_LIMIT)
+		{
+			int16_t targetFileCount = (int16_t)(FILENUMBER_ALARM / 2);
+			if (targetFileCount < 1)
+			{
+				targetFileCount = 1;
+			}
+			int16_t toDelete = (int16_t)(fileCount - targetFileCount);
+			if (toDelete < 1)
+			{
+				toDelete = 1;
+			}
+			for (int16_t i = 0; i < toDelete; i++)
+			{
+				char deleteName[16];
+				snprintf(deleteName, sizeof(deleteName), "%d.csv", fileNumbers[i]);
+				f_unlink(deleteName);
+			}
+			// 配列を詰め直し
+			for (int16_t i = 0; i < fileCount - toDelete; i++)
+			{
+				fileNumbers[i] = fileNumbers[i + toDelete];
+			}
+			fileCount -= toDelete;
+		}
 		endFileIndex = fileCount - 1;	// 最終インデックスを更新
 		fileIndexLog = endFileIndex;	// 現在のログ番号を最終インデックスに設定
 	}
@@ -835,7 +972,7 @@ void setLogStr(char *column, char *format)
 	char columnStr[30];	// ヘッダー文字列を一時的に格納するバッファ
 	char formatStr[30];	// フォーマット文字列を一時的に格納するバッファ
 
-       // copy str to local variable
+	// copy str to local variable
        snprintf((char *)columnStr, sizeof(columnStr), "%s", column); // バッファサイズを指定して安全にコピー
        snprintf((char *)formatStr, sizeof(formatStr), "%s", format); // バッファサイズを指定して安全にコピー
 

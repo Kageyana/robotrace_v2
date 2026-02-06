@@ -17,9 +17,11 @@
 
 #define BUFFER_SIZE_MARKER 500
 #define FILENUMBER_NUM 1000		// ログファイルナンバーの上限
-#define FILENUMBER_LIMIT 300	// 書き込み不備を警告する数
+#define FILENUMBER_ALARM 50	// 書き込み不備を警告する数
+#define FILENUMBER_LIMIT 100	// 超過時に古いログを削除する上限数
 
 #define PATH_SETTING "./setting/"
+#define FILENAME_LOGNUMBER "lognum"	// 保存ログ番号ファイル名(拡張子なし)
 
 //====================================//
 // グローバル変数の宣言
@@ -49,6 +51,7 @@ void send8bit(uint8_t data);
 void send16bit(uint16_t data);
 void send32bit(uint32_t data);
 int16_t getFileNumbers(void);
+int16_t getNextLogNumber(void);
 void setLogStr(char *column, char *format);
 void setLogHeaderStr(char *name, int32_t value);
 void setLogHeaderStrF(char *name, float value);
