@@ -33,15 +33,17 @@
 	STORED(F32, slipRatioLat, "%f", getSlipIndicatorFiltered()) \
 	STORED(F32, motorCurrentL, "%f", motorCurrentL) \
 	STORED(F32, motorCurrentR, "%f", motorCurrentR) \
-	STORED(F32, slipDistScaleF, "%f", Control_GetSlipDistScale()) \
-	STORED(U32, distEncRaw_p, "%d", (uint32_t)Control_GetDistEncRaw_p()) \
-	STORED(U32, distCorr_p, "%d", (uint32_t)Control_GetDistCorr_p()) \
-	STORED(U32, distSlipLoss_p, "%d", (uint32_t)Control_GetDistSlipLoss_p()) \
 	STORED(U32, encCurrentCorr_p, "%d", (uint32_t)Control_GetEncCurrentCorr_p()) \
-	STORED(U8, straightPendingAttempt, "%d", (uint8_t)straightMarkerPendingLog) \
+	STORED(U8, straightPendingAttempt, "%d", (uint8_t)straightMarkerPending) \
+	STORED(U8, lineTraceOmegaFBCtrlkp, "%d", (uint8_t)lineTraceOmegaFBCtrl.kp) \
 	DERIVED(F32, x, "%f", log_x) \
 	DERIVED(F32, y, "%f", log_y)
 
+
+	// STORED(F32, slipDistScaleF, "%f", Control_GetSlipDistScale()) \
+	// STORED(U32, distEncRaw_p, "%d", (uint32_t)Control_GetDistEncRaw_p()) \
+	// STORED(U32, distCorr_p, "%d", (uint32_t)Control_GetDistCorr_p()) \
+	// STORED(U32, distSlipLoss_p, "%d", (uint32_t)Control_GetDistSlipLoss_p()) \
 // バイナリログで保存する型の対応表。
 #define LOG_CTYPE_U8  uint8_t
 #define LOG_CTYPE_U16 uint16_t

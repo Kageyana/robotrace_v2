@@ -124,7 +124,8 @@ void Interrupt1ms(void)
 		if (encLog >= encMM(CALCDISTANCE_SHORTCUT))
 		{
 			// ROC(曲率半径)計算
-			if (calcROC(encCurrentN, BMI088val.gyro.z, (float)cntLog / 1000) >= 700.0F) // 直線判断
+			rocrun = calcROC(encCurrentN, BMI088val.gyro.z, (float)cntLog / 1000);
+			if (rocrun >= 700.0F) // 直線判断
 			{
 				straightMeter += CALCDISTANCE_SHORTCUT; // 距離積算
 			}

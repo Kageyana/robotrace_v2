@@ -83,7 +83,7 @@
 #define SLIP_DIST_LPF_COEF_UP		0.06f	// 回復追従
 
 // ゴール
-#define COUNT_GOAL 3 // ゴールマーカーを読む回数
+#define COUNT_GOAL 2 // ゴールマーカーを読む回数
 
 // スタートモード
 #define START_SERACH 3
@@ -129,6 +129,7 @@ extern bool initIMU;			// IMU初期化状況
 extern bool initCurrent;		// 電流センサ初期化状況
 extern uint8_t autoStart;		// 5走を自動で開始する
 extern bool stateCrossLine;		// クロスライン検出状態
+extern float rocrun; 			// 曲率半径計算用変数
 
 extern uint16_t analogValLSon[11]; // ADC結果格納配列
 extern uint16_t analogValLSoff[11]; // ADC結果格納配列

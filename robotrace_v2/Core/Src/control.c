@@ -26,7 +26,8 @@ static bool softreset = false;		// ソフトウェアリセット	false:リセ�
 uint8_t autoStart = 0;				// 5走を自動で開始する
 int16_t autoStartAnalize = 0; 		// 自動走行で使用するログの解析番号
 
-bool stateCrossLine = false;			// クロスライン検出状態
+bool stateCrossLine = false;		// クロスライン検出状態
+float rocrun = 2000;		// 曲率半径計算用変数
 
 uint16_t analogValLSon[NUM_SENSORS+1]; // ADC結果格納配列
 uint16_t analogValLSoff[NUM_SENSORS+1]; // ADC結果格納配列s
@@ -944,12 +945,24 @@ void changeGain(void)
 	// 距離基準2次走行のみ、ROC閾値で直線/カーブに合わせてゲインを切り替える
 	if (optimalTrace == BOOST_DISTANCE && numPPADarry > 0)
 	{
-		uint16_t rocIndex = optimalIndex;
-		if (rocIndex >= (uint16_t)numPPADarry)
+		uint16_t rocIndexNext = optimalIndex+2; // 少し先のROCを参照
+		float rocNow = rocrun;
+		float rocAhead = 0.0F;
+
+		if (rocIndexNext >= (uint16_t)numPPADarry)
 		{
-			rocIndex = (uint16_t)(numPPADarry - 1);
+			rocIndexNext = (uint16_t)(numPPADarry - 1);
 		}
-		if (PPAD[rocIndex].ROC > ROC_STRAIGHTTH)
+
+		// 現在位置と少し先のROCを比較して、カーブ寄りの方を採用する
+		if(PPAD[rocIndexNext].ROC > rocNow)
+		{
+			rocAhead = rocNow;	// カーブ寄りの方を採用
+		}else{
+			rocAhead = PPAD[rocIndexNext].ROC; // 直線寄りの方を採用
+		}
+		
+		if (rocAhead > ROC_STRAIGHTTH)
 		{
 			useStraightGain = true;
 		}

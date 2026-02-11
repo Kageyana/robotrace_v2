@@ -23,7 +23,7 @@ static bool sd_remount_for_analysis(void)
 #define STRAIGHT_WINDOW_MM		150	// 直線判定に用いる距離窓[mm]
 #define STRAIGHT_RATIO_THRESHOLD	0.80f	// 直線率の閾値
 #define CORR_THRESH_MIN_MM		120	// 補正許容誤差の下限[mm]
-#define CORR_THRESH_MAX_MM		400	// 補正許容誤差の上限[mm]
+#define CORR_THRESH_MAX_MM		200	// 補正許容誤差の上限[mm]
 #define CORR_STEP_MAX_MM		200	// 1回あたりの最大補正量[mm]
 #define FAILSAFE_MISS_MAX		2	// 補正失敗回数の閾値
 #define FAILSAFE_SPEED_SCALE	0.85f	// フェイルセーフ時の速度倍率
