@@ -348,11 +348,6 @@ void loopSystem(void)
 {
 	int16_t ret = 0;
 
-	if (patternTrace > 10 && patternTrace < 100)        // 走行中のみ処理
-	{
-		logWriteTask();        // 割り込み外でSD書き込みを実行する
-	}
-
     // 緊急停止処理
 	if (patternTrace > 10 && patternTrace < 100 && emcStop > 0)
 	{
@@ -821,6 +816,11 @@ void loopSystem(void)
 	default:
 		break;
 	} // switch case
+
+	if (patternTrace > 10 && patternTrace < 100) // 走行中のみ処理（制御出力の後に実行）
+	{
+		logWriteTask(); // 割り込み外でSD書き込みを実行する
+	}
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 emargencyStop

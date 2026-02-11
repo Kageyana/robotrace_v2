@@ -23,6 +23,7 @@ char columnTitle[2048] = "", formatLog[256] = "";
 #define CROSS_STRAIGHT_MM 100.0f
 #define CROSSSEG_MAX 128
 #define LOG_BUFFER_COUNT 3
+#define LOG_TEMP_PREALLOC_BYTES (2UL * 1024UL * 1024UL)
 uint8_t logBuffer[LOG_BUFFER_COUNT][BUFFER_SIZE_LOG];
 uint8_t *activeBuf = logBuffer[0];
 uint8_t *flushBuf = logBuffer[1];
@@ -51,6 +52,7 @@ bool getFileNumbersError = false; // getFileNumbersでエラーが発生した�
 
 static volatile bool sd_fatfs_locked = false;
 static volatile bool sd_analysis_active = false;
+static volatile bool create_log_ready = false;
 
 // スキーマ順で生成するレコード配置。
 typedef struct
@@ -386,7 +388,10 @@ int16_t getNextLogNumber(void)
 void createLog(void)
 {
 	FRESULT fresult;		// f_write status
-	char fileName[10];
+	char fileName[32];
+	UINT written = 0;
+	UINT total = 0;
+	create_log_ready = false;
 
 	// 初回は保存値/SD内最大から次番号を決定
 	if (logFileNumber == 0)
@@ -403,7 +408,7 @@ void createLog(void)
 	snprintf((char *)fileName, sizeof(fileName), "%d", logFileNumber);
 	// バッファサイズを指定して安全に拡張子を追加
 	strncat((char *)fileName, ".csv", sizeof(fileName) - strlen((char *)fileName) - 1);
-	fresult = f_open(&fil_W, fileName, FA_OPEN_ALWAYS | FA_WRITE); // create file
+	fresult = f_open(&fil_W, fileName, FA_CREATE_ALWAYS | FA_WRITE); // create/overwrite file
 	if (fresult != FR_OK)
 	{
 		// ファイルオープンに失敗した場合はログ作成を中止する
@@ -464,7 +469,22 @@ void createLog(void)
 	setLogHeaderStrF("distCtrl.kd", distCtrl.kd);
     strncat((char *)columnTitle, "\n", sizeof(columnTitle) - strlen((char *)columnTitle) - 1); // バッファサイズを指定して安全に改行を追加
     strncat((char *)formatLog, "\n", sizeof(formatLog) - strlen((char *)formatLog) - 1);       // バッファサイズを指定して安全に改行を追加
-	f_printf(&fil_W, columnTitle);
+	total = (UINT)strlen(columnTitle);
+	fresult = f_write(&fil_W, columnTitle, total, &written);
+	if (fresult != FR_OK || written != total)
+	{
+		printf("createLog header write error: %d (%lu/%lu)\r\n", fresult, (unsigned long)written, (unsigned long)total);
+		f_close(&fil_W);
+		return;
+	}
+	fresult = f_sync(&fil_W);
+	if (fresult != FR_OK)
+	{
+		printf("createLog f_sync error: %d\r\n", fresult);
+		f_close(&fil_W);
+		return;
+	}
+	create_log_ready = true;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 initLog
@@ -477,7 +497,7 @@ void initLog(void)
 	FRESULT fresult;		// f_write status
 	// CSV変換ループの実行回数を走行ごとに正しく制御するため送信カウンタをリセット
 	cntSend = 0;
-	fresult = f_open(&fil_W, "temp", FA_OPEN_ALWAYS | FA_WRITE); // create file
+	fresult = f_open(&fil_W, "temp", FA_CREATE_ALWAYS | FA_WRITE); // create/overwrite file
 	if (fresult != FR_OK)
 	{
 		printf("error opening log file: %d\r\n", fresult); // エラー内容を出力
@@ -485,6 +505,15 @@ void initLog(void)
 		return;          // ログ初期化を中止
 	}
 	logBuffIndex = 0;					// 書込位置を初期化
+#if _USE_EXPAND
+	/* Best-effort contiguous preallocation to reduce FAT updates during logging. */
+	fresult = f_expand(&fil_W, (FSIZE_t)LOG_TEMP_PREALLOC_BYTES, 1);
+	if (fresult != FR_OK)
+	{
+		printf("f_expand failed: %d\r\n", fresult);
+	}
+#endif
+	f_lseek(&fil_W, 0);
 	activeBuf = logBuffer[0];			// アクティブバッファを初期化
 	flushBuf = logBuffer[1];			// フラッシュバッファを初期化
 	pendingBuf = logBuffer[2];
@@ -698,13 +727,18 @@ void endLog(void)
 
 	logBuffSendIndex = logBuffIndex;
 	fresult = f_write(&fil_W, activeBuf, logBuffSendIndex, &writtenlog);
-	if (fresult != FR_OK)
+	if (fresult != FR_OK || writtenlog != logBuffSendIndex)
 	{
-		printf("f_write error in endLog\r\n");
+		printf("f_write error in endLog: %d (%lu/%lu)\r\n", fresult, (unsigned long)writtenlog, (unsigned long)logBuffSendIndex);
 	}
 	f_close(&fil_W);
 
 	createLog();
+	if (!create_log_ready)
+	{
+		printf("endLog: createLog failed\r\n");
+		return;
+	}
 
 	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ);
 	if (fresult != FR_OK)
@@ -860,7 +894,13 @@ void endLog(void)
 #undef LOG_FORMAT_VALUE_U32
 #undef LOG_FORMAT_VALUE_F32
 
-		f_puts(logStr, &fil_W);
+		if (f_puts(logStr, &fil_W) < 0)
+		{
+			printf("f_puts error in endLog\r\n");
+			f_close(&fil_W);
+			f_close(&fil);
+			return;
+		}
 	}
 
 	f_sync(&fil_W);

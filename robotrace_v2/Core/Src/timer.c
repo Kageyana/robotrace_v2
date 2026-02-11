@@ -239,7 +239,13 @@ void Interrupt1ms(void)
 /////////////////////////////////////////////////////////////////////
 void Interrupt100us(void)
 {
-        logWriteReq = true;
+	static uint8_t logWriteReqDivider = 0;
+	logWriteReqDivider++;
+	if (logWriteReqDivider >= 10U) // 100us x 10 = 1ms
+	{
+		logWriteReqDivider = 0;
+		logWriteReq = true;
+	}
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logWriteTask

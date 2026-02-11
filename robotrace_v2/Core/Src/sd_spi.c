@@ -26,6 +26,7 @@ extern volatile int g_sd_last_read_multi_status;
  ***************************************************************/
 
 #define USE_DMA 1
+#define SD_DMA_WAIT_TIMEOUT_MS 50U
 
 // extern SPI_HandleTypeDef hspi3;
 #define SD_SPI_HANDLE hspi3
@@ -67,27 +68,54 @@ static uint8_t SD_ReceiveByte(void) {
     return data;
 }
 
-static void SD_TransmitBuffer(const uint8_t *buffer, uint16_t len) {
+static SD_Status SD_TransmitBuffer(const uint8_t *buffer, uint16_t len) {
 #if USE_DMA
+    uint32_t start;
     dma_tx_done = 0;
-    HAL_SPI_Transmit_DMA(&SD_SPI_HANDLE, (uint8_t *)buffer, len);
-    while (!dma_tx_done);
+    if (HAL_SPI_Transmit_DMA(&SD_SPI_HANDLE, (uint8_t *)buffer, len) != HAL_OK) {
+        return SD_ERROR;
+    }
+    start = HAL_GetTick();
+    while (!dma_tx_done) {
+        if ((HAL_GetTick() - start) > SD_DMA_WAIT_TIMEOUT_MS) {
+            (void)HAL_SPI_DMAStop(&SD_SPI_HANDLE);
+            return SD_ERROR;
+        }
+    }
+    return SD_OK;
 #else
-    HAL_SPI_Transmit(&SD_SPI_HANDLE, (uint8_t *)buffer, len, HAL_MAX_DELAY);
+    return (HAL_SPI_Transmit(&SD_SPI_HANDLE, (uint8_t *)buffer, len, HAL_MAX_DELAY) == HAL_OK) ? SD_OK : SD_ERROR;
 #endif
 }
 
-static void SD_ReceiveBuffer(uint8_t *buffer, uint16_t len) {
+static SD_Status SD_ReceiveBuffer(uint8_t *buffer, uint16_t len) {
 #if USE_DMA
 	static uint8_t tx_dummy[512];
+    uint32_t start;
+    if (len > sizeof(tx_dummy)) {
+        return SD_ERROR;
+    }
     for (int i = 0; i < len; i++) tx_dummy[i] = 0xFF;  // Fill with 0xFF
     dma_rx_done = 0;
-    HAL_SPI_TransmitReceive_DMA(&SD_SPI_HANDLE, tx_dummy, buffer, len);
-    while (!dma_rx_done);
-#else
-    for (uint16_t i = 0; i < len; i++) {
-        buffer[i] = SD_ReceiveByte();
+    if (HAL_SPI_TransmitReceive_DMA(&SD_SPI_HANDLE, tx_dummy, buffer, len) != HAL_OK) {
+        return SD_ERROR;
     }
+    start = HAL_GetTick();
+    while (!dma_rx_done) {
+        if ((HAL_GetTick() - start) > SD_DMA_WAIT_TIMEOUT_MS) {
+            (void)HAL_SPI_DMAStop(&SD_SPI_HANDLE);
+            return SD_ERROR;
+        }
+    }
+    return SD_OK;
+#else
+    uint8_t dummy = 0xFF;
+    for (uint16_t i = 0; i < len; i++) {
+        if (HAL_SPI_TransmitReceive(&SD_SPI_HANDLE, &dummy, &buffer[i], 1, HAL_MAX_DELAY) != HAL_OK) {
+            return SD_ERROR;
+        }
+    }
+    return SD_OK;
 #endif
 }
 
@@ -230,7 +258,11 @@ static SD_Status SD_ReadCSD(uint8_t *csd) {
         return SD_ERROR;
     }
 
-    SD_ReceiveBuffer(csd, 16);
+    if (SD_ReceiveBuffer(csd, 16) != SD_OK) {
+        SD_CS_HIGH();
+        SD_TransmitByte(0xFF);
+        return SD_ERROR;
+    }
     SD_ReceiveByte();  // CRC
     SD_ReceiveByte();
     SD_CS_HIGH();
@@ -314,7 +346,11 @@ SD_Status SD_ReadBlocks(uint8_t *buff, uint32_t sector, uint32_t count) {
             return SD_ERROR;
         }
 
-        SD_ReceiveBuffer(buff, 512);
+        if (SD_ReceiveBuffer(buff, 512) != SD_OK) {
+            SD_CS_HIGH();
+            SD_TransmitByte(0xFF);
+            return SD_ERROR;
+        }
         uint8_t crc_hi = SD_ReceiveByte();
         uint8_t crc_lo = SD_ReceiveByte();
 #if SD_SPI_CRC_CHECK
@@ -357,7 +393,13 @@ SD_Status SD_ReadMultiBlocks(uint8_t *buff, uint32_t sector, uint32_t count) {
             return SD_ERROR;
         }
 
-        SD_ReceiveBuffer(buff, 512);
+        if (SD_ReceiveBuffer(buff, 512) != SD_OK) {
+            (void)SD_StopTransmission();
+            SD_CS_HIGH();
+            SD_TransmitByte(0xFF);
+            g_sd_last_read_multi_status = (int)SD_ERROR;
+            return SD_ERROR;
+        }
         uint8_t crc_hi = SD_ReceiveByte();
         uint8_t crc_lo = SD_ReceiveByte();
 #if SD_SPI_CRC_CHECK
@@ -400,7 +442,11 @@ SD_Status SD_WriteBlocks(const uint8_t *buff, uint32_t sector, uint32_t count) {
         }
 
         SD_TransmitByte(0xFE);
-        SD_TransmitBuffer(buff, 512);
+        if (SD_TransmitBuffer(buff, 512) != SD_OK) {
+            SD_CS_HIGH();
+            SD_TransmitByte(0xFF);
+            return SD_ERROR;
+        }
         SD_TransmitByte(0xFF);
         SD_TransmitByte(0xFF);
 
@@ -439,7 +485,11 @@ SD_Status SD_WriteMultiBlocks(const uint8_t *buff, uint32_t sector, uint32_t cou
     while (count--) {
         SD_TransmitByte(0xFC);  // Start multi-block write token
 
-        SD_TransmitBuffer((uint8_t *)buff, 512);
+        if (SD_TransmitBuffer((uint8_t *)buff, 512) != SD_OK) {
+            SD_CS_HIGH();
+            SD_TransmitByte(0xFF);
+            return SD_ERROR;
+        }
         SD_TransmitByte(0xFF);  // dummy CRC
         SD_TransmitByte(0xFF);
 
