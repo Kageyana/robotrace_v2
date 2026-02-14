@@ -34,7 +34,7 @@
 	STORED(F32, motorCurrentL, "%f", motorCurrentL) \
 	STORED(F32, motorCurrentR, "%f", motorCurrentR) \
 	STORED(U32, encCurrentCorr_p, "%d", (uint32_t)Control_GetEncCurrentCorr_p()) \
-	STORED(U8, straightPendingAttempt, "%d", (uint8_t)straightMarkerPending) \
+	STORED(U8, straightPendingAttempt, "%d", (uint8_t)straightMarkerPendingLog) \
 	STORED(U8, lineTraceOmegaFBCtrlkp, "%d", (uint8_t)lineTraceOmegaFBCtrl.kp) \
 	DERIVED(F32, x, "%f", log_x) \
 	DERIVED(F32, y, "%f", log_y)

@@ -945,7 +945,7 @@ void changeGain(void)
 	// 距離基準2次走行のみ、ROC閾値で直線/カーブに合わせてゲインを切り替える
 	if (optimalTrace == BOOST_DISTANCE && numPPADarry > 0)
 	{
-		uint16_t rocIndexNext = optimalIndex+2; // 少し先のROCを参照
+		uint16_t rocIndexNext = optimalIndex+4; // 少し先のROCを参照
 		float rocNow = rocrun;
 		float rocAhead = 0.0F;
 

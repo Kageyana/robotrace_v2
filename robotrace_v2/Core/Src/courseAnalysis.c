@@ -27,8 +27,13 @@ static bool sd_remount_for_analysis(void)
 #define CORR_STEP_MAX_MM		200	// 1回あたりの最大補正量[mm]
 #define FAILSAFE_MISS_MAX		2	// 補正失敗回数の閾値
 #define FAILSAFE_SPEED_SCALE	0.85f	// フェイルセーフ時の速度倍率
-#define MARKER_SEARCH_BACK		3	// マーカー探索時の後方探索幅
-#define MARKER_SEARCH_FORWARD	3	// マーカー探索時の前方探索幅
+#define MARKER_SEARCH_BACK		6	// マーカー探索時の後方探索幅
+#define MARKER_SEARCH_FORWARD	6	// マーカー探索時の前方探索幅
+#define MARKER_SEARCH_CROSS_BACK	24	// クロス時の後方探索幅
+#define MARKER_SEARCH_CROSS_FORWARD	24	// クロス時の前方探索幅
+#define MARKER_INDEX_DEV_NORMAL		24	// 通常補正時に許容するoptimalIndex近傍幅
+#define MARKER_INDEX_DEV_CROSS		32	// クロス補正時に許容するoptimalIndex近傍幅
+#define MARKER_INDEX_JUMP_CROSS_MAX	16	// クロス補正時の1回あたり最大indexジャンプ
 #define CORR_DYN_COEFF_SPEED	0.02f	// 速度依存補正係数
 #define CORR_DYN_COEFF_ANG	0.5f	// 角速度依存補正係数
 uint8_t optimalTrace = 0;
@@ -1403,7 +1408,7 @@ static int32_t calcDynamicThresholdPulse(void)
 // 引数	 encNow: 現在エンコーダ値
 // 戻り値	 最寄りマーカーのインデックス
 /////////////////////////////////////////////////////////////////////
-static int16_t findNearestMarkerIndex(int32_t encNow)
+static int16_t findNearestMarkerIndex(int32_t encNow, bool isCross)
 {
 	if (numPPAMarry <= 0)
 	{
@@ -1411,8 +1416,10 @@ static int16_t findNearestMarkerIndex(int32_t encNow)
 	}
 	int16_t hint = clampMarkerIndex(pathedMarker);	// 推定走行位置からのヒント
 	int16_t center = clampMarkerIndex(lastCorrectedMarker);	// 直近で補正したマーカーを中心にする
-	int16_t lower = center - MARKER_SEARCH_BACK;	// 後方探索開始位置
-	int16_t upper = center + MARKER_SEARCH_FORWARD;	// 前方探索終了位置
+	int16_t searchBack = isCross ? MARKER_SEARCH_CROSS_BACK : MARKER_SEARCH_BACK;
+	int16_t searchForward = isCross ? MARKER_SEARCH_CROSS_FORWARD : MARKER_SEARCH_FORWARD;
+	int16_t lower = center - searchBack;	// 後方探索開始位置
+	int16_t upper = center + searchForward;	// 前方探索終了位置
 	if (hint < lower)
 	{
 		lower = hint;	// ヒントがより手前なら後方範囲を拡張
@@ -1482,7 +1489,7 @@ void processMarkerEvent(void) {
 					if (straightPending) {
 						straightMarkerPending = false;
 					}
-					int16_t nearestIdx = findNearestMarkerIndex(encTotalOptimal);	// 近傍から最適マーカーを取得
+					int16_t nearestIdx = findNearestMarkerIndex(encTotalOptimal, isCross);	// 近傍から最適マーカーを取得
 					int32_t rawDiff = encTotalOptimal - markerPos[nearestIdx].distance;	// 現在距離との差分[パルス]
 					int32_t absDiff = (rawDiff < 0) ? -rawDiff : rawDiff;
 					int32_t allowDiff = calcDynamicThresholdPulse();	// 動的に算出した許容誤差
@@ -1504,6 +1511,29 @@ void processMarkerEvent(void) {
 						Control_ApplyMarkerCorrection_p(diff);	// マーカー補正をスリップ補正後パルスへ反映
 						DistanceOptimal = encTotalOptimal - errorDistance;	// 誤差を維持したまま目標距離を更新
 						int32_t markerIndex = markerPos[nearestIdx].indexPPAD;	// PPAD側の対応インデックス
+						int32_t currentIndex = (int32_t)optimalIndex;
+						int32_t nearDev = isCross ? MARKER_INDEX_DEV_CROSS : MARKER_INDEX_DEV_NORMAL;
+						// marker indexを現在のoptimalIndex近傍に拘束する
+						if (markerIndex > currentIndex + nearDev)
+						{
+							markerIndex = currentIndex + nearDev;
+						}
+						if (markerIndex < currentIndex - nearDev)
+						{
+							markerIndex = currentIndex - nearDev;
+						}
+						// クロスライン補正時は1回でのジャンプ量をさらに制限する
+						if (isCross)
+						{
+							if (markerIndex > currentIndex + MARKER_INDEX_JUMP_CROSS_MAX)
+							{
+								markerIndex = currentIndex + MARKER_INDEX_JUMP_CROSS_MAX;
+							}
+							if (markerIndex < currentIndex - MARKER_INDEX_JUMP_CROSS_MAX)
+							{
+								markerIndex = currentIndex - MARKER_INDEX_JUMP_CROSS_MAX;
+							}
+						}
 						if (markerIndex >= 0 && markerIndex < numPPADarry) {
 							optimalIndex = (uint16_t)markerIndex;
 						} else if (numPPADarry > 0) {
