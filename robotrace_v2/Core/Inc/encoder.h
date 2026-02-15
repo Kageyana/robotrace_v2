@@ -32,6 +32,7 @@ extern uint16_t encBufR, encBufL;
 extern int32_t enc1;
 extern int32_t encRightMarker;
 extern int32_t encCurve;
+extern int32_t encChangeGain;
 //====================================//
 // プロトタイプ宣言
 //====================================//

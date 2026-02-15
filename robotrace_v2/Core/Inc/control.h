@@ -94,6 +94,10 @@
 #define TRACE_CROSSLINE_TH			2000	// クロスライン検出閾値
 #define TRACE_CROSSLINE_DISTANCE	60		// クロスライン付近でゲインを変更する距離[mm]
 
+// 走行中ゲイン変更関連
+#define GAIN_CHANGE_ROC_HIGH		600		// ゲイン変更する曲率半径の閾値[mm]
+#define GAIN_CHANGE_ROC_LOW			500		// ゲイン変更を元に戻す曲率半径の閾値[mm]
+
 // ファイル名
 #define FILENAME_TARGET_SPEED "targetSpeeds"
 

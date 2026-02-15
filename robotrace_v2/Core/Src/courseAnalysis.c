@@ -84,16 +84,16 @@ float calcROC(int16_t velo, float angvelo, float dt)
     float absDrad = (drad < 0.0f) ? -drad : drad;
     float absDl   = (dl   < 0.0f) ? -dl   : dl;
 
-    // 直線判定：|dl/drad| > ROC_STRAIGHTTH ⇔ ROC_STRAIGHTTH * |drad| < |dl|
+    // 直線判定：|dl/drad| > ROC_STRAIGHT_TH ⇔ ROC_STRAIGHT_TH * |drad| < |dl|
     // → 除算せずに比較できる
-    if (absDrad < 1e-6f || ROC_STRAIGHTTH * absDrad < absDl) {
-        return 2000.0f; // 直線とみなす
+    if (absDrad < 1e-6f || ROC_STRAIGHT_TH * absDrad < absDl) {
+        return ROC_STRAIGHT_MAX; // 直線とみなす
     }
 
     // カーブの場合のみ除算実行
     float R = absDl / absDrad;
     // float absR = (R < 0.0f) ? -R : R;
-    // return (absR > ROC_STRAIGHTTH) ? 2000.0f : R;
+    // return (absR > ROC_STRAIGHT_TH) ? 2000.0f : R;
 
 	return R;
 }
@@ -1032,8 +1032,8 @@ cleanup:
 		}
 		else
 		{
-			float avgRoc = (rocCnt[i] > 0) ? (rocAbsSum[i] / (float)rocCnt[i]) : ROC_STRAIGHTTH;
-			float up = (avgRoc >= ROC_STRAIGHTTH) ? CA_SLIP_UP_STRAIGHT : CA_SLIP_UP_CURVE;
+			float avgRoc = (rocCnt[i] > 0) ? (rocAbsSum[i] / (float)rocCnt[i]) : ROC_STRAIGHT_TH;
+			float up = (avgRoc >= ROC_STRAIGHT_TH) ? CA_SLIP_UP_STRAIGHT : CA_SLIP_UP_CURVE;
 			v3[i] = v * (1.0f + up);
 		}
 	}

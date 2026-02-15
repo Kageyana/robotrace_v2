@@ -4,6 +4,7 @@
 #include "control.h"
 #include "BMI088.h"
 #include "PIDcontrol.h"
+#include "encoder.h"
 #include "motor.h"
 #include "fatfs.h"
 #include "battery.h"
@@ -475,32 +476,15 @@ void loopSystem(void)
 
 			// SDカードに変数保存
 			// PIDゲインを記録
-			if (autoStart == 0)
+			if(autoStart <= 1)
 			{
 				writePIDparameters(&lineTraceCtrl);
 				writePIDparameters(&lineTraceOmegaFBCtrl);
 				writePIDparameters(&veloCtrl);
-				writeSpeedFeedForwardGain(speedFeedForwardGain);	// 速度フィードフォワード係数も保存
+				writeSpeedFeedForwardGain(speedFeedForwardGain);
 				writePIDparameters(&yawRateCtrl);
 				writePIDparameters(&yawCtrl);
 				writePIDparameters(&distCtrl);
-			}
-
-			if (autoStart <= 1)
-			{
-				writeTgtspeeds(); // 目標速度を記録
-			}
-
-			if (optimalTrace == BOOST_NONE)
-			{
-				// lineTraceOmegaFBCtrl.kp = 12;
-				// lineTraceOmegaFBCtrl.ki = 0;
-				// lineTraceOmegaFBCtrl.kd = 0;
-
-				// veloCtrl.kp = 8;
-				// veloCtrl.ki = 0;
-				// veloCtrl.kd = 0;
-				// speedFeedForwardGain = 150;
 			}
 
 			if (initMSD)
@@ -922,6 +906,7 @@ void changeGain(void)
 	static bool changeGain = false;
 	static int16_t beforeGainP = 0, beforeGainD = 0;
 	static bool softresetHandled = false;
+	static uint16_t cntStableRoc = 0; // ROCが安定している状態をカウント
 	bool useStraightGain = false;
 	bool useCrossLineGain = false;
 
@@ -946,9 +931,10 @@ void changeGain(void)
 	// 距離基準2次走行のみ、ROC閾値で直線/カーブに合わせてゲインを切り替える
 	if (optimalTrace == BOOST_DISTANCE && numPPADarry > 0)
 	{
-		uint16_t rocIndexNext = optimalIndex+4; // 少し先のROCを参照
+		uint16_t rocIndexNext = optimalIndex + 4; // 少し先のROCを参照
 		float rocNow = rocrun;
 		float rocAhead = 0.0F;
+		useStraightGain = true; // デフォルトは直線用ゲイン
 
 		if (rocIndexNext >= (uint16_t)numPPADarry)
 		{
@@ -963,9 +949,16 @@ void changeGain(void)
 			rocAhead = PPAD[rocIndexNext].ROC; // 直線寄りの方を採用
 		}
 		
-		if (rocAhead > ROC_STRAIGHTTH)
+		// ROCが閾値以下であれば安定しているとみなし、カウントを増やす。閾値を超えるとリセットする。
+		if (rocAhead > GAIN_CHANGE_ROC_HIGH)
 		{
-			useStraightGain = true;
+			encChangeGain = 0;
+		}
+
+		// ROCが安定している状態が一定時間続いたら、カーブ用ゲインを使用する
+		if(encChangeGain > encMM(40))
+		{
+			useStraightGain = false;
 		}
 	}
 
@@ -1622,10 +1615,11 @@ void setEncoderVal(void)
 #endif
 
 	// 外部変数
-	enc1 += dEncUse_p;			// 通常トレース用
+	enc1 += dEncUse_p;				// 通常トレース用
 	encRightMarker += dEncUse_p;	// ゴールマーカ判定用
-	encCurve += dEncUse_p;		// カーブ処理用
-	encTotalOptimal += dEncUse_p; // 2次走行用
+	encCurve += dEncUse_p;			// カーブ処理用
+	encChangeGain += dEncUse_p;		// ゲイン変更用
+	encTotalOptimal += dEncUse_p; 	// 2次走行用
 	encLog += dEncUse_p;			// 一定距離ごとにログを保存する用
 	encPID += dEncUse_p;			// 距離制御用
 	encClick += encCurrentL;		// ホイールクリック用

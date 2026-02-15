@@ -16,6 +16,7 @@ int32_t encTotalN = 0;
 int32_t enc1 = 0;
 int32_t encRightMarker = 0;
 int32_t encCurve = 0;
+int32_t encChangeGain = 0;
 
 uint16_t encRawR = 0, encRawL = 0;
 uint16_t encBufR = 0, encBufL = 0;

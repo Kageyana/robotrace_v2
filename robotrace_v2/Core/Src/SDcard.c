@@ -19,7 +19,6 @@ char columnTitle[2048] = "", formatLog[256] = "";
 // ログバッファ
 // Log buffers
 
-#define ROC_STRAIGHT_MM 2000.0f
 #define CROSS_STRAIGHT_MM 100.0f
 #define CROSSSEG_MAX 128
 #define LOG_BUFFER_COUNT 3
@@ -876,7 +875,7 @@ void endLog(void)
 		}
 		if (straight_zone || rec.courseMarker == 3)
 		{
-			log_roc = ROC_STRAIGHT_MM;
+			log_roc = ROC_STRAIGHT_MAX;
 		}
 
 #define LOG_FORMAT_VALUE_U8(value) (value)

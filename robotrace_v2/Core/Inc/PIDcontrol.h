@@ -18,7 +18,7 @@
 #define KD1		200
 
 // ライントレース用センサ重み係数（中央から外側に向かって適用）
-#define TRACE_WEIGHT_CENTER		1.0f
+#define TRACE_WEIGHT_CENTER		1.01f
 #define TRACE_WEIGHT_INNER		1.01f
 #define TRACE_WEIGHT_MIDDLE		1.02f
 #define TRACE_WEIGHT_OUTER		1.03f
