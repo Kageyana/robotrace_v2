@@ -951,7 +951,7 @@ void changeGain(void)
 		}
 		
 		// ROCが閾値以下であれば安定しているとみなし、カウントを増やす。閾値を超えるとリセットする。
-		if (rocAhead > GAIN_CHANGE_ROC_HIGH)
+		if (rocAhead > GAIN_CHANGE_ROC)
 		{
 			encChangeGain = 0;
 		}
