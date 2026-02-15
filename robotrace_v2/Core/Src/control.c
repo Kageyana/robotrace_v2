@@ -52,7 +52,8 @@ speedParam tgtParam = {
 	PARAM_BOOST_100,
 	MACHINEACCELE,
 	MACHINEDECREACE,
-	PARAM_SHORTCUT};
+	PARAM_SHORTCUT,
+	PARAM_DECEL_LEAD_MM};
 // スリップ検出用の状態（1ms割り込みで軽量に処理するためここで管理）
 static float slipEncSpeedHist[SLIP_WINDOW_SAMPLES];		// 時間窓の開始時点のエンコーダ由来速度[m/s]（リングバッファ）
 static uint16_t slipBufIndex = 0;						// リングバッファの書き込み位置
@@ -1670,15 +1671,16 @@ void writeTgtspeeds(void)
 										(int32_t)(round(tgtParam.bst100 * 100)),
 										(int32_t)(round(tgtParam.acceleF * 100)),
 										(int32_t)(round(tgtParam.acceleD * 100)),
-										(int32_t)(round(tgtParam.shortCut * 100)));
+										(int32_t)(round(tgtParam.shortCut * 100)),
+										(int32_t)(round(tgtParam.decelLeadMm * 100)));
 	}
 
 	f_close(&fil);
 }
 ///////////////////////////////////////////////////////////////////////////
-// モジュール名 readPIDparameters
-// 処理概要     PIDゲインをSDカードから読み取る
-// 引数         pid:pidParam型の変数
+// モジュール名 readTgtspeeds
+// 処理概要     速度パラメータをSDカードから読み取る
+// 引数         なし
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
 void readTgtspeeds(void)
@@ -1686,9 +1688,10 @@ void readTgtspeeds(void)
 	FIL fil;
 	FRESULT fresult;
 	char fileName[30] = PATH_SETTING;
-	int16_t param[20];
+	int16_t param[24] = {0};
 	TCHAR paramStr[100];
 	int16_t i;
+	int16_t readCount = 0;
 
 	// ファイル読み込み
 	strcat(fileName, FILENAME_TARGET_SPEED);					  // ファイル名追加
@@ -1697,29 +1700,39 @@ void readTgtspeeds(void)
 
 	if (fresult == FR_OK)
 	{
+		// speedParamの定義順で読み取る。途中で終端した場合はそこで打ち切る。
 		for (i = 0; i < sizeof(speedParam) / sizeof(float); i++)
 		{
-			f_gets(paramStr, 6, &fil);			// 文字列取得 カンマ含む
-			sscanf(paramStr, "%04d,", &param[i]); // 文字列→数値
+			if (f_gets(paramStr, 6, &fil) == NULL)
+			{
+				break;
+			}
+			if (sscanf(paramStr, "%04hd,", &param[i]) != 1)
+			{
+				break;
+			}
+			readCount++;
 		}
-		i=0;
-		tgtParam.search = (float)param[i++] / 100;
-		tgtParam.stop = (float)param[i++] / 100;
-		tgtParam.bstStraight = (float)param[i++] / 100;
-		tgtParam.bst1500 = (float)param[i++] / 100;
-		tgtParam.bst1300 = (float)param[i++] / 100;
-		tgtParam.bst1000 = (float)param[i++] / 100;
-		tgtParam.bst800 = (float)param[i++] / 100;
-		tgtParam.bst700 = (float)param[i++] / 100;
-		tgtParam.bst600 = (float)param[i++] / 100;
-		tgtParam.bst500 = (float)param[i++] / 100;
-		tgtParam.bst400 = (float)param[i++] / 100;
-		tgtParam.bst300 = (float)param[i++] / 100;
-		tgtParam.bst200 = (float)param[i++] / 100;
-		tgtParam.bst100 = (float)param[i++] / 100;
-		tgtParam.acceleF = (float)param[i++] / 100;
-		tgtParam.acceleD = (float)param[i++] / 100;
-		tgtParam.shortCut = (float)param[i++] / 100;
+		i = 0;
+		// 読み取れた項目だけ反映することで、旧フォーマット(項目数不足)と互換を保つ。
+		if (readCount > i) { tgtParam.search = (float)param[i] / 100; } i++;
+		if (readCount > i) { tgtParam.stop = (float)param[i] / 100; } i++;
+		if (readCount > i) { tgtParam.bstStraight = (float)param[i] / 100; } i++;
+		if (readCount > i) { tgtParam.bst1500 = (float)param[i] / 100; } i++;
+		if (readCount > i) { tgtParam.bst1300 = (float)param[i] / 100; } i++;
+		if (readCount > i) { tgtParam.bst1000 = (float)param[i] / 100; } i++;
+		if (readCount > i) { tgtParam.bst800 = (float)param[i] / 100; } i++;
+		if (readCount > i) { tgtParam.bst700 = (float)param[i] / 100; } i++;
+		if (readCount > i) { tgtParam.bst600 = (float)param[i] / 100; } i++;
+		if (readCount > i) { tgtParam.bst500 = (float)param[i] / 100; } i++;
+		if (readCount > i) { tgtParam.bst400 = (float)param[i] / 100; } i++;
+		if (readCount > i) { tgtParam.bst300 = (float)param[i] / 100; } i++;
+		if (readCount > i) { tgtParam.bst200 = (float)param[i] / 100; } i++;
+		if (readCount > i) { tgtParam.bst100 = (float)param[i] / 100; } i++;
+		if (readCount > i) { tgtParam.acceleF = (float)param[i] / 100; } i++;
+		if (readCount > i) { tgtParam.acceleD = (float)param[i] / 100; } i++;
+		if (readCount > i) { tgtParam.shortCut = (float)param[i] / 100; } i++;
+		if (readCount > i) { tgtParam.decelLeadMm = (float)param[i] / 100; } i++;
 	}
 
 	f_close(&fil);

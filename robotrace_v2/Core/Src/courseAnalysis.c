@@ -58,6 +58,9 @@ static bool failSafeActive = false;	// フェイルセーフ動作中フラグ
 static int16_t lastCorrectedMarker = 0;	// 直近で補正したマーカーインデックス
 
 static void logReadSlipIoError(int logNumber, UINT lineNo, FIL *fil, const char *tag);
+static float calcDecelLeadMmByRoc(int16_t rocPrev, int16_t rocNow);
+static void applyDecelLeadToPpad(int16_t count);
+static void applyDecelLeadToArray(float *speed, int16_t count);
 
 AnalysisData PPAD[OPT_BUFF_SIZE];
 EventPos markerPos[OPT_BUFF_SIZE];
@@ -172,6 +175,142 @@ static void sortInt16Ascending(int16_t *values, uint16_t length)
 			insertPos--;
 		}
 		values[insertPos] = key;
+	}
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 calcDecelLeadMmByRoc
+// 処理概要     曲率半径の変化量から先行減速距離[mm]を算出する
+// 引数         rocPrev:直前の曲率半径[mm], rocNow:現在の曲率半径[mm]
+// 戻り値       先行減速距離[mm]
+/////////////////////////////////////////////////////////////////////
+static float calcDecelLeadMmByRoc(int16_t rocPrev, int16_t rocNow)
+{
+	float baseLeadMm = tgtParam.decelLeadMm;
+	int16_t absPrev = (int16_t)abs(rocPrev);
+	int16_t absNow = (int16_t)abs(rocNow);
+
+	if (baseLeadMm <= 0.0f)
+	{
+		return 0.0f;
+	}
+	if (absPrev <= absNow)
+	{
+		return 0.0f; // 曲率が緩くなる方向は先行減速しない
+	}
+	if (absPrev <= 0)
+	{
+		absPrev = 1;
+	}
+
+	float changeRatio = (float)(absPrev - absNow) / (float)absPrev; // 変化率(0.0〜1.0)
+	if (changeRatio < 0.0f)
+	{
+		changeRatio = 0.0f;
+	}
+	if (changeRatio > 1.0f)
+	{
+		changeRatio = 1.0f;
+	}
+
+	return baseLeadMm * changeRatio;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 applyDecelLeadToPpad
+// 処理概要     PPAD速度配列の減速区間に先行減速を適用する
+// 引数         count:PPAD配列の有効要素数
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void applyDecelLeadToPpad(int16_t count)
+{
+	if (count <= 1)
+	{
+		return;
+	}
+
+	for (int16_t i = 1; i < count; i++)
+	{
+		float prevSpeed = PPAD[i - 1].boostSpeed;
+		float nowSpeed = PPAD[i].boostSpeed;
+		if (nowSpeed >= prevSpeed)
+		{
+			continue; // do not shift acceleration
+		}
+
+		float leadMm = calcDecelLeadMmByRoc(PPAD[i - 1].ROC, PPAD[i].ROC);
+		if (leadMm <= 0.0f)
+		{
+			continue;
+		}
+
+		int16_t leadStep = (int16_t)ceilf(leadMm / (float)CALCDISTANCE); // mmを配列ステップ数へ換算
+		if (leadStep <= 0)
+		{
+			continue;
+		}
+
+		int16_t start = i - leadStep;
+		if (start < 0)
+		{
+			start = 0;
+		}
+		for (int16_t j = start; j < i; j++)
+		{
+			// 減速後速度がすでに決まる位置を手前側へ拡張
+			if (PPAD[j].boostSpeed > nowSpeed)
+			{
+				PPAD[j].boostSpeed = nowSpeed;
+			}
+		}
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 applyDecelLeadToArray
+// 処理概要     任意の速度配列の減速区間に先行減速を適用する
+// 引数         speed:速度配列, count:有効要素数
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void applyDecelLeadToArray(float *speed, int16_t count)
+{
+	if (speed == NULL || count <= 1)
+	{
+		return;
+	}
+
+	for (int16_t i = 1; i < count; i++)
+	{
+		float prevSpeed = speed[i - 1];
+		float nowSpeed = speed[i];
+		if (nowSpeed >= prevSpeed)
+		{
+			continue; // do not shift acceleration
+		}
+
+		float leadMm = calcDecelLeadMmByRoc(PPAD[i - 1].ROC, PPAD[i].ROC);
+		if (leadMm <= 0.0f)
+		{
+			continue;
+		}
+
+		int16_t leadStep = (int16_t)ceilf(leadMm / (float)CALCDISTANCE); // mmを配列ステップ数へ換算
+		if (leadStep <= 0)
+		{
+			continue;
+		}
+
+		int16_t start = i - leadStep;
+		if (start < 0)
+		{
+			start = 0;
+		}
+		for (int16_t j = start; j < i; j++)
+		{
+			// 減速後速度がすでに決まる位置を手前側へ拡張
+			if (speed[j] > nowSpeed)
+			{
+				speed[j] = nowSpeed;
+			}
+		}
 	}
 }
 /////////////////////////////////////////////////////////////////////
@@ -361,6 +500,7 @@ int16_t readLogDistance(int logNumber)
 				numDCount = numD;        // 要素数0の場合はそのまま利用
 			}
 			numD = numDCount;
+			applyDecelLeadToPpad((int16_t)numD); // 曲率変化に応じて、減速到達位置を手前へ寄せる
 
 			// 目標速度配列の整形 加減速が間に合うように距離を調整する
 			float acceleration, elapsedTime, dv, dl;
@@ -899,6 +1039,7 @@ cleanup:
 	}
 
 	// 追加: 2次の速度変化量以内に収める(前後パス)
+	applyDecelLeadToArray(v3, (int16_t)(maxOptimalIndex + 1)); // 曲率変化に応じて、減速到達位置を手前へ寄せる
 	for (int16_t i = 0; i < maxOptimalIndex; i++)
 	{
 		float dvUp = v2Max[i + 1] - v2Max[i];

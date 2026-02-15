@@ -28,6 +28,7 @@
 #define PARAM_BOOST_300 1.3F
 #define PARAM_BOOST_200 1.2F
 #define PARAM_BOOST_100 1.1F
+#define PARAM_DECEL_LEAD_MM 20.0F
 
 #define PARAM_UP_STEP 1.02F
 
@@ -115,6 +116,7 @@ typedef struct
 	float acceleF;
 	float acceleD;
 	float shortCut;
+	float decelLeadMm;
 } speedParam;
 //====================================//
 // グローバル変数の宣言

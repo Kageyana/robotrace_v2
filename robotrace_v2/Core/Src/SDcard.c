@@ -447,6 +447,7 @@ void createLog(void)
 	setLogHeaderStrF("tgtParam.bst100", tgtParam.bst100);
 	setLogHeaderStrF("tgtParam.acceleF", tgtParam.acceleF);
 	setLogHeaderStrF("tgtParam.acceleD", tgtParam.acceleD);
+	setLogHeaderStrF("tgtParam.decelLeadMm", tgtParam.decelLeadMm);
 
 	setLogHeaderStrF("lineTraceCtrl.kp", lineTraceCtrl.kp);
 	setLogHeaderStrF("lineTraceCtrl.ki", lineTraceCtrl.ki);
