@@ -485,6 +485,8 @@ void loopSystem(void)
 				writePIDparameters(&yawRateCtrl);
 				writePIDparameters(&yawCtrl);
 				writePIDparameters(&distCtrl);
+
+				writeTgtspeeds();  // 目標速度を保存
 			}
 
 			if (initMSD)
@@ -906,7 +908,6 @@ void changeGain(void)
 	static bool changeGain = false;
 	static int16_t beforeGainP = 0, beforeGainD = 0;
 	static bool softresetHandled = false;
-	static uint16_t cntStableRoc = 0; // ROCが安定している状態をカウント
 	bool useStraightGain = false;
 	bool useCrossLineGain = false;
 
@@ -956,7 +957,7 @@ void changeGain(void)
 		}
 
 		// ROCが安定している状態が一定時間続いたら、カーブ用ゲインを使用する
-		if(encChangeGain > encMM(40))
+		if(encChangeGain > encMM(50))
 		{
 			useStraightGain = false;
 		}

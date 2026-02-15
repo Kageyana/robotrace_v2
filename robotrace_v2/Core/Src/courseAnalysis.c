@@ -29,8 +29,8 @@ static bool sd_remount_for_analysis(void)
 #define FAILSAFE_SPEED_SCALE	0.85f	// フェイルセーフ時の速度倍率
 #define MARKER_SEARCH_BACK		6	// マーカー探索時の後方探索幅
 #define MARKER_SEARCH_FORWARD	6	// マーカー探索時の前方探索幅
-#define MARKER_SEARCH_CROSS_BACK	24	// クロス時の後方探索幅
-#define MARKER_SEARCH_CROSS_FORWARD	24	// クロス時の前方探索幅
+#define MARKER_SEARCH_CROSS_BACK	14	// クロス時の後方探索幅
+#define MARKER_SEARCH_CROSS_FORWARD	14	// クロス時の前方探索幅
 #define MARKER_INDEX_DEV_NORMAL		24	// 通常補正時に許容するoptimalIndex近傍幅
 #define MARKER_INDEX_DEV_CROSS		32	// クロス補正時に許容するoptimalIndex近傍幅
 #define MARKER_INDEX_JUMP_CROSS_MAX	16	// クロス補正時の1回あたり最大indexジャンプ
