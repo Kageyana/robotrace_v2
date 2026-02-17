@@ -33,9 +33,7 @@
 #define ROC_STRAIGHT_TH 2800.0F		// 直線とみなす曲率半径の閾値[mm]
 #define ROC_STRAIGHT_MAX 3000.0F		// 直線とみなす曲率半径の閾値[mm]
 
-//====================================//
 // 3次走行用スリップ解析(2次ログ)の調整用定数
-//====================================//
 #define CA_SECOND_LOG_LINE_BUFSIZE 1600		// 2次ログ1行バッファサイズ
 #define CA_SLIP_CNT_MIN 3				// スリップ回数のノイズ除外閾値(値↑で判定が厳しくなりリスク↓→減速弱)
 #define CA_SLIP_FRAC_FULL 0.60f			// risk=1.0とみなすスリップ割合(値↑でフルリスク到達しにくく減速弱、例:0.60→0.70)
@@ -47,6 +45,24 @@
 #define CA_SLIP_MIN_SCALE 0.80f			// 最小スケール(減速下限)(値↑で下限が高くなり減速弱、値↓で減速強)
 #define CA_SLIP_UP_STRAIGHT 0.05f		// 直線での微増速(値↑で増速強、例:0.09→0.12)
 #define CA_SLIP_UP_CURVE 0.05f			// カーブでの微増速(値↑で増速強、例:0.05→0.08)
+
+// 距離補正関連の定数
+#define STRAIGHT_WINDOW_MM		150	// 直線判定に用いる距離窓[mm]
+#define STRAIGHT_RATIO_THRESHOLD	0.80f	// 直線率の閾値
+#define CORR_THRESH_MIN_MM		120	// 補正許容誤差の下限[mm]
+#define CORR_THRESH_MAX_MM		200	// 補正許容誤差の上限[mm]
+#define CORR_STEP_MAX_MM		200	// 1回あたりの最大補正量[mm]
+#define FAILSAFE_MISS_MAX		2	// 補正失敗回数の閾値
+#define FAILSAFE_SPEED_SCALE	0.85f	// フェイルセーフ時の速度倍率
+#define MARKER_SEARCH_BACK		6	// マーカー探索時の後方探索幅
+#define MARKER_SEARCH_FORWARD	6	// マーカー探索時の前方探索幅
+#define MARKER_SEARCH_CROSS_BACK	14	// クロス時の後方探索幅
+#define MARKER_SEARCH_CROSS_FORWARD	14	// クロス時の前方探索幅
+#define MARKER_INDEX_DEV_NORMAL		24	// 通常補正時に許容するoptimalIndex近傍幅
+#define MARKER_INDEX_DEV_CROSS		32	// クロス補正時に許容するoptimalIndex近傍幅
+#define MARKER_INDEX_JUMP_CROSS_MAX	16	// クロス補正時の1回あたり最大indexジャンプ
+#define CORR_DYN_COEFF_SPEED	0.02f	// 速度依存補正係数
+#define CORR_DYN_COEFF_ANG	0.5f	// 角速度依存補正係数
 
 // #define WRITE_BOOSTSPEED_LOG 	 // 速度計画ログを書き出すかどうかのフラグ
 

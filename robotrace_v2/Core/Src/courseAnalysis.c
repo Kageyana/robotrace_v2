@@ -20,22 +20,6 @@ static bool sd_remount_for_analysis(void)
 //====================================//
 // グローバル変数の宣
 //====================================//
-#define STRAIGHT_WINDOW_MM		150	// 直線判定に用いる距離窓[mm]
-#define STRAIGHT_RATIO_THRESHOLD	0.80f	// 直線率の閾値
-#define CORR_THRESH_MIN_MM		120	// 補正許容誤差の下限[mm]
-#define CORR_THRESH_MAX_MM		200	// 補正許容誤差の上限[mm]
-#define CORR_STEP_MAX_MM		200	// 1回あたりの最大補正量[mm]
-#define FAILSAFE_MISS_MAX		2	// 補正失敗回数の閾値
-#define FAILSAFE_SPEED_SCALE	0.85f	// フェイルセーフ時の速度倍率
-#define MARKER_SEARCH_BACK		6	// マーカー探索時の後方探索幅
-#define MARKER_SEARCH_FORWARD	6	// マーカー探索時の前方探索幅
-#define MARKER_SEARCH_CROSS_BACK	14	// クロス時の後方探索幅
-#define MARKER_SEARCH_CROSS_FORWARD	14	// クロス時の前方探索幅
-#define MARKER_INDEX_DEV_NORMAL		24	// 通常補正時に許容するoptimalIndex近傍幅
-#define MARKER_INDEX_DEV_CROSS		32	// クロス補正時に許容するoptimalIndex近傍幅
-#define MARKER_INDEX_JUMP_CROSS_MAX	16	// クロス補正時の1回あたり最大indexジャンプ
-#define CORR_DYN_COEFF_SPEED	0.02f	// 速度依存補正係数
-#define CORR_DYN_COEFF_ANG	0.5f	// 角速度依存補正係数
 uint8_t optimalTrace = 0;
 uint16_t optimalIndex;
 int16_t numPPADarry; // path palanning analysis distance (PPAD)

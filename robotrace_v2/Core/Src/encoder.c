@@ -28,25 +28,18 @@ uint16_t encBufR = 0, encBufL = 0;
 /////////////////////////////////////////////////////////////////////
 void getEncoder(void)
 {
-	// uint16_t encRawR = 0, encRawL = 0;
-	// static uint16_t encBufR = 0, encBufL = 0;
-
 	// エンコーダカウントを取得
 	encRawR = ENC_TIM_R->CNT;
 	encRawL = ENC_TIM_L->CNT;
 
-	// 正常に1ms割り込みしたとき更新
-	// if ((uint16_t)(bootTime * 100) > 90 && (uint16_t)(bootTime * 100) < 110)
-	// {
-		// 1msあたりのカウント
-		encCurrentR = encRawR - encBufR;
-		encCurrentL = encBufL - encRawL;
-		encCurrentN = (encCurrentR + encCurrentL) / 2;
-		// カウントの積算(回転方向が逆なのでマイナスで積算)
-		encTotalR += encCurrentR;
-		encTotalL += encCurrentL;
-		encTotalN += encCurrentN;
-	// }
+	// 1msあたりのカウント
+	encCurrentR = encRawR - encBufR;
+	encCurrentL = encBufL - encRawL;
+	encCurrentN = (encCurrentR + encCurrentL) / 2;
+	// カウントの積算(回転方向が逆なのでマイナスで積算)
+	encTotalR += encCurrentR;
+	encTotalL += encCurrentL;
+	encTotalN += encCurrentN;
 	// 前回値を更新
 	encBufR = encRawR;
 	encBufL = encRawL;
