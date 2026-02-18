@@ -542,6 +542,7 @@ void loopSystem(void)
 			encPID = 0;
 			enc1 = 0;
 			encCurve = 0;
+			encChangeGain = 0;
 			encClick = 0;
 			cntRun = 0;
 			cntLog = 0;
@@ -908,6 +909,7 @@ void changeGain(void)
 	static bool changeGain = false;
 	static int16_t beforeGainP = 0, beforeGainD = 0;
 	static bool softresetHandled = false;
+	static bool curveGainHold = false; // 急カーブ進入時にカーブ用ゲインを保持する
 	bool useStraightGain = false;
 	bool useCrossLineGain = false;
 
@@ -922,6 +924,8 @@ void changeGain(void)
 		beforeGainP = 0;
 		beforeGainD = 0;
 		changeGain = false;
+		curveGainHold = false;
+		encChangeGain = 0;
 		softresetHandled = true;
 	}
 	else if (!softreset)
@@ -932,35 +936,84 @@ void changeGain(void)
 	// 距離基準2次走行のみ、ROC閾値で直線/カーブに合わせてゲインを切り替える
 	if (optimalTrace == BOOST_DISTANCE && numPPADarry > 0)
 	{
-		uint16_t rocIndexNext = optimalIndex + 4; // 少し先のROCを参照
+		uint16_t rocIndexEnter = optimalIndex + GAIN_CHANGE_LOOKAHEAD_ENTER; // 先読みROCのインデックス
+		uint16_t rocIndexExit = optimalIndex + GAIN_CHANGE_LOOKAHEAD_EXIT; // 復帰判定用の先読みROCインデックス
 		float rocNow = rocrun;
-		float rocAhead = 0.0F;
+		float rocEnter = 0.0F;
+		float rocExit = 0.0F;
+		bool curvePredicted = false;
+		bool straightStable = false;
 		useStraightGain = true; // デフォルトは直線用ゲイン
 
-		if (rocIndexNext >= (uint16_t)numPPADarry)
+		// インデックスが配列範囲を超えないようにガード
+		if (rocIndexEnter >= (uint16_t)numPPADarry)
 		{
-			rocIndexNext = (uint16_t)(numPPADarry - 1);
+			rocIndexEnter = (uint16_t)(numPPADarry - 1);
+		}
+		if (rocIndexExit >= (uint16_t)numPPADarry)
+		{
+			rocIndexExit = (uint16_t)(numPPADarry - 1);
 		}
 
-		// 現在位置と少し先のROCを比較して、カーブ寄りの方を採用する
-		if(PPAD[rocIndexNext].ROC > rocNow)
+		// 進入判定: 先読みROCと実測ROCのうちカーブ寄り（小さい側）を使う
+		if (PPAD[rocIndexEnter].ROC > rocNow)
 		{
-			rocAhead = rocNow;	// カーブ寄りの方を採用
-		}else{
-			rocAhead = PPAD[rocIndexNext].ROC; // 直線寄りの方を採用
+			rocEnter = rocNow;
 		}
-		
-		// ROCが閾値以下であれば安定しているとみなし、カウントを増やす。閾値を超えるとリセットする。
-		if (rocAhead > GAIN_CHANGE_ROC)
+		else
 		{
-			encChangeGain = 0;
+			rocEnter = PPAD[rocIndexEnter].ROC;
 		}
 
-		// ROCが安定している状態が一定時間続いたら、カーブ用ゲインを使用する
-		if(encChangeGain > encMM(50))
+		// 復帰判定: 実測ROCと近傍先読みROCの両方が直線側であることを要求
+		if (PPAD[rocIndexExit].ROC > rocNow)
 		{
+			rocExit = rocNow;
+		}
+		else
+		{
+			rocExit = PPAD[rocIndexExit].ROC;
+		}
+
+		curvePredicted = (rocEnter <= GAIN_CHANGE_ROC_ENTER);
+		straightStable = (rocExit >= GAIN_CHANGE_ROC_EXIT);
+
+		if (curveGainHold)
+		{
+			// カーブを抜けきるまでカーブ用ゲインを維持する
 			useStraightGain = false;
+
+			if (straightStable)
+			{
+				// 直線が一定距離続いたら直線用ゲインに戻す
+				if (encChangeGain > encMM(GAIN_CHANGE_STRAIGHT_STABLE_MM))
+				{
+					curveGainHold = false;
+					encChangeGain = 0;
+					useStraightGain = true;
+				}
+			}
+			else
+			{
+				// 直線安定が途切れたので復帰用の距離カウントをやり直す
+				encChangeGain = 0;
+			}
 		}
+		else
+		{
+			// 高速直線から急カーブへは先読みROCで早めにカーブ用ゲインへ切替える
+			if (curvePredicted)
+			{
+				curveGainHold = true;
+				encChangeGain = 0;
+				useStraightGain = false;
+			}
+		}
+	}
+	else
+	{
+		curveGainHold = false;
+		encChangeGain = 0;
 	}
 
 	// クロスライン検出時のゲイン切り替え

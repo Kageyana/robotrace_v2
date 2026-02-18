@@ -84,7 +84,7 @@
 #define SLIP_DIST_LPF_COEF_UP		0.06f	// 回復追従
 
 // ゴール
-#define COUNT_GOAL 2 // ゴールマーカーを読む回数
+#define COUNT_GOAL 6 // ゴールマーカーを読む回数
 
 // スタートモード
 #define START_SERACH 3
@@ -95,7 +95,11 @@
 #define TRACE_CROSSLINE_DISTANCE	60		// クロスライン付近でゲインを変更する距離[mm]
 
 // 走行中ゲイン変更関連
-#define GAIN_CHANGE_ROC		500		// ゲイン変更する曲率半径の閾値[mm]
+#define GAIN_CHANGE_ROC_ENTER			600		// カーブ用ゲインへ切替えるROC閾値[mm]（小さいほどカーブ）
+#define GAIN_CHANGE_ROC_EXIT			600		// 直線用ゲインへ戻すROC閾値[mm]（大きいほど直線）
+#define GAIN_CHANGE_LOOKAHEAD_ENTER		4		// カーブ進入判定用の先読みインデックス
+#define GAIN_CHANGE_LOOKAHEAD_EXIT		2		// 直線復帰判定用の先読みインデックス
+#define GAIN_CHANGE_STRAIGHT_STABLE_MM	50		// 直線安定がこの距離続いたら直線用ゲインへ復帰
 
 // ファイル名
 #define FILENAME_TARGET_SPEED "targetSpeeds"
