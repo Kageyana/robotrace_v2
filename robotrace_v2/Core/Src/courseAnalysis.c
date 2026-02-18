@@ -1233,42 +1233,46 @@ int16_t calcXYcies(int logNumber)
 	char fileName[10];
 	int16_t ret = 0;
 	bool lock_acquired = sd_fatfs_lock(200);
+	bool fileOpenedRead = false;
+	bool fileOpenedPlot = false;
+	bool retried = false;
+	bool fgets_null = false;
 
 	if (!lock_acquired)
 	{
 		return -9; // SD/FatFs使用中
 	}
+	sd_set_analysis_active(true);
 
 	// ファイル読み込み
-	snprintf(fileName, sizeof(fileName), "%d", logNumber);				// 数値を文字列に変換
-	strcat(fileName, ".csv");											// 拡張子を追加
-	fresult1 = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // ログファイルを開く
-	if (fresult1 != FR_OK)
+	snprintf(fileName, sizeof(fileName), "%d", logNumber);
+	strcat(fileName, ".csv");
+
+retry_open_xy:
+	if (!sd_remount_for_analysis())
 	{
-		// ログファイルのオープンに失敗した場合はエラーを返す
-		ret = -5;       // ログファイルオープンエラー
-		if (lock_acquired)
-		{
-			sd_fatfs_unlock();
-		}
-		return ret;
-	}
-	fresult2 = f_open(&fil_Plot, "./plot/plot.csv", FA_CREATE_ALWAYS | FA_WRITE); // csvファイルを開く
-	if (fresult2 != FR_OK)
-	{
-		// プロットファイルのオープンに失敗した場合はエラーを返す
-		f_close(&fil_Read);
-		ret = -6;       // プロットファイルオープンエラー
-		if (lock_acquired)
-		{
-			sd_fatfs_unlock();
-		}
-		return ret;
+		ret = -6;
+		goto cleanup_xy;
 	}
 
-	// プロットファイルが開けたので解析を開始
-	// ログデータの取得
-	TCHAR log[512];
+	fresult1 = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ);
+	if (fresult1 != FR_OK)
+	{
+		ret = -5;
+		goto cleanup_xy;
+	}
+	fileOpenedRead = true;
+
+	fresult2 = f_open(&fil_Plot, "./plot/plot.csv", FA_CREATE_ALWAYS | FA_WRITE);
+	if (fresult2 != FR_OK)
+	{
+		ret = -6;
+		goto cleanup_xy;
+	}
+	fileOpenedPlot = true;
+
+	// ファイルが開けたので解析を開始
+	TCHAR log[2048];
 	const int log_len = (int)(sizeof(log) / sizeof(log[0]));
 	uint8_t plotStr[128];
 	int32_t time, marker, velo, distance;
@@ -1278,48 +1282,64 @@ int16_t calcXYcies(int logNumber)
 	float x = 0, y = 0, xm = 0, ym = 0, degzm = 0;
 	float xValues[SHORTCUTWINDOW], yValues[SHORTCUTWINDOW], degzValues[SHORTCUTWINDOW];
 	int16_t i = 0, j = 0;
-
-	// 配列の初期化
 	memset(&xValues, 0, sizeof(float) * SHORTCUTWINDOW);
 	memset(&yValues, 0, sizeof(float) * SHORTCUTWINDOW);
 	memset(&degzValues, 0, sizeof(float) * SHORTCUTWINDOW);
 	indexSC = 0;
 
-	// ショートカット軌跡初期値の設定
 	shortCutxycie[indexSC].x = 0;
 	shortCutxycie[indexSC].y = 0;
 	shortCutxycie[indexSC].w = 0;
 	indexSC++;
 
-	// plotファイルのヘッダ書き込み
-	f_printf(&fil_Plot, "xm,ym,degzm\n");
-	
-	f_gets(log, log_len, &fil_Read); // 1行目はヘッダなので読み飛ばす
-
-	// ログデータ取得開始
-	while (f_gets(log, log_len, &fil_Read) != NULL)
+	if (f_printf(&fil_Plot, "xm,ym,degzm\n") < 0)
 	{
-		sscanf(log, "%d,%d,%f,%d,%d", &time, &velo, &angVelo, &marker, &distance);
+		ret = -6;
+	}
 
-		dt = (float)(time - beforeTime) / 1000;		// 時間[s]
+	fgets_null = false;
+	if (ret == 0)
+	{
+		TCHAR *header = f_gets(log, log_len, &fil_Read); // 1行目はヘッダなので読み飛ばす
+		if (!header)
+		{
+			int eof = f_eof(&fil_Read);
+			int err = f_error(&fil_Read);
+			if (!eof && err != 0)
+			{
+				ret = -5; // f_gets I/O error
+			}
+		}
+	}
 
-		degz = degz + (angVelo * dt);			   	// 角度
-		degzR = degz * DEG2RAD;					   	// [rad]に変換
-		velocity = (float)velo / PALSE_MILLIMETER;	// 速度
-		distEnc += velo * (time - beforeTime);		// 距離計測
+	while (ret == 0)
+	{
+		TCHAR *s = f_gets(log, log_len, &fil_Read);
+		if (!s)
+		{
+			fgets_null = true;
+			break;
+		}
 
-		// 座標計算
+		if (sscanf(log, "%d,%d,%f,%d,%d", &time, &velo, &angVelo, &marker, &distance) != 5)
+		{
+			continue;
+		}
+
+		dt = (float)(time - beforeTime) / 1000;
+		degz = degz + (angVelo * dt);
+		degzR = degz * DEG2RAD;
+		velocity = encPulse(velo);
+		distEnc += velo * (time - beforeTime);
+
 		x = x + (velocity * sin(degzR));
 		y = y + (velocity * cos(degzR));
 
-		// リングバッファに座標を保存
 		xValues[i & (SHORTCUTWINDOW - 1)] = x;
 		yValues[i & (SHORTCUTWINDOW - 1)] = y;
 		degzValues[i & (SHORTCUTWINDOW - 1)] = degz;
 
-		// リングバッファの総和計算前に初期化
-		xm = ym = degzm = 0.0f; // 各周回で正しい平均値を得るためリセット
-		// リングバッファの総和を計算
+		xm = ym = degzm = 0.0f;
 		for (j = 0; j < SHORTCUTWINDOW; j++)
 		{
 			xm += xValues[j];
@@ -1327,23 +1347,20 @@ int16_t calcXYcies(int logNumber)
 			degzm += degzValues[j];
 		}
 
-		// 移動平均を計算(ショートカット座標)
 		xm /= SHORTCUTWINDOW;
 		ym /= SHORTCUTWINDOW;
 		degzm /= SHORTCUTWINDOW;
 		if (distEnc - startEnc >= encMM(CALCDISTANCE_SHORTCUT))
 		{
-			// バッファ上限に達していないか確認
 			if (indexSC < OPT_SHORT_BUFF_SIZE)
 			{
 				shortCutxycie[indexSC].x = xm;
 				shortCutxycie[indexSC].y = ym;
-				startEnc = distEnc; // 距離計測開始位置を更新
-				indexSC++; // バッファの次の位置へ
+				startEnc = distEnc;
+				indexSC++;
 			}
 			else
 			{
-				// 上限超過: エラー番号-7を設定しループを終了
 				ret = -7;
 				break;
 			}
@@ -1352,23 +1369,34 @@ int16_t calcXYcies(int logNumber)
 		i++;
 		beforeTime = time;
 	}
+	if (ret == 0 && fgets_null)
+	{
+		int eof = f_eof(&fil_Read);
+		int err = f_error(&fil_Read);
+		if (!eof && err != 0)
+		{
+			ret = -5; // f_gets I/O error
+		}
+	}
 
-	// ショートカット座標からyaw軸角度を計算
 	float xe = 0, ye = 0;
 	float theta = 0, thetaBefore = 90, thetae;
 
 	degz = 0;
-	// plotファイルに初期値記録
-	f_printf(&fil_Plot, "%d,%d,%d\n", (int32_t)(shortCutxycie[0].x * 10000), (int32_t)(shortCutxycie[0].y * 10000), (int32_t)(shortCutxycie[0].w * 10000));
-
-	for (i = 1; i < indexSC; i++)
+	if (ret == 0)
 	{
-		xe = shortCutxycie[i].x - shortCutxycie[i - 1].x; // x座標の移動量
-		ye = shortCutxycie[i].y - shortCutxycie[i - 1].y; // y座標の移動量
+		if (f_printf(&fil_Plot, "%d,%d,%d\n", (int32_t)(shortCutxycie[0].x * 10000), (int32_t)(shortCutxycie[0].y * 10000), (int32_t)(shortCutxycie[0].w * 10000)) < 0)
+		{
+			ret = -6;
+		}
+	}
 
-		theta = atan2(ye, xe) * RAD2DEG; // [deg]に変換
+	for (i = 1; i < indexSC && ret >= 0; i++)
+	{
+		xe = shortCutxycie[i].x - shortCutxycie[i - 1].x;
+		ye = shortCutxycie[i].y - shortCutxycie[i - 1].y;
 
-		// 2直線のなす角を計算
+		theta = atan2(ye, xe) * RAD2DEG;
 		thetae = thetaBefore - theta;
 		if (thetae > 180)
 		{
@@ -1380,47 +1408,70 @@ int16_t calcXYcies(int logNumber)
 		}
 		degz += thetae;
 
-		shortCutxycie[i].w = degz; // yaw軸角度
-		// plotファイルに書き込み
-		int snlen = snprintf((char *)plotStr, sizeof(plotStr), "%f,%f,%f\n", shortCutxycie[i].x, shortCutxycie[i].y, shortCutxycie[i].w); // 戻り値で書き込み長を確認
+		shortCutxycie[i].w = degz;
+		int snlen = snprintf((char *)plotStr, sizeof(plotStr), "%f,%f,%f\n", shortCutxycie[i].x, shortCutxycie[i].y, shortCutxycie[i].w);
 		if (snlen < 0 || snlen >= sizeof(plotStr))
 		{
-			// snprintfが失敗した場合やバッファが不足した場合はエラー番号-8を設定して処理を中断する
 			ret = -8;
 			break;
 		}
-		f_puts((TCHAR *)plotStr, &fil_Plot);
-		
-		thetaBefore = theta; // 前回のyaw軸角度を更新
+		if (f_puts((TCHAR *)plotStr, &fil_Plot) < 0)
+		{
+			ret = -6;
+			break;
+		}
+
+		thetaBefore = theta;
 	}
 
 	if (ret >= 0)
 	{
-		// ループ内でエラーがなければ解析した要素数を返す
 		ret = indexSC;
 	}
 
-	// ファイルクローズ
-	f_close(&fil_Read);
-	f_close(&fil_Plot);
+	if (ret == -5 && !retried)
+	{
+		if (fileOpenedRead)
+		{
+			f_close(&fil_Read);
+			fileOpenedRead = false;
+		}
+		if (fileOpenedPlot)
+		{
+			f_close(&fil_Plot);
+			fileOpenedPlot = false;
+		}
+		retried = true;
+		ret = 0;
+		fgets_null = false;
+		goto retry_open_xy;
+	}
+
+cleanup_xy:
+	if (fileOpenedRead)
+	{
+		f_close(&fil_Read);
+	}
+	if (fileOpenedPlot)
+	{
+		f_close(&fil_Plot);
+	}
 	if (lock_acquired)
 	{
+		sd_set_analysis_active(false);
 		sd_fatfs_unlock();
 	}
 
-	// エラー時にはログ番号保存やフラグ設定をスキップする
 	if (ret >= 0)
 	{
-		// 解析済みのログ番号を保存
 		saveLogNumber(logNumber);
 		analizedNumber = logNumber;
-
-		// 2次走行フラグ 距離基準2次走行
 		optimalTrace = BOOST_SHORTCUT;
 	}
 
 	return ret;
 }
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 calcXYcie (cie=Coordinate)
 // 処理概要     走行中にxy座標を計算しグローバル変数に保存する
@@ -1468,7 +1519,6 @@ void setShortCutTarget(void)
 
         setTargetDist(dist);
 }
-
 /////////////////////////////////////////////////////////////////////
 // ローカル関数 clampMarkerIndex
 // 処理概要	 マーカーインデックスを安全な範囲に収める

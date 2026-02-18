@@ -13,9 +13,9 @@
 // 機体諸元
 
 // 速度パラメータ関連
-#define PARAM_SEARCH 1.0F
-#define PARAM_STOP 0.8F
-#define PARAM_SHORTCUT 0.5F
+#define PARAM_SEARCH 	1.0F
+#define PARAM_STOP 		0.8F
+#define PARAM_SHORTCUT 	0.5F
 #define PARAM_BOOST_STRAIGHT 2.8F
 #define PARAM_BOOST_1500 2.6F
 #define PARAM_BOOST_1300 2.4F
@@ -28,7 +28,7 @@
 #define PARAM_BOOST_300 1.3F
 #define PARAM_BOOST_200 1.2F
 #define PARAM_BOOST_100 1.1F
-#define PARAM_DECEL_LEAD_MM 30.0F
+#define PARAM_DECEL_LEAD_MM 60.0F
 
 #define PARAM_UP_STEP 1.02F
 

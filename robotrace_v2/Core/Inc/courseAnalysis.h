@@ -11,7 +11,7 @@
 // シンボル定義
 //====================================//
 #define OPT_BUFF_SIZE 1000
-#define OPT_SHORT_BUFF_SIZE 1000
+#define OPT_SHORT_BUFF_SIZE 3000
 #define CALCDISTANCE 50				// 距離解析ステップ[mm]
 #define CALCDISTANCE_SHORTCUT 10 	// 距離解析ステップ(ショートカット走行)[mm]
 #define MACHINEACCELE 3.4F			// 加速度[m/s^2]

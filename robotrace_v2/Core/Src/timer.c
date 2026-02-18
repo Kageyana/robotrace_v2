@@ -73,27 +73,29 @@ void Interrupt1ms(void)
 	}
 	else 
 	{
-		// ライン追従＋左右独立速度制御
-		motorControlTraceOmegaFB();
+		if(optimalTrace == BOOST_NONE || optimalTrace == BOOST_DISTANCE)
+		{
+			// ライン追従＋左右独立速度制御
+			motorControlTraceOmegaFB();
 
-		int16_t delta = lineTraceOmegaFBCtrl.pwm;
-		int16_t targetL = (int16_t)targetSpeed + delta;
-		int16_t targetR = (int16_t)targetSpeed - delta;
-		// クリップ（例：目標が大きくなりすぎないように。上限は実機で調整）
-		const int16_t TARGET_MAX = (int16_t)PALSE_MILLIMETER * 4;	// 4.0m/s
-		if (targetL >  TARGET_MAX) targetL =  TARGET_MAX;
-		if (targetL < -TARGET_MAX) targetL = -TARGET_MAX;
-		if (targetR >  TARGET_MAX) targetR =  TARGET_MAX;
-		if (targetR < -TARGET_MAX) targetR = -TARGET_MAX;
+			int16_t delta = lineTraceOmegaFBCtrl.pwm;
+			int16_t targetL = (int16_t)targetSpeed + delta;
+			int16_t targetR = (int16_t)targetSpeed - delta;
+			// クリップ（例：目標が大きくなりすぎないように。上限は実機で調整）
+			const int16_t TARGET_MAX = (int16_t)PALSE_MILLIMETER * 4;	// 4.0m/s
+			if (targetL >  TARGET_MAX) targetL =  TARGET_MAX;
+			if (targetL < -TARGET_MAX) targetL = -TARGET_MAX;
+			if (targetR >  TARGET_MAX) targetR =  TARGET_MAX;
+			if (targetR < -TARGET_MAX) targetR = -TARGET_MAX;
 
-		motorControlSpeedLR(targetL, targetR);
-	}
-	
-	
-
-	if(optimalTrace == BOOST_SHORTCUT)
-	{
-		motorControldist();
+			motorControlSpeedLR(targetL, targetR);
+		} 
+		else if(optimalTrace == BOOST_SHORTCUT)
+		{
+			motorControldist();
+			motorControlSpeed();
+			motorControlYaw();		// 角度制御
+		}
 	}
 
 	if (patternTrace > 10 && patternTrace < 100)
