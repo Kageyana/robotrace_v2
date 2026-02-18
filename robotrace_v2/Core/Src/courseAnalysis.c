@@ -1245,16 +1245,19 @@ int16_t calcXYcies(int logNumber)
 	sd_set_analysis_active(true);
 
 	// ファイル読み込み
+	// 解析対象ログのファイル名を作成
 	snprintf(fileName, sizeof(fileName), "%d", logNumber);
 	strcat(fileName, ".csv");
 
 retry_open_xy:
+	// 一時的なI/O不整合対策として解析前にリマウント
 	if (!sd_remount_for_analysis())
 	{
 		ret = -6;
 		goto cleanup_xy;
 	}
 
+	// 入力ログを開く
 	fresult1 = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ);
 	if (fresult1 != FR_OK)
 	{
@@ -1263,6 +1266,7 @@ retry_open_xy:
 	}
 	fileOpenedRead = true;
 
+	// XYプロット出力先を開く
 	fresult2 = f_open(&fil_Plot, "./plot/plot.csv", FA_CREATE_ALWAYS | FA_WRITE);
 	if (fresult2 != FR_OK)
 	{
@@ -1282,16 +1286,19 @@ retry_open_xy:
 	float x = 0, y = 0, xm = 0, ym = 0, degzm = 0;
 	float xValues[SHORTCUTWINDOW], yValues[SHORTCUTWINDOW], degzValues[SHORTCUTWINDOW];
 	int16_t i = 0, j = 0;
+	// ショートカット点列生成用の作業バッファを初期化
 	memset(&xValues, 0, sizeof(float) * SHORTCUTWINDOW);
 	memset(&yValues, 0, sizeof(float) * SHORTCUTWINDOW);
 	memset(&degzValues, 0, sizeof(float) * SHORTCUTWINDOW);
 	indexSC = 0;
 
+	// 原点を先頭点として登録
 	shortCutxycie[indexSC].x = 0;
 	shortCutxycie[indexSC].y = 0;
 	shortCutxycie[indexSC].w = 0;
 	indexSC++;
 
+	// 出力CSVヘッダ
 	if (f_printf(&fil_Plot, "xm,ym,degzm\n") < 0)
 	{
 		ret = -6;
@@ -1300,6 +1307,7 @@ retry_open_xy:
 	fgets_null = false;
 	if (ret == 0)
 	{
+		// 1行目のヘッダを読み飛ばす
 		TCHAR *header = f_gets(log, log_len, &fil_Read); // 1行目はヘッダなので読み飛ばす
 		if (!header)
 		{
@@ -1314,6 +1322,7 @@ retry_open_xy:
 
 	while (ret == 0)
 	{
+		// 1行読み込み（NULLはEOFまたはI/Oエラー）
 		TCHAR *s = f_gets(log, log_len, &fil_Read);
 		if (!s)
 		{
@@ -1321,35 +1330,41 @@ retry_open_xy:
 			break;
 		}
 
+		// 先頭5列を取り出せない行は解析対象外としてスキップ
 		if (sscanf(log, "%d,%d,%f,%d,%d", &time, &velo, &angVelo, &marker, &distance) != 5)
 		{
 			continue;
 		}
 
-		dt = (float)(time - beforeTime) / 1000;
-		degz = degz + (angVelo * dt);
-		degzR = degz * DEG2RAD;
-		velocity = encPulse(velo);
-		distEnc += velo * (time - beforeTime);
+		// 速度・角速度を積分して座標を更新
+		dt = (float)(time - beforeTime) / 1000;	// 微小時間
+		degz = degz + (angVelo * dt);			// yaw角を更新[deg]
+		degzR = degz * DEG2RAD;					// yaw角をラジアンに変換[rad]
+		velocity = encPulse(velo);		// エンコーダパルスを速度に変換[m/s]
+		distEnc += velo * (time - beforeTime);  // エンコーダパルスの積分で距離を更新
 
+		// 速度とyaw角からXY座標の変化量を計算して更新
 		x = x + (velocity * sin(degzR));
 		y = y + (velocity * cos(degzR));
 
+		// ショートカット点列生成のための移動平均計算用バッファに値を保存
 		xValues[i & (SHORTCUTWINDOW - 1)] = x;
 		yValues[i & (SHORTCUTWINDOW - 1)] = y;
 		degzValues[i & (SHORTCUTWINDOW - 1)] = degz;
 
 		xm = ym = degzm = 0.0f;
+		// バッファに溜まった値の平均を計算
 		for (j = 0; j < SHORTCUTWINDOW; j++)
 		{
 			xm += xValues[j];
 			ym += yValues[j];
 			degzm += degzValues[j];
 		}
-
 		xm /= SHORTCUTWINDOW;
 		ym /= SHORTCUTWINDOW;
 		degzm /= SHORTCUTWINDOW;
+
+		// 一定移動距離ごとにショートカット点を採用
 		if (distEnc - startEnc >= encMM(CALCDISTANCE_SHORTCUT))
 		{
 			if (indexSC < OPT_SHORT_BUFF_SIZE)
@@ -1361,6 +1376,7 @@ retry_open_xy:
 			}
 			else
 			{
+				// ショートカット点バッファ不足
 				ret = -7;
 				break;
 			}
@@ -1369,6 +1385,7 @@ retry_open_xy:
 		i++;
 		beforeTime = time;
 	}
+	// f_getsがNULLで抜けた場合、EOFかI/Oエラーかを判定
 	if (ret == 0 && fgets_null)
 	{
 		int eof = f_eof(&fil_Read);
@@ -1382,6 +1399,7 @@ retry_open_xy:
 	float xe = 0, ye = 0;
 	float theta = 0, thetaBefore = 90, thetae;
 
+	// 生成した点列から各点の目標yaw角を再計算
 	degz = 0;
 	if (ret == 0)
 	{
@@ -1393,6 +1411,7 @@ retry_open_xy:
 
 	for (i = 1; i < indexSC && ret >= 0; i++)
 	{
+		// 2点間の角度を計算
 		xe = shortCutxycie[i].x - shortCutxycie[i - 1].x;
 		ye = shortCutxycie[i].y - shortCutxycie[i - 1].y;
 
@@ -1406,9 +1425,11 @@ retry_open_xy:
 		{
 			thetae += 360;
 		}
-		degz += thetae;
+		degz += thetae; // 角度の変化量を積算して目標yaw角を更新
 
 		shortCutxycie[i].w = degz;
+
+		// 生成したショートカット点の座標と目標yaw角をCSVへ出力
 		int snlen = snprintf((char *)plotStr, sizeof(plotStr), "%f,%f,%f\n", shortCutxycie[i].x, shortCutxycie[i].y, shortCutxycie[i].w);
 		if (snlen < 0 || snlen >= sizeof(plotStr))
 		{
@@ -1429,6 +1450,7 @@ retry_open_xy:
 		ret = indexSC;
 	}
 
+	// 読み取りI/Oエラー(-5)のみ1回だけ再試行
 	if (ret == -5 && !retried)
 	{
 		if (fileOpenedRead)
@@ -1448,6 +1470,7 @@ retry_open_xy:
 	}
 
 cleanup_xy:
+	// ファイル/ロックを必ず解放
 	if (fileOpenedRead)
 	{
 		f_close(&fil_Read);
@@ -1462,6 +1485,7 @@ cleanup_xy:
 		sd_fatfs_unlock();
 	}
 
+	// 解析成功時のみ解析番号と走行モードを更新
 	if (ret >= 0)
 	{
 		saveLogNumber(logNumber);
