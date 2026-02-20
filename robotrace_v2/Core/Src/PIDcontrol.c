@@ -481,14 +481,14 @@ void motorControlYaw(void)
 	// I成分積算
 	yawCtrl.Int += Dev * 0.005;
 	// 目標値を変更したらI成分リセット
-	// if ( targetAngle != targetAngleBefore ) yawCtrl.Int = 0;
+	if ( targetAngle != targetAngleBefore ) yawCtrl.Int = 0;
 	Dif = (Dev - angleBefore) * 1; // dゲイン1/1000倍
 
 	iP = yawCtrl.kp * Dev;		   // 比例
 	iI = yawCtrl.ki * yawCtrl.Int; // 積分
 	iD = yawCtrl.kd * Dif;		   // 微分
 	iRet = (int32_t)iP + iI + iD;
-	iRet = iRet >> 2; // PWMを0～1000近傍に収める
+	iRet = iRet >> 4; // PWMを0～1000近傍に収める
 
 	// PWMの上限の設定
 	if (iRet > 900)

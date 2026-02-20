@@ -1409,10 +1409,10 @@ void setup(void)
 				setupFlags.clickStart = -1;
 			}
 
-			if (pattern.display > HEX_PID_SPEED)
+			if (pattern.display > HEX_PID_DIST)
 				pattern.display = 0;
 			else if (pattern.display < 0)
-				pattern.display = HEX_PID_SPEED;
+				pattern.display = HEX_PID_DIST;
 			encClick = 0;
 		}
 	}
@@ -1519,19 +1519,19 @@ void setup(void)
 	// //------------------------------------------------------------------
 	// // ゲイン調整(角度)
 	// //------------------------------------------------------------------
-	// case HEX_PID_ANGLE:
-	// {
-	// 	setup_pid_angle(); // ゲイン調整(角度)
-	// 	break;
-	// }
+	case HEX_PID_ANGLE:
+	{
+		setup_pid_angle(); // ゲイン調整(角度)
+		break;
+	}
 	// //------------------------------------------------------------------
 	// // ゲイン調整(距離)
 	// //------------------------------------------------------------------
-	// case HEX_PID_DIST:
-	// {
-	// 	setup_pid_dist(); // 距離PID調整処理を実行
-	// 	break;
-	// }
+	case HEX_PID_DIST:
+	{
+		setup_pid_dist(); // 距離PID調整処理を実行
+		break;
+	}
 
 	default:
 	{

@@ -852,7 +852,7 @@ void endLog(void)
 		dt = (float)(time - beforeTime) / 1000.0f;
 		log_roc = calcROC(speed, zg, dt);
 
-		calcXYcie((int16_t)rec.encCurrentCorr_p, zg, dt);
+		calcXYcie((int16_t)rec.encCurrentN, zg, dt);
 		log_x = xycie.x;
 		log_y = xycie.y;
 		dist_mm += calcDlMm(speed, dt);

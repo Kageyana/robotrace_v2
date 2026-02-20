@@ -84,7 +84,7 @@
 #define SLIP_DIST_LPF_COEF_UP		0.06f	// 回復追従
 
 // ゴール
-#define COUNT_GOAL 6 // ゴールマーカーを読む回数
+#define COUNT_GOAL 2 // ゴールマーカーを読む回数
 
 // スタートモード
 #define START_SERACH 3

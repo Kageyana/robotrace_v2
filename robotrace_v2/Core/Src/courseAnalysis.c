@@ -1340,7 +1340,7 @@ retry_open_xy:
 		dt = (float)(time - beforeTime) / 1000;	// 微小時間
 		degz = degz + (angVelo * dt);			// yaw角を更新[deg]
 		degzR = degz * DEG2RAD;					// yaw角をラジアンに変換[rad]
-		velocity = encPulse(velo);		// エンコーダパルスを速度に変換[m/s]
+		velocity = calcDlMm(velo, dt);		// エンコーダパルスを速度に変換[mm/s]
 		distEnc += velo * (time - beforeTime);  // エンコーダパルスの積分で距離を更新
 
 		// 速度とyaw角からXY座標の変化量を計算して更新
@@ -1524,6 +1524,138 @@ void clearXYcie(void)
 	xycie.x = 0;
 	xycie.y = 0;
 	xydegz = 0;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 approxDistanceShortcut
+// 処理概要     現在座標と目標座標の距離を近似式で算出する
+// 引数         dx,dy: 座標差分[mm]
+// 戻り値       近似距離[mm]
+/////////////////////////////////////////////////////////////////////
+static float approxDistanceShortcut(float dx, float dy)
+{
+	float adx = fabsf(dx);
+	float ady = fabsf(dy);
+	float maxv = (adx > ady) ? adx : ady;
+	float minv = (adx > ady) ? ady : adx;
+
+	// sqrt(dx^2+dy^2)の近似: max + 3/8 * min
+	return maxv + (0.375f * minv);
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 updateShortCutOptimalIndexByRange
+// 処理概要     半径R内に現在目標点が入ったら、距離L先の目標点へoptimalIndexを更新する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void updateShortCutOptimalIndexByRange(void)
+{
+	if (indexSC <= 0)
+	{
+		return;
+	}
+
+	// ショートカット点列の末尾に収まるように現在インデックスを補正
+	uint16_t maxIndex = (uint16_t)(indexSC - 1);
+	bool indexChanged = false;
+	if (optimalIndex > maxIndex)
+	{
+		optimalIndex = maxIndex;
+		indexChanged = true;
+	}
+
+	// 現在の目標点が半径R内に入るまではインデックスを進めない
+	float dxNow = shortCutxycie[optimalIndex].x - xycie.x;
+	float dyNow = shortCutxycie[optimalIndex].y - xycie.y;
+	float distNow = approxDistanceShortcut(dxNow, dyNow);
+	if (distNow > SHORTCUT_UPDATE_RADIUS_MM)
+	{
+		if (indexChanged)
+		{
+			// クランプでインデックスが変わった場合のみ目標角を同期
+			setTargetAngle(shortCutxycie[optimalIndex].w);
+		}
+		return;
+	}
+
+	// 更新時は現在位置からLだけ離れた目標点を前方探索して選ぶ
+	uint16_t startIndex = optimalIndex;
+	uint16_t bestIndex = startIndex;
+	float bestError = 1.0e9f;
+	for (uint16_t idx = startIndex; idx <= maxIndex; idx++)
+	{
+		float dx = shortCutxycie[idx].x - xycie.x;
+		float dy = shortCutxycie[idx].y - xycie.y;
+		float dist = approxDistanceShortcut(dx, dy);
+		float err = fabsf(dist - SHORTCUT_LOOKAHEAD_MM);
+		if (err < bestError)
+		{
+			bestError = err;
+			bestIndex = idx;
+		}
+
+		// Lを超えた最初の点で十分近いので探索を打ち切る
+		if (dist >= SHORTCUT_LOOKAHEAD_MM && idx > startIndex)
+		{
+			break;
+		}
+	}
+
+	if (bestIndex != optimalIndex)
+	{
+		optimalIndex = bestIndex;
+		indexChanged = true;
+	}
+
+	// optimalIndex更新後に目標角度を反映する
+	if (indexChanged)
+	{
+		setTargetAngle(shortCutxycie[optimalIndex].w);
+	}
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 setShortCutLookaheadTarget
+// 処理概要     現在座標からSHORTCUT_LOOKAHEAD_MM離れた目標座標を設定して目標角度を更新する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void setShortCutLookaheadTarget(void)
+{
+	if (indexSC <= 0)
+	{
+		return;
+	}
+
+	uint16_t maxIndex = (uint16_t)(indexSC - 1);
+	if (optimalIndex > maxIndex)
+	{
+		optimalIndex = maxIndex;
+	}
+
+	// 現在位置からLだけ離れた目標点を前方探索して選ぶ
+	uint16_t startIndex = optimalIndex;
+	uint16_t bestIndex = startIndex;
+	float bestError = 1.0e9f;
+	for (uint16_t idx = startIndex; idx <= maxIndex; idx++)
+	{
+		float dx = shortCutxycie[idx].x - xycie.x;
+		float dy = shortCutxycie[idx].y - xycie.y;
+		float dist = approxDistanceShortcut(dx, dy);
+		float err = fabsf(dist - SHORTCUT_LOOKAHEAD_MM);
+		if (err < bestError)
+		{
+			bestError = err;
+			bestIndex = idx;
+		}
+
+		// Lを超えた最初の点で十分近いので探索を打ち切る
+		if (dist >= SHORTCUT_LOOKAHEAD_MM && idx > startIndex)
+		{
+			break;
+		}
+	}
+
+	optimalIndex = bestIndex;
+	setTargetAngle(shortCutxycie[optimalIndex].w);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setShortCutTarget

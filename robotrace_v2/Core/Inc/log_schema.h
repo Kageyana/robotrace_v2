@@ -24,22 +24,28 @@
 	STORED(U8, slipFlag, "%d", (uint8_t)getSlipFlag()) \
 	STORED(U8, slipFlagLat, "%d", (uint8_t)getSlipFlagLat()) \
 	STORED(S16, lineTraceCtrl, "%d", (int16_t)lineTraceOmegaFBCtrl.pwm) \
-	STORED(S16, targetAngularvelo, "%d", (int16_t)log_targetAngularVelocity) \
 	STORED(S16, motorpwmL, "%d", (int16_t)veloCtrlL.pwm) \
 	STORED(S16, motorpwmR, "%d", (int16_t)veloCtrlR.pwm) \
 	STORED(F32, acceleVal_X, "%f", BMI088val.accele.x) \
 	STORED(F32, acceleVal_Y, "%f", BMI088val.accele.y) \
-	STORED(F32, slipRatio, "%f", getSlipIndicatorRaw()) \
-	STORED(F32, slipRatioLat, "%f", getSlipIndicatorFiltered()) \
 	STORED(F32, motorCurrentL, "%f", motorCurrentL) \
 	STORED(F32, motorCurrentR, "%f", motorCurrentR) \
-	STORED(U32, encCurrentCorr_p, "%d", (uint32_t)Control_GetEncCurrentCorr_p()) \
-	STORED(U8, straightPendingAttempt, "%d", (uint8_t)straightMarkerPendingLog) \
 	STORED(U8, lineTraceOmegaFBCtrlkp, "%d", (uint8_t)lineTraceOmegaFBCtrl.kp) \
+	STORED(F32, targetAngle, "%f", targetAngle) \
+	STORED(F32, angleVal_z, "%f", BMI088val.angle.z) \
+	STORED(F32, TargetX, "%f", shortCutxycie[optimalIndex].x) \
+	STORED(F32, TargetY, "%f", shortCutxycie[optimalIndex].y) \
+	STORED(F32, CurrentX, "%f", xycie.x) \
+	STORED(F32, CurrentY, "%f", xycie.y) \
 	DERIVED(F32, x, "%f", log_x) \
 	DERIVED(F32, y, "%f", log_y)
 
 
+	// STORED(F32, slipRatio, "%f", getSlipIndicatorRaw()) \
+	// STORED(F32, slipRatioLat, "%f", getSlipIndicatorFiltered()) \
+	// STORED(U32, encCurrentCorr_p, "%d", (uint32_t)Control_GetEncCurrentCorr_p()) \
+	// STORED(U8, straightPendingAttempt, "%d", (uint8_t)straightMarkerPendingLog) \
+	// STORED(S16, targetAngularvelo, "%d", (int16_t)log_targetAngularVelocity) \
 	// STORED(F32, slipDistScaleF, "%f", Control_GetSlipDistScale()) \
 	// STORED(U32, distEncRaw_p, "%d", (uint32_t)Control_GetDistEncRaw_p()) \
 	// STORED(U32, distCorr_p, "%d", (uint32_t)Control_GetDistCorr_p()) \

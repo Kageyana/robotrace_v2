@@ -29,6 +29,8 @@
 #define DPS2RADS(dps)   ((dps) * DEG2RAD)	// deg/s → rad/s
 
 #define SHORTCUTWINDOW 4			// ショートカットコース生成時の移動平均サンプル数
+#define SHORTCUT_UPDATE_RADIUS_MM 	100.0F	// optimalIndex更新判定に使う半径R[mm]
+#define SHORTCUT_LOOKAHEAD_MM 		10.0F	// 更新後に狙う先読み距離L[mm]
 
 #define ROC_STRAIGHT_TH 2800.0F		// 直線とみなす曲率半径の閾値[mm]
 #define ROC_STRAIGHT_MAX 3000.0F		// 直線とみなす曲率半径の閾値[mm]
@@ -127,6 +129,8 @@ int16_t calcXYcies(int logNumber);
 void calcXYcie(int16_t encpulse, float angVelo, float dt);
 void clearXYcie(void);
 void setShortCutTarget(void);
+void setShortCutLookaheadTarget(void);
+void updateShortCutOptimalIndexByRange(void);
 void processMarkerEvent(void);
 void clearMarkerProcessState(void);
 

@@ -625,15 +625,16 @@ void loopSystem(void)
 			if (SGmarker > 0 && DistanceOptimal == 0)
 			{
 				DistanceOptimal = encTotalOptimal;
-				// 初期目標値をセット
-				optimalIndex = 1;
-				setShortCutTarget();
+				// スタート通過時は現在位置からL先の点を初期目標に設定
+				optimalIndex = 0;
+				clearXYcie(); // 座標計算変数初期化
+				setShortCutLookaheadTarget();
 			}
 			boostSpeed = tgtParam.shortCut;
 			// 目標速度に設定
 			setTargetSpeed(boostSpeed);
-			// ライントレース
-			motorPwmOutSynth(0, veloCtrl.pwm, yawCtrl.pwm, distCtrl.pwm);
+			// ショートカット走行では距離PWMは使わない
+			motorPwmOutSynth(0, veloCtrl.pwm, yawCtrl.pwm, 0);
 		}
 
 		// ゴール判定
