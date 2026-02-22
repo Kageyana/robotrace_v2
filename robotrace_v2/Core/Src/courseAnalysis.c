@@ -1,4 +1,4 @@
-//====================================//
+﻿//====================================//
 // インクルード
 //====================================//
 #include "courseAnalysis.h"
@@ -1415,7 +1415,7 @@ retry_open_xy:
 		xe = shortCutxycie[i].x - shortCutxycie[i - 1].x;
 		ye = shortCutxycie[i].y - shortCutxycie[i - 1].y;
 
-		theta = atan2(ye, xe) * RAD2DEG;
+		theta = atan2f(ye, xe) * RAD2DEG;
 		thetae = thetaBefore - theta;
 		if (thetae > 180)
 		{
@@ -1542,6 +1542,44 @@ static float approxDistanceShortcut(float dx, float dy)
 	return maxv + (0.375f * minv);
 }
 /////////////////////////////////////////////////////////////////////
+// モジュール名 normalizeAngleDegShortcut
+// 処理概要     角度[deg]を-180〜180の範囲に正規化する
+// 引数         angle: 正規化対象の角度[deg]
+// 戻り値       正規化後の角度[deg]
+/////////////////////////////////////////////////////////////////////
+static float normalizeAngleDegShortcut(float angle)
+{
+	while (angle > 180.0f)
+	{
+		angle -= 360.0f;
+	}
+	while (angle < -180.0f)
+	{
+		angle += 360.0f;
+	}
+	return angle;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 calcShortcutTargetAngleFromCurrent
+// 処理概要     現在座標(xycie)から目標座標(shortCutxycie[targetIndex])への方位角を目標yaw角として算出する
+// 引数         targetIndex: 目標点インデックス
+// 戻り値       目標yaw角[deg]
+/////////////////////////////////////////////////////////////////////
+static float calcShortcutTargetAngleFromCurrent(uint16_t targetIndex)
+{
+	float dx = shortCutxycie[targetIndex].x - xycie.x;
+	float dy = shortCutxycie[targetIndex].y - xycie.y;
+	float dist2 = (dx * dx) + (dy * dy);
+	if (dist2 < 1.0e-4f)
+	{
+		return shortCutxycie[targetIndex].w;
+	}
+
+	float worldHeading = atan2f(dy, dx) * RAD2DEG;
+	float yawTarget = 90.0f - worldHeading;
+	return normalizeAngleDegShortcut(yawTarget);
+}
+/////////////////////////////////////////////////////////////////////
 // モジュール名 updateShortCutOptimalIndexByRange
 // 処理概要     半径R内に現在目標点が入ったら、距離L先の目標点へoptimalIndexを更新する
 // 引数         なし
@@ -1572,7 +1610,7 @@ void updateShortCutOptimalIndexByRange(void)
 		if (indexChanged)
 		{
 			// クランプでインデックスが変わった場合のみ目標角を同期
-			setTargetAngle(shortCutxycie[optimalIndex].w);
+			setTargetAngle(calcShortcutTargetAngleFromCurrent(optimalIndex));
 		}
 		return;
 	}
@@ -1609,7 +1647,7 @@ void updateShortCutOptimalIndexByRange(void)
 	// optimalIndex更新後に目標角度を反映する
 	if (indexChanged)
 	{
-		setTargetAngle(shortCutxycie[optimalIndex].w);
+		setTargetAngle(calcShortcutTargetAngleFromCurrent(optimalIndex));
 	}
 }
 /////////////////////////////////////////////////////////////////////
@@ -1655,7 +1693,7 @@ void setShortCutLookaheadTarget(void)
 	}
 
 	optimalIndex = bestIndex;
-	setTargetAngle(shortCutxycie[optimalIndex].w);
+	setTargetAngle(calcShortcutTargetAngleFromCurrent(optimalIndex));
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setShortCutTarget
@@ -1666,7 +1704,7 @@ void setShortCutLookaheadTarget(void)
 void setShortCutTarget(void)
 {
 	float xe, ye, dist;
-	setTargetAngle(shortCutxycie[optimalIndex].w);
+	setTargetAngle(calcShortcutTargetAngleFromCurrent(optimalIndex));
 
 	xe = shortCutxycie[optimalIndex].x - xycie.x;
 	ye = shortCutxycie[optimalIndex].y - xycie.y;

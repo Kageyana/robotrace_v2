@@ -467,6 +467,12 @@ void createLog(void)
 	setLogHeaderStrF("distCtrl.kp", distCtrl.kp);
 	setLogHeaderStrF("distCtrl.ki", distCtrl.ki);
 	setLogHeaderStrF("distCtrl.kd", distCtrl.kd);
+
+	setLogHeaderStrF("indexSC", indexSC);
+	setLogHeaderStrF("SHORTCUT_UPDATE_RADIUS_MM", SHORTCUT_UPDATE_RADIUS_MM);
+	setLogHeaderStrF("SHORTCUT_LOOKAHEAD_MM", SHORTCUT_LOOKAHEAD_MM);
+
+
     strncat((char *)columnTitle, "\n", sizeof(columnTitle) - strlen((char *)columnTitle) - 1); // バッファサイズを指定して安全に改行を追加
     strncat((char *)formatLog, "\n", sizeof(formatLog) - strlen((char *)formatLog) - 1);       // バッファサイズを指定して安全に改行を追加
 	total = (UINT)strlen(columnTitle);

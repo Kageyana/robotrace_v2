@@ -18,21 +18,16 @@
 	STORED(F32, gyroVal_Z, "%f", BMI088val.gyro.z) \
 	STORED(U8, courseMarker, "%d", courseMarkerLog) \
 	STORED(U32, encTotalOptimal, "%d", (uint32_t)encTotalOptimal) \
+	STORED(U8, beforeCourseMarker, "%d", (uint8_t)beforeCourseMarker) \
+	STORED(U8, SGmarker, "%d", (uint8_t)SGmarker) \
+	STORED(U32, DistanceOptimal, "%d", (uint32_t)DistanceOptimal) \
 	DERIVED(F32, ROC, "%f", log_roc) \
 	STORED(U8, targetSpeed, "%d", targetSpeed) \
 	STORED(U16, optimalIndex, "%d", (uint16_t)optimalIndex) \
 	STORED(U8, slipFlag, "%d", (uint8_t)getSlipFlag()) \
 	STORED(U8, slipFlagLat, "%d", (uint8_t)getSlipFlagLat()) \
-	STORED(S16, lineTraceCtrl, "%d", (int16_t)lineTraceOmegaFBCtrl.pwm) \
-	STORED(S16, motorpwmL, "%d", (int16_t)veloCtrlL.pwm) \
-	STORED(S16, motorpwmR, "%d", (int16_t)veloCtrlR.pwm) \
-	STORED(F32, acceleVal_X, "%f", BMI088val.accele.x) \
-	STORED(F32, acceleVal_Y, "%f", BMI088val.accele.y) \
-	STORED(F32, motorCurrentL, "%f", motorCurrentL) \
-	STORED(F32, motorCurrentR, "%f", motorCurrentR) \
-	STORED(U8, lineTraceOmegaFBCtrlkp, "%d", (uint8_t)lineTraceOmegaFBCtrl.kp) \
-	STORED(F32, targetAngle, "%f", targetAngle) \
 	STORED(F32, angleVal_z, "%f", BMI088val.angle.z) \
+	STORED(F32, targetAngle, "%f", targetAngle) \
 	STORED(F32, TargetX, "%f", shortCutxycie[optimalIndex].x) \
 	STORED(F32, TargetY, "%f", shortCutxycie[optimalIndex].y) \
 	STORED(F32, CurrentX, "%f", xycie.x) \
@@ -41,6 +36,15 @@
 	DERIVED(F32, y, "%f", log_y)
 
 
+	// STORED(U8, lineTraceOmegaFBCtrlkp, "%d", (uint8_t)lineTraceOmegaFBCtrl.kp) \
+	// STORED(F32, targetAngle, "%f", targetAngle) \
+	// STORED(S16, lineTraceCtrl, "%d", (int16_t)lineTraceOmegaFBCtrl.pwm) \
+	// STORED(S16, motorpwmL, "%d", (int16_t)veloCtrlL.pwm) \
+	// STORED(S16, motorpwmR, "%d", (int16_t)veloCtrlR.pwm) \
+	// STORED(F32, acceleVal_X, "%f", BMI088val.accele.x) \
+	// STORED(F32, acceleVal_Y, "%f", BMI088val.accele.y) \
+	// STORED(F32, motorCurrentL, "%f", motorCurrentL) \
+	// STORED(F32, motorCurrentR, "%f", motorCurrentR) \
 	// STORED(F32, slipRatio, "%f", getSlipIndicatorRaw()) \
 	// STORED(F32, slipRatioLat, "%f", getSlipIndicatorFiltered()) \
 	// STORED(U32, encCurrentCorr_p, "%d", (uint32_t)Control_GetEncCurrentCorr_p()) \

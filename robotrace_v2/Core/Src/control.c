@@ -649,7 +649,7 @@ void loopSystem(void)
 		}
 		else
 		{
-			if (numPPADarry > 0 && optimalIndex >= numPPADarry - 1)
+			if (indexSC > 0 && optimalIndex >= (uint16_t)(indexSC - 1))
 			{
 				goalTime = cntRun;
 				enc1 = 0;
