@@ -11,6 +11,7 @@
 #include "sd_diskio_spi.h"
 #include "sd_functions.h"
 #include "ff.h"
+#include <math.h>
 #include <stdint.h>
 
 static bool sd_remount_for_analysis(void)
@@ -1344,8 +1345,8 @@ retry_open_xy:
 		distEnc += velo * (time - beforeTime);  // エンコーダパルスの積分で距離を更新
 
 		// 速度とyaw角からXY座標の変化量を計算して更新
-		x = x + (velocity * sin(degzR));
-		y = y + (velocity * cos(degzR));
+		x = x + (velocity * sinf(degzR));
+		y = y + (velocity * cosf(degzR));
 
 		// ショートカット点列生成のための移動平均計算用バッファに値を保存
 		xValues[i & (SHORTCUTWINDOW - 1)] = x;
@@ -1510,8 +1511,8 @@ void calcXYcie(int16_t encpulse, float angVelo, float dt)
 	degzR = xydegz * (M_PI / 180.0F);		// [rad]に変換
 	velocity = (float)encpulse / PALSE_MILLIMETER * 1000; // 速度
 
-	xycie.x = xycie.x + (velocity * sin(degzR) * dt);
-	xycie.y = xycie.y + (velocity * cos(degzR) * dt);
+	xycie.x = xycie.x + (velocity * sinf(degzR) * dt);
+	xycie.y = xycie.y + (velocity * cosf(degzR) * dt);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 clearXYcie (cie=Coordinate)
@@ -1711,7 +1712,7 @@ void setShortCutTarget(void)
 
 	dist = sqrt(pow(xe, 2) + pow(ye, 2));
 
-        setTargetDist(dist);
+    setTargetDist(dist);
 }
 /////////////////////////////////////////////////////////////////////
 // ローカル関数 clampMarkerIndex

@@ -30,7 +30,7 @@
 
 #define SHORTCUTWINDOW 4			// ショートカットコース生成時の移動平均サンプル数
 #define SHORTCUT_UPDATE_RADIUS_MM 	40.0F	// optimalIndex更新判定に使う半径R[mm]
-#define SHORTCUT_LOOKAHEAD_MM 		50.0F	// 更新後に狙う先読み距離L[mm]
+#define SHORTCUT_LOOKAHEAD_MM 		150.0F	// 更新後に狙う先読み距離L[mm]
 
 #define ROC_STRAIGHT_TH 2800.0F		// 直線とみなす曲率半径の閾値[mm]
 #define ROC_STRAIGHT_MAX 3000.0F		// 直線とみなす曲率半径の閾値[mm]
