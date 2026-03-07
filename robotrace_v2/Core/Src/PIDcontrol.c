@@ -1,4 +1,4 @@
-//====================================//
+﻿//====================================//
 // インクルード
 //====================================//
 #include "PIDcontrol.h"
@@ -253,7 +253,7 @@ void motorControlTraceOmegaFB(void)
 	}
 	target = ((senR - senL) * encCurrentN) >> 9;
 	log_targetAngularVelocity = target; // ログ用に目標角速度を保存
-	Dev = target - (int32_t)BMI088val.gyro.z;
+	Dev = target - (int32_t)imuVal.gyro.z;
 
 	// I成分積算
 	if(lineTraceOmegaFBCtrl.pwm <= 900 && lineTraceOmegaFBCtrl.pwm >= -900)
@@ -440,7 +440,7 @@ void motorControlYawRate(void)
 	static float targetAngularVelocityBefore;
 	int32_t iRet;
 
-	Dev = (targetAngularVelocity - BMI088val.gyro.z) * 1; // 目標値-現在値
+	Dev = (targetAngularVelocity - imuVal.gyro.z) * 1; // 目標値-現在値
 	// I成分積算
 	yawRateCtrl.Int += Dev * 0.005;
 	// 目標値を変更したらI成分リセット
@@ -477,7 +477,7 @@ void motorControlYaw(void)
 	static float targetAngleBefore;
 	int32_t iRet;
 
-	Dev = (targetAngle - BMI088val.angle.z) * 20; // 目標値-現在値
+	Dev = (targetAngle - imuVal.angle.z) * 20; // 目標値-現在値
 	// I成分積算
 	yawCtrl.Int += Dev * 0.005;
 	// 目標値を変更したらI成分リセット

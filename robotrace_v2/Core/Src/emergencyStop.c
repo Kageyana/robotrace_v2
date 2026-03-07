@@ -1,4 +1,4 @@
-//====================================//
+﻿//====================================//
 // インクルード
 //====================================//
 #include "emergencyStop.h"
@@ -21,7 +21,7 @@ static uint16_t cntOverSpeed = 0;
 bool cntEmcStopAngleX(void)
 {
 	// 緊急停止条件
-	if (fabs(BMI088val.gyro.x) > 2.0f)
+	if (fabs(imuVal.gyro.x) > 2.0f)
 	{
 		cntAngleX++;
 	}
@@ -49,7 +49,7 @@ bool cntEmcStopAngleX(void)
 bool cntEmcStopAngleY(void)
 {
 	// 緊急停止条件
-	if (fabs(BMI088val.gyro.y) > 2.0f)
+	if (fabs(imuVal.gyro.y) > 2.0f)
 	{
 		cntAngleY++;
 	}

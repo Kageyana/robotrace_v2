@@ -257,18 +257,18 @@ static void test_imu_deg(void)
 	if (!calibratIMU)
 	{
 		ssd1306_SetCursor(64, 30);
-		ssd1306_printf(Font_7x10, "xd:%6.1f", BMI088val.angle.x);
+		ssd1306_printf(Font_7x10, "xd:%6.1f", imuVal.angle.x);
 		ssd1306_SetCursor(64, 42);
-		ssd1306_printf(Font_7x10, "yd:%6.1f", BMI088val.angle.y);
+		ssd1306_printf(Font_7x10, "yd:%6.1f", imuVal.angle.y);
 		ssd1306_SetCursor(64, 54);
-		ssd1306_printf(Font_7x10, "zd:%6.1f", BMI088val.angle.z);
+		ssd1306_printf(Font_7x10, "zd:%6.1f", imuVal.angle.z);
 	}
 
 	if (swValTact == SW_PUSH)
 	{
-		BMI088val.angle.x = 0;
-		BMI088val.angle.y = 0;
-		BMI088val.angle.z = 0;
+		imuVal.angle.x = 0;
+		imuVal.angle.y = 0;
+		imuVal.angle.z = 0;
 	}
 
 	if (swValTact == SW_UP)
@@ -301,14 +301,14 @@ static void test_imu_accel(void)
 	}
 
 	ssd1306_SetCursor(0, 30);
-	ssd1306_printf(Font_7x10, "xa:%6.1f", BMI088val.accele.x);
+	ssd1306_printf(Font_7x10, "xa:%6.1f", imuVal.accele.x);
 	ssd1306_SetCursor(0, 42);
-	ssd1306_printf(Font_7x10, "ya:%6.1f", BMI088val.accele.y);
+	ssd1306_printf(Font_7x10, "ya:%6.1f", imuVal.accele.y);
 	ssd1306_SetCursor(0, 54);
-	ssd1306_printf(Font_7x10, "za:%6.1f", BMI088val.accele.z);
+	ssd1306_printf(Font_7x10, "za:%6.1f", imuVal.accele.z);
 
 	ssd1306_SetCursor(64, 30);
-	ssd1306_printf(Font_7x10, "T:%4.1f", BMI088val.temp);
+	ssd1306_printf(Font_7x10, "T:%4.1f", imuVal.temp);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -1330,7 +1330,7 @@ static void setup_start(void)
 		if (setupTimer.cntSetup1 > 1000)
 		{
 			veloCtrl.Int = 0;                // I成分リセット
-			BMI088val.angle.z = 0.0; // 角度リセット
+			imuVal.angle.z = 0.0; // 角度リセット
 			yawRateCtrl.Int = 0.0;   // I成分リセット
 			setTargetSpeed(0);               // 目標速度0[m/s]
 			enc1 = 0;
@@ -1343,7 +1343,7 @@ static void setup_start(void)
 	{
 		setTargetAngularVelocity(CALIBRATIONSPEED);
 		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-		if (BMI088val.angle.z < -340.0)
+		if (imuVal.angle.z < -340.0)
 		{
 			pattern.calibration = 5;
 		}
@@ -1832,9 +1832,9 @@ void setupNonDisp(void)
 		// 開始準備
 		if (setupTimer.cntSetup1 > 1000)
 		{
-			veloCtrl.Int = 0;		 // I成分リセット
-			BMI088val.angle.z = 0.0; // 角度リセット
-			yawRateCtrl.Int = 0.0;	 // I成分リセット
+			veloCtrl.Int = 0;		// I成分リセット
+			imuVal.angle.z = 0.0;	// 角度リセット
+			yawRateCtrl.Int = 0.0;	// I成分リセット
 			setTargetSpeed(0);		 // 目標速度0[m/s]
 			enc1 = 0;
 			modeCalLinesensors = 1; // キャリブレーション開始
@@ -1846,7 +1846,7 @@ void setupNonDisp(void)
 		// 左旋回
 		setTargetAngularVelocity(CALIBRATIONSPEED);
 		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-		if (BMI088val.angle.z < -35.0)
+		if (imuVal.angle.z < -35.0)
 		{
 			pattern.calibration = 4;
 		}
@@ -1866,7 +1866,7 @@ void setupNonDisp(void)
 		// 右旋回
 		setTargetAngularVelocity(-CALIBRATIONSPEED);
 		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-		if (BMI088val.angle.z > 35.0)
+		if (imuVal.angle.z > 35.0)
 		{
 			pattern.calibration = 6;
 		}

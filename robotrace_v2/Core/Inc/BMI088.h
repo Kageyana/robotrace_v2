@@ -4,7 +4,8 @@
 //====================================//
 // インクルード
 //====================================//
-#include "main.h"
+#include <stdbool.h>
+#include <stdint.h>
 //====================================//
 // シンボル定義
 //====================================//
@@ -17,9 +18,6 @@
 #define GYROLSB 16.384F
 #define MAGPLSB 16.0F
 
-#define DEFF_TIME 0.001F
-#define COEFF_DPD -0.996F
-#define COEFF_COMPFILTER 0.96F
 #define IMU_TRANSMIT true
 #define IMU_STOP false
 
@@ -74,20 +72,12 @@ typedef struct
 // グローバル変数の宣言
 //====================================//
 extern volatile IMUval BMI088val;
-extern bool calibratIMU;
 //====================================//
 // プロトタイプ宣言
 //====================================//
-uint8_t BMI088readByte(bool sensorType, uint8_t reg);
-void BMI088writeByte(bool sensorType, uint8_t reg, uint8_t val);
-void BMI088readAxisData(bool sensorType, uint8_t reg, uint8_t *rxData, uint8_t rxNum);
 bool initBMI088(void);
 void BMI088getGyro(void);
 void BMI088getAccele(void);
 void BMI088getTemp(void);
-void calcDegrees(void);
-void calcVelocity(void);
-void clearIMUval(void);
-void calibrationIMU(void);
 
 #endif // BMI088_H_

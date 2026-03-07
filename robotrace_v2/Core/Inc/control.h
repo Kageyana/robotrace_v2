@@ -5,6 +5,7 @@
 //====================================//
 #include "main.h"
 #include "SDcard.h"
+#include "IMU.h"
 #include <stdbool.h>
 #include <stdint.h>
 //====================================//

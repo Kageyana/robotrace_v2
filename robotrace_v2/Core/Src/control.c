@@ -1239,11 +1239,11 @@ static void slipPrimeSpeedHist(SlipDetState *st, float encSpeed)
 	slipFlag = false;
 	slipFlagLat = false;
 
-	float ax0 = BMI088val.accele.y * 9.81f;
-	float ay0 = BMI088val.accele.x * 9.81f;
+	float ax0 = imuVal.accele.y * 9.81f;
+	float ay0 = imuVal.accele.x * 9.81f;
 	st->axBias = ax0;
 	st->ayBias = ay0;
-	float wz0 = BMI088val.gyro.z * DEG2RAD;
+	float wz0 = imuVal.gyro.z * DEG2RAD;
 	st->turningState = (fabsf(wz0) > SLIP_GYRO_ON_RADS);
 
 #if SLIP_CUR_ENABLE
@@ -1306,9 +1306,9 @@ void updateSlipDetection(void)
 
 		st->prevMoving = false;
 
-		float ax = BMI088val.accele.y * 9.81f;
-		float ay = BMI088val.accele.x * 9.81f;
-		float wz = BMI088val.gyro.z * DEG2RAD;
+		float ax = imuVal.accele.y * 9.81f;
+		float ay = imuVal.accele.x * 9.81f;
+		float wz = imuVal.gyro.z * DEG2RAD;
 		float absWz = fabsf(wz);
 		updateTurningHysteresis(st, absWz);
 		// 旋回していない時だけバイアス更新(横Gの影響を受けないようにするため)
@@ -1340,11 +1340,11 @@ void updateSlipDetection(void)
 	}
 
 	// ---- IMU加速度（ボディ座標）----
-	float ax = BMI088val.accele.y * 9.81f;  // 前後
-	float ay = BMI088val.accele.x * 9.81f;  // 左右
+	float ax = imuVal.accele.y * 9.81f;  // 前後
+	float ay = imuVal.accele.x * 9.81f;  // 左右
 
 	// ---- yaw角速度（rad/s）----
-	float wz = BMI088val.gyro.z * DEG2RAD;
+	float wz = imuVal.gyro.z * DEG2RAD;
 
 	float dt = SLIP_SAMPLE_PERIOD_S;
 
@@ -1819,3 +1819,4 @@ void checkCrossLine(void)
 		}
 	}
 }
+

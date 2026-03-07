@@ -1,4 +1,4 @@
-#ifndef LOG_SCHEMA_H_
+﻿#ifndef LOG_SCHEMA_H_
 #define LOG_SCHEMA_H_
 //====================================//
 // インクルード
@@ -15,7 +15,7 @@
 #define LOG_FIELD_LIST(STORED, DERIVED) \
 	STORED(U16, cntlog, "%d", (uint16_t)cntRun) \
 	STORED(U16, encCurrentN, "%d", (uint16_t)encCurrentN) \
-	STORED(F32, gyroVal_Z, "%f", BMI088val.gyro.z) \
+	STORED(F32, gyroVal_Z, "%f", imuVal.gyro.z) \
 	STORED(U8, courseMarker, "%d", courseMarkerLog) \
 	STORED(U32, encTotalOptimal, "%d", (uint32_t)encTotalOptimal) \
 	DERIVED(F32, ROC, "%f", log_roc) \
@@ -27,8 +27,8 @@
 	STORED(S16, targetAngularvelo, "%d", (int16_t)log_targetAngularVelocity) \
 	STORED(S16, motorpwmL, "%d", (int16_t)veloCtrlL.pwm) \
 	STORED(S16, motorpwmR, "%d", (int16_t)veloCtrlR.pwm) \
-	STORED(F32, acceleVal_X, "%f", BMI088val.accele.x) \
-	STORED(F32, acceleVal_Y, "%f", BMI088val.accele.y) \
+	STORED(F32, acceleVal_X, "%f", imuVal.accele.x) \
+	STORED(F32, acceleVal_Y, "%f", imuVal.accele.y) \
 	STORED(F32, slipRatio, "%f", getSlipIndicatorRaw()) \
 	STORED(F32, slipRatioLat, "%f", getSlipIndicatorFiltered()) \
 	STORED(F32, motorCurrentL, "%f", motorCurrentL) \

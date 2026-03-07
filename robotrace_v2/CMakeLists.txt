@@ -47,6 +47,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
 	${CMAKE_SOURCE_DIR}/Core/Src/battery.c
 	${CMAKE_SOURCE_DIR}/Core/Src/BMI088.c
+	${CMAKE_SOURCE_DIR}/Core/Src/IMU.c
 	${CMAKE_SOURCE_DIR}/Core/Src/control.c
 	${CMAKE_SOURCE_DIR}/Core/Src/courseAnalysis.c
 	${CMAKE_SOURCE_DIR}/Core/Src/DWT.c

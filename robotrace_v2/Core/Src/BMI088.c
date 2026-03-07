@@ -1,29 +1,19 @@
 //====================================//
 // インクルード
 //====================================//
+#include "main.h"
 #include "BMI088.h"
-#include <math.h> // 加速度補正の計算で使用
 //====================================//
 // グローバル変数の宣
 //====================================//
-axis accele = {0.0F, 0.0F, 0.0F};
-axis velo = {0.0F, 0.0F, 0.0F};
-axis gyro = {0.0F, 0.0F, 0.0F};
-axis angle = {0.0F, 0.0F, 0.0F};
 volatile IMUval BMI088val;
-
-int16_t angleOffset[3] = {0, 0, 0};
-#ifdef USE_ACCELE
-int16_t acceleOffset[3] = {0, 0, 0};
-#endif
-bool calibratIMU = false;
 /////////////////////////////////////////////////////////////////////
 // モジュール名 BMI088ReadByteG
 // 処理概要     指定レジスタの値を読み出す(ジャイロセンサ部)
 // 引数         reg: レジスタのアドレス
 // 戻り値       読み出した値
 ////////////////////////////////////////////////////////////////////
-uint8_t BMI088readByte(bool sensorType, uint8_t reg)
+static uint8_t BMI088readByte(bool sensorType, uint8_t reg)
 {
 	uint8_t txData[2]={reg | 0x80, 0x0}, rxData[2] = {0x0};
 
@@ -51,7 +41,7 @@ uint8_t BMI088readByte(bool sensorType, uint8_t reg)
 // 引数         reg: レジスタのアドレス val: 書き込む値
 // 戻り値       なし
 ////////////////////////////////////////////////////////////////////
-void BMI088writeByte(bool sensorType, uint8_t reg, uint8_t val)
+static void BMI088writeByte(bool sensorType, uint8_t reg, uint8_t val)
 {
 	uint8_t txData[2] = {reg, val}, rxData[2];
 
@@ -77,7 +67,7 @@ void BMI088writeByte(bool sensorType, uint8_t reg, uint8_t val)
 // 引数         reg:レジスタアドレス
 // 戻り値       読み出したデータ
 /////////////////////////////////////////////////////////////////////
-void BMI088readAxisData(bool sensorType, uint8_t reg, uint8_t *rxData, uint8_t rxNum)
+static void BMI088readAxisData(bool sensorType, uint8_t reg, uint8_t *rxData, uint8_t rxNum)
 {
 	uint8_t txData[20] = {0}, rxDatabuff[20];
 
@@ -158,13 +148,13 @@ void BMI088getGyro(void)
 	// 角速度の生データを取得
 	BMI088readAxisData(GYRO, REG_RATE_X_LSB, rawData, 6); // x,y,z軸の生データを取得
 	// LSBとMSBを結合
-	gyroVal[0] = ((rawData[1] << 8) | rawData[0]) - angleOffset[0]; // x軸角速度
-	gyroVal[1] = ((rawData[3] << 8) | rawData[2]) - angleOffset[1]; // y軸角速度
-	gyroVal[2] = ((rawData[5] << 8) | rawData[4]) - angleOffset[2]; // z軸角速度
+	gyroVal[0] = ((rawData[1] << 8) | rawData[0]); // x軸角速度
+	gyroVal[1] = ((rawData[3] << 8) | rawData[2]); // y軸角速度
+	gyroVal[2] = ((rawData[5] << 8) | rawData[4]); // z軸角速度
 
-	BMI088val.gyro.x = (float)gyroVal[0] / GYROLSB * COEFF_DPD; // x軸角速度[deg/s]
-	BMI088val.gyro.y = (float)gyroVal[1] / GYROLSB * COEFF_DPD; // y軸角速度[deg/s]
-	BMI088val.gyro.z = (float)gyroVal[2] / GYROLSB * COEFF_DPD; // z軸角速度[deg/s]
+	BMI088val.gyro.x = (float)gyroVal[0] / GYROLSB; // x軸角速度[deg/s]
+	BMI088val.gyro.y = (float)gyroVal[1] / GYROLSB; // y軸角速度[deg/s]
+	BMI088val.gyro.z = (float)gyroVal[2] / GYROLSB; // z軸角速度[deg/s]
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 BMI088getAccele
@@ -186,9 +176,9 @@ void BMI088getAccele(void)
 	BMI088readAxisData(ACCELE, REG_ACC_X_LSB, rawData, 7);
 	// LSBとMSBを結合
 	// 最初のデータは破棄する
-	accelVal[0] = ((rawData[2] << 8) | rawData[1]) - acceleOffset[0];
-	accelVal[1] = ((rawData[4] << 8) | rawData[3]) - acceleOffset[1];
-	accelVal[2] = ((rawData[6] << 8) | rawData[5]) - acceleOffset[2];
+	accelVal[0] = ((rawData[2] << 8) | rawData[1]);
+	accelVal[1] = ((rawData[4] << 8) | rawData[3]);
+	accelVal[2] = ((rawData[6] << 8) | rawData[5]);
 
 	BMI088val.accele.x = (float)accelVal[0] / ACCELELSB; // x軸加速度[g]
 	BMI088val.accele.y = (float)accelVal[1] / ACCELELSB * -1; // y軸加速度[g]
@@ -225,157 +215,4 @@ void BMI088getTemp(void)
 	}
 
 	BMI088val.temp = ((float)tempVal * 0.125F) + 23.0F;
-}
-/////////////////////////////////////////////////////////////////////
-// モジュール名 calcDegrees
-// 処理概要     角度の計算（加速度とジャイロの融合）
-// 引数         なし
-// 戻り値       なし
-/////////////////////////////////////////////////////////////////////
-void calcDegrees(void)
-{
-	if(!BMI088val.Initialized)
-	{
-		return;
-	}
-	// ジャイロ積分による角度更新 度数法 
-#ifdef USE_ACCELE
-    // 加速度からのピッチ・ロール角算出 度数法
-    volatile float pitchAccele = atan2f(BMI088val.accele.y, BMI088val.accele.z) * 180.0f / M_PI;
-    volatile float rollAccele = atan2f(BMI088val.accele.x,sqrtf(BMI088val.accele.y * BMI088val.accele.y +BMI088val.accele.z * BMI088val.accele.z)) * 180.0f / M_PI;
-
-    // 相補フィルタでドリフト補正
-    BMI088val.angle.x = COEFF_COMPFILTER * BMI088val.angle.x + (1.0f - COEFF_COMPFILTER) * pitchAccele;
-    BMI088val.angle.y = COEFF_COMPFILTER * BMI088val.angle.y + (1.0f - COEFF_COMPFILTER) * rollAccele;
-#else
-	BMI088val.angle.x += BMI088val.gyro.x * DEFF_TIME;  // pitch
-    BMI088val.angle.y += BMI088val.gyro.y * DEFF_TIME;  // roll
-#endif
-    // Z軸（ヨー角）は加速度では補正できないのでそのまま
-	BMI088val.angle.z += BMI088val.gyro.z * DEFF_TIME;  // yaw（補正しない）
-}
-/////////////////////////////////////////////////////////////////////
-// モジュール名 calcVelocity
-// 処理概要     速度の計算
-// 引数         なし
-// 戻り値       なし
-/////////////////////////////////////////////////////////////////////
-void calcVelocity(void)
-{
-#ifdef USE_ACCELE
-	if(!BMI088val.Initialized)
-	{
-		return;
-	}
-
-	BMI088val.velo.x += BMI088val.accele.x * 9.81f * DEFF_TIME; // x軸加速度[m/s²]から速度[m/s]を計算
-	BMI088val.velo.y += BMI088val.accele.y * 9.81f * DEFF_TIME; // y軸加速度[m/s²]から速度[m/s]を計算
-	BMI088val.velo.z += BMI088val.accele.z * 9.81f * DEFF_TIME; // z軸加速度[m/s²]から速度[m/s]を計算
-#endif
-}
-/////////////////////////////////////////////////////////////////////
-// モジュール名 clearIMUval
-// 処理概要     IMU値の初期化
-// 引数         なし
-// 戻り値       なし
-/////////////////////////////////////////////////////////////////////
-void clearIMUval(void)
-{
-	BMI088val.accele.x = 0.0F;
-	BMI088val.accele.y = 0.0F;
-	BMI088val.accele.z = 0.0F;
-
-	BMI088val.velo.x = 0.0F;
-	BMI088val.velo.y = 0.0F;
-	BMI088val.velo.z = 0.0F;
-
-	BMI088val.gyro.x = 0.0F;
-	BMI088val.gyro.y = 0.0F;
-	BMI088val.gyro.z = 0.0F;
-
-	BMI088val.angle.x = 0.0F;
-	BMI088val.angle.y = 0.0F;
-	BMI088val.angle.z = 0.0F;
-}
-/////////////////////////////////////////////////////////////////////
-// モジュール名 cariblationIMU
-// 処理概要     角速度,加速度キャリブレーション
-// 引数         なし
-// 戻り値       なし
-/////////////////////////////////////////////////////////////////////
-void calibrationIMU(void)
-{
-	static uint16_t i = 0;
-	static int32_t angleInt[3];
-	uint8_t rawData[6];
-	int16_t gyroVal[3];
-#ifdef USE_ACCELE
-	static int32_t acceleInt[3];
-	uint8_t rawAccele[8];
-	int16_t accelVal[3];
-#endif
-
-	if (i < (uint32_t)(1.0 / DEFF_TIME))
-	{
-		// 角速度の生データを取得
-		BMI088readAxisData(GYRO, REG_RATE_X_LSB, rawData, 6);
-		// LSBとMSBを結合
-		gyroVal[0] = (rawData[1] << 8) | rawData[0];
-		gyroVal[1] = (rawData[3] << 8) | rawData[2];
-		gyroVal[2] = (rawData[5] << 8) | rawData[4];
-
-		angleInt[0] += gyroVal[0];
-		angleInt[1] += gyroVal[1];
-		angleInt[2] += gyroVal[2];
-#ifdef USE_ACCELE
-		// 加速度の生データを取得
-		BMI088readAxisData(ACCELE, REG_ACC_X_LSB, rawAccele, 7);
-		// LSBとMSBを結合（最初のデータは破棄）
-		accelVal[0] = (rawAccele[2] << 8) | rawAccele[1];
-		accelVal[1] = (rawAccele[4] << 8) | rawAccele[3];
-		accelVal[2] = (rawAccele[6] << 8) | rawAccele[5];
-
-		acceleInt[0] += accelVal[0];
-		acceleInt[1] += accelVal[1];
-		acceleInt[2] += accelVal[2];
-#endif
-		i++;
-	}
-	else
-	{
-		angleOffset[0] = angleInt[0] / i;
-		angleOffset[1] = angleInt[1] / i;
-		angleOffset[2] = angleInt[2] / i;
-		angleInt[0] = 0;
-		angleInt[1] = 0;
-		angleInt[2] = 0;
-#ifdef USE_ACCELE
-		// 加速度オフセットの平均値を算出（重力成分を保持したままバイアスのみ補正）
-		float acceleAvgX = (float)acceleInt[0] / i;
-		float acceleAvgY = (float)acceleInt[1] / i;
-		float acceleAvgZ = (float)acceleInt[2] / i;
-		float gravityScale = sqrtf((acceleAvgX * acceleAvgX) + (acceleAvgY * acceleAvgY) + (acceleAvgZ * acceleAvgZ));
-		float gravityCompX = 0.0f;
-		float gravityCompY = 0.0f;
-		float gravityCompZ = 0.0f;
-
-		// 計測方向に1g分の重力を復元することで、角度計算用の基準ベクトルを確保
-		if (gravityScale > 0.0f)
-		{
-			float normCoef = ACCELELSB / gravityScale;
-			gravityCompX = acceleAvgX * normCoef;
-			gravityCompY = acceleAvgY * normCoef;
-			gravityCompZ = acceleAvgZ * normCoef;
-		}
-
-		acceleOffset[0] = (int16_t)(acceleAvgX - gravityCompX);
-		acceleOffset[1] = (int16_t)(acceleAvgY - gravityCompY);
-		acceleOffset[2] = (int16_t)(acceleAvgZ - gravityCompZ);
-		acceleInt[0] = 0;
-		acceleInt[1] = 0;
-		acceleInt[2] = 0;
-#endif
-		i = 0;
-		calibratIMU = false;
-	}
 }

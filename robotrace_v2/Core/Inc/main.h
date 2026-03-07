@@ -43,6 +43,7 @@ extern "C" {
 #include "timer.h"
 #include "WS2812C.h"
 #include "BMI088.h"
+#include "IMU.h"
 #include "ssd1306.h"
 #include "ssd1306_fonts.h"
 #include "switch.h"
