@@ -24,10 +24,6 @@
 
 #define SEARCHRANGE 150				// 距離補正時の距離検索範囲[mm]
 
-#define DEG2RAD M_PI / 180.0F		// deg→rad
-#define RAD2DEG 180.0F / M_PI		// rad→deg
-#define DPS2RADS(dps)   ((dps) * DEG2RAD)	// deg/s → rad/s
-
 #define SHORTCUTWINDOW 4			// ショートカットコース生成時の移動平均サンプル数
 
 #define ROC_STRAIGHT_TH 2800.0F		// 直線とみなす曲率半径の閾値[mm]

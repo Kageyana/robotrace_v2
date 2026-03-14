@@ -6,16 +6,80 @@
 //====================================//
 // グローバル変数の定義
 //====================================//
-bool calibratIMU = false;
-volatile IMUval imuVal = {0};
-float angleOffset[3] = {0.0F, 0.0F, 0.0F};
+bool calibratIMU = false;		// IMUキャリブレーション中フラグ
+volatile IMUval imuVal = {0};	// IMUの実行時変数（加速度、角速度、角度などを保持）
+float angleOffset[3] = {0.0F, 0.0F, 0.0F};	// ジャイロオフセット[deg/s]（calibrationIMU()で算出される）
 #ifdef USE_ACCELE
-float acceleOffset[3] = {0.0F, 0.0F, 0.0F};
+float acceleOffset[3] = {0.0F, 0.0F, 0.0F};	// 加速度オフセット[g]（calibrationIMU()で算出される）
+#ifdef USE_IMU_ROT_CENTER_CORRECTION
+static float prevGyroZRad = 0.0F;		// 角加速度算出用の前回ジャイロz値[rad/s]
+static float alphaZFiltered = 0.0F;		// 角加速度のLPF後値[rad/s^2]
+static bool gyroZInitialized = false;	// ジャイロzの初期化フラグ
+#endif
 #endif
 
 //====================================//
 // ローカル関数
 //====================================//
+#ifdef USE_ACCELE
+#ifdef USE_IMU_ROT_CENTER_CORRECTION
+static void applyRotCenterCorrectionIMU(void);
+#endif
+#endif
+/////////////////////////////////////////////////////////////////////
+// モジュール名 applyRotCenterCorrectionIMU
+// 処理概要     旋回中心ずれによる加速度成分を2D(yaw軸まわり)で補正する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+#ifdef USE_ACCELE
+#ifdef USE_IMU_ROT_CENTER_CORRECTION
+static void applyRotCenterCorrectionIMU(void)
+{
+	// IMUが旋回中心からずれていると、加速度には接線加速度項 α×r と向心加速度項 ω×(ω×r) が混ざる
+	// この関数ではヨー軸まわりの2D近似でx/yのみ補正する
+	// 補正オフセットはrawセンサ軸ではなく、applyOffsetIMU()後のimuVal座標系基準で与える
+	// ジャイロz[deg/s]を[rad/s]へ変換する
+	float omegaZ = imuVal.gyro.z * DEG2RAD;
+	// 角加速度[rad/s^2]（初回は0扱い）
+	float alphaZ = 0.0F;
+	// 旋回中心ずれにより加算する補正加速度[m/s^2]
+	float corrX_mps2 = 0.0F;
+	float corrY_mps2 = 0.0F;
+
+	if(gyroZInitialized)
+	{
+		// 差分から角加速度を算出する
+		alphaZ = (omegaZ - prevGyroZRad) / DEFF_TIME;
+	}
+	else
+	{
+		// 初回は差分が取れないため次回以降用の初期化のみ行う
+		gyroZInitialized = true;
+	}
+
+	// 角加速度ノイズ低減のため1次LPFを適用する
+	alphaZFiltered = IMU_ALPHA_LPF_COEF * alphaZFiltered + (1.0F - IMU_ALPHA_LPF_COEF) * alphaZ;
+
+	// 接線加速度項(α×r)と向心加速度項(ω×(ω×r))を2Dで合成する
+	corrX_mps2 = alphaZFiltered * IMU_OFFSET_Y_M + omegaZ * omegaZ * IMU_OFFSET_X_M;
+	corrY_mps2 = -alphaZFiltered * IMU_OFFSET_X_M + omegaZ * omegaZ * IMU_OFFSET_Y_M;
+
+	// [m/s^2]から[g]へ戻してimuValの加速度x/yへ反映する（zは補正しない）
+	imuVal.accele.x += corrX_mps2 / GRAVITY_MPS2;
+	imuVal.accele.y += corrY_mps2 / GRAVITY_MPS2;
+
+	// 次回の角加速度算出用に現在値を保持する
+	prevGyroZRad = omegaZ;
+}
+#endif
+#endif
+/////////////////////////////////////////////////////////////////////
+// モジュール名 applyOffsetIMU
+// 処理概要     BMI088の出力値にオフセット補正を適用し、imuValを更新する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
 static void applyOffsetIMU(void)
 {
 	imuVal.Aid = BMI088val.Aid;
@@ -33,6 +97,9 @@ static void applyOffsetIMU(void)
 	imuVal.accele.x = BMI088val.accele.x - acceleOffset[0];
 	imuVal.accele.y = BMI088val.accele.y - acceleOffset[1];
 	imuVal.accele.z = BMI088val.accele.z - acceleOffset[2];
+#ifdef USE_IMU_ROT_CENTER_CORRECTION
+	applyRotCenterCorrectionIMU();
+#endif
 #else
 	imuVal.accele = BMI088val.accele;
 #endif
@@ -84,6 +151,7 @@ void calcVelocity(void)
 		return;
 	}
 
+	// この実装は、calcDegrees()内でapplyOffsetIMU()を実行後のimuValを積分する前提
 	imuVal.velo.x += imuVal.accele.x * 9.81f * DEFF_TIME;
 	imuVal.velo.y += imuVal.accele.y * 9.81f * DEFF_TIME;
 	imuVal.velo.z += imuVal.accele.z * 9.81f * DEFF_TIME;
@@ -112,6 +180,14 @@ void clearIMUval(void)
 	imuVal.angle.x = 0.0F;
 	imuVal.angle.y = 0.0F;
 	imuVal.angle.z = 0.0F;
+
+#ifdef USE_ACCELE
+#ifdef USE_IMU_ROT_CENTER_CORRECTION
+	prevGyroZRad = 0.0F;
+	alphaZFiltered = 0.0F;
+	gyroZInitialized = false;
+#endif
+#endif
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 calibrationIMU
