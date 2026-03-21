@@ -431,6 +431,7 @@ void createLog(void)
 	logBuildColumns();
 	// 制御パラメータ
 	setLogHeaderStrF("batteryVoltage_V", batteryVoltage_V);
+	setLogHeaderStrF("optimalTrace", optimalTrace);
 
 	setLogHeaderStrF("tgtParam.bstStraight", tgtParam.bstStraight);
 	setLogHeaderStrF("tgtParam.bst1500", tgtParam.bst1500);

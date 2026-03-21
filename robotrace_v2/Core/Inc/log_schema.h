@@ -37,7 +37,14 @@
 	STORED(U8, straightPendingAttempt, "%d", (uint8_t)straightMarkerPendingLog) \
 	STORED(U8, lineTraceOmegaFBCtrlkp, "%d", (uint8_t)lineTraceOmegaFBCtrl.kp) \
 	DERIVED(F32, x, "%f", log_x) \
-	DERIVED(F32, y, "%f", log_y)
+	DERIVED(F32, y, "%f", log_y) \
+	STORED(U8, slipLatEnabled, "%d", (uint8_t)getSlipLatEnabled()) \
+	STORED(U8, slipLatOnCountEnabled, "%d", (uint8_t)getSlipLatOnCountEnabled()) \
+	STORED(U16, slipISumOkCount, "%d", getSlipISumOkCount()) \
+	STORED(F32, slipPwmSumF, "%f", getSlipPwmSumF()) \
+	STORED(F32, slipISumF, "%f", getSlipISumF()) \
+	STORED(F32, slipEncAyF, "%f", getSlipEncAyF()) \
+	STORED(F32, slipImuAyF, "%f", getSlipImuAyF())
 
 
 	// STORED(F32, slipDistScaleF, "%f", Control_GetSlipDistScale()) \

@@ -69,6 +69,8 @@ static uint16_t slipLowCountLat = 0;					// 横スリップ解除判定用の連
 static uint16_t slipISumOkCount = 0;					// Lat ON用の瞬時電流連続カウンタ
 static bool slipFlag = false;							// 縦スリップ判定フラグ
 static bool slipFlagLat = false;						// 横スリップ判定フラグ
+static bool slipLatEnabledLog = false;					// 横滑り判定の有効条件
+static bool slipLatOnCountEnabledLog = false;			// 横滑りONカウント許可条件
 // スリップ距離補正用の状態
 static float slipDistScaleRaw = 1.0f;					// 距離補正スケール（生）
 static float slipDistScaleF = 1.0f;						// 距離補正スケール（LPF後）
@@ -1143,6 +1145,8 @@ static void slipResetAll(SlipDetState *st)
 	slipISumOkCount = 0;
 	slipFlag = false;
 	slipFlagLat = false;
+	slipLatEnabledLog = false;
+	slipLatOnCountEnabledLog = false;
 	st->slipPrimed = false;
 	st->turningState = false;
 #if SLIP_CUR_ENABLE
@@ -1326,6 +1330,8 @@ void updateSlipDetection(void)
 		slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF_LAT);
 		// 低速スキップ領域では距離補正スケールを1.0へ寄せる
 		slipDistScaleRaw = 1.0f;
+		slipLatEnabledLog = false;
+		slipLatOnCountEnabledLog = false;
 		return;
 	}
 	st->prevMoving = true;
@@ -1336,6 +1342,8 @@ void updateSlipDetection(void)
 		slipPrimeSpeedHist(st, encSpeed);
 		// 初回は距離補正スケールを1.0で積算
 		slipDistScaleRaw = 1.0f;
+		slipLatEnabledLog = false;
+		slipLatOnCountEnabledLog = false;
 		return; // 初回は判定しない
 	}
 
@@ -1446,8 +1454,8 @@ void updateSlipDetection(void)
 			&& (st->pwmSumF < SLIP_PWM_COAST_MAX)
 			&& (st->iSumF < SLIP_ISUM_COAST_MAX);
 #endif
-	// LatのON判定は瞬時電流が連続で閾値以上の時だけ許可する
-	bool iSumOk = (iSum > SLIP_ISUM_LAT_COUNT_MIN);
+	// LatのON判定はLPF後電流が連続で閾値以上の時だけ許可する
+	bool iSumOk = (st->iSumF > SLIP_ISUM_LAT_COUNT_MIN);
 	if (!latEnabled || latCoastHardClear) {
 		slipISumOkCount = 0;
 	} else if (iSumOk) {
@@ -1461,6 +1469,8 @@ void updateSlipDetection(void)
 	latOnCountEnabled = latEnabled
 			&& (pwmSum > SLIP_PWM_LAT_COUNT_MIN)
 			&& (slipISumOkCount >= SLIP_ISUM_LAT_COUNT_N);
+	slipLatEnabledLog = latEnabled;
+	slipLatOnCountEnabledLog = latOnCountEnabled;
 
 	// 低加速度では見ない（縦/横の誤検出抑制）
 	if (accMag < 0.8f) {
@@ -1602,6 +1612,42 @@ bool getSlipFlag(void)
 bool getSlipFlagLat(void)
 {
 	return slipFlagLat;
+}
+bool getSlipLatEnabled(void)
+{
+	return slipLatEnabledLog;
+}
+bool getSlipLatOnCountEnabled(void)
+{
+	return slipLatOnCountEnabledLog;
+}
+uint16_t getSlipISumOkCount(void)
+{
+	return slipISumOkCount;
+}
+float getSlipPwmSumF(void)
+{
+#if SLIP_CUR_ENABLE
+	return slipDetState.pwmSumF;
+#else
+	return 0.0f;
+#endif
+}
+float getSlipISumF(void)
+{
+#if SLIP_CUR_ENABLE
+	return slipDetState.iSumF;
+#else
+	return 0.0f;
+#endif
+}
+float getSlipEncAyF(void)
+{
+	return slipDetState.encAyF;
+}
+float getSlipImuAyF(void)
+{
+	return slipDetState.imuAyF;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 Control_ApplyMarkerCorrection_p
