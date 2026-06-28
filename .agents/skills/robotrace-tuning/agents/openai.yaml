@@ -1,0 +1,4 @@
+interface:
+  display_name: "Robotrace Tuning"
+  short_description: "Tune robotrace control parameters"
+  default_prompt: "Use $robotrace-tuning to tune robotrace_v2 control parameters."

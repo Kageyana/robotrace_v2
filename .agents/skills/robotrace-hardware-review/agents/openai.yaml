@@ -1,0 +1,4 @@
+interface:
+  display_name: "Robotrace Hardware Review"
+  short_description: "Review robotrace machine and circuit changes"
+  default_prompt: "Use $robotrace-hardware-review to review robotrace_v2 hardware changes."

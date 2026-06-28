@@ -1,0 +1,4 @@
+interface:
+  display_name: "Robotrace SD Settings"
+  short_description: "Review robotrace SD card setting files"
+  default_prompt: "Use $robotrace-sd-settings to review robotrace_v2 SD card setting files."

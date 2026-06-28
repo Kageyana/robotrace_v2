@@ -1,0 +1,4 @@
+interface:
+  display_name: "Robotrace Flash Debug"
+  short_description: "Flash and debug STM32 robotrace firmware"
+  default_prompt: "Use $robotrace-flash-debug to flash or debug robotrace_v2 firmware."

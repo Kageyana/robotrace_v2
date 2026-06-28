@@ -1,0 +1,4 @@
+interface:
+  display_name: "Robotrace Log Analysis"
+  short_description: "Analyze and compare robotrace run logs"
+  default_prompt: "Use $robotrace-log-analysis to analyze robotrace_v2 run logs."
