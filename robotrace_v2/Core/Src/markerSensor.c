@@ -10,7 +10,7 @@
 //====================================//
 uint8_t markerSensor = 0;
 uint8_t SGmarker = 0;
-static int32_t encMarkerL = PALSE_METER/10, encMarkerR = (PALSE_METER/10) + 1;
+static int32_t encMarkerL = PULSE_METER/10, encMarkerR = (PULSE_METER/10) + 1;
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getMarksensor
 // 処理概要     マーカーセンサの値を取得
@@ -59,8 +59,8 @@ void initMarkerSensor(void)
 {
     markerSensor = 0;
     SGmarker = 0;
-    encMarkerL = PALSE_METER/10;
-    encMarkerR = (PALSE_METER/10) + 1;
+    encMarkerL = PULSE_METER/10;
+    encMarkerR = (PULSE_METER/10) + 1;
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 checkMarker

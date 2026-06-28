@@ -8,8 +8,8 @@
 //====================================//
 // シンボル定義
 //====================================//
-#define PALSE_METER 53424		 // 1m走行時のカウント
-#define PALSE_MILLIMETER 54.324F // 1mmのカウント↑を1/1000
+#define PULSE_METER 53424		 // 1m走行時のカウント
+#define PULSE_MILLIMETER 54.324F // 1mmのカウント↑を1/1000
 
 #define ENC_TIM_HANDLER_R htim8
 #define ENC_TIM_HANDLER_L htim4

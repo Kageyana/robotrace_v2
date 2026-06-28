@@ -204,13 +204,13 @@ static void test_motor(void)
 
 	// Left
 	ssd1306_SetCursor(0, 42);
-	ssd1306_printf(Font_6x8, "enc:%5.0f", encTotalL / PALSE_MILLIMETER); // Encoder
+	ssd1306_printf(Font_6x8, "enc:%5.0f", encTotalL / PULSE_MILLIMETER); // Encoder
 	ssd1306_SetCursor(0, 52);
 	ssd1306_printf(Font_6x8, "Cur:%5.2f", motorCurrentL); // Current
 
 	// // Right
 	ssd1306_SetCursor(70, 42);
-	ssd1306_printf(Font_6x8, "enc:%5.0f", encTotalR / PALSE_MILLIMETER); // Encoder
+	ssd1306_printf(Font_6x8, "enc:%5.0f", encTotalR / PULSE_MILLIMETER); // Encoder
 	ssd1306_SetCursor(70, 52);
 	// ssd1306_printf(Font_6x8, "Cur:%f", motorCurrentR); // Current
 	ssd1306_printf(Font_6x8, "Cur:%5.2f", motorCurrentR); // Current
@@ -1902,7 +1902,7 @@ void setupNonDisp(void)
 			if (mode == START_OPTIMAL)
 			{
 				// 距離基準解析
-				numPPADarry = readLogDistance(analizedNumber);
+				numPPADarry = readLogDistance(analyzedNumber);
 				if (numPPADarry > 0)
 				{
 					optimalTrace = BOOST_DISTANCE;

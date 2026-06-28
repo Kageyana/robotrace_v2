@@ -28,7 +28,7 @@ int16_t indexSC;
 int16_t pathedMarker = 0;
 float boostSpeed;
 int32_t DistanceOptimal = 0; // 2谺｡襍ｰ陦檎畑襍ｰ陦瑚ｷ晞屬螟画焚
-int16_t analizedNumber = 0;	 // 蜑榊屓隗｣譫舌＠縺溘Ο繧ｰ逡ｪ蜿ｷ
+int16_t analyzedNumber = 0;	 // 蜑榊屓隗｣譫舌＠縺溘Ο繧ｰ逡ｪ蜿ｷ
 int32_t encTotalOptimal = 0; // 2谺｡襍ｰ陦檎畑縺ｮ霍晞屬螟画焚(霍晞屬陬懈ｭ｣繧偵☆繧・
 int32_t encPID = 0;			 // 霍晞屬蛻ｶ蠕｡逕ｨ縺ｮ霍晞屬螟画焚
 float xydegz = 0;
@@ -91,9 +91,9 @@ void saveLogNumber(int16_t fileNumber)
 {
 	FRESULT fresult;
 	FIL fil;
-	char fileName[20] = PATH_SETTING;
+	char fileName[32] = PATH_SETTING;
 
-	strcat(fileName, FILENAME_ANALIZENUMBER);					 // 繝輔ぃ繧､繝ｫ蜷崎ｿｽ蜉
+	strcat(fileName, FILENAME_ANALYSIS_NUMBER);					 // 繝輔ぃ繧､繝ｫ蜷崎ｿｽ蜉
 	strcat(fileName, ".txt");									 // 諡｡蠑ｵ蟄占ｿｽ蜉
 	fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_WRITE); // create file
 	if (fresult == FR_OK)
@@ -113,23 +113,23 @@ void getLogNumber(void)
 	FRESULT fresult;
 	FIL fil;
 	TCHAR log[20];
-	char fileName[20] = PATH_SETTING;
+	char fileName[32] = PATH_SETTING;
 
-	strcat(fileName, FILENAME_ANALIZENUMBER);					// 繝輔ぃ繧､繝ｫ蜷崎ｿｽ蜉
+	strcat(fileName, FILENAME_ANALYSIS_NUMBER);					// 繝輔ぃ繧､繝ｫ蜷崎ｿｽ蜉
 	strcat(fileName, ".txt");									// 諡｡蠑ｵ蟄占ｿｽ蜉
 	fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_READ); // csv繝輔ぃ繧､繝ｫ繧帝幕縺・
 	if (fresult == FR_OK)
 	{
 		// 隗｣譫先ｸ医∩縺ｮ繝ｭ繧ｰ逡ｪ蜿ｷ繧貞叙蠕・
 		f_gets(log, (int)(sizeof(log) / sizeof(log[0])), &fil);
-		sscanf(log, "%05d", &analizedNumber);	
+		sscanf(log, "%5hd", &analyzedNumber);
 		f_close(&fil);
 	}
 
 	for (int16_t i = 0; i <= endFileIndex; i++)
 	{
 		// 隗｣譫先ｸ医∩縺ｮ繝ｭ繧ｰ逡ｪ蜿ｷ縺ｫ荳閾ｴ縺吶ｋ繧､繝ｳ繝・ャ繧ｯ繧ｹ繧剃ｿ晏ｭ・
-		if (analizedNumber == fileNumbers[i])
+		if (analyzedNumber == fileNumbers[i])
 		{
 			fileIndexLog = i;
 			break;
@@ -597,7 +597,7 @@ cleanup_read:
 	{
 		// 豁｣蟶ｸ邨ゆｺ・凾縺ｮ縺ｿ隗｣譫先ｸ医∩諠・ｱ繧呈峩譁ｰ
 		saveLogNumber(logNumber);
-		analizedNumber = logNumber;
+		analyzedNumber = logNumber;
 
 		// 2谺｡襍ｰ陦後ヵ繝ｩ繧ｰ 霍晞屬蝓ｺ貅・谺｡襍ｰ陦・
 		optimalTrace = BOOST_DISTANCE;
@@ -718,7 +718,7 @@ static void logReadSlipIoError(int logNumber, UINT lineNo, FIL *fil, const char 
 /////////////////////////////////////////////////////////////////////
 int16_t readLogDistanceSlip(int logNumber)
 {
-	int16_t baseLogNumber = analizedNumber;
+	int16_t baseLogNumber = analyzedNumber;
 	if (baseLogNumber <= 0)
 	{
 		baseLogNumber = logNumber; // 霑ｽ蜉: 1襍ｰ逶ｮ繝ｭ繧ｰ縺檎┌縺代ｌ縺ｰ逶ｴ蜑阪Ο繧ｰ繧剃ｽｿ逕ｨ
@@ -1216,7 +1216,7 @@ int16_t readLogTest(int logNumber)
 
 	// 隗｣譫先ｸ医∩縺ｮ繝ｭ繧ｰ逡ｪ蜿ｷ繧剃ｿ晏ｭ・
 	// saveLogNumber(logNumber);
-	analizedNumber = logNumber;
+	analyzedNumber = logNumber;
 
 	return ret;
 }
@@ -1305,7 +1305,7 @@ int16_t calcXYcies(int logNumber)
 
 		degz = degz + (angVelo * dt);			   	// 隗貞ｺｦ
 		degzR = degz * DEG2RAD;					   	// [rad]縺ｫ螟画鋤
-		velocity = (float)velo / PALSE_MILLIMETER;	// 騾溷ｺｦ
+		velocity = (float)velo / PULSE_MILLIMETER;	// 騾溷ｺｦ
 		distEnc += velo * (time - beforeTime);		// 霍晞屬險域ｸｬ
 
 		// 蠎ｧ讓呵ｨ育ｮ・
@@ -1413,7 +1413,7 @@ int16_t calcXYcies(int logNumber)
 	{
 		// 隗｣譫先ｸ医∩縺ｮ繝ｭ繧ｰ逡ｪ蜿ｷ繧剃ｿ晏ｭ・
 		saveLogNumber(logNumber);
-		analizedNumber = logNumber;
+		analyzedNumber = logNumber;
 
 		// 2谺｡襍ｰ陦後ヵ繝ｩ繧ｰ 霍晞屬蝓ｺ貅・谺｡襍ｰ陦・
 		optimalTrace = BOOST_SHORTCUT;
@@ -1433,7 +1433,7 @@ void calcXYcie(int16_t encpulse, float angVelo, float dt)
 
 	xydegz = xydegz + (angVelo * dt);		// 隗貞ｺｦ
 	degzR = xydegz * (M_PI / 180.0F);		// [rad]縺ｫ螟画鋤
-	velocity = (float)encpulse / PALSE_MILLIMETER * 1000; // 騾溷ｺｦ
+	velocity = (float)encpulse / PULSE_MILLIMETER * 1000; // 騾溷ｺｦ
 
 	xycie.x = xycie.x + (velocity * sin(degzR) * dt);
 	xycie.y = xycie.y + (velocity * cos(degzR) * dt);
@@ -1588,7 +1588,7 @@ static void activateFailSafe(void)
 	{
 		return;	// 譌｢縺ｫ逋ｺ蜍墓ｸ医∩縺ｪ繧我ｽ輔ｂ縺励↑縺・
 	}
-	float currentSpeed = (float)targetSpeed / PALSE_MILLIMETER;	// 迴ｾ蝨ｨ縺ｮ逶ｮ讓咎溷ｺｦ[m/s]
+	float currentSpeed = (float)targetSpeed / PULSE_MILLIMETER;	// 迴ｾ蝨ｨ縺ｮ逶ｮ讓咎溷ｺｦ[m/s]
 	float limitedSpeed = currentSpeed * FAILSAFE_SPEED_SCALE;	// 謖・ｮ壼咲紫縺ｧ螳牙・蛛ｴ縺ｫ貂幃・
 	setTargetSpeed(limitedSpeed);	// 騾溷ｺｦ謖・ｻ､繧呈峩譁ｰ
 	boostSpeed = limitedSpeed;	// 蜿ら・騾溷ｺｦ繧ょ酔譛・

@@ -1,6 +1,6 @@
 ---
 name: robotrace-sd-settings
-description: robotrace_v2のSDカード内設定ファイルを読む、書く、修復する、保存形式を変更するときに使う。targetSpeeds.txt、PID設定、lsval.txt、lognum.txt、analize.txt、boostログの形式を扱う。
+description: robotrace_v2のSDカード内設定ファイルを読む、書く、修復する、保存形式を変更するときに使う。targetSpeeds.txt、PID設定、lsval.txt、lognum.txt、analysis.txt、boostログの形式を扱う。
 ---
 
 # Robotrace SD Settings
@@ -72,12 +72,12 @@ File: `lsval.txt`
 
 ### Analysis and Log Numbers
 
-File: `analize.txt`
+File: `analysis.txt`
 
 - Implementation: `courseAnalysis.c`, `saveLogNumber()`, `getLogNumber()`
 - Format: 5-digit zero-padded log number.
 - Write format: `%05d`
-- Read format: `%05d`
+- Read format: `%5hd`
 - Stores the analyzed log number.
 
 File: `lognum.txt`

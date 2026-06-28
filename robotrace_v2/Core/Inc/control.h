@@ -163,7 +163,7 @@ extern int16_t countdown;
 //====================================//
 void initSystem(void);
 void loopSystem(void);
-void emargencyStop(void);
+void emergencyStop(void);
 void countDown(void);
 void changeGain(void);
 void getADC2(void);

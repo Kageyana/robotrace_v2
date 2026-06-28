@@ -316,13 +316,13 @@ cmake --build --preset Release
 - スリップ判定、クロスライン検出、走行中ゲイン変更: `robotrace_v2/Core/Inc/control.h`, `robotrace_v2/Core/Src/control.c`
 - 緊急停止条件: `robotrace_v2/Core/Inc/emergencyStop.h`, `robotrace_v2/Core/Src/emergencyStop.c`
 - 走行モード、コース解析、速度計画: `robotrace_v2/Core/Inc/courseAnalysis.h`, `robotrace_v2/Core/Src/courseAnalysis.c`
-- エンコーダ換算: `robotrace_v2/Core/Inc/encoder.h` の `PALSE_METER`, `PALSE_MILLIMETER`
+- エンコーダ換算: `robotrace_v2/Core/Inc/encoder.h` の `PULSE_METER`, `PULSE_MILLIMETER`
 - モーター PWM・電流: `robotrace_v2/Core/Inc/motor.h`, `robotrace_v2/Core/Src/motor.c`
 - バッテリー電圧換算: `robotrace_v2/Core/Inc/battery.h` の `VBAT_R1`, `VBAT_R2`, `AD2VOLTAGE`
 
 ### エンコーダ・距離換算の正
 
-- `robotrace_v2/Core/Inc/encoder.h` の `PALSE_METER = 53424`, `PALSE_MILLIMETER = 54.324F` を正とする。
+- `robotrace_v2/Core/Inc/encoder.h` の `PULSE_METER = 53424`, `PULSE_MILLIMETER = 54.324F` を正とする。
 - `encCurrentN` は左右エンコーダの平均で、1 ms あたりのパルス数とする。距離、速度、XY 座標、速度計画で距離換算を使う場合はこの換算値を基準にする。
 
 `setup.c` には `yawRate`, `yaw`, `dist` の PID 調整画面実装がありますが、現在の表示切替では一部ケースがコメントアウトされており、通常メニューから到達しない可能性があります。
@@ -503,7 +503,7 @@ cmake --build --preset Release
 
 ### 実装済み履歴
 
-現時点ではなし。
+- 2026-06-28: 誤字由来の識別子を正規化し、解析済みログ番号ファイル名を `analize.txt` から `analysis.txt` へ変更した。旧名の読み取りフォールバックは設けない。
 
 ## 15. 機体・回路変更時にコードへ反映する項目
 

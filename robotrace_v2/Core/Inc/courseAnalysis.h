@@ -63,7 +63,7 @@
 // #define WRITE_BOOSTSPEED_LOG 	 // 速度計画ログを書き出すかどうかのフラグ
 
 // ファイル名
-#define FILENAME_ANALIZENUMBER "analize"
+#define FILENAME_ANALYSIS_NUMBER "analysis"
 
 typedef struct
 {
@@ -95,7 +95,7 @@ extern int16_t indexSC;
 extern int16_t pathedMarker;
 extern float boostSpeed;
 extern int32_t DistanceOptimal;
-extern int16_t analizedNumber;
+extern int16_t analyzedNumber;
 extern int32_t encTotalOptimal;
 extern int32_t encPID;
 extern int32_t straightMeter;

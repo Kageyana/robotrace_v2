@@ -100,7 +100,7 @@ static int16_t calcSpeedFeedForward(float targetSpeed_mm_s, float batteryVoltage
 void setTargetSpeed(float speed)
 {
 	targetSpeedCommand_m_s = speed;	// フィードフォワード計算へ引き渡す速度指令値[m/s]を保存
-	targetSpeed = (int16_t)(speed * PALSE_MILLIMETER);	// 速度指令値[m/s]をエンコーダ換算値へ変換
+	targetSpeed = (int16_t)(speed * PULSE_MILLIMETER);	// 速度指令値[m/s]をエンコーダ換算値へ変換
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 setTargetAngularVelocity
@@ -130,7 +130,7 @@ void setTargetAngle(float angle)
 ///////////////////////////////////////////////////////////////////////////
 void setTargetDist(float dist)
 {
-	targetDist = (int16_t)(dist * PALSE_MILLIMETER);
+	targetDist = (int16_t)(dist * PULSE_MILLIMETER);
 	encPID = 0;
 }
 ///////////////////////////////////////////////////////////////////////////
@@ -362,7 +362,7 @@ void motorControlSpeedLR(int16_t targetEncL, int16_t targetEncR)
 		veloCtrlL.Int = 0.0f;
 
 		// targetEncL[count/ms] -> mm/s
-		float target_mm_s_L = ((float)targetEncL / PALSE_MILLIMETER) * 1000.0f;
+		float target_mm_s_L = ((float)targetEncL / PULSE_MILLIMETER) * 1000.0f;
 		feedForwardPwmL = calcSpeedFeedForward(target_mm_s_L, batteryVoltage_V,
 			SPEED_FEEDFORWARD_PWM_MAX_DEFAULT, crr);
 	}
@@ -398,7 +398,7 @@ void motorControlSpeedLR(int16_t targetEncL, int16_t targetEncR)
 	if (targetEncR != speedTargetBeforeR){
 		veloCtrlR.Int = 0.0f;
 
-		float target_mm_s_R = ((float)targetEncR / PALSE_MILLIMETER) * 1000.0f;
+		float target_mm_s_R = ((float)targetEncR / PULSE_MILLIMETER) * 1000.0f;
 		feedForwardPwmR = calcSpeedFeedForward(target_mm_s_R, batteryVoltage_V,
 			SPEED_FEEDFORWARD_PWM_MAX_DEFAULT, crr);
 	}

@@ -25,7 +25,7 @@ bool initIMU = false;		// IMU初期化状況		false:初期化失敗	true:初期�
 bool initCurrent = false;	// 電流センサ初期化状況	false:初期化失敗	true:初期化成功
 static bool softreset = false;		// ソフトウェアリセット	false:リセット未実行	true:リセット実行
 uint8_t autoStart = 0;				// 5走を自動で開始する
-int16_t autoStartAnalize = 0; 		// 自動走行で使用するログの解析番号
+int16_t autoStartAnalyze = 0; 		// 自動走行で使用するログの解析番号
 
 bool stateCrossLine = false;		// クロスライン検出状態
 float rocrun = 2000;		// 曲率半径計算用変数
@@ -358,7 +358,7 @@ void loopSystem(void)
 	{
 		goalTime = cntRun;
 		patternTrace = 255;
-		emargencyStop();
+		emergencyStop();
 	}
 
 	switch (patternTrace)
@@ -373,22 +373,22 @@ void loopSystem(void)
 			// コース解析
 			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 			ssd1306_SetCursor(0, 25);
-			ssd1306_printf(Font_11x18, "Analizing");
+			ssd1306_printf(Font_11x18, "Analyzing");
 			ssd1306_SetCursor(0, 50);
-			ssd1306_printf(Font_6x8, "log %d", autoStartAnalize);	// 追加: 解析対象ログ番号を表示
+			ssd1306_printf(Font_6x8, "log %d", autoStartAnalyze);	// 追加: 解析対象ログ番号を表示
 			// Ensure SD write buffers are flushed before analysis
 			sd_flush_log();
 
 			if (autoStart == 2)
 			{
-				ret = readLogDistance(autoStartAnalize);	// 追加: 2走目は1走目ログを解析
+				ret = readLogDistance(autoStartAnalyze);	// 追加: 2走目は1走目ログを解析
 			}
 			else
 			{
-				ret = readLogDistanceSlip(autoStartAnalize);	// 追加: 3走目以降は直前ログをスリップ解析
+				ret = readLogDistanceSlip(autoStartAnalyze);	// 追加: 3走目以降は直前ログをスリップ解析
 				if (ret < 0)
 				{
-					ret = readLogDistance(autoStartAnalize);	// 追加: 解析失敗時は距離解析へフォールバック
+					ret = readLogDistance(autoStartAnalyze);	// 追加: 解析失敗時は距離解析へフォールバック
 				}
 			}
 			if(ret > 0)
@@ -414,7 +414,7 @@ void loopSystem(void)
 
 				patternTrace = 0;
 				autoStart = 0;
-				autoStartAnalize = 0;
+				autoStartAnalyze = 0;
 			}
 		}
 		else
@@ -709,14 +709,14 @@ void loopSystem(void)
 			if (endFileIndex > endIdxBefore)
 			{
 				savedLogNo = fileNumbers[endFileIndex];	// 追加: 実際に保存されたログ番号を採用
-				autoStartAnalize = savedLogNo;
+				autoStartAnalyze = savedLogNo;
 				// 自動走行モードのときは再度走行準備へ
 				autoStart++;
 			}
 			else
 			{
 				autoStart = 0;
-				autoStartAnalize = 0;
+				autoStartAnalyze = 0;
 			}
 
 			if (autoStart > 5)
@@ -814,12 +814,12 @@ void loopSystem(void)
 	}
 }
 ///////////////////////////////////////////////////////////////////////////
-// モジュール名 emargencyStop
+// モジュール名 emergencyStop
 // 処理概要     緊急停止処理
 // 引数         なし
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
-void emargencyStop(void)
+void emergencyStop(void)
 {
 	// 機体停止処理
 	setTargetSpeed(0);
@@ -861,7 +861,7 @@ void emargencyStop(void)
 		ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 
 		ssd1306_SetCursor(0, 15);
-		ssd1306_printf(Font_11x18, "EMS!! %d", autoStartAnalize);
+		ssd1306_printf(Font_11x18, "EMS!! %d", autoStartAnalyze);
 
 		ssd1306_SetCursor(0, 35);
 		switch (emcStop)
@@ -1296,7 +1296,7 @@ void updateSlipDetection(void)
 	st->prevRunning = true;
 
 	// ---- エンコーダ速度 ----
-	float encSpeed = (float)encCurrentN / PALSE_MILLIMETER;
+	float encSpeed = (float)encCurrentN / PULSE_MILLIMETER;
 
 	//==========================================================
 	// 超低速：遷移時だけリセット（微分スパイク防止）

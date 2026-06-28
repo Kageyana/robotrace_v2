@@ -80,7 +80,7 @@ void Interrupt1ms(void)
 		int16_t targetL = (int16_t)targetSpeed + delta;
 		int16_t targetR = (int16_t)targetSpeed - delta;
 		// クリップ（例：目標が大きくなりすぎないように。上限は実機で調整）
-		const int16_t TARGET_MAX = (int16_t)PALSE_MILLIMETER * 4;	// 4.0m/s
+		const int16_t TARGET_MAX = (int16_t)PULSE_MILLIMETER * 4;	// 4.0m/s
 		if (targetL >  TARGET_MAX) targetL =  TARGET_MAX;
 		if (targetL < -TARGET_MAX) targetL = -TARGET_MAX;
 		if (targetR >  TARGET_MAX) targetR =  TARGET_MAX;
@@ -175,8 +175,8 @@ void Interrupt1ms(void)
 		if (optimalTrace == BOOST_SHORTCUT && DistanceOptimal > 0)
 		{
 			calcXYcie(encPulse5ms, BMI088val.gyro.z, DEFF_TIME); // 累積パルスを使用してxy座標計算
-			// distLen = (float)encCurrentN * PALSE_MILLIMETER * 0.005; // 現在速度から5ms後の移動距離を計算
-			optimalIndex = (int32_t)(encTotalOptimal / PALSE_MILLIMETER) / CALCDISTANCE_SHORTCUT; // 50mmごとにショートカット配列を作っているので移動距離[mm]を50mmで割った商がインデクス
+			// distLen = (float)encCurrentN * PULSE_MILLIMETER * 0.005; // 現在速度から5ms後の移動距離を計算
+			optimalIndex = (int32_t)(encTotalOptimal / PULSE_MILLIMETER) / CALCDISTANCE_SHORTCUT; // 50mmごとにショートカット配列を作っているので移動距離[mm]を50mmで割った商がインデクス
 			if (optimalIndex + 1 < numPPADarry)
 			{
 				optimalIndex++;
