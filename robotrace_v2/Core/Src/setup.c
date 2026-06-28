@@ -1280,9 +1280,23 @@ static void setup_start(void)
 		// 停止状態を維持
 		setTargetSpeed(0);
 
+		if (!initIMU)
+		{
+			if (swValTact == SW_PUSH || swValTact == SW_RIGHT)
+			{
+				ssd1306_FillRectangle(0, 15, 127, 63, Black);
+				ssd1306_SetCursor(15, 25);
+				ssd1306_printf(Font_11x18, "Start NG");
+				ssd1306_SetCursor(20, 50);
+				ssd1306_printf(Font_6x8, "IMU failed");
+				ssd1306_UpdateScreen();
+			}
+			break;
+		}
+
 		if (swValTact == SW_PUSH)
 		{
-			if (lSensorMax[0] > lSensorMin[0])
+			if (isLineSensorCalibrationValid())
 			{
 				// キャリブレーション実施済み
 				setupFlags.start = 1;
@@ -1295,7 +1309,7 @@ static void setup_start(void)
 		else if (swValTact == SW_RIGHT)
 		{
 			// オートスタート
-			if (lSensorMax[0] > lSensorMin[0])
+			if (isLineSensorCalibrationValid())
 			{
 				// キャリブレーション実施済み
 				autoStart = 1;
@@ -1800,6 +1814,12 @@ void setupNonDisp(void)
 		setTargetSpeed(0);
 
 		led_out(0x9);
+		if (!initIMU)
+		{
+			led_out(0xe);
+			break;
+		}
+
 		// スイッチ入力待ち
 		if (swValMainTact == SW_TACT_L || swValMainTact == SW_TACT_R)
 		{
@@ -1812,7 +1832,7 @@ void setupNonDisp(void)
 				mode = START_OPTIMAL;
 			}
 			veloCtrl.Int = 0; // I成分リセット
-            if (lSensorMax[0] > lSensorMin[0])
+			if (isLineSensorCalibrationValid())
 			{
 				// キャリブレーション実施済み
 				setupFlags.start = 1;

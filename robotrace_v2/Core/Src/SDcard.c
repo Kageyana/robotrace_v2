@@ -3,6 +3,7 @@
 //====================================//
 #include "SDcard.h"
 #include "courseAnalysis.h"
+#include "firmware_version.h"
 #include "sd_functions.h"
 #include "stdio.h"
 #include <stdint.h>
@@ -429,6 +430,11 @@ void createLog(void)
 
 	// ログヘッダー
 	logBuildColumns();
+	setLogHeaderStrS("fwVersion", FW_VERSION);
+	setLogHeaderStrS("gitCommit", GIT_COMMIT);
+	setLogHeaderStrS("buildDate", BUILD_DATE);
+	setLogHeaderStrS("buildTime", BUILD_TIME);
+	setLogHeaderStrS("branch", GIT_BRANCH);
 	// 制御パラメータ
 	setLogHeaderStrF("batteryVoltage_V", batteryVoltage_V);
 	setLogHeaderStrF("optimalTrace", optimalTrace);
@@ -1049,6 +1055,19 @@ void setLogHeaderStrF(char *name, float value)
 
     snprintf((char *)headerStr, sizeof(headerStr), "%s=%4.2f,", name, (double)value);
     strncat((char *)columnTitle, (char *)headerStr, sizeof(columnTitle) - strlen((char *)columnTitle) - 1);
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 setLogHeaderStrS
+// 処理概要     ログCSVのヘッダーに "変数名=文字列" を追記する
+// 引数         name:変数名 value:文字列値
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void setLogHeaderStrS(char *name, const char *value)
+{
+	char headerStr[96];
+
+	snprintf(headerStr, sizeof(headerStr), "%s=%s,", name, value);
+	strncat(columnTitle, headerStr, sizeof(columnTitle) - strlen(columnTitle) - 1);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SDtest

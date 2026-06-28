@@ -32,6 +32,7 @@ extern uint16_t lSensorCari[NUM_SENSORS];
 extern uint16_t lSensorMax[NUM_SENSORS];	// 各センサの最大値
 extern uint16_t lSensorMin[NUM_SENSORS];	// 各センサの最小値
 extern uint8_t modeCalLinesensors;
+extern bool lineSensorSettingCorrupt;
 
 //====================================//
 // プロトタイプ宣言
@@ -43,5 +44,7 @@ void getAngleSensor(void);
 void calibrationLinesensor(void);
 void writeLinesenval(void);
 void readLinesenval(void);
+bool isLineSensorCalibrationValid(void);
+bool isLineSensorSettingCorrupt(void);
 
 #endif // LINESENSOR_H_

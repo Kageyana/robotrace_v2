@@ -22,6 +22,100 @@ float angleSensor;
 uint16_t lSensorMax[NUM_SENSORS] = {0};	// 各センサの最大値
 uint16_t lSensorMin[NUM_SENSORS] = {[0 ... NUM_SENSORS - 1] = UINT16_MAX};	// 各センサの最小値
 uint8_t modeCalLinesensors = 0;
+static bool lineSensorCalibrationValid = false;
+bool lineSensorSettingCorrupt = false;
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 isLineSensorStoredValueInRange
+// 処理概要     lsval.txtの保存値がAD値の許容範囲内か判定する
+// 引数         value:判定対象値
+// 戻り値       true:範囲内 false:範囲外
+/////////////////////////////////////////////////////////////////////
+static bool isLineSensorStoredValueInRange(int32_t value)
+{
+	return value >= 0 && value <= (int32_t)BASEVAL;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 lineSensorStoredValueOr
+// 処理概要     保存可能なラインセンサ値を取得し、範囲外なら代替値を返す
+// 引数         value:保存候補値, fallback:代替値
+// 戻り値       保存するラインセンサ値
+/////////////////////////////////////////////////////////////////////
+static uint16_t lineSensorStoredValueOr(uint16_t value, uint16_t fallback)
+{
+	if (isLineSensorStoredValueInRange(value))
+	{
+		return value;
+	}
+	return fallback;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 validateLineSensorCalibrationValues
+// 処理概要     現在のラインセンサ校正値が全センサで有効か判定する
+// 引数         なし
+// 戻り値       true:校正値有効 false:校正値無効
+/////////////////////////////////////////////////////////////////////
+static bool validateLineSensorCalibrationValues(void)
+{
+	for (uint8_t i = 0; i < NUM_SENSORS; i++)
+	{
+		if (!isLineSensorStoredValueInRange(lSensorMax[i]) ||
+			!isLineSensorStoredValueInRange(lSensorMin[i]) ||
+			lSensorMax[i] <= lSensorMin[i])
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 readLineSensorStoredValue
+// 処理概要     lsval.txtからラインセンサ保存値を1項目読み取る
+// 引数         fil:読み取り対象ファイル, value:読み取り値の格納先
+// 戻り値       true:読み取り成功 false:読み取り失敗
+/////////////////////////////////////////////////////////////////////
+static bool readLineSensorStoredValue(FIL *fil, uint16_t *value)
+{
+	TCHAR str[10] = {0};
+	int raw = 0;
+
+	if (f_gets(str, 6, fil) == NULL)
+	{
+		return false;
+	}
+	if (sscanf(str, "%d,", &raw) != 1 || !isLineSensorStoredValueInRange(raw))
+	{
+		return false;
+	}
+
+	*value = (uint16_t)raw;
+	return true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 isLineSensorCalibrationValid
+// 処理概要     ラインセンサ校正値が走行可能な状態か取得する
+// 引数         なし
+// 戻り値       true:校正値有効 false:校正値無効
+/////////////////////////////////////////////////////////////////////
+bool isLineSensorCalibrationValid(void)
+{
+	return lineSensorCalibrationValid;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 isLineSensorSettingCorrupt
+// 処理概要     ラインセンサ設定ファイルの破損検出状態を取得する
+// 引数         なし
+// 戻り値       true:破損検出あり false:破損検出なし
+/////////////////////////////////////////////////////////////////////
+bool isLineSensorSettingCorrupt(void)
+{
+	return lineSensorSettingCorrupt;
+}
 /////////////////////////////////////////////////////////////////////
 // モジュール名 powerLineSensors
 // 処理概要  	ラインセンサのON/OFF処理
@@ -231,23 +325,34 @@ void writeLinesenval(void)
 	strcat(fileName, ".txt");									 // 拡張子追加
 	fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_WRITE); // ファイルを開く
 
+	if (fresult != FR_OK)
+	{
+		lineSensorCalibrationValid = validateLineSensorCalibrationValues();
+		lineSensorSettingCorrupt = !lineSensorCalibrationValid;
+		return;
+	}
+
 	if (fresult == FR_OK)
 	{
+		f_lseek(&fil, 0);
+		f_truncate(&fil);
 		// 最大値を保存
 		for (i = 0; i < NUM_SENSORS; i++)
 		{
-			sprintf(str, "%04d,", lSensorMax[i]);
+			sprintf(str, "%04u,", lineSensorStoredValueOr(lSensorMax[i], 0U));
 			f_puts(str, &fil);
 		}
 		// 最小値を保存
 		for (i = 0; i < NUM_SENSORS; i++)
 		{
-			sprintf(str, "%04d,", lSensorMin[i]);
+			sprintf(str, "%04u,", lineSensorStoredValueOr(lSensorMin[i], (uint16_t)BASEVAL));
 			f_puts(str, &fil);
 		}
 	}
 
 	f_close(&fil);
+	lineSensorCalibrationValid = validateLineSensorCalibrationValues();
+	lineSensorSettingCorrupt = !lineSensorCalibrationValid;
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 readLinesenval
@@ -260,8 +365,8 @@ void readLinesenval(void)
 	FIL fil;
 	FRESULT fresult;
 	char fileName[20] = PATH_SETTING;
-	TCHAR str[10];
 	int16_t i;
+	bool repair = false;
 
 	// ファイル読み込み
 	strcat(fileName, FILENAME_LS_VAL);							  // ファイル名追加
@@ -270,19 +375,44 @@ void readLinesenval(void)
 
 	if (fresult == FR_OK)
 	{
-		// 最大値を読み込む
 		for (i = 0; i < NUM_SENSORS; i++)
 		{
-			f_gets(str, 6, &fil);
-			sscanf(str, "%hu,", &lSensorMax[i]);
+			uint16_t value = lSensorMax[i];
+			if (readLineSensorStoredValue(&fil, &value))
+			{
+				lSensorMax[i] = value;
+			}
+			else
+			{
+				repair = true;
+				break;
+			}
 		}
-		// 最小値を読み込む
-		for (i = 0; i < NUM_SENSORS; i++)
+		for (i = 0; i < NUM_SENSORS && !repair; i++)
 		{
-			f_gets(str, 6, &fil);
-			sscanf(str, "%hu,", &lSensorMin[i]);
+			uint16_t value = lSensorMin[i];
+			if (readLineSensorStoredValue(&fil, &value))
+			{
+				lSensorMin[i] = value;
+			}
+			else
+			{
+				repair = true;
+				break;
+			}
 		}
+		f_close(&fil);
+	}
+	else
+	{
+		repair = true;
 	}
 
-	f_close(&fil);
+	lineSensorCalibrationValid = validateLineSensorCalibrationValues();
+	lineSensorSettingCorrupt = repair || !lineSensorCalibrationValid;
+	if (repair)
+	{
+		writeLinesenval();
+		lineSensorSettingCorrupt = repair || !lineSensorCalibrationValid;
+	}
 }

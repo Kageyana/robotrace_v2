@@ -17,7 +17,7 @@ extern float bootTime;
 // プロトタイプ宣言
 //====================================//
 void Interrupt1ms(void);
-void Interrupt100us(void);
+void Interrupt500us(void);
 void Interrupt300ns(void);
 void logWriteTask(void);
 

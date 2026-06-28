@@ -98,9 +98,11 @@ void saveLogNumber(int16_t fileNumber)
 	fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_WRITE); // create file
 	if (fresult == FR_OK)
 	{
+		f_lseek(&fil, 0);
+		f_truncate(&fil);
 		f_printf(&fil, "%05d", fileNumber);
+		f_close(&fil);
 	}
-	f_close(&fil);
 }
 /////////////////////////////////////////////////////////////////////
 // 繝｢繧ｸ繝･繝ｼ繝ｫ蜷・getLogNumber
@@ -114,16 +116,35 @@ void getLogNumber(void)
 	FIL fil;
 	TCHAR log[20];
 	char fileName[32] = PATH_SETTING;
+	int parsedNumber = analyzedNumber;
+	bool repair = false;
 
 	strcat(fileName, FILENAME_ANALYSIS_NUMBER);					// 繝輔ぃ繧､繝ｫ蜷崎ｿｽ蜉
 	strcat(fileName, ".txt");									// 諡｡蠑ｵ蟄占ｿｽ蜉
-	fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_READ); // csv繝輔ぃ繧､繝ｫ繧帝幕縺・
+	fresult = f_open(&fil, fileName, FA_OPEN_EXISTING | FA_READ); // csv繝輔ぃ繧､繝ｫ繧帝幕縺・
 	if (fresult == FR_OK)
 	{
 		// 隗｣譫先ｸ医∩縺ｮ繝ｭ繧ｰ逡ｪ蜿ｷ繧貞叙蠕・
-		f_gets(log, (int)(sizeof(log) / sizeof(log[0])), &fil);
-		sscanf(log, "%5hd", &analyzedNumber);
+		if (f_gets(log, (int)(sizeof(log) / sizeof(log[0])), &fil) != NULL &&
+			sscanf(log, "%5d", &parsedNumber) == 1 &&
+			parsedNumber >= 0 && parsedNumber <= INT16_MAX)
+		{
+			analyzedNumber = (int16_t)parsedNumber;
+		}
+		else
+		{
+			repair = true;
+		}
 		f_close(&fil);
+	}
+	else
+	{
+		repair = true;
+	}
+
+	if (repair)
+	{
+		saveLogNumber(analyzedNumber);
 	}
 
 	for (int16_t i = 0; i <= endFileIndex; i++)

@@ -39,6 +39,22 @@ extern float batteryVoltage_V;	// control.cで保持したバッテリ電圧[V]
 
 int32_t log_targetAngularVelocity; // ログ用目標角速度
 
+#define PID_GAIN_MIN 0
+#define PID_GAIN_MAX 255
+#define SPEED_FF_GAIN_MIN 0
+#define SPEED_FF_GAIN_MAX 255
+
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 settingValueInRange
+// 処理概要     設定ファイルから読んだ整数値が指定範囲内か判定する
+// 引数         value:判定対象値, min:最小値, max:最大値
+// 戻り値       true:範囲内 false:範囲外
+///////////////////////////////////////////////////////////////////////////
+static bool settingValueInRange(int32_t value, int32_t min, int32_t max)
+{
+	return (value >= min) && (value <= max);
+}
+
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 calcSpeedFeedForward
 // 処理概要     目標速度からフィードフォワード項を算出
@@ -159,7 +175,14 @@ void motorControlTrace(void)
 	static int32_t traceBefore;
 
 	// サーボモータ用PWM値計算
-	if (lSensorMax[0] > lSensorMin[0])
+	if (!isLineSensorCalibrationValid())
+	{
+		lineTraceCtrl.pwm = 0;
+		traceBefore = 0;
+		return;
+	}
+
+	if (isLineSensorCalibrationValid())
 	{
 		// マクロで設定した重みを掛け合わせてセンサ値を合成
 		senL = (lSensorCari[4] * TRACE_WEIGHT_CENTER)
@@ -224,7 +247,14 @@ void motorControlTraceOmegaFB(void)
 	static int32_t traceBefore;
 
 	// サーボモータ用PWM値計算
-	if (lSensorMax[0] > lSensorMin[0])
+	if (!isLineSensorCalibrationValid())
+	{
+		lineTraceOmegaFBCtrl.pwm = 0;
+		traceBefore = 0;
+		return;
+	}
+
+	if (isLineSensorCalibrationValid())
 	{
 		// マクロで設定した重みを掛け合わせてセンサ値を合成
 		senL = (lSensorCari[4] * TRACE_WEIGHT_CENTER)
@@ -544,19 +574,18 @@ void writePIDparameters(pidParam *pid)
 {
 	FIL fil;
 	FRESULT fresult;
-	char fileName[20] = PATH_SETTING;
+	char fileName[32] = PATH_SETTING;
 
 	// ファイル読み込み
 	strcat(fileName, pid->name);								 // ファイル名追加
 	strcat(fileName, ".txt");									 // 拡張子追加
-	fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_WRITE); // ファイルを開く
+	fresult = f_open(&fil, fileName, FA_CREATE_ALWAYS | FA_WRITE); // ファイルを開く
 
 	if (fresult == FR_OK)
 	{
 		f_printf(&fil, "%03d,%03d,%03d", pid->kp, pid->ki, pid->kd);
+		f_close(&fil);
 	}
-
-	f_close(&fil);
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 readPIDparameters
@@ -568,8 +597,11 @@ void readPIDparameters(pidParam *pid)
 {
 	FIL fil;
 	FRESULT fresult;
-	char fileName[20] = PATH_SETTING;
-	TCHAR gain[20];
+	char fileName[32] = PATH_SETTING;
+	TCHAR gain[20] = {0};
+	int raw[3] = {pid->kp, pid->ki, pid->kd};
+	int parsed = 0;
+	bool repair = false;
 
 	// ファイル読み込み
 	strcat(fileName, pid->name);								  // ファイル名追加
@@ -578,11 +610,49 @@ void readPIDparameters(pidParam *pid)
 
 	if (fresult == FR_OK)
 	{
-		f_gets(gain, sizeof(gain), &fil);						// 文字列取得
-		sscanf(gain, "%d,%d,%d", &pid->kp, &pid->ki, &pid->kd); // 文字列→数値
+		if (f_gets(gain, sizeof(gain), &fil) != NULL)
+		{
+			parsed = sscanf(gain, "%d,%d,%d", &raw[0], &raw[1], &raw[2]);
+			if (parsed >= 1 && settingValueInRange(raw[0], PID_GAIN_MIN, PID_GAIN_MAX))
+			{
+				pid->kp = (int16_t)raw[0];
+			}
+			else
+			{
+				repair = true;
+			}
+			if (parsed >= 2 && settingValueInRange(raw[1], PID_GAIN_MIN, PID_GAIN_MAX))
+			{
+				pid->ki = (int16_t)raw[1];
+			}
+			else
+			{
+				repair = true;
+			}
+			if (parsed >= 3 && settingValueInRange(raw[2], PID_GAIN_MIN, PID_GAIN_MAX))
+			{
+				pid->kd = (int16_t)raw[2];
+			}
+			else
+			{
+				repair = true;
+			}
+		}
+		else
+		{
+			repair = true;
+		}
+		f_close(&fil);
+	}
+	else
+	{
+		repair = true;
 	}
 
-	f_close(&fil);
+	if (repair)
+	{
+		writePIDparameters(pid);
+	}
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 writeSpeedFeedForwardGain
@@ -594,19 +664,16 @@ void writeSpeedFeedForwardGain(int16_t gain)
 {
 	FIL fil;
 	FRESULT fresult;
-	char fileName[20] = PATH_SETTING;
+	char fileName[32] = PATH_SETTING;
 
 	// ファイル名を生成して係数を書き込み
 	strcat(fileName, "speed_ff.txt");
-	fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_WRITE);
+	fresult = f_open(&fil, fileName, FA_CREATE_ALWAYS | FA_WRITE);
 	if (fresult == FR_OK)
 	{
-		f_lseek(&fil, 0);	// 既存内容を先頭から上書き
-		f_truncate(&fil);
 		f_printf(&fil, "%03d", gain);
+		f_close(&fil);
 	}
-
-	f_close(&fil);
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 readSpeedFeedForwardGain
@@ -618,9 +685,11 @@ void readSpeedFeedForwardGain(int16_t *gain)
 {
 	FIL fil;
 	FRESULT fresult;
-	char fileName[20] = PATH_SETTING;
-	TCHAR gainStr[10];
+	char fileName[32] = PATH_SETTING;
+	TCHAR gainStr[10] = {0};
 	int16_t readGain = *gain;
+	int rawGain = *gain;
+	bool repair = false;
 
 	// ファイル名を生成して係数を読み込み
 	strcat(fileName, "speed_ff.txt");
@@ -629,10 +698,30 @@ void readSpeedFeedForwardGain(int16_t *gain)
 	{
 		if (f_gets(gainStr, sizeof(gainStr), &fil) != NULL)
 		{
-			sscanf(gainStr, "%hd", &readGain);
+			if (sscanf(gainStr, "%d", &rawGain) == 1 &&
+				settingValueInRange(rawGain, SPEED_FF_GAIN_MIN, SPEED_FF_GAIN_MAX))
+			{
+				readGain = (int16_t)rawGain;
+			}
+			else
+			{
+				repair = true;
+			}
 		}
+		else
+		{
+			repair = true;
+		}
+		f_close(&fil);
+	}
+	else
+	{
+		repair = true;
 	}
 
-	f_close(&fil);
 	*gain = readGain;
+	if (repair)
+	{
+		writeSpeedFeedForwardGain(*gain);
+	}
 }

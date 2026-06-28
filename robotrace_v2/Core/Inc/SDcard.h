@@ -55,6 +55,7 @@ int16_t getNextLogNumber(void);
 void setLogStr(char *column, char *format);
 void setLogHeaderStr(char *name, int32_t value);
 void setLogHeaderStrF(char *name, float value);
+void setLogHeaderStrS(char *name, const char *value);
 void SDtest(void);
 void createDir(char *dirName);
 bool sd_fatfs_lock(uint32_t timeout_ms);

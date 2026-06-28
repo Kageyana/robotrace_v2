@@ -63,7 +63,7 @@
 #define SPEED_FEEDFORWARD_CRR_SCALE             0.001f  // speedFeedForwardGain→Crr 変換係数
 
 typedef struct {
-	uint8_t *name;
+	const char *name;
 	int16_t kp;
 	int16_t ki;
 	int16_t kd;

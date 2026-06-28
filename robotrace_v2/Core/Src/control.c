@@ -102,6 +102,10 @@ static SlipDetState slipDetState = {0};
 static void slipResetAll(SlipDetState *st);
 static void slipDistReset(void);
 static int32_t slipDistUpdateAndApply_p(float rawScale, int32_t dEncRaw_p);
+static const char *getRunStartBlockReason(void);
+static bool isRunStartAllowed(void);
+static void showRunStartBlocked(const char *reason);
+static bool blockRunStartIfNeeded(void);
 // タイマ関連
 uint32_t cntRun = 0;
 int16_t countdown;
@@ -343,6 +347,81 @@ void initSystem(void)
 
 	printf("hello \n");
 }
+
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 getRunStartBlockReason
+// 処理概要     走行開始を禁止する理由を取得する
+// 引数         なし
+// 戻り値       NULL:走行開始可能, 文字列:走行開始禁止理由
+///////////////////////////////////////////////////////////////////////////
+static const char *getRunStartBlockReason(void)
+{
+	if (!initIMU)
+	{
+		return "IMU failed";
+	}
+	if (!isLineSensorCalibrationValid())
+	{
+		return "LS calib";
+	}
+	return NULL;
+}
+
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 isRunStartAllowed
+// 処理概要     現在の初期化状態で走行開始してよいか判定する
+// 引数         なし
+// 戻り値       true:走行開始可能 false:走行開始禁止
+///////////////////////////////////////////////////////////////////////////
+static bool isRunStartAllowed(void)
+{
+	return getRunStartBlockReason() == NULL;
+}
+
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 showRunStartBlocked
+// 処理概要     走行開始禁止理由をディスプレイに表示する
+// 引数         reason:走行開始禁止理由
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+static void showRunStartBlocked(const char *reason)
+{
+	if (!modeDSP)
+	{
+		return;
+	}
+
+	ssd1306_FillRectangle(0, 15, 127, 63, Black);
+	ssd1306_SetCursor(15, 25);
+	ssd1306_printf(Font_11x18, "Start NG");
+	ssd1306_SetCursor(20, 50);
+	ssd1306_printf(Font_6x8, "%s", reason);
+	ssd1306_UpdateScreen();
+	HAL_Delay(1000);
+}
+
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 blockRunStartIfNeeded
+// 処理概要     走行開始禁止条件に該当する場合に開始要求を解除する
+// 引数         なし
+// 戻り値       true:開始要求を解除した false:走行開始可能
+///////////////////////////////////////////////////////////////////////////
+static bool blockRunStartIfNeeded(void)
+{
+	if (isRunStartAllowed())
+	{
+		return false;
+	}
+
+	motorPwmOut(0, 0);
+	powerLineSensors(0);
+	setupFlags.start = 0;
+	autoStart = 0;
+	autoStartAnalyze = 0;
+	pattern.calibration = 1;
+	showRunStartBlocked(getRunStartBlockReason());
+	return true;
+}
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 systemLoop
 // 処理概要     メインループ
@@ -364,6 +443,11 @@ void loopSystem(void)
 	switch (patternTrace)
 	{
 	case 0:
+		if ((setupFlags.start || autoStart) && blockRunStartIfNeeded())
+		{
+			break;
+		}
+
 		if (autoStart > 1)
 		{
 			// 2次走行
@@ -431,6 +515,11 @@ void loopSystem(void)
 
 			if (setupFlags.start || autoStart)
 			{
+				if (blockRunStartIfNeeded())
+				{
+					break;
+				}
+
 				motorPwmOut(0, 0);
 				countdown = 2000;							  // カウントダウンスタート
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
@@ -1686,6 +1775,64 @@ float Control_GetSlipDistScaleRaw(void)
 {
 	return slipDistScaleRaw;
 }
+
+#define TARGET_SPEED_PARAM_COUNT ((int16_t)(sizeof(speedParam) / sizeof(float)))
+
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 isTargetSpeedStoredValueInRange
+// 処理概要     targetSpeeds.txtの保存値が項目ごとの許容範囲内か判定する
+// 引数         index:速度パラメータ番号, value:保存値
+// 戻り値       true:範囲内 false:範囲外
+///////////////////////////////////////////////////////////////////////////
+static bool isTargetSpeedStoredValueInRange(int16_t index, int16_t value)
+{
+	int16_t maxValue = 1000; // 10.00m/s
+
+	if (index == 14 || index == 15)
+	{
+		maxValue = 2000; // 20.00m/s^2
+	}
+	else if (index == 17)
+	{
+		maxValue = 9900; // 99.00mm
+	}
+
+	return value >= 0 && value <= maxValue;
+}
+
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 applyTargetSpeedStoredValue
+// 処理概要     targetSpeeds.txtの保存値を速度パラメータへ反映する
+// 引数         index:速度パラメータ番号, value:保存値
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+static void applyTargetSpeedStoredValue(int16_t index, int16_t value)
+{
+	float converted = (float)value / 100.0F;
+
+	switch (index)
+	{
+	case 0: tgtParam.search = converted; break;
+	case 1: tgtParam.stop = converted; break;
+	case 2: tgtParam.bstStraight = converted; break;
+	case 3: tgtParam.bst1500 = converted; break;
+	case 4: tgtParam.bst1300 = converted; break;
+	case 5: tgtParam.bst1000 = converted; break;
+	case 6: tgtParam.bst800 = converted; break;
+	case 7: tgtParam.bst700 = converted; break;
+	case 8: tgtParam.bst600 = converted; break;
+	case 9: tgtParam.bst500 = converted; break;
+	case 10: tgtParam.bst400 = converted; break;
+	case 11: tgtParam.bst300 = converted; break;
+	case 12: tgtParam.bst200 = converted; break;
+	case 13: tgtParam.bst100 = converted; break;
+	case 14: tgtParam.acceleF = converted; break;
+	case 15: tgtParam.acceleD = converted; break;
+	case 16: tgtParam.shortCut = converted; break;
+	case 17: tgtParam.decelLeadMm = converted; break;
+	default: break;
+	}
+}
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setEncoderVal
 // 処理概要     エンコーダ値を変数に加算する
@@ -1740,7 +1887,7 @@ void writeTgtspeeds(void)
 	// ファイル読み込み
 	strcat(fileName, FILENAME_TARGET_SPEED);					 // ファイル名追加
 	strcat(fileName, ".txt");									 // 拡張子追加
-	fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_WRITE); // ファイルを開く
+	fresult = f_open(&fil, fileName, FA_CREATE_ALWAYS | FA_WRITE); // ファイルを開く
 
 	if (fresult == FR_OK)
 	{
@@ -1767,9 +1914,8 @@ void writeTgtspeeds(void)
 										(int32_t)(round(tgtParam.acceleD * 100)),
 										(int32_t)(round(tgtParam.shortCut * 100)),
 										(int32_t)(round(tgtParam.decelLeadMm * 100)));
+		f_close(&fil);
 	}
-
-	f_close(&fil);
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 readTgtspeeds
@@ -1782,10 +1928,9 @@ void readTgtspeeds(void)
 	FIL fil;
 	FRESULT fresult;
 	char fileName[30] = PATH_SETTING;
-	int16_t param[24] = {0};
 	TCHAR paramStr[100];
 	int16_t i;
-	int16_t readCount = 0;
+	bool repair = false;
 
 	// ファイル読み込み
 	strcat(fileName, FILENAME_TARGET_SPEED);					  // ファイル名追加
@@ -1795,41 +1940,43 @@ void readTgtspeeds(void)
 	if (fresult == FR_OK)
 	{
 		// speedParamの定義順で読み取る。途中で終端した場合はそこで打ち切る。
-		for (i = 0; i < sizeof(speedParam) / sizeof(float); i++)
+		for (i = 0; i < TARGET_SPEED_PARAM_COUNT; i++)
 		{
+			int16_t value = 0;
 			if (f_gets(paramStr, 6, &fil) == NULL)
 			{
+				repair = true;
 				break;
 			}
-			if (sscanf(paramStr, "%04hd,", &param[i]) != 1)
+			if (sscanf(paramStr, "%04hd,", &value) != 1)
 			{
+				repair = true;
 				break;
 			}
-			readCount++;
+			if (isTargetSpeedStoredValueInRange(i, value))
+			{
+				applyTargetSpeedStoredValue(i, value);
+			}
+			else
+			{
+				repair = true;
+			}
 		}
-		i = 0;
-		// 読み取れた項目だけ反映することで、旧フォーマット(項目数不足)と互換を保つ。
-		if (readCount > i) { tgtParam.search = (float)param[i] / 100; } i++;
-		if (readCount > i) { tgtParam.stop = (float)param[i] / 100; } i++;
-		if (readCount > i) { tgtParam.bstStraight = (float)param[i] / 100; } i++;
-		if (readCount > i) { tgtParam.bst1500 = (float)param[i] / 100; } i++;
-		if (readCount > i) { tgtParam.bst1300 = (float)param[i] / 100; } i++;
-		if (readCount > i) { tgtParam.bst1000 = (float)param[i] / 100; } i++;
-		if (readCount > i) { tgtParam.bst800 = (float)param[i] / 100; } i++;
-		if (readCount > i) { tgtParam.bst700 = (float)param[i] / 100; } i++;
-		if (readCount > i) { tgtParam.bst600 = (float)param[i] / 100; } i++;
-		if (readCount > i) { tgtParam.bst500 = (float)param[i] / 100; } i++;
-		if (readCount > i) { tgtParam.bst400 = (float)param[i] / 100; } i++;
-		if (readCount > i) { tgtParam.bst300 = (float)param[i] / 100; } i++;
-		if (readCount > i) { tgtParam.bst200 = (float)param[i] / 100; } i++;
-		if (readCount > i) { tgtParam.bst100 = (float)param[i] / 100; } i++;
-		if (readCount > i) { tgtParam.acceleF = (float)param[i] / 100; } i++;
-		if (readCount > i) { tgtParam.acceleD = (float)param[i] / 100; } i++;
-		if (readCount > i) { tgtParam.shortCut = (float)param[i] / 100; } i++;
-		if (readCount > i) { tgtParam.decelLeadMm = (float)param[i] / 100; } i++;
+		if (i < TARGET_SPEED_PARAM_COUNT)
+		{
+			repair = true;
+		}
+		f_close(&fil);
+	}
+	else
+	{
+		repair = true;
 	}
 
-	f_close(&fil);
+	if (repair)
+	{
+		writeTgtspeeds();
+	}
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 checkCrossLine
@@ -1841,7 +1988,7 @@ void checkCrossLine(void)
 {
 	static int32_t encCrossLine = 0;
 
-	if (lSensorMax[0] > lSensorMin[0])
+	if (isLineSensorCalibrationValid())
 	{
 		// 中央2センサが閾値以上かつ、外側1センサが閾値以上でクロスライン検出
 		if((lSensorCari[4] > TRACE_CROSSLINE_TH && lSensorCari[5] > TRACE_CROSSLINE_TH)

@@ -34,6 +34,28 @@ enable_language(C ASM)
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME})
 
+execute_process(
+    COMMAND git rev-parse --short HEAD
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_COMMIT_SHORT
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+)
+if(NOT GIT_COMMIT_SHORT)
+    set(GIT_COMMIT_SHORT "unknown")
+endif()
+
+execute_process(
+    COMMAND git branch --show-current
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_BRANCH_NAME
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+)
+if(NOT GIT_BRANCH_NAME)
+    set(GIT_BRANCH_NAME "unknown")
+endif()
+
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
 
@@ -80,6 +102,8 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add project symbols (macros)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined symbols
+    GIT_COMMIT="${GIT_COMMIT_SHORT}"
+    GIT_BRANCH="${GIT_BRANCH_NAME}"
 )
 
 # Remove wrong libob.a library dependency when using cpp files
