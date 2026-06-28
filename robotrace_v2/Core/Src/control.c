@@ -563,6 +563,7 @@ void loopSystem(void)
 		// IMUのキャリブレーションが終了したら走行開始
 		if (!calibratIMU && !calibrateMotorCurrent && countdown == 0)
 		{
+			batteryVoltage_V = AD2VOLTAGE(batteryAD); // 走行開始直前の電圧を速度FFへ反映
 			powerLineSensors(1);   // ラインセンサ点灯
 
 			// SDカードに変数保存

@@ -428,6 +428,8 @@ void createLog(void)
 	columnTitle[0] = 0; // バッファを安全に初期化
 	formatLog[0] = 0;   // バッファを安全に初期化
 
+	batteryVoltage_V = AD2VOLTAGE(batteryAD); // ログヘッダへ停止時点の電圧を残す
+
 	// ログヘッダー
 	logBuildColumns();
 	setLogHeaderStrS("fwVersion", FW_VERSION);
