@@ -24,3 +24,6 @@ build.ninja
 #Circuit
 fp-info-cache
 *lck
+
+# analiysis
+analysis/

@@ -235,7 +235,7 @@ void Interrupt1ms(void)
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 Interrupt100us
-// 処理概要     タイマー割り込み(0.1ms)
+// 処理概要     タイマー割り込み(0.5ms)
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
@@ -243,7 +243,7 @@ void Interrupt100us(void)
 {
 	static uint8_t logWriteReqDivider = 0;
 	logWriteReqDivider++;
-	if (logWriteReqDivider >= 10U) // 100us x 10 = 1ms
+	if (logWriteReqDivider >= 10U) // 0.5ms x 10 = 5ms
 	{
 		logWriteReqDivider = 0;
 		logWriteReq = true;
