@@ -27,6 +27,14 @@ int16_t motorCurrentADLoffset = 4096/2, motorCurrentADRoffset = 4096/2; // キ�
 /////////////////////////////////////////////////////////////////////
 void motorPwmOut(int16_t pwmL, int16_t pwmR)
 {
+	if (pwmL > 1000) pwmL = 1000;
+	else if (pwmL < -1000) pwmL = -1000;
+	if (pwmR > 1000) pwmR = 1000;
+	else if (pwmR < -1000) pwmR = -1000;
+
+	motorpwmL = pwmL;
+	motorpwmR = pwmR;
+
         // PWM が 0 のとき比較レジスタを 0 に設定
         if (pwmL == 0)
                 __HAL_TIM_SET_COMPARE(&MOTOR_TIM_HANDLER, MOTOR_TIM_CH_L, 0); // 左モータ出力を停止
@@ -90,16 +98,16 @@ void motorPwmOutSynth(int16_t tPwm, int16_t sPwm, int16_t yrPwm, int16_t dPwm)
 		}
 	}
 
-	motorpwmR = sPwm - tracePwm - yrPwm + dPwm;
+	int16_t pwmR = sPwm - tracePwm - yrPwm + dPwm;
 	// PWMの飽和防止
-	if (motorpwmR > 1000) motorpwmR = 1000;
-	else if (motorpwmR < -1000) motorpwmR = -1000;
-	motorpwmL = sPwm + tracePwm + yrPwm + dPwm;
+	if (pwmR > 1000) pwmR = 1000;
+	else if (pwmR < -1000) pwmR = -1000;
+	int16_t pwmL = sPwm + tracePwm + yrPwm + dPwm;
 	// PWMの飽和防止
-	if (motorpwmL > 1000) motorpwmL = 1000;
-	else if (motorpwmL < -1000) motorpwmL = -1000;
+	if (pwmL > 1000) pwmL = 1000;
+	else if (pwmL < -1000) pwmL = -1000;
 
-	motorPwmOut(motorpwmL, motorpwmR);
+	motorPwmOut(pwmL, pwmR);
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 getMotorAD

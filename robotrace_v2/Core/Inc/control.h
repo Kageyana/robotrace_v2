@@ -48,9 +48,15 @@
 #define SLIP_LPF_COEF_LAT			0.08f	// Lat指標は速め（~20ms程度を想定）
 #define SLIP_HIGH_COUNT_REQ_LAT		3U		// Lat ONは3ms連続で良い
 #define SLIP_LOW_COUNT_REQ_LAT		5U		// Lat OFFも5ms連続（まずは同じ）
+#define SLIP_LONG_LOWLOAD_SPEEDERR_MAX	0.12f	// 縦スリップONを抑制する低負荷時の最大速度誤差[m/s]
+#define SLIP_LONG_LOWLOAD_ISUM_MAX		0.35f	// 縦スリップONを抑制する低負荷時の最大電流合計[A]
+#define SLIP_LONG_LOWLOAD_CLEAR_COUNT	4U		// 低負荷継続時に縦スリップON保持を解除する連続サンプル数
 
 #define SLIP_ACC_BIAS_COEF		0.001f   // ≒ dt/1s（1秒時定数くらい）
 #define SLIP_ACC_LPF_COEF		0.03f    // ≒ 20ms前後のLPF
+#define SLIP_BIAS_ENCAX_MAX	0.5f     // バイアス更新を許可する最大エンコーダ加速度[m/s^2]
+#define SLIP_BIAS_PWM_MAX		80.0f    // バイアス更新を許可する最大PWM合計
+#define SLIP_BIAS_ISUM_MAX		0.20f    // バイアス更新を許可する最大電流合計[A]
 
 #define SLIP_GYRO_ON_DPS		250.0f
 #define SLIP_GYRO_OFF_DPS		220.0f
@@ -177,6 +183,8 @@ float getSlipIndicatorRaw(void);
 float getSlipIndicatorFiltered(void);
 bool getSlipFlag(void);
 bool getSlipFlagLat(void);
+bool getSlipLongOnCountEnabled(void);
+uint16_t getSlipLongLowloadClearCount(void);
 bool getSlipLatEnabled(void);
 bool getSlipLatOnCountEnabled(void);
 uint16_t getSlipISumOkCount(void);
@@ -184,6 +192,14 @@ float getSlipPwmSumF(void);
 float getSlipISumF(void);
 float getSlipEncAyF(void);
 float getSlipImuAyF(void);
+float getSlipThresholdHigh(void);
+float getSlipThresholdLow(void);
+float getSlipLatHigh(void);
+float getSlipLatLow(void);
+float getSlipCurScale(void);
+bool getSlipTurningState(void);
+float getSlipAxBias(void);
+float getSlipAyBias(void);
 // スリップ距離補正（パルス版）
 int32_t Control_GetEncCurrentCorr_p(void);
 int32_t Control_GetDistEncRaw_p(void);

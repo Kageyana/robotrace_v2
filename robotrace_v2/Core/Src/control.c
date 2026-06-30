@@ -69,8 +69,18 @@ static uint16_t slipLowCountLat = 0;					// 横スリップ解除判定用の連
 static uint16_t slipISumOkCount = 0;					// Lat ON用の瞬時電流連続カウンタ
 static bool slipFlag = false;							// 縦スリップ判定フラグ
 static bool slipFlagLat = false;						// 横スリップ判定フラグ
+static bool slipLongOnCountEnabledLog = false;			// 縦スリップONカウント許可条件
+static uint16_t slipLongLowloadClearCount = 0;			// 低負荷継続時の縦スリップ保持解除カウンタ
 static bool slipLatEnabledLog = false;					// 横滑り判定の有効条件
 static bool slipLatOnCountEnabledLog = false;			// 横滑りONカウント許可条件
+static float slipThresholdHighLog = 0.0f;				// 縦スリップON閾値[m/s^2]
+static float slipThresholdLowLog = 0.0f;					// 縦スリップOFF閾値[m/s^2]
+static float slipLatHighLog = 0.0f;						// 横スリップON閾値[m/s^2]
+static float slipLatLowLog = 0.0f;						// 横スリップOFF閾値[m/s^2]
+static float slipCurScaleLog = 1.0f;						// 電流由来の閾値スケール
+static bool slipTurningStateLog = false;					// 旋回判定状態
+static float slipAxBiasLog = 0.0f;						// 縦加速度バイアス[m/s^2]
+static float slipAyBiasLog = 0.0f;						// 横加速度バイアス[m/s^2]
 // スリップ距離補正用の状態
 static float slipDistScaleRaw = 1.0f;					// 距離補正スケール（生）
 static float slipDistScaleF = 1.0f;						// 距離補正スケール（LPF後）
@@ -1188,12 +1198,12 @@ static void updateTurningHysteresis(SlipDetState *st, float absWz)
 ///////////////////////////////////////////////////////////////////////////
 static void updateHysFlag(bool *flag, uint16_t *highCount, uint16_t *lowCount,
 	float value, float highTh, float lowTh,
-	uint16_t highReq, uint16_t lowReq)
+	uint16_t highReq, uint16_t lowReq, bool highEnabled)
 {
 	// ヒステリシス判定（縦スリップ等の汎用）
 	if (!*flag) {
 		*lowCount = 0; // ★追加：OFF中は解除側カウントを必ず0に
-		if (value > highTh) {
+		if (highEnabled && (value > highTh)) {
 			if (++(*highCount) >= highReq) {
 				*flag = true;
 				*highCount = 0;
@@ -1235,8 +1245,18 @@ static void slipResetAll(SlipDetState *st)
 	slipISumOkCount = 0;
 	slipFlag = false;
 	slipFlagLat = false;
+	slipLongOnCountEnabledLog = false;
+	slipLongLowloadClearCount = 0;
 	slipLatEnabledLog = false;
 	slipLatOnCountEnabledLog = false;
+	slipThresholdHighLog = 0.0f;
+	slipThresholdLowLog = 0.0f;
+	slipLatHighLog = 0.0f;
+	slipLatLowLog = 0.0f;
+	slipCurScaleLog = 1.0f;
+	slipTurningStateLog = false;
+	slipAxBiasLog = 0.0f;
+	slipAyBiasLog = 0.0f;
 	st->slipPrimed = false;
 	st->turningState = false;
 #if SLIP_CUR_ENABLE
@@ -1332,18 +1352,36 @@ static void slipPrimeSpeedHist(SlipDetState *st, float encSpeed)
 	slipDeltaEnc = 0.0f;
 	slipFlag = false;
 	slipFlagLat = false;
+	slipLongOnCountEnabledLog = false;
+	slipLongLowloadClearCount = 0;
+	slipThresholdHighLog = 0.0f;
+	slipThresholdLowLog = 0.0f;
+	slipLatHighLog = 0.0f;
+	slipLatLowLog = 0.0f;
+	slipCurScaleLog = 1.0f;
+	slipTurningStateLog = st->turningState;
+	slipAxBiasLog = st->axBias;
+	slipAyBiasLog = st->ayBias;
 
 	float ax0 = imuVal.accele.y * 9.81f;
 	float ay0 = imuVal.accele.x * 9.81f;
-	st->axBias = ax0;
-	st->ayBias = ay0;
 	float wz0 = imuVal.gyro.z * DEG2RAD;
 	st->turningState = (fabsf(wz0) > SLIP_GYRO_ON_RADS);
+	slipTurningStateLog = st->turningState;
+	float pwmSum = fabsf((float)motorpwmL) + fabsf((float)motorpwmR);
+	float iSum = fabsf(motorCurrentL) + fabsf(motorCurrentR);
+
+	if (!st->turningState
+			&& (pwmSum < SLIP_BIAS_PWM_MAX)
+			&& (iSum < SLIP_BIAS_ISUM_MAX)) {
+		st->axBias = ax0;
+		st->ayBias = ay0;
+	}
+	slipAxBiasLog = st->axBias;
+	slipAyBiasLog = st->ayBias;
 
 #if SLIP_CUR_ENABLE
 	// PWM/電流LPF初期化（開始直後のゲート鈍化を防止）
-	float pwmSum = fabsf((float)motorpwmL) + fabsf((float)motorpwmR);
-	float iSum = fabsf(motorCurrentL) + fabsf(motorCurrentR);
 	st->pwmSumF = pwmSum;
 	st->iSumF = iSum;
 #endif
@@ -1403,10 +1441,14 @@ void updateSlipDetection(void)
 		float ax = imuVal.accele.y * 9.81f;
 		float ay = imuVal.accele.x * 9.81f;
 		float wz = imuVal.gyro.z * DEG2RAD;
+		float pwmSum = fabsf((float)motorpwmL) + fabsf((float)motorpwmR);
+		float iSum = fabsf(motorCurrentL) + fabsf(motorCurrentR);
 		float absWz = fabsf(wz);
 		updateTurningHysteresis(st, absWz);
-		// 旋回していない時だけバイアス更新(横Gの影響を受けないようにするため)
-		if (!st->turningState) {
+		// 低速かつ低トルク時だけバイアス更新する
+		if (!st->turningState
+				&& (pwmSum < SLIP_BIAS_PWM_MAX)
+				&& (iSum < SLIP_BIAS_ISUM_MAX)) {
 			st->axBias = lpf1(st->axBias, ax, SLIP_ACC_BIAS_COEF);
 			st->ayBias = lpf1(st->ayBias, ay, SLIP_ACC_BIAS_COEF);
 		}
@@ -1420,8 +1462,18 @@ void updateSlipDetection(void)
 		slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF_LAT);
 		// 低速スキップ領域では距離補正スケールを1.0へ寄せる
 		slipDistScaleRaw = 1.0f;
+		slipLongOnCountEnabledLog = false;
+		slipLongLowloadClearCount = 0;
 		slipLatEnabledLog = false;
 		slipLatOnCountEnabledLog = false;
+		slipThresholdHighLog = 0.0f;
+		slipThresholdLowLog = 0.0f;
+		slipLatHighLog = 0.0f;
+		slipLatLowLog = 0.0f;
+		slipCurScaleLog = 1.0f;
+		slipTurningStateLog = st->turningState;
+		slipAxBiasLog = st->axBias;
+		slipAyBiasLog = st->ayBias;
 		return;
 	}
 	st->prevMoving = true;
@@ -1432,8 +1484,18 @@ void updateSlipDetection(void)
 		slipPrimeSpeedHist(st, encSpeed);
 		// 初回は距離補正スケールを1.0で積算
 		slipDistScaleRaw = 1.0f;
+		slipLongOnCountEnabledLog = false;
+		slipLongLowloadClearCount = 0;
 		slipLatEnabledLog = false;
 		slipLatOnCountEnabledLog = false;
+		slipThresholdHighLog = 0.0f;
+		slipThresholdLowLog = 0.0f;
+		slipLatHighLog = 0.0f;
+		slipLatLowLog = 0.0f;
+		slipCurScaleLog = 1.0f;
+		slipTurningStateLog = st->turningState;
+		slipAxBiasLog = st->axBias;
+		slipAyBiasLog = st->ayBias;
 		return; // 初回は判定しない
 	}
 
@@ -1462,11 +1524,25 @@ void updateSlipDetection(void)
 	float encAy = wz * encSpeed;
 
 	//==========================================================
+	// PWM/電流の合計（惰性/低トルク判定用）
+	//==========================================================
+	// 瞬時値はバイアス更新とON判定ゲートで使用する
+	float pwmSum = fabsf((float)motorpwmL) + fabsf((float)motorpwmR);
+	float iSum = fabsf(motorCurrentL) + fabsf(motorCurrentR);
+#if SLIP_CUR_ENABLE
+	// PWM/電流のLPF更新（SLIP_CUR_ENABLE=1のみ）
+	st->pwmSumF = lpf1(st->pwmSumF, pwmSum, SLIP_PWM_LPF_COEF);
+	st->iSumF = lpf1(st->iSumF, iSum, SLIP_CUR_LPF_COEF);
+#endif
+
+	//==========================================================
 	// IMUのDC成分（バイアス/傾き由来の重力漏れ等）を除去
 	//==========================================================
-	// 旋回していない時だけバイアス更新(横Gの影響を受けないようにするため)
 	updateTurningHysteresis(st, fabsf(wz));
-	if (!st->turningState) {
+	if (!st->turningState
+			&& (fabsf(encAx) < SLIP_BIAS_ENCAX_MAX)
+			&& (pwmSum < SLIP_BIAS_PWM_MAX)
+			&& (iSum < SLIP_BIAS_ISUM_MAX)) {
 		st->axBias = lpf1(st->axBias, ax, SLIP_ACC_BIAS_COEF);
 		st->ayBias = lpf1(st->ayBias, ay, SLIP_ACC_BIAS_COEF);
 	}
@@ -1488,18 +1564,6 @@ void updateSlipDetection(void)
 	float dy = st->encAyF - st->imuAyF;	// 横方向(左右)残差
 	float absDx = fabsf(dx);
 	float absDy = fabsf(dy);
-
-	//==========================================================
-	// PWM/電流の合計（惰性/低トルク判定用）
-	//==========================================================
-	// 瞬時値はON判定ゲートでも使用する
-	float pwmSum = fabsf((float)motorpwmL) + fabsf((float)motorpwmR);
-	float iSum = fabsf(motorCurrentL) + fabsf(motorCurrentR);
-#if SLIP_CUR_ENABLE
-	// PWM/電流のLPF更新（SLIP_CUR_ENABLE=1のみ）
-	st->pwmSumF = lpf1(st->pwmSumF, pwmSum, SLIP_PWM_LPF_COEF);
-	st->iSumF = lpf1(st->iSumF, iSum, SLIP_CUR_LPF_COEF);
-#endif
 
 #if SLIP_CUR_ENABLE
 	//==========================================================
@@ -1530,10 +1594,16 @@ void updateSlipDetection(void)
 
 	// 横スリップ判定の有効化条件（直進ノイズ抑制）
 	bool latEnabled = st->turningState && (fabsf(st->encAyF) > SLIP_LAT_ENCAY_MIN);
+	float longSpeedErr = fabsf(((float)targetSpeed / PULSE_MILLIMETER) - encSpeed);
+#if SLIP_CUR_ENABLE
+	float longLoadISum = st->iSumF;
+#else
+	float longLoadISum = iSum;
+#endif
+	bool slipLongOnCountEnabled = !((longSpeedErr < SLIP_LONG_LOWLOAD_SPEEDERR_MAX)
+			&& (longLoadISum < SLIP_LONG_LOWLOAD_ISUM_MAX));
 	// 横判定のカウントを許可する条件（PWMが小さい区間は止める）
-	// デフォルトはPWM/電流ゲートなしの条件
 	bool latCountEnabled = latEnabled;
-	// LatのON判定は瞬時電流ゲートも満たした時だけ進める
 	bool latOnCountEnabled = latEnabled;
 	bool latCoastHardClear = false;
 #if SLIP_CUR_ENABLE
@@ -1543,7 +1613,6 @@ void updateSlipDetection(void)
 	latCoastHardClear = (!calibrateMotorCurrent)
 			&& (st->pwmSumF < SLIP_PWM_COAST_MAX)
 			&& (st->iSumF < SLIP_ISUM_COAST_MAX);
-#endif
 	// LatのON判定はLPF後電流が連続で閾値以上の時だけ許可する
 	bool iSumOk = (st->iSumF > SLIP_ISUM_LAT_COUNT_MIN);
 	if (!latEnabled || latCoastHardClear) {
@@ -1555,10 +1624,15 @@ void updateSlipDetection(void)
 	} else {
 		slipISumOkCount = 0;
 	}
-	// LatのON判定は瞬時PWM/電流の閾値も満たす場合のみ進める
-	latOnCountEnabled = latEnabled
+	// LatのON判定はLPF後PWM、瞬時PWM、電流連続条件を満たす場合のみ進める
+	latOnCountEnabled = latCountEnabled
 			&& (pwmSum > SLIP_PWM_LAT_COUNT_MIN)
 			&& (slipISumOkCount >= SLIP_ISUM_LAT_COUNT_N);
+#else
+	latOnCountEnabled = latCountEnabled
+			&& (pwmSum > SLIP_PWM_LAT_COUNT_MIN);
+#endif
+	slipLongOnCountEnabledLog = slipLongOnCountEnabled;
 	slipLatEnabledLog = latEnabled;
 	slipLatOnCountEnabledLog = latOnCountEnabled;
 
@@ -1624,11 +1698,32 @@ void updateSlipDetection(void)
 	// ---- 縦スリップ ヒステリシス判定（absDxのみ）----
 	updateHysFlag(&slipFlag, &slipHighCount, &slipLowCount,
 		slipIndicatorRaw, slipThresholdHigh, slipThresholdLow,
-		SLIP_HIGH_COUNT_REQ, SLIP_LOW_COUNT_REQ);
+		SLIP_HIGH_COUNT_REQ, SLIP_LOW_COUNT_REQ, slipLongOnCountEnabled);
+	if (slipFlag && !slipLongOnCountEnabled) {
+		if (slipLongLowloadClearCount < SLIP_LONG_LOWLOAD_CLEAR_COUNT) {
+			slipLongLowloadClearCount++;
+		}
+		if (slipLongLowloadClearCount >= SLIP_LONG_LOWLOAD_CLEAR_COUNT) {
+			slipFlag = false;
+			slipHighCount = 0;
+			slipLowCount = 0;
+			slipLongLowloadClearCount = 0;
+		}
+	} else {
+		slipLongLowloadClearCount = 0;
+	}
 
 	// ---- 横スリップ判定（旋回中のみ）----
 	float slipLatHigh = SLIP_LAT_HIGH * curScale;
 	float slipLatLow  = SLIP_LAT_LOW  * curScale;
+	slipThresholdHighLog = slipThresholdHigh;
+	slipThresholdLowLog = slipThresholdLow;
+	slipLatHighLog = slipLatHigh;
+	slipLatLowLog = slipLatLow;
+	slipCurScaleLog = curScale;
+	slipTurningStateLog = st->turningState;
+	slipAxBiasLog = st->axBias;
+	slipAyBiasLog = st->ayBias;
 	if (!slipFlagLat) {
 		if (latOnCountEnabled) {
 			// LatのON判定はPWM/電流ゲート許可時のみ進める
@@ -1703,6 +1798,14 @@ bool getSlipFlagLat(void)
 {
 	return slipFlagLat;
 }
+bool getSlipLongOnCountEnabled(void)
+{
+	return slipLongOnCountEnabledLog;
+}
+uint16_t getSlipLongLowloadClearCount(void)
+{
+	return slipLongLowloadClearCount;
+}
 bool getSlipLatEnabled(void)
 {
 	return slipLatEnabledLog;
@@ -1738,6 +1841,38 @@ float getSlipEncAyF(void)
 float getSlipImuAyF(void)
 {
 	return slipDetState.imuAyF;
+}
+float getSlipThresholdHigh(void)
+{
+	return slipThresholdHighLog;
+}
+float getSlipThresholdLow(void)
+{
+	return slipThresholdLowLog;
+}
+float getSlipLatHigh(void)
+{
+	return slipLatHighLog;
+}
+float getSlipLatLow(void)
+{
+	return slipLatLowLog;
+}
+float getSlipCurScale(void)
+{
+	return slipCurScaleLog;
+}
+bool getSlipTurningState(void)
+{
+	return slipTurningStateLog;
+}
+float getSlipAxBias(void)
+{
+	return slipAxBiasLog;
+}
+float getSlipAyBias(void)
+{
+	return slipAyBiasLog;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 Control_ApplyMarkerCorrection_p
@@ -1846,7 +1981,6 @@ void setEncoderVal(void)
 	int32_t dEncRaw_p = (int32_t)encCurrentN;
 	bool running = (patternTrace >= 11 && patternTrace < 100);
 	int32_t dEncCorr_p = dEncRaw_p;
-	int32_t dEncUse_p = dEncRaw_p;
 
 	if (running) {
 		dEncCorr_p = slipDistUpdateAndApply_p(slipDistScaleRaw, dEncRaw_p);
@@ -1859,7 +1993,10 @@ void setEncoderVal(void)
 	prevRunning = running;
 
 #if SLIP_DIST_CORRECTION_ENABLE
-	dEncUse_p = dEncCorr_p;
+	int32_t dEncUse_p = dEncCorr_p;
+#else
+	(void)dEncCorr_p;
+	int32_t dEncUse_p = dEncRaw_p;
 #endif
 
 	// 外部変数

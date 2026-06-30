@@ -18,11 +18,12 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - Distinguish run mode by `optimalTrace`.
 - Exclude failed runs when `emcStop != 0`.
 - Invalidate logs with `cntlog` gaps or processing drops; identify and report the cause.
+- When selecting recent logs, inspect the newest 10 logs first. If none of those are valid, continue checking older logs until a valid log is found, and report that the search range was expanded.
 - If battery voltage differs significantly, recommend charging and retrying instead of comparing as equal conditions.
 
 ## Workflow
 
-1. Inspect available logs and identify target log numbers.
+1. Inspect available logs and identify target log numbers. Start with the newest 10 logs; if all are invalid, continue to older logs instead of stopping.
 2. Confirm the run mode from `optimalTrace` and compare only compatible run types.
 3. Check validity:
    - `emcStop == 0`
@@ -53,6 +54,15 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - `lineTraceCtrl`: current log column name; value is `lineTraceOmegaFBCtrl.pwm`.
 - `targetAngularvelo`: log target angular velocity, `[deg/s]`.
 - `motorpwmL`, `motorpwmR`: left/right motor PWM.
+- `slipLongResidual_mps2`: longitudinal slip residual acceleration, `[m/s^2]`.
+- `slipLatResidual_mps2`: lateral slip residual acceleration, `[m/s^2]`.
+- `slipThresholdHigh`, `slipThresholdLow`: longitudinal slip ON/OFF thresholds, `[m/s^2]`.
+- `slipLongOnCountEnabled`: longitudinal slip ON-count gate state.
+- `slipLongLowloadClearCount`: consecutive low-load samples used to clear held longitudinal slip.
+- `slipLatHigh`, `slipLatLow`: lateral slip ON/OFF thresholds, `[m/s^2]`.
+- `slipCurScale`: current-based slip threshold scale.
+- `slipTurningState`: turning hysteresis state used by slip detection.
+- `slipAxBias`, `slipAyBias`: acceleration bias values used by slip detection, `[m/s^2]`.
 - `x`, `y`: estimated position from the start marker origin, `[mm]`.
 
 ## Run Mode Checks
@@ -70,4 +80,5 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - Save results in `analysis/`.
 - Name outputs so the target log number and analysis type are clear.
 - Examples: `log_00012_summary.csv`, `log_00012_xy.png`.
+- Use `analysis/script/slip_detection_report.py` for slip detection review. It writes `log_<range>_summary.csv`, `log_<range>_slip_by_index.csv`, and `log_<range>_label_candidates.csv`. Use `--long-lowload-speederr-max`, `--long-lowload-isum-max`, and `--long-lowload-clear-count` to simulate longitudinal low-load gating and held-flag clearing.
 - If the input contract is not yet implemented, decide it before adding a script: single log, multi-log comparison, and autoStart 5-run comparison are separate modes.

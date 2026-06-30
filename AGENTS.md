@@ -432,6 +432,9 @@ cmake --build --preset Release
 
 - スリップ判定は `1 ms` 周期で、`patternTrace >= 12 && patternTrace < 100` の走行中に実行する。`encSpeed < 0.1 m/s` では判定をスキップする。
 - `slipFlag` は縦スリップ、`slipFlagLat` は横スリップの判定フラグとする。
+- `slipLongResidual_mps2` は縦方向、`slipLatResidual_mps2` は横方向のスリップ判定用加速度残差 `[m/s^2]` とする。
+- `slipLongOnCountEnabled`, `slipLongLowloadClearCount`, `slipThresholdHigh`, `slipThresholdLow`, `slipLatHigh`, `slipLatLow`, `slipCurScale`, `slipTurningState`, `slipAxBias`, `slipAyBias` はスリップ判定理由を追うためのデバッグ列とする。
+- `motorpwmL`, `motorpwmR` は実際にモーターへ出力した飽和後 PWM とする。
 - 性能改善の優先順位は、再現性、完走率、ラップタイム短縮の順とする。
 - 1 回の走行で変更してよいパラメータ数は最大 2 個までとする。
 - PID、速度フィードフォワード、スリップ判定、速度・加速度の調整手順は `.agents/skills/robotrace-tuning/SKILL.md` を使う。
@@ -497,6 +500,10 @@ cmake --build --preset Release
 
 - 2026-06-28: 誤字由来の識別子を正規化し、解析済みログ番号ファイル名を `analize.txt` から `analysis.txt` へ変更した。旧名の読み取りフォールバックは設けない。
 - 2026-06-28: ログヘッダへ `fwVersion`, `gitCommit`, `buildDate`, `buildTime`, `branch` を出力するようにした。設定ファイル欠落時のデフォルト作成、破損時の部分反映と修復、`lsval.txt` 破損時および IMU/ラインセンサー異常時の走行禁止、TIM7 ログ要求周期の命名整理を実装した。
+- 2026-06-28: スリップ判定で実PWMを参照するようにし、IMUバイアス更新を低動的状態に限定した。ログ列 `slipRatio`, `slipRatioLat` は `slipLongResidual_mps2`, `slipLatResidual_mps2` へ変更した。
+- 2026-06-28: スリップ判定のデバッグ列 `slipThresholdHigh`, `slipThresholdLow`, `slipLatHigh`, `slipLatLow`, `slipCurScale`, `slipTurningState`, `slipAxBias`, `slipAyBias` を追加し、オフライン評価用スクリプトを追加した。
+- 2026-06-29: 縦スリップの低負荷誤検出抑制として、速度誤差と電流によるONカウントゲートを追加し、ログ列 `slipLongOnCountEnabled` を追加した。
+- 2026-06-30: 縦スリップON後に低負荷が継続した場合の保持解除を追加し、ログ列 `slipLongLowloadClearCount` を追加した。
 
 ## 15. 機体・回路変更時にコードへ反映する項目
 

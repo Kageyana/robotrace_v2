@@ -15,7 +15,7 @@ FIL fil_W;
 FIL fil_R;
 
 // ログヘッダー
-char columnTitle[2048] = "", formatLog[256] = "";
+char columnTitle[2048] = "", formatLog[512] = "";
 
 // ログバッファ
 // Log buffers
@@ -716,7 +716,7 @@ void endLog(void)
 	FRESULT fresult;		// f_write status
 	FIL fil;
 	uint8_t log[LOG_SIZE];
-	char logStr[256];
+	char logStr[512];
 	UINT readByte, writtenlog;
 	uint16_t j;
 	uint16_t time, beforeTime = 0;

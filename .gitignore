@@ -25,5 +25,9 @@ build.ninja
 fp-info-cache
 *lck
 
-# analiysis
-analysis/
+# analysis
+analysis/*
+!analysis/script/
+!analysis/script/**
+analysis/script/__pycache__/
+analysis/script/**/*.pyc
