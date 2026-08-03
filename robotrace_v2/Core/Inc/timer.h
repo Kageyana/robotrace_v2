@@ -13,6 +13,9 @@
 // グローバル変数の宣言
 //====================================//
 extern float bootTime;
+extern int16_t targetSpeedLLog;
+extern int16_t targetSpeedRLog;
+extern uint8_t speedTargetClipLog;
 //====================================//
 // プロトタイプ宣言
 //====================================//

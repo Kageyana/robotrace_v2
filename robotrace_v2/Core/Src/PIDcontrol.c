@@ -44,6 +44,51 @@ int32_t log_targetAngularVelocity; // ログ用目標角速度
 #define SPEED_FF_GAIN_MIN 0
 #define SPEED_FF_GAIN_MAX 255
 
+static int16_t clampFloatToPwm(float pwm, int16_t pwm_max)
+{
+	if (pwm > (float)pwm_max)
+		pwm = (float)pwm_max;
+	else if (pwm < -(float)pwm_max)
+		pwm = -(float)pwm_max;
+	return (int16_t)pwm;
+}
+
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 applyLineTraceOmegaCurveFeedForward
+// 処理概要     低速小Rカーブで曲率由来FFとラインセンサーFBを分離して目標角速度を作る
+// 引数         sensorTarget:センサー偏差由来の目標角速度[deg/s], sensorDiff:左右センサー合成差
+// 戻り値       曲率FF反映後の目標角速度[deg/s]
+///////////////////////////////////////////////////////////////////////////
+static int32_t applyLineTraceOmegaCurveFeedForward(int32_t sensorTarget, int32_t sensorDiff)
+{
+	if (!LINE_TRACE_OMEGA_CURVE_FF_ENABLE ||
+			optimalTrace != BOOST_DISTANCE ||
+			targetSpeed == 0 ||
+			targetSpeed > LINE_TRACE_OMEGA_CURVE_FF_MAX_SPEED_PULSE ||
+			numPPADarry <= 0 ||
+			optimalIndex >= (uint16_t)numPPADarry ||
+			sensorDiff == 0)
+	{
+		return sensorTarget;
+	}
+
+	int32_t roc = PPAD[optimalIndex].ROC;
+	if (roc < 0)
+		roc = -roc;
+	if (roc <= 0 || roc > LINE_TRACE_OMEGA_CURVE_FF_ROC_MAX_MM)
+		return sensorTarget;
+	if (roc < LINE_TRACE_OMEGA_CURVE_FF_ROC_MIN_MM)
+		roc = LINE_TRACE_OMEGA_CURVE_FF_ROC_MIN_MM;
+
+	float targetSpeed_mm_s = ((float)targetSpeed / PULSE_MILLIMETER) * 1000.0f;
+	float curveFf = (targetSpeed_mm_s / (float)roc) * RAD2DEG * ((float)LINE_TRACE_OMEGA_CURVE_FF_GAIN_PCT / 100.0f);
+	if (sensorDiff < 0)
+		curveFf = -curveFf;
+
+	float sensorFb = (float)sensorTarget * ((float)LINE_TRACE_OMEGA_CURVE_FB_SCALE_PCT / 100.0f);
+	return (int32_t)(curveFf + sensorFb);
+}
+
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 settingValueInRange
 // 処理概要     設定ファイルから読んだ整数値が指定範囲内か判定する
@@ -97,14 +142,8 @@ static int16_t calcSpeedFeedForward(float targetSpeed_mm_s, float batteryVoltage
 	else
 		pwm = 0.0f;
 
-	/* PWM の上限をクリップ */
-	if (pwm > (float)pwm_max)
-		pwm = (float)pwm_max;
-	else if (pwm < -(float)pwm_max)
-		pwm = -(float)pwm_max;
-
 	/* 例: Crr=0.02, η=0.90, Vbat=4.5V, PWM_MAX=1000, v=1000mm/s → PWM≈145 */
-	return (int16_t)pwm;
+	return clampFloatToPwm(pwm, pwm_max);
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -243,7 +282,7 @@ void motorControlTrace(void)
 ///////////////////////////////////////////////////////////////////////////
 void motorControlTraceOmegaFB(void)
 {
-	int32_t iP, iI, iD, iRet, target, Dev, Dif, senL, senR;;
+	int32_t iP, iI, iD, iRet, target, Dev, Dif, senL, senR, sensorDiff;
 	static int32_t traceBefore;
 
 	// サーボモータ用PWM値計算
@@ -281,7 +320,18 @@ void motorControlTraceOmegaFB(void)
 				+ (lSensor[8] * TRACE_WEIGHT_OUTER)
 				+ (lSensor[9] * TRACE_WEIGHT_FAR);
 	}
-	target = ((senR - senL) * encCurrentN) >> 9;
+	sensorDiff = senR - senL;
+	target = (sensorDiff * encCurrentN) >> 9;
+	target = applyLineTraceOmegaCurveFeedForward(target, sensorDiff);
+	if (LINE_TRACE_OMEGA_TARGET_CAP_ENABLE &&
+			optimalTrace == BOOST_DISTANCE &&
+			targetSpeed <= LINE_TRACE_OMEGA_TARGET_CAP_MAX_SPEED_PULSE)
+	{
+		if (target > LINE_TRACE_OMEGA_TARGET_CAP_ABS_DEG_S)
+			target = LINE_TRACE_OMEGA_TARGET_CAP_ABS_DEG_S;
+		else if (target < -LINE_TRACE_OMEGA_TARGET_CAP_ABS_DEG_S)
+			target = -LINE_TRACE_OMEGA_TARGET_CAP_ABS_DEG_S;
+	}
 	log_targetAngularVelocity = target; // ログ用に目標角速度を保存
 	Dev = target - (int32_t)imuVal.gyro.z;
 

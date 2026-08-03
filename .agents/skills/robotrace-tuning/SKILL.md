@@ -26,16 +26,18 @@ Do not adopt a change that improves finish rate or lap time but worsens reproduc
    - secondary runs with the same secondary mode
    - autoStart only against runs where all 5 runs completed
 2. Validate logs using the log-analysis skill.
-3. Change at most two parameters per run.
-4. Tune in this order:
+3. Use only runs with `batteryVoltage_V >= 7.6 V` for tuning comparison and adoption decisions. If voltage is below 7.6 V, charge and retry before judging the parameter change.
+4. Change at most two parameters per run.
+5. Tune in this order:
    - PID
    - speed feedforward
    - slip detection
    - speed
-5. When increasing speed, start from sections with smaller curvature radius.
-6. After a control change, collect at least 10 real-run logs.
-7. Compare against logs from before the code or parameter change.
-8. Adopt a change only when the goal time improves stably without reducing reproducibility.
+6. When increasing speed, start from sections with smaller curvature radius.
+7. After a control change, collect at least 10 real-run logs.
+8. If a tested parameter or tuning constant is rejected and the only change is reverting it to the previous known-good value, do not require a new real-run confirmation just for the revert. Confirm the restored value by SD readback or code inspection.
+9. Compare against logs from before the code or parameter change.
+10. Adopt a change only when the goal time improves stably without reducing reproducibility.
 
 ## Allowed Risks
 

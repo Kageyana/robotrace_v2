@@ -12,11 +12,14 @@
 #include "sd_functions.h"
 #include "ff.h"
 #include <stdint.h>
+#include <string.h>
 
 static bool sd_remount_for_analysis(void)
 {
 	return (sd_remount() == FR_OK);
 }
+
+#define SECOND_LOG_COL_MISSING (-1)
 //====================================//
 // 繧ｰ繝ｭ繝ｼ繝舌Ν螟画焚縺ｮ螳｣
 //====================================//
@@ -45,6 +48,19 @@ static void logReadSlipIoError(int logNumber, UINT lineNo, FIL *fil, const char 
 static float calcDecelLeadMmByRoc(int16_t rocPrev, int16_t rocNow);
 static void applyDecelLeadToPpad(int16_t count);
 static void applyDecelLeadToArray(float *speed, int16_t count);
+static float calcExpandedSlipRisk(const float *risk, int16_t index, int16_t maxIndex);
+static bool isSlipSpeedPropagationProtected(const float *riskLat, const float *v2Max, const int16_t *baseRoc, int16_t index, int16_t maxIndex);
+
+typedef struct
+{
+	int16_t courseMarker;
+	int16_t encTotalOptimal;
+	int16_t ROC;
+	int16_t targetSpeed;
+	int16_t optimalIndex;
+	int16_t slipFlag;
+	int16_t slipFlagLat;
+} SecondLogColumnMap;
 
 AnalysisData PPAD[OPT_BUFF_SIZE];
 EventPos markerPos[OPT_BUFF_SIZE];
@@ -630,13 +646,243 @@ cleanup_read:
 
 	return ret;
 }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 initSecondLogColumnMap
+// 処理概要     2次ログ解析用の列番号マップを未検出状態に初期化する
+// 引数         map: 列番号マップ
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void initSecondLogColumnMap(SecondLogColumnMap *map)
+{
+	map->courseMarker = SECOND_LOG_COL_MISSING;
+	map->encTotalOptimal = SECOND_LOG_COL_MISSING;
+	map->ROC = SECOND_LOG_COL_MISSING;
+	map->targetSpeed = SECOND_LOG_COL_MISSING;
+	map->optimalIndex = SECOND_LOG_COL_MISSING;
+	map->slipFlag = SECOND_LOG_COL_MISSING;
+	map->slipFlagLat = SECOND_LOG_COL_MISSING;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 csvFieldEquals
+// 処理概要     CSVフィールド名が指定名と一致するか判定する
+// 引数         field: フィールド先頭
+// 引数         end: フィールド終端
+// 引数         name: 比較する列名
+// 戻り値       一致する場合true
+/////////////////////////////////////////////////////////////////////
+static bool csvFieldEquals(const char *field, const char *end, const char *name)
+{
+	while (end > field && (*(end - 1) == '\r' || *(end - 1) == '\n' || *(end - 1) == ' ' || *(end - 1) == '\t'))
+	{
+		end--;
+	}
+	while (field < end && (*field == ' ' || *field == '\t'))
+	{
+		field++;
+	}
+	size_t len = (size_t)(end - field);
+	return (strlen(name) == len && strncmp(field, name, len) == 0);
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 csvFieldHasEquals
+// 処理概要     CSVフィールドにパラメータ区切りの'='が含まれるか判定する
+// 引数         field: フィールド先頭
+// 引数         end: フィールド終端
+// 戻り値       '='を含む場合true
+/////////////////////////////////////////////////////////////////////
+static bool csvFieldHasEquals(const char *field, const char *end)
+{
+	while (field < end)
+	{
+		if (*field == '=')
+		{
+			return true;
+		}
+		field++;
+	}
+	return false;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 secondLogColumnMapIsValid
+// 処理概要     2次ログ再解析に必要な列番号が揃っているか判定する
+// 引数         map: 列番号マップ
+// 戻り値       必須列が揃っている場合true
+/////////////////////////////////////////////////////////////////////
+static bool secondLogColumnMapIsValid(const SecondLogColumnMap *map)
+{
+	return (map->courseMarker != SECOND_LOG_COL_MISSING &&
+			map->encTotalOptimal != SECOND_LOG_COL_MISSING &&
+			map->ROC != SECOND_LOG_COL_MISSING &&
+			map->targetSpeed != SECOND_LOG_COL_MISSING &&
+			map->optimalIndex != SECOND_LOG_COL_MISSING &&
+			map->slipFlag != SECOND_LOG_COL_MISSING &&
+			map->slipFlagLat != SECOND_LOG_COL_MISSING);
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 parseSecondLogHeader
+// 処理概要     2次ログCSVヘッダから再解析に必要な列番号を取得する
+// 引数         header: CSVヘッダ行
+// 引数         map: 列番号マップ
+// 戻り値       必須列が取得できた場合true
+/////////////////////////////////////////////////////////////////////
+static bool parseSecondLogHeader(const char *header, SecondLogColumnMap *map)
+{
+	initSecondLogColumnMap(map);
+
+	const char *p = header;
+	const char *field = p;
+	int16_t col = 0;
+	while (1)
+	{
+		if (*p == ',' || *p == '\n' || *p == '\r' || *p == '\0')
+		{
+			if (csvFieldHasEquals(field, p))
+			{
+				break;
+			}
+			if (csvFieldEquals(field, p, "courseMarker"))
+			{
+				map->courseMarker = col;
+			}
+			else if (csvFieldEquals(field, p, "encTotalOptimal"))
+			{
+				map->encTotalOptimal = col;
+			}
+			else if (csvFieldEquals(field, p, "ROC"))
+			{
+				map->ROC = col;
+			}
+			else if (csvFieldEquals(field, p, "targetSpeed"))
+			{
+				map->targetSpeed = col;
+			}
+			else if (csvFieldEquals(field, p, "optimalIndex"))
+			{
+				map->optimalIndex = col;
+			}
+			else if (csvFieldEquals(field, p, "slipFlag"))
+			{
+				map->slipFlag = col;
+			}
+			else if (csvFieldEquals(field, p, "slipFlagLat"))
+			{
+				map->slipFlagLat = col;
+			}
+
+			if (*p == ',')
+			{
+				col++;
+				p++;
+				field = p;
+				continue;
+			}
+			break;
+		}
+		p++;
+	}
+
+	return secondLogColumnMapIsValid(map);
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 secondLogMaxRequiredColumn
+// 処理概要     2次ログ再解析で読む必要がある最大列番号を取得する
+// 引数         map: 列番号マップ
+// 戻り値       最大列番号
+/////////////////////////////////////////////////////////////////////
+static int16_t secondLogMaxRequiredColumn(const SecondLogColumnMap *map)
+{
+	int16_t maxCol = map->courseMarker;
+	if (map->encTotalOptimal > maxCol) maxCol = map->encTotalOptimal;
+	if (map->ROC > maxCol) maxCol = map->ROC;
+	if (map->targetSpeed > maxCol) maxCol = map->targetSpeed;
+	if (map->optimalIndex > maxCol) maxCol = map->optimalIndex;
+	if (map->slipFlag > maxCol) maxCol = map->slipFlag;
+	if (map->slipFlagLat > maxCol) maxCol = map->slipFlagLat;
+	return maxCol;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 calcExpandedSlipRisk
+// 処理概要     指定インデックス周辺のスリップリスクを近傍拡張して取得する
+// 引数         risk: スリップリスク配列
+// 引数         index: 対象インデックス
+// 引数         maxIndex: 最大有効インデックス
+// 戻り値       近傍拡張後のスリップリスク
+/////////////////////////////////////////////////////////////////////
+static float calcExpandedSlipRisk(const float *risk, int16_t index, int16_t maxIndex)
+{
+	float expanded = risk[index];
+	if (index - 1 >= 0)
+	{
+		float cand = risk[index - 1] * CA_SLIP_EXPAND_1;
+		if (cand > expanded)
+		{
+			expanded = cand;
+		}
+	}
+	if (index - 2 >= 0)
+	{
+		float cand = risk[index - 2] * CA_SLIP_EXPAND_2;
+		if (cand > expanded)
+		{
+			expanded = cand;
+		}
+	}
+	if (index + 1 <= maxIndex)
+	{
+		float cand = risk[index + 1] * CA_SLIP_EXPAND_1;
+		if (cand > expanded)
+		{
+			expanded = cand;
+		}
+	}
+	if (index + 2 <= maxIndex)
+	{
+		float cand = risk[index + 2] * CA_SLIP_EXPAND_2;
+		if (cand > expanded)
+		{
+			expanded = cand;
+		}
+	}
+	return expanded;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 isSlipSpeedPropagationProtected
+// 処理概要     速度変化制限の伝播から保護する高速度帯ストレートか判定する
+// 引数         riskLat: 横スリップリスク配列
+// 引数         v2Max: 1次ログ由来の基準速度配列[m/s]
+// 引数         baseRoc: 1次ログ由来の基準ROC配列[mm]
+// 引数         index: 対象インデックス
+// 引数         maxIndex: 最大有効インデックス
+// 戻り値       true: 保護対象, false: 保護対象外
+/////////////////////////////////////////////////////////////////////
+static bool isSlipSpeedPropagationProtected(const float *riskLat, const float *v2Max, const int16_t *baseRoc, int16_t index, int16_t maxIndex)
+{
+	if (index < 0 || index > maxIndex)
+	{
+		return false;
+	}
+
+	float expandedLat = calcExpandedSlipRisk(riskLat, index, maxIndex);
+	return (v2Max[index] >= CA_SLIP_STRAIGHT_FLOOR_MIN_SPEED_MPS &&
+			fabsf((float)baseRoc[index]) >= ROC_STRAIGHT_TH &&
+			expandedLat <= 0.0f);
+}
+
 /////////////////////////////////////////////////////////////////////
 // 繝ｭ繝ｼ繧ｫ繝ｫ髢｢謨ｰ parseSecondLogLine
 // 蜃ｦ逅・ｦりｦ・ 2谺｡襍ｰ陦後Ο繧ｰ縺ｮ蠢・ｦ∝・縺ｮ縺ｿ繧呈歓蜃ｺ縺吶ｋ
 // 蠑墓焚	 line: 1陦梧枚蟄怜・, 蜷・・蜉帛・繝昴う繝ｳ繧ｿ
 // 謌ｻ繧雁､	 隗｣譫先・蜉溘↑繧液rue
 /////////////////////////////////////////////////////////////////////
-static bool parseSecondLogLine(const char *line, uint8_t *courseMarker, int32_t *encTotal,
+static bool parseSecondLogLine(const char *line, const SecondLogColumnMap *map, uint8_t *courseMarker, int32_t *encTotal,
 		int16_t *roc, float *targetSpeedLog, int16_t *optimalIdx, uint8_t *slipLong, uint8_t *slipLat)
 {
 	// 霑ｽ蜉: 繝倥ャ繝/遨ｺ陦悟愛螳壹・縺溘ａ蜈磯ｭ縺ｮ譛牙柑譁・ｭ励ｒ遒ｺ隱阪☆繧・
@@ -652,6 +898,7 @@ static bool parseSecondLogLine(const char *line, uint8_t *courseMarker, int32_t 
 
 	// 霑ｽ蜉: 繧ｫ繝ｳ繝槭ｒ謨ｰ縺医↑縺後ｉ蠢・ｦ∝・縺縺代ｒ謚ｽ蜃ｺ縺吶ｋ
 	int col = 0;
+	const int16_t maxCol = secondLogMaxRequiredColumn(map);
 	const char *field = p;
 	bool gotOptimal = false;
 	while (1)
@@ -660,37 +907,39 @@ static bool parseSecondLogLine(const char *line, uint8_t *courseMarker, int32_t 
 		if (*p == ',' || *p == '\n' || *p == '\r' || *p == '\0')
 		{
 			char *endptr = NULL;
-			switch (col)
+			if (col == map->courseMarker)
 			{
-			case 3:
 				*courseMarker = (uint8_t)strtol(field, &endptr, 10);
-				break;
-			case 4:
+			}
+			else if (col == map->encTotalOptimal)
+			{
 				*encTotal = (int32_t)strtol(field, &endptr, 10);
-				break;
-			case 5:
+			}
+			else if (col == map->ROC)
+			{
 				*roc = (int16_t)strtol(field, &endptr, 10);
-				break;
-			case 6:
+			}
+			else if (col == map->targetSpeed)
+			{
 				*targetSpeedLog = strtof(field, &endptr);
-				break;
-			case 7:
+			}
+			else if (col == map->optimalIndex)
+			{
 				*optimalIdx = (int16_t)strtol(field, &endptr, 10);
 				gotOptimal = true;
-				break;
-			case 8:
+			}
+			else if (col == map->slipFlag)
+			{
 				*slipLong = (uint8_t)strtol(field, &endptr, 10);
-				break;
-			case 9:
+			}
+			else if (col == map->slipFlagLat)
+			{
 				*slipLat = (uint8_t)strtol(field, &endptr, 10);
-				break;
-			default:
-				break;
 			}
 			if (*p == ',')
 			{
 				col++;
-				if (col > 9)
+				if (col > maxCol)
 				{
 					break;	// 霑ｽ蜉: 蠢・ｦ∝・繧定ｶ・∴縺溘ｉ譌ｩ譛溽ｵゆｺ・
 				}
@@ -775,12 +1024,13 @@ int16_t readLogDistanceSlip(int logNumber)
 	// 霑ｽ蜉: 隗｣譫千畑繝舌ャ繝輔ぃ繝ｻ驟榊・縺ｯ髱咏噪鬆伜沺縺ｧ遒ｺ菫昴＠縺ｦ繧ｹ繧ｿ繝・け繧堤ｯ邏・
 	static uint16_t sampleCnt[OPT_BUFF_SIZE];
 	static float v2Max[OPT_BUFF_SIZE];
+	static int16_t baseRoc[OPT_BUFF_SIZE];
 	static float rocAbsSum[OPT_BUFF_SIZE];
 	static uint16_t rocCnt[OPT_BUFF_SIZE];
 	static uint16_t slipLongCnt[OPT_BUFF_SIZE];
 	static uint16_t slipLatCnt[OPT_BUFF_SIZE];
-	static float risk[OPT_BUFF_SIZE];
-	static float riskExpanded[OPT_BUFF_SIZE];
+	static float riskLong[OPT_BUFF_SIZE];
+	static float riskLat[OPT_BUFF_SIZE];
 	static float v3[OPT_BUFF_SIZE];
 
 	snprintf(fileName, sizeof(fileName), "%d", logNumber);			   // 謨ｰ蛟､繧呈枚蟄怜・縺ｫ螟画鋤
@@ -801,21 +1051,24 @@ int16_t readLogDistanceSlip(int logNumber)
 
 	memset(sampleCnt, 0, sizeof(sampleCnt));
 	memset(v2Max, 0, sizeof(v2Max));
+	memset(baseRoc, 0, sizeof(baseRoc));
 	memset(rocAbsSum, 0, sizeof(rocAbsSum));
 	memset(rocCnt, 0, sizeof(rocCnt));
 	memset(slipLongCnt, 0, sizeof(slipLongCnt));
 	memset(slipLatCnt, 0, sizeof(slipLatCnt));
-	memset(risk, 0, sizeof(risk));
-	memset(riskExpanded, 0, sizeof(riskExpanded));
+	memset(riskLong, 0, sizeof(riskLong));
+	memset(riskLat, 0, sizeof(riskLat));
 	memset(v3, 0, sizeof(v3));
 	for (int16_t i = 0; i < baseCount && i < OPT_BUFF_SIZE; i++)
 	{
 		v2Max[i] = PPAD[i].boostSpeed;
+		baseRoc[i] = PPAD[i].ROC;
 	}
 
 	static TCHAR log[CA_SECOND_LOG_LINE_BUFSIZE];
 	const int log_len = (int)(sizeof(log) / sizeof(log[0]));
 	int16_t maxOptimalIndex = -1;
+	SecondLogColumnMap secondLogCols;
 
 	// 1陦檎岼縺ｯ繝倥ャ繝縺ｪ縺ｮ縺ｧ隱ｭ縺ｿ鬟帙・縺・
 	TCHAR *header = f_gets(log, log_len, &fil_Read);
@@ -832,6 +1085,11 @@ int16_t readLogDistanceSlip(int logNumber)
 		{
 			ret = -2; // 隗｣譫仙ｯｾ雎｡縺檎┌縺・
 		}
+		goto cleanup;
+	}
+	if (!parseSecondLogHeader((const char *)header, &secondLogCols))
+	{
+		ret = -2;
 		goto cleanup;
 	}
 
@@ -860,7 +1118,7 @@ int16_t readLogDistanceSlip(int logNumber)
 		uint8_t slipLong = 0;
 		uint8_t slipLat = 0;
 
-		if (!parseSecondLogLine((const char *)log, &courseMarker, &encTotal, &roc,
+		if (!parseSecondLogLine((const char *)log, &secondLogCols, &courseMarker, &encTotal, &roc,
 				&targetSpeedLog, &optimalIdx, &slipLong, &slipLat))
 		{
 			continue;	// 霑ｽ蜉: 繝倥ャ繝/遨ｺ陦後・隗｣譫舌＠縺ｪ縺・
@@ -955,80 +1213,55 @@ cleanup:
 	{
 		if (sampleCnt[i] == 0)
 		{
-			risk[i] = 0.0f;
+			riskLong[i] = 0.0f;
+			riskLat[i] = 0.0f;
 			continue;
 		}
 		uint16_t longCnt = (slipLongCnt[i] >= CA_SLIP_CNT_MIN) ? slipLongCnt[i] : 0;
 		uint16_t latCnt = (slipLatCnt[i] >= CA_SLIP_CNT_MIN) ? slipLatCnt[i] : 0;
 		float fracLong = (float)longCnt / (float)sampleCnt[i];
 		float fracLat = (float)latCnt / (float)sampleCnt[i];
-		float riskLong = fracLong / CA_SLIP_FRAC_FULL;
-		float riskLat = fracLat / CA_SLIP_FRAC_FULL;
-		if (riskLong > 1.0f)
+		float riskLongValue = fracLong / CA_SLIP_FRAC_FULL;
+		float riskLatValue = fracLat / CA_SLIP_FRAC_FULL;
+		if (riskLongValue > 1.0f)
 		{
-			riskLong = 1.0f;
+			riskLongValue = 1.0f;
 		}
-		if (riskLat > 1.0f)
+		if (riskLatValue > 1.0f)
 		{
-			riskLat = 1.0f;
+			riskLatValue = 1.0f;
 		}
-		risk[i] = (riskLong > riskLat) ? riskLong : riskLat;
-	}
-
-	// 霑ｽ蜉: 霑大ｍ縺ｸ繝ｪ繧ｹ繧ｯ諡｡蠑ｵ
-	for (int16_t i = 0; i <= maxOptimalIndex; i++)
-	{
-		float expanded = risk[i];
-		if (i - 1 >= 0)
-		{
-			float cand = risk[i - 1] * CA_SLIP_EXPAND_1;
-			if (cand > expanded)
-			{
-				expanded = cand;
-			}
-		}
-		if (i - 2 >= 0)
-		{
-			float cand = risk[i - 2] * CA_SLIP_EXPAND_2;
-			if (cand > expanded)
-			{
-				expanded = cand;
-			}
-		}
-		if (i + 1 <= maxOptimalIndex)
-		{
-			float cand = risk[i + 1] * CA_SLIP_EXPAND_1;
-			if (cand > expanded)
-			{
-				expanded = cand;
-			}
-		}
-		if (i + 2 <= maxOptimalIndex)
-		{
-			float cand = risk[i + 2] * CA_SLIP_EXPAND_2;
-			if (cand > expanded)
-			{
-				expanded = cand;
-			}
-		}
-		riskExpanded[i] = expanded;
+		riskLong[i] = riskLongValue;
+		riskLat[i] = riskLatValue;
 	}
 
 	// 霑ｽ蜉: v3繧呈峩譁ｰ(貂幃・蠅鈴・
 	for (int16_t i = 0; i <= maxOptimalIndex; i++)
 	{
 		float v = v2Max[i];
-		if (riskExpanded[i] > 0.0f)
+		float expandedLong = calcExpandedSlipRisk(riskLong, i, maxOptimalIndex);
+		float expandedLat = calcExpandedSlipRisk(riskLat, i, maxOptimalIndex);
+		if (expandedLong > 0.0f || expandedLat > 0.0f)
 		{
-			float scale = 1.0f - (CA_SLIP_DOWN_RISK * riskExpanded[i]);
-			if (slipLongCnt[i] >= CA_SLIP_CNT_MIN)
+			float scaleLong = 1.0f;
+			float scaleLat = 1.0f;
+			if (expandedLong > 0.0f)
 			{
-				scale -= CA_SLIP_DOWN_LONG_EXTRA;
+				scaleLong = 1.0f - (CA_SLIP_DOWN_LONG_RISK * expandedLong);
+				if (slipLongCnt[i] >= CA_SLIP_CNT_MIN)
+				{
+					scaleLong -= CA_SLIP_DOWN_LONG_EXTRA;
+				}
 			}
-			if (slipLatCnt[i] >= CA_SLIP_CNT_MIN)
+			if (expandedLat > 0.0f)
 			{
-				scale -= CA_SLIP_DOWN_LAT_EXTRA;
+				scaleLat = 1.0f - (CA_SLIP_DOWN_LAT_RISK * expandedLat);
+				if (slipLatCnt[i] >= CA_SLIP_CNT_MIN)
+				{
+					scaleLat -= CA_SLIP_DOWN_LAT_EXTRA;
+				}
 			}
+			float scale = (scaleLong < scaleLat) ? scaleLong : scaleLat;
 			if (scale < CA_SLIP_MIN_SCALE)
 			{
 				scale = CA_SLIP_MIN_SCALE;
@@ -1045,6 +1278,7 @@ cleanup:
 
 	// 霑ｽ蜉: 2谺｡縺ｮ騾溷ｺｦ螟牙喧驥丈ｻ･蜀・↓蜿弱ａ繧・蜑榊ｾ後ヱ繧ｹ)
 	applyDecelLeadToArray(v3, (int16_t)(maxOptimalIndex + 1)); // 譖ｲ邇・､牙喧縺ｫ蠢懊§縺ｦ縲∵ｸ幃溷芦驕比ｽ咲ｽｮ繧呈焔蜑阪∈蟇・○繧・
+	int16_t protectedLimitCount = 0;
 	for (int16_t i = 0; i < maxOptimalIndex; i++)
 	{
 		float dvUp = v2Max[i + 1] - v2Max[i];
@@ -1055,9 +1289,33 @@ cleanup:
 		float limit = v3[i] + dvUp;
 		if (v3[i + 1] > limit)
 		{
-			v3[i + 1] = limit;
+			bool protectedStraight = isSlipSpeedPropagationProtected(riskLat, v2Max, baseRoc, i + 1, maxOptimalIndex);
+			if (protectedStraight)
+			{
+				protectedLimitCount++;
+			}
+			else
+			{
+				protectedLimitCount = 0;
+			}
+
+			float limitedSpeed = limit;
+			if (protectedStraight && protectedLimitCount > CA_SLIP_SPEED_PROPAGATE_PROTECT_STEPS)
+			{
+				float recoverSpeed = v2Max[i + 1] * CA_SLIP_SPEED_PROPAGATE_RECOVER_SCALE;
+				if (limitedSpeed < recoverSpeed)
+				{
+					limitedSpeed = recoverSpeed;
+				}
+			}
+			v3[i + 1] = limitedSpeed;
+		}
+		else
+		{
+			protectedLimitCount = 0;
 		}
 	}
+	protectedLimitCount = 0;
 	for (int32_t i = maxOptimalIndex - 1; i >= 0; i--)
 	{
 		float dvDown = v2Max[i] - v2Max[i + 1];
@@ -1068,7 +1326,43 @@ cleanup:
 		float limit = v3[i + 1] + dvDown;
 		if (v3[i] > limit)
 		{
-			v3[i] = limit;
+			bool protectedStraight = isSlipSpeedPropagationProtected(riskLat, v2Max, baseRoc, i, maxOptimalIndex);
+			if (protectedStraight)
+			{
+				protectedLimitCount++;
+			}
+			else
+			{
+				protectedLimitCount = 0;
+			}
+
+			float limitedSpeed = limit;
+			if (protectedStraight && protectedLimitCount > CA_SLIP_SPEED_PROPAGATE_PROTECT_STEPS)
+			{
+				float recoverSpeed = v2Max[i] * CA_SLIP_SPEED_PROPAGATE_RECOVER_SCALE;
+				if (limitedSpeed < recoverSpeed)
+				{
+					limitedSpeed = recoverSpeed;
+				}
+			}
+			v3[i] = limitedSpeed;
+		}
+		else
+		{
+			protectedLimitCount = 0;
+		}
+	}
+
+	// 追加: 横スリップが無い高速度帯ストレートは、低速カーブ側の減速伝播で落とし過ぎない。
+	for (int16_t i = 0; i <= maxOptimalIndex; i++)
+	{
+		if (isSlipSpeedPropagationProtected(riskLat, v2Max, baseRoc, i, maxOptimalIndex))
+		{
+			float floorSpeed = v2Max[i] * CA_SLIP_STRAIGHT_FLOOR_SCALE;
+			if (v3[i] < floorSpeed)
+			{
+				v3[i] = floorSpeed;
+			}
 		}
 	}
 

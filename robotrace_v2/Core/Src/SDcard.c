@@ -4,6 +4,7 @@
 #include "SDcard.h"
 #include "courseAnalysis.h"
 #include "firmware_version.h"
+#include "PIDcontrol.h"
 #include "sd_functions.h"
 #include "stdio.h"
 #include <stdint.h>
@@ -15,7 +16,7 @@ FIL fil_W;
 FIL fil_R;
 
 // ログヘッダー
-char columnTitle[2048] = "", formatLog[512] = "";
+char columnTitle[3072] = "", formatLog[512] = "";
 
 // ログバッファ
 // Log buffers
@@ -442,6 +443,11 @@ void createLog(void)
 	setLogHeaderStrF("optimalTrace", optimalTrace);
 	setLogHeaderStrF("autoStart", autoStart);
 	setLogHeaderStrF("emcStop", emcStop);
+	setLogHeaderStr("logRecordSizeBytes", LOG_RECORD_SIZE_BYTES);
+	setLogHeaderStr("logBufferSizeBytes", BUFFER_SIZE_LOG);
+	setLogHeaderStr("logBufferRecordCapacity", BUFFER_SIZE_LOG / LOG_RECORD_SIZE_BYTES);
+	setLogHeaderStr("dbgOverflowFinal", (int32_t)dbg_overflow);
+	setLogHeaderStr("logOverflowFinal", logOverflow ? 1 : 0);
 
 	setLogHeaderStrF("tgtParam.bstStraight", tgtParam.bstStraight);
 	setLogHeaderStrF("tgtParam.bst1500", tgtParam.bst1500);
@@ -468,7 +474,24 @@ void createLog(void)
 	setLogHeaderStrF("veloCtrl.kp", veloCtrl.kp);
 	setLogHeaderStrF("veloCtrl.ki", veloCtrl.ki);
 	setLogHeaderStrF("veloCtrl.kd", veloCtrl.kd);
+	setLogHeaderStrF("veloCtrlL.kp", veloCtrlL.kp);
+	setLogHeaderStrF("veloCtrlL.ki", veloCtrlL.ki);
+	setLogHeaderStrF("veloCtrlL.kd", veloCtrlL.kd);
+	setLogHeaderStrF("veloCtrlR.kp", veloCtrlR.kp);
+	setLogHeaderStrF("veloCtrlR.ki", veloCtrlR.ki);
+	setLogHeaderStrF("veloCtrlR.kd", veloCtrlR.kd);
 	setLogHeaderStrF("speedFeedForwardGain", speedFeedForwardGain);
+	setLogHeaderStr("speedPropagateProtectSteps", CA_SLIP_SPEED_PROPAGATE_PROTECT_STEPS);
+	setLogHeaderStrF("speedPropagateRecoverScale", CA_SLIP_SPEED_PROPAGATE_RECOVER_SCALE);
+	setLogHeaderStr("lineOmegaTargetCapEnable", LINE_TRACE_OMEGA_TARGET_CAP_ENABLE);
+	setLogHeaderStr("lineOmegaTargetCapDegS", LINE_TRACE_OMEGA_TARGET_CAP_ABS_DEG_S);
+	setLogHeaderStr("lineOmegaTargetCapMaxSpeedPulse", LINE_TRACE_OMEGA_TARGET_CAP_MAX_SPEED_PULSE);
+	setLogHeaderStr("lineOmegaCurveFfEnable", LINE_TRACE_OMEGA_CURVE_FF_ENABLE);
+	setLogHeaderStr("lineOmegaCurveFfRocMaxMm", LINE_TRACE_OMEGA_CURVE_FF_ROC_MAX_MM);
+	setLogHeaderStr("lineOmegaCurveFfRocMinMm", LINE_TRACE_OMEGA_CURVE_FF_ROC_MIN_MM);
+	setLogHeaderStr("lineOmegaCurveFfMaxSpeedPulse", LINE_TRACE_OMEGA_CURVE_FF_MAX_SPEED_PULSE);
+	setLogHeaderStr("lineOmegaCurveFfGainPct", LINE_TRACE_OMEGA_CURVE_FF_GAIN_PCT);
+	setLogHeaderStr("lineOmegaCurveFbScalePct", LINE_TRACE_OMEGA_CURVE_FB_SCALE_PCT);
 	setLogHeaderStrF("yawRateCtrl.kp", yawRateCtrl.kp);
 	setLogHeaderStrF("yawRateCtrl.ki", yawRateCtrl.ki);
 	setLogHeaderStrF("yawRateCtrl.kd", yawRateCtrl.kd);

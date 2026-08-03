@@ -105,8 +105,10 @@
 #define GAIN_CHANGE_ROC_ENTER			500		// カーブ用ゲインへ切替えるROC閾値[mm]（小さいほどカーブ）
 #define GAIN_CHANGE_ROC_EXIT			600		// 直線用ゲインへ戻すROC閾値[mm]（大きいほど直線）
 #define GAIN_CHANGE_LOOKAHEAD_ENTER		4		// カーブ進入判定用の先読みインデックス
-#define GAIN_CHANGE_LOOKAHEAD_EXIT		2		// 直線復帰判定用の先読みインデックス
-#define GAIN_CHANGE_STRAIGHT_STABLE_MM	20		// 直線安定がこの距離続いたら直線用ゲインへ復帰
+#define GAIN_CHANGE_LOOKAHEAD_EXIT		1		// 直線復帰判定用の先読みインデックス
+#define GAIN_CHANGE_STRAIGHT_STABLE_MM	10		// 直線安定がこの距離続いたら直線用ゲインへ復帰
+#define GAIN_CHANGE_STRAIGHT_KP			2		// 直線用lineTraceOmegaFBCtrl Pゲイン
+#define GAIN_CHANGE_STRAIGHT_KD			1		// 直線用lineTraceOmegaFBCtrl Dゲイン
 
 // ファイル名
 #define FILENAME_TARGET_SPEED "targetSpeeds"

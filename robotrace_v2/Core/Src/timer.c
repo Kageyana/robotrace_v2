@@ -8,6 +8,8 @@
 #include "lineSensor.h"
 #include <stdint.h>
 #define STRAIGHT_STATE_THRESHOLD_MM	70	// 直線判定の距離閾値[mm]
+#define SPEED_LR_TARGET_MAX_MPS		5.0f	// 左右独立速度制御の片輪目標上限[m/s]
+#define SPEED_LR_TARGET_MAX_PULSE	((int16_t)(PULSE_MILLIMETER * SPEED_LR_TARGET_MAX_MPS))
 //====================================//
 // グローバル変数の宣
 //====================================//
@@ -15,6 +17,9 @@ int32_t cnt5 = 0;
 int32_t cnt10 = 0;
 int32_t encPulse5ms = 0; // 5ms間のエンコーダパルスを累積
 float bootTime;
+int16_t targetSpeedLLog = 0;
+int16_t targetSpeedRLog = 0;
+uint8_t speedTargetClipLog = 0;
 static volatile bool logWriteReq = false;
 /////////////////////////////////////////////////////////////////////
 // モジュール名 Interrupt1ms
@@ -68,6 +73,9 @@ void Interrupt1ms(void)
 	if(patternTrace < 12 || patternTrace > 100)
 	{
 		// スタート直後とゴール後は通常のライン制御
+		targetSpeedLLog = (int16_t)targetSpeed;
+		targetSpeedRLog = (int16_t)targetSpeed;
+		speedTargetClipLog = 0;
 		motorControlTrace();
 		motorControlSpeed();
 	}
@@ -77,16 +85,33 @@ void Interrupt1ms(void)
 		motorControlTraceOmegaFB();
 
 		int16_t delta = lineTraceOmegaFBCtrl.pwm;
-		int16_t targetL = (int16_t)targetSpeed + delta;
-		int16_t targetR = (int16_t)targetSpeed - delta;
-		// クリップ（例：目標が大きくなりすぎないように。上限は実機で調整）
-		const int16_t TARGET_MAX = (int16_t)PULSE_MILLIMETER * 4;	// 4.0m/s
-		if (targetL >  TARGET_MAX) targetL =  TARGET_MAX;
-		if (targetL < -TARGET_MAX) targetL = -TARGET_MAX;
-		if (targetR >  TARGET_MAX) targetR =  TARGET_MAX;
-		if (targetR < -TARGET_MAX) targetR = -TARGET_MAX;
+		int32_t targetL = (int32_t)targetSpeed + delta;
+		int32_t targetR = (int32_t)targetSpeed - delta;
+		speedTargetClipLog = 0;
+		if (targetL > SPEED_LR_TARGET_MAX_PULSE)
+		{
+			targetL = SPEED_LR_TARGET_MAX_PULSE;
+			speedTargetClipLog = 1;
+		}
+		if (targetL < -SPEED_LR_TARGET_MAX_PULSE)
+		{
+			targetL = -SPEED_LR_TARGET_MAX_PULSE;
+			speedTargetClipLog = 1;
+		}
+		if (targetR > SPEED_LR_TARGET_MAX_PULSE)
+		{
+			targetR = SPEED_LR_TARGET_MAX_PULSE;
+			speedTargetClipLog = 1;
+		}
+		if (targetR < -SPEED_LR_TARGET_MAX_PULSE)
+		{
+			targetR = -SPEED_LR_TARGET_MAX_PULSE;
+			speedTargetClipLog = 1;
+		}
+		targetSpeedLLog = (int16_t)targetL;
+		targetSpeedRLog = (int16_t)targetR;
 
-		motorControlSpeedLR(targetL, targetR);
+		motorControlSpeedLR(targetSpeedLLog, targetSpeedRLog);
 	}
 	
 	
@@ -103,13 +128,21 @@ void Interrupt1ms(void)
 		// if (cntEmcStopAngleX()) emcStop = STOP_ANGLE_X;
 		// if (cntEmcStopAngleY()) emcStop = STOP_ANGLE_Y;
 		if (cntEmcStopEncStop())
+		{
 			emcStop = STOP_ENCODER_STOP;
+		}
 		if (cntEmcStopLineSensorBright() && optimalTrace != BOOST_SHORTCUT)
+		{
 			emcStop = STOP_LINESENSOR_BRIGHT;
+		}
 		if (cntEmcStopLineSensorUnbright() && optimalTrace != BOOST_SHORTCUT)
+		{
 			emcStop = STOP_LINESENSOR_UNBRIGHT;
+		}
 		if (judgeOverSpeed())
+		{
 			emcStop = STOP_OVERSPEED;
+		}
 
 		changeGain();		// ROCに応じてゲインを切り替える
 		checkCrossLine();	// クロスライン確認
@@ -243,7 +276,7 @@ void Interrupt500us(void)
 {
 	static uint8_t logWriteReqDivider = 0;
 	logWriteReqDivider++;
-	if (logWriteReqDivider >= 10U) // 0.5ms x 10 = 5ms
+	if (logWriteReqDivider >= 2U) // 0.5ms x 10 = 5ms
 	{
 		logWriteReqDivider = 0;
 		logWriteReq = true;

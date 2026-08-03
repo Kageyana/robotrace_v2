@@ -215,6 +215,12 @@ void initSystem(void)
 			// 前回のPIDゲインを取得
 			readPIDparameters(&lineTraceCtrl);
 			readPIDparameters(&veloCtrl);
+			veloCtrlL.kp = veloCtrl.kp;
+			veloCtrlL.ki = veloCtrl.ki;
+			veloCtrlL.kd = veloCtrl.kd;
+			veloCtrlR.kp = veloCtrl.kp;
+			veloCtrlR.ki = veloCtrl.ki;
+			veloCtrlR.kd = veloCtrl.kd;
 			readSpeedFeedForwardGain(&speedFeedForwardGain);	// 速度フィードフォワード係数も読み出す
 			readPIDparameters(&yawRateCtrl);
 			readPIDparameters(&yawCtrl);
@@ -1130,8 +1136,8 @@ void changeGain(void)
 		{
 			beforeGainP = lineTraceOmegaFBCtrl.kp;
 			beforeGainD = lineTraceOmegaFBCtrl.kd;
-			lineTraceOmegaFBCtrl.kp = 2;
-			lineTraceOmegaFBCtrl.kd = 0;
+			lineTraceOmegaFBCtrl.kp = GAIN_CHANGE_STRAIGHT_KP;
+			lineTraceOmegaFBCtrl.kd = GAIN_CHANGE_STRAIGHT_KD;
 			changeGain = true;
 		}
 	}

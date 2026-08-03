@@ -5,6 +5,8 @@
 //====================================//
 #include <stdint.h>
 #include "SDcard.h"
+#include "timer.h"
+#include "encoder.h"
 //====================================//
 // シンボル定義
 //====================================//
@@ -12,14 +14,23 @@
 // STOREDはバイナリに保存、DERIVEDはendLogで計算。
 // このリストを編集して、CSVログフィールドを追加または削除してください。
 // STORED(type, name, fmt, expr) or DERIVED(type, name, fmt, expr)
-#define LOG_FIELD_LIST(STORED, DERIVED) \
+#ifndef LOG_SCHEMA_PROFILE_LIGHT
+#define LOG_SCHEMA_PROFILE_LIGHT 1
+#endif
+
+#define LOG_FIELD_LIST_FULL(STORED, DERIVED) \
 	STORED(U16, cntlog, "%d", (uint16_t)cntRun) \
 	STORED(U16, encCurrentN, "%d", (uint16_t)encCurrentN) \
 	STORED(F32, gyroVal_Z, "%f", imuVal.gyro.z) \
 	STORED(U8, courseMarker, "%d", courseMarkerLog) \
 	STORED(U32, encTotalOptimal, "%d", (uint32_t)encTotalOptimal) \
 	DERIVED(F32, ROC, "%f", log_roc) \
+	STORED(S16, encCurrentL, "%d", encCurrentL) \
+	STORED(S16, encCurrentR, "%d", encCurrentR) \
 	STORED(U8, targetSpeed, "%d", targetSpeed) \
+	STORED(S16, targetSpeedL, "%d", targetSpeedLLog) \
+	STORED(S16, targetSpeedR, "%d", targetSpeedRLog) \
+	STORED(U8, speedTargetClip, "%d", speedTargetClipLog) \
 	STORED(U16, optimalIndex, "%d", (uint16_t)optimalIndex) \
 	STORED(U8, slipFlag, "%d", (uint8_t)getSlipFlag()) \
 	STORED(U8, slipFlagLat, "%d", (uint8_t)getSlipFlagLat()) \
@@ -36,25 +47,39 @@
 	STORED(U32, encCurrentCorr_p, "%d", (uint32_t)Control_GetEncCurrentCorr_p()) \
 	STORED(U8, straightPendingAttempt, "%d", (uint8_t)straightMarkerPendingLog) \
 	STORED(U8, lineTraceOmegaFBCtrlkp, "%d", (uint8_t)lineTraceOmegaFBCtrl.kp) \
+	STORED(U8, lineTraceOmegaFBCtrlkd, "%d", (uint8_t)lineTraceOmegaFBCtrl.kd) \
 	DERIVED(F32, x, "%f", log_x) \
-	DERIVED(F32, y, "%f", log_y) \
-	STORED(U8, slipLongOnCountEnabled, "%d", (uint8_t)getSlipLongOnCountEnabled()) \
-	STORED(U8, slipLatEnabled, "%d", (uint8_t)getSlipLatEnabled()) \
-	STORED(U8, slipLatOnCountEnabled, "%d", (uint8_t)getSlipLatOnCountEnabled()) \
-	STORED(U16, slipISumOkCount, "%d", getSlipISumOkCount()) \
-	STORED(F32, slipPwmSumF, "%f", getSlipPwmSumF()) \
-	STORED(F32, slipISumF, "%f", getSlipISumF()) \
-	STORED(F32, slipEncAyF, "%f", getSlipEncAyF()) \
-	STORED(F32, slipImuAyF, "%f", getSlipImuAyF()) \
-	STORED(F32, slipThresholdHigh, "%f", getSlipThresholdHigh()) \
-	STORED(F32, slipThresholdLow, "%f", getSlipThresholdLow()) \
-	STORED(F32, slipLatHigh, "%f", getSlipLatHigh()) \
-	STORED(F32, slipLatLow, "%f", getSlipLatLow()) \
-	STORED(F32, slipCurScale, "%f", getSlipCurScale()) \
-	STORED(U8, slipTurningState, "%d", (uint8_t)getSlipTurningState()) \
-	STORED(F32, slipAxBias, "%f", getSlipAxBias()) \
-	STORED(F32, slipAyBias, "%f", getSlipAyBias()) \
-	STORED(U16, slipLongLowloadClearCount, "%d", getSlipLongLowloadClearCount())
+	DERIVED(F32, y, "%f", log_y)
+
+#define LOG_FIELD_LIST_LIGHT(STORED, DERIVED) \
+	STORED(U16, cntlog, "%d", (uint16_t)cntRun) \
+	STORED(U16, encCurrentN, "%d", (uint16_t)encCurrentN) \
+	STORED(F32, gyroVal_Z, "%f", imuVal.gyro.z) \
+	STORED(U8, courseMarker, "%d", courseMarkerLog) \
+	STORED(U32, encTotalOptimal, "%d", (uint32_t)encTotalOptimal) \
+	DERIVED(F32, ROC, "%f", log_roc) \
+	STORED(U8, targetSpeed, "%d", targetSpeed) \
+	STORED(U16, logPadU16_01, "%d", 0) \
+	STORED(U8, logPadU8_01, "%d", 0) \
+	STORED(U16, optimalIndex, "%d", (uint16_t)optimalIndex) \
+	STORED(U8, slipFlag, "%d", (uint8_t)getSlipFlag()) \
+	STORED(U8, slipFlagLat, "%d", (uint8_t)getSlipFlagLat()) \
+	STORED(S16, lineTraceCtrl, "%d", (int16_t)lineTraceOmegaFBCtrl.pwm) \
+	STORED(S16, motorpwmL, "%d", (int16_t)motorpwmL) \
+	STORED(S16, motorpwmR, "%d", (int16_t)motorpwmR) \
+	STORED(U32, encCurrentCorr_p, "%d", (uint32_t)Control_GetEncCurrentCorr_p()) \
+	STORED(U8, lineTraceOmegaFBCtrlkp, "%d", (uint8_t)lineTraceOmegaFBCtrl.kp) \
+	STORED(U8, lineTraceOmegaFBCtrlkd, "%d", (uint8_t)lineTraceOmegaFBCtrl.kd) \
+	STORED(U16, logPadU16_00, "%d", 0) \
+	STORED(U8, logPadU8_00, "%d", 0) \
+	DERIVED(F32, x, "%f", log_x) \
+	DERIVED(F32, y, "%f", log_y)
+
+#if LOG_SCHEMA_PROFILE_LIGHT
+#define LOG_FIELD_LIST(STORED, DERIVED) LOG_FIELD_LIST_LIGHT(STORED, DERIVED)
+#else
+#define LOG_FIELD_LIST(STORED, DERIVED) LOG_FIELD_LIST_FULL(STORED, DERIVED)
+#endif
 
 
 	/* STORED(F32, slipDistScaleF, "%f", Control_GetSlipDistScale()) */

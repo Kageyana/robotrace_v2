@@ -35,10 +35,15 @@
 #define CA_SLIP_FRAC_FULL 0.60f			// risk=1.0とみなすスリップ割合(値↑でフルリスク到達しにくく減速弱、例:0.60→0.70)
 #define CA_SLIP_EXPAND_1 0.50f			// 近傍拡張係数(±1)(値↑で周辺にもリスク拡散→減速範囲広、例:0.25→0.40)
 #define CA_SLIP_EXPAND_2 0.25f			// 近傍拡張係数(±2)(値↑で遠方へも拡散→減速範囲広、例:0.25→0.40)
-#define CA_SLIP_DOWN_RISK 0.20f			// riskに応じた基本減速ゲイン(値↑で減速強、例:0.20→0.30)
+#define CA_SLIP_DOWN_LONG_RISK 0.04f	// 縦スリップriskに応じた基本減速ゲイン
+#define CA_SLIP_DOWN_LAT_RISK 0.20f		// 横スリップriskに応じた基本減速ゲイン
 #define CA_SLIP_DOWN_LONG_EXTRA 0.01f	// 縦スリップ追加減速(値↑で縦スリップ時の減速強、例:0.01→0.02)
-#define CA_SLIP_DOWN_LAT_EXTRA 0.3f		// 横スリップ追加減速(値↑で横スリップ時の減速強、例:0.10→0.15)
+#define CA_SLIP_DOWN_LAT_EXTRA 0.30f	// 横スリップ追加減速(値↑で横スリップ時の減速強)
 #define CA_SLIP_MIN_SCALE 0.80f			// 最小スケール(減速下限)(値↑で下限が高くなり減速弱、値↓で減速強)
+#define CA_SLIP_STRAIGHT_FLOOR_SCALE 0.92f		// 横スリップなし高速度帯ストレートの下限スケール
+#define CA_SLIP_STRAIGHT_FLOOR_MIN_SPEED_MPS 3.0f	// ストレート下限を適用する基準速度[m/s]
+#define CA_SLIP_SPEED_PROPAGATE_PROTECT_STEPS OPT_BUFF_SIZE	// 高速直線の0.94回復処理を無効化する連続index数
+#define CA_SLIP_SPEED_PROPAGATE_RECOVER_SCALE 0.94f	// 伝播範囲外の高速直線を戻す下限スケール
 #define CA_SLIP_UP_STRAIGHT 0.05f		// 直線での微増速(値↑で増速強、例:0.09→0.12)
 #define CA_SLIP_UP_CURVE 0.05f			// カーブでの微増速(値↑で増速強、例:0.05→0.08)
 

@@ -24,7 +24,7 @@
 #define STOP_COUNT_OVERSPEED	200	    // 目標速度を大きく超えている
 
 #define STOP_TH_LINE_SENSOR_BRIGHT	1000	// ラインセンサ停止閾値
-#define STOP_TH_LINE_SENSOR_UNBRIGHT 100	// ラインセンサ停止閾値
+#define STOP_TH_LINE_SENSOR_UNBRIGHT 200	// ラインセンサ停止閾値
 //====================================//
 // グローバル変数の宣言
 //====================================//
