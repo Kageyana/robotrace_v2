@@ -12,6 +12,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define DISPLAY_INIT_DMA_TIMEOUT_MS 200U
+
 //====================================//
 // グローバル変数の宣言
 //====================================//
@@ -33,7 +35,6 @@ float rocrun = 2000;		// 曲率半径計算用変数
 uint16_t analogValLSon[NUM_SENSORS+1]; // ADC結果格納配列
 uint16_t analogValLSoff[NUM_SENSORS+1]; // ADC結果格納配列s
 uint16_t analogVal2[4];			  // ADC結果格納配列
-float batteryVoltage_V = 0.0f;	// DWT初期化後に取得したバッテリ電圧[V]を保持
 
 // 速度パラメータ関連
 speedParam tgtParam = {
@@ -106,6 +107,34 @@ static const char *getRunStartBlockReason(void);
 static bool isRunStartAllowed(void);
 static void showRunStartBlocked(const char *reason);
 static bool blockRunStartIfNeeded(void);
+/////////////////////////////////////////////////////////////////////
+// モジュール名 updateDisplayDmaAndWait
+// 処理概要     初期化表示をDMA更新し、完了しない場合はタイムアウトで抜ける
+// 引数         timeout_ms: 待ち時間上限[ms]
+// 戻り値       true: 更新完了 false: タイムアウト
+/////////////////////////////////////////////////////////////////////
+static bool updateDisplayDmaAndWait(uint32_t timeout_ms)
+{
+	uint32_t startTick = HAL_GetTick();
+
+	if (!modeDSP)
+	{
+		return true;
+	}
+
+	ssd1306_UpdateScreen_DMA();
+	while (!ssd1306_IsTransferCompleted())
+	{
+		if ((HAL_GetTick() - startTick) >= timeout_ms)
+		{
+			ssd1306_StopDMA();
+			SSD1306_DMA_Completed = 1;
+			return false;
+		}
+	}
+
+	return true;
+}
 // タイマ関連
 uint32_t cntRun = 0;
 int16_t countdown;
@@ -154,7 +183,7 @@ void initSystem(void)
 		resultHAL[8] = HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_3);
 		resultHAL[9] = HAL_TIM_OC_Start_IT(&htim3, TIM_CHANNEL_1);
 	}
-	motorPwmOut(0, 0);
+	motorCommandOut(0, 0);
 	MotorFanPwmOut(0);
 	powerLineSensors(0);
 	powerMarkerSensors(0);
@@ -177,7 +206,7 @@ void initSystem(void)
 		showBattery();	 // 充電Lv表示
 		ssd1306_SetCursor(0, 16);
 		ssd1306_printf(Font_6x8, "Exboard connect");
-		ssd1306_UpdateScreen_DMA(); // グラフィック液晶更新開始
+		updateDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS); // グラフィック液晶更新
 
 		setLED(0, 0, 50, 0); // 初期化 成功 緑点灯
 	}
@@ -231,8 +260,7 @@ void initSystem(void)
 	}
 	if (modeDSP)
 	{
-		SSD1306_DMA_Completed = 0;				// 全ページ送信完了フラグリセット
-		while(!ssd1306_IsTransferCompleted());	// 全ページ送信完了まで待つ
+		updateDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS); // 全ページ送信完了まで待つ
 	}
 	sendLED();
 
@@ -257,8 +285,7 @@ void initSystem(void)
 	}
 	if (modeDSP)
 	{
-		SSD1306_DMA_Completed = 0;				// 全ページ送信完了フラグリセット
-		while(!ssd1306_IsTransferCompleted());	// 全ページ送信完了まで待つ
+		updateDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS); // 全ページ送信完了まで待つ
 	}
 	sendLED();
 
@@ -297,8 +324,7 @@ void initSystem(void)
 		}
 		if (modeDSP)
 		{
-			SSD1306_DMA_Completed = 0;				// 全ページ送信完了フラグリセット
-			while(!ssd1306_IsTransferCompleted());	// 全ページ送信完了まで待つ
+			updateDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS); // 全ページ送信完了まで待つ
 		}
 		sendLED();
 	}
@@ -313,8 +339,7 @@ void initSystem(void)
 			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 			ssd1306_SetCursor(15, 30);
 			ssd1306_printf(Font_11x18, "No SDcard");
-			SSD1306_DMA_Completed = 0; // 全ページ送信完了フラグリセット
-			while(!ssd1306_IsTransferCompleted());	// 全ページ送信完了まで待つ
+			updateDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS); // 全ページ送信完了まで待つ
 
 			HAL_Delay(1000);
 		}
@@ -328,8 +353,7 @@ void initSystem(void)
 			ssd1306_printf(Font_11x18, "Too many");
 			ssd1306_SetCursor(14, 36	);
 			ssd1306_printf(Font_11x18, "Log files");
-			SSD1306_DMA_Completed = 0; // 全ページ送信完了フラグリセット
-			while(!ssd1306_IsTransferCompleted());	// 全ページ送信完了まで待つ
+			updateDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS); // 全ページ送信完了まで待つ
 
 			HAL_Delay(1000);
 		}
@@ -341,7 +365,7 @@ void initSystem(void)
 	resetCycleCounter();
 	enableCycleCounter(); // カウント開始
 
-	batteryVoltage_V = AD2VOLTAGE(batteryAD); // バッテリ電圧を計算
+	updateBatteryVoltage(); // バッテリ電圧を計算
 
 	encClick = 0; // ホイールクリッククリア
 
@@ -413,7 +437,7 @@ static bool blockRunStartIfNeeded(void)
 		return false;
 	}
 
-	motorPwmOut(0, 0);
+	motorCommandOut(0, 0);
 	powerLineSensors(0);
 	setupFlags.start = 0;
 	autoStart = 0;
@@ -451,7 +475,7 @@ void loopSystem(void)
 		if (autoStart > 1)
 		{
 			// 2次走行
-			motorPwmOut(0, 0);
+			motorCommandOut(0, 0);
 
 			// 目標速度調整
 			// コース解析
@@ -520,7 +544,7 @@ void loopSystem(void)
 					break;
 				}
 
-				motorPwmOut(0, 0);
+				motorCommandOut(0, 0);
 				countdown = 2000;							  // カウントダウンスタート
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56, 28);
@@ -563,7 +587,7 @@ void loopSystem(void)
 		// IMUのキャリブレーションが終了したら走行開始
 		if (!calibratIMU && !calibrateMotorCurrent && countdown == 0)
 		{
-			batteryVoltage_V = AD2VOLTAGE(batteryAD); // 走行開始直前の電圧を速度FFへ反映
+			updateBatteryVoltage(); // 走行開始直前の電圧を反映
 			powerLineSensors(1);   // ラインセンサ点灯
 
 			// SDカードに変数保存
@@ -618,8 +642,8 @@ void loopSystem(void)
 			setTargetSpeed(tgtParam.search); // 目標速度
 		}
 		// ライントレース
-		motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
-		// motorPwmOut(veloCtrlL.pwm,veloCtrlR.pwm);
+		motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+		// motorCommandOut(veloCtrlL.pwm,veloCtrlR.pwm);
 
 		// スタートマーカーを通過したら本走行に移行
 		if (SGmarker > 0)
@@ -665,8 +689,8 @@ void loopSystem(void)
 			// 探索走行
 			setTargetSpeed(tgtParam.search);
 			// ライントレース
-			// motorPwmOutSynth(lineTraceOmegaFBCtrl.pwm, veloCtrl.pwm, 0, 0);
-			motorPwmOut(veloCtrlL.pwm,veloCtrlR.pwm);
+			// motorCommandOutSynth(lineTraceOmegaFBCtrl.pwm, veloCtrl.pwm, 0, 0);
+			motorCommandOut(veloCtrlL.pwm,veloCtrlR.pwm);
 		}
 		else if (optimalTrace == BOOST_DISTANCE)
 		{
@@ -707,8 +731,8 @@ void loopSystem(void)
 			// 目標速度に設定
 			setTargetSpeed(boostSpeed);
 			// モーター出力
-			// motorPwmOutSynth(lineTraceOmegaFBCtrl.pwm, veloCtrl.pwm, 0, 0);
-			motorPwmOut(veloCtrlL.pwm,veloCtrlR.pwm);
+			// motorCommandOutSynth(lineTraceOmegaFBCtrl.pwm, veloCtrl.pwm, 0, 0);
+			motorCommandOut(veloCtrlL.pwm,veloCtrlR.pwm);
 		}
 		else if (optimalTrace == BOOST_SHORTCUT)
 		{
@@ -725,7 +749,7 @@ void loopSystem(void)
 			// 目標速度に設定
 			setTargetSpeed(boostSpeed);
 			// ライントレース
-			motorPwmOutSynth(0, veloCtrl.pwm, yawCtrl.pwm, distCtrl.pwm);
+			motorCommandOutSynth(0, veloCtrl.pwm, yawCtrl.pwm, distCtrl.pwm);
 		}
 
 		// ゴール判定
@@ -763,7 +787,7 @@ void loopSystem(void)
 		{
 			setTargetSpeed(tgtParam.stop);
 		}
-		motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+		motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 
 		if (encCurrentN == 0)
 		{
@@ -773,7 +797,7 @@ void loopSystem(void)
 
 	case 102:
 		setTargetSpeed(0);
-		motorPwmOutSynth(0, 0, 0, 0);
+		motorCommandOutSynth(0, 0, 0, 0);
 
 		int16_t savedLogNo = 0;	// 追加: 保存実績ログ番号
 		int16_t endIdxBefore = endFileIndex;	// 追加: endLog前のログ末尾を保持
@@ -867,7 +891,7 @@ void loopSystem(void)
 		break;
 
 	case 103:
-		motorPwmOutSynth(0, 0, 0, 0);
+		motorCommandOutSynth(0, 0, 0, 0);
 		powerLineSensors(0);
 		powerMarkerSensors(0);
 		
@@ -915,9 +939,9 @@ void emergencyStop(void)
 	setTargetSpeed(0);
 	while (encCurrentN > 5)
 	{
-		motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
+		motorCommandOutSynth(0, veloCtrl.pwm, 0, 0);
 	}
-	motorPwmOut(0, 0);
+	motorCommandOut(0, 0);
 	
 	if (!ssd1306_IsDMARunning())
 	{

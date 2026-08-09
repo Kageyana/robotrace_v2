@@ -101,7 +101,7 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
-  motorPwmOut(0,0);
+  motorCommandOut(0,0);
   if (modeLOG) endLog();
   ssd1306_FillRectangle(0,15,127,63, Black); // メイン表示空白埋め
   ssd1306_SetCursor(34,28);

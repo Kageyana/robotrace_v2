@@ -144,7 +144,6 @@ extern float rocrun; 			// 曲率半径計算用変数
 extern uint16_t analogValLSon[11]; // ADC結果格納配列
 extern uint16_t analogValLSoff[11]; // ADC結果格納配列
 extern uint16_t analogVal2[4];	// ADC結果格納配列
-extern float batteryVoltage_V;	// DWT初期化後に取得したバッテリ電圧[V]
 
 // パラメータ関連
 extern speedParam tgtParam;

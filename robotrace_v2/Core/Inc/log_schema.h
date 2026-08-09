@@ -5,14 +5,21 @@
 //====================================//
 #include <stdint.h>
 #include "SDcard.h"
+#include "battery.h"
+#include "motor.h"
 //====================================//
 // シンボル定義
 //====================================//
 // CSV列の定義を順番どおりに集中管理。
 // STOREDはバイナリに保存、DERIVEDはendLogで計算。
-// このリストを編集して、CSVログフィールドを追加または削除してください。
+// 通常は軽量プロファイルで走行比較に必要な列だけを残す。
+// 詳細デバッグ列が必要な場合は、ビルド定義でLOG_SCHEMA_PROFILE_LIGHT=0にする。
 // STORED(type, name, fmt, expr) or DERIVED(type, name, fmt, expr)
-#define LOG_FIELD_LIST(STORED, DERIVED) \
+#ifndef LOG_SCHEMA_PROFILE_LIGHT
+#define LOG_SCHEMA_PROFILE_LIGHT 1
+#endif
+
+#define LOG_FIELD_LIST_CORE(STORED, DERIVED) \
 	STORED(U16, cntlog, "%d", (uint16_t)cntRun) \
 	STORED(U16, encCurrentN, "%d", (uint16_t)encCurrentN) \
 	STORED(F32, gyroVal_Z, "%f", imuVal.gyro.z) \
@@ -25,19 +32,24 @@
 	STORED(U8, slipFlagLat, "%d", (uint8_t)getSlipFlagLat()) \
 	STORED(S16, lineTraceCtrl, "%d", (int16_t)lineTraceOmegaFBCtrl.pwm) \
 	STORED(S16, targetAngularvelo, "%d", (int16_t)log_targetAngularVelocity) \
-	STORED(S16, motorpwmL, "%d", (int16_t)veloCtrlL.pwm) \
-	STORED(S16, motorpwmR, "%d", (int16_t)veloCtrlR.pwm) \
+	STORED(S16, motorpwmL, "%d", (int16_t)motorpwmL) \
+	STORED(S16, motorpwmR, "%d", (int16_t)motorpwmR) \
+	STORED(U16, batteryVoltage_mV, "%d", (uint16_t)(batteryVoltage_V * 1000.0f)) \
+	STORED(S16, motorVoltageCmdL_mV, "%d", (int16_t)(motorVoltageCmdL_V * 1000.0f)) \
+	STORED(S16, motorVoltageCmdR_mV, "%d", (int16_t)(motorVoltageCmdR_V * 1000.0f)) \
+	STORED(U32, encCurrentCorr_p, "%d", (uint32_t)Control_GetEncCurrentCorr_p()) \
+	DERIVED(F32, x, "%f", log_x) \
+	DERIVED(F32, y, "%f", log_y)
+
+#define LOG_FIELD_LIST_DEBUG(STORED, DERIVED) \
 	STORED(F32, acceleVal_X, "%f", imuVal.accele.x) \
 	STORED(F32, acceleVal_Y, "%f", imuVal.accele.y) \
 	STORED(F32, slipRatio, "%f", getSlipIndicatorRaw()) \
 	STORED(F32, slipRatioLat, "%f", getSlipIndicatorFiltered()) \
 	STORED(F32, motorCurrentL, "%f", motorCurrentL) \
 	STORED(F32, motorCurrentR, "%f", motorCurrentR) \
-	STORED(U32, encCurrentCorr_p, "%d", (uint32_t)Control_GetEncCurrentCorr_p()) \
 	STORED(U8, straightPendingAttempt, "%d", (uint8_t)straightMarkerPendingLog) \
 	STORED(U8, lineTraceOmegaFBCtrlkp, "%d", (uint8_t)lineTraceOmegaFBCtrl.kp) \
-	DERIVED(F32, x, "%f", log_x) \
-	DERIVED(F32, y, "%f", log_y) \
 	STORED(U8, slipLatEnabled, "%d", (uint8_t)getSlipLatEnabled()) \
 	STORED(U8, slipLatOnCountEnabled, "%d", (uint8_t)getSlipLatOnCountEnabled()) \
 	STORED(U16, slipISumOkCount, "%d", getSlipISumOkCount()) \
@@ -46,11 +58,18 @@
 	STORED(F32, slipEncAyF, "%f", getSlipEncAyF()) \
 	STORED(F32, slipImuAyF, "%f", getSlipImuAyF())
 
-
-	// STORED(F32, slipDistScaleF, "%f", Control_GetSlipDistScale()) \
-	// STORED(U32, distEncRaw_p, "%d", (uint32_t)Control_GetDistEncRaw_p()) \
-	// STORED(U32, distCorr_p, "%d", (uint32_t)Control_GetDistCorr_p()) \
-	// STORED(U32, distSlipLoss_p, "%d", (uint32_t)Control_GetDistSlipLoss_p()) \
+#if LOG_SCHEMA_PROFILE_LIGHT
+#define LOG_FIELD_LIST(STORED, DERIVED) LOG_FIELD_LIST_CORE(STORED, DERIVED)
+#else
+#define LOG_FIELD_LIST(STORED, DERIVED) \
+	LOG_FIELD_LIST_CORE(STORED, DERIVED) \
+	LOG_FIELD_LIST_DEBUG(STORED, DERIVED)
+#endif
+// 詳細デバッグ列の追加候補:
+// STORED(F32, slipDistScaleF, "%f", Control_GetSlipDistScale())
+// STORED(U32, distEncRaw_p, "%d", (uint32_t)Control_GetDistEncRaw_p())
+// STORED(U32, distCorr_p, "%d", (uint32_t)Control_GetDistCorr_p())
+// STORED(U32, distSlipLoss_p, "%d", (uint32_t)Control_GetDistSlipLoss_p())
 // バイナリログで保存する型の対応表。
 #define LOG_CTYPE_U8  uint8_t
 #define LOG_CTYPE_U16 uint16_t

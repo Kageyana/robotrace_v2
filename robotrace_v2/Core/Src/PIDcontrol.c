@@ -8,6 +8,7 @@
 #include "encoder.h"
 #include "fatfs.h"
 #include "lineSensor.h"
+#include "motor.h"
 #include <stdbool.h>
 #include <stdint.h>
 //====================================//
@@ -35,7 +36,6 @@ static int16_t speedTargetBeforeL = 0, speedTargetBeforeR = 0;
 static int16_t speedEncoderBeforeL = 0, speedEncoderBeforeR = 0;
 static int16_t feedForwardPwmL = 0, feedForwardPwmR = 0;
 static int16_t speedEncoderBefore = 0;	// 速度PID用の前回偏差
-extern float batteryVoltage_V;	// control.cで保持したバッテリ電圧[V]
 
 int32_t log_targetAngularVelocity; // ログ用目標角速度
 
@@ -58,11 +58,11 @@ static bool settingValueInRange(int32_t value, int32_t min, int32_t max)
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 calcSpeedFeedForward
 // 処理概要     目標速度からフィードフォワード項を算出
-// 引数         targetSpeed_mm_s:目標速度[mm/s], batteryVoltage:バッテリ電圧[V]
-//              pwm_max:PWM最大値, crr:転がり抵抗係数Crr
-// 戻り値       フィードフォワードPWM値
+// 引数         targetSpeed_mm_s:目標速度[mm/s], command_max:正規化指令最大値
+//              crr:転がり抵抗係数Crr
+// 戻り値       フィードフォワード正規化指令
 ///////////////////////////////////////////////////////////////////////////
-static int16_t calcSpeedFeedForward(float targetSpeed_mm_s, float batteryVoltage, int16_t pwm_max, float crr)
+static int16_t calcSpeedFeedForward(float targetSpeed_mm_s, int16_t command_max, float crr)
 {
 	float sign;
 	float kv_ff;              // [V/(mm/s)]
@@ -70,7 +70,7 @@ static int16_t calcSpeedFeedForward(float targetSpeed_mm_s, float batteryVoltage
 	float tau_wheel_per_mNm;  // [mNm]
 	float v_bias;             // [V]
 	float voltageRequest;     // [V]
-	float pwm;
+	int16_t command;
 
 	/* sgn(v) をデッドバンド付きで算出 */
 	if (targetSpeed_mm_s > SPEED_FEEDFORWARD_SIGN_DEADBAND_MM_S)
@@ -91,20 +91,13 @@ static int16_t calcSpeedFeedForward(float targetSpeed_mm_s, float batteryVoltage
 	         tau_wheel_per_mNm / (SPEED_FEEDFORWARD_EFFICIENCY * SPEED_FEEDFORWARD_GEAR_RATIO);
 	/* Vreq = Kv_ff*v + sgn(v)*V_bias */
 	voltageRequest = (kv_ff * targetSpeed_mm_s) + (sign * v_bias);
-	/* PWM = Vreq / Vbat * PWM_MAX （バッテリ電圧0V時は0とする）*/
-	if (batteryVoltage > 0.0f)
-		pwm = voltageRequest / batteryVoltage * (float)pwm_max;
-	else
-		pwm = 0.0f;
+	command = motorVoltageToCommand(voltageRequest);
+	if (command > command_max)
+		command = command_max;
+	else if (command < -command_max)
+		command = -command_max;
 
-	/* PWM の上限をクリップ */
-	if (pwm > (float)pwm_max)
-		pwm = (float)pwm_max;
-	else if (pwm < -(float)pwm_max)
-		pwm = -(float)pwm_max;
-
-	/* 例: Crr=0.02, η=0.90, Vbat=4.5V, PWM_MAX=1000, v=1000mm/s → PWM≈145 */
-	return (int16_t)pwm;
+	return command;
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -339,9 +332,8 @@ void motorControlSpeed(void)
 		veloCtrl.Int = 0;	/* 目標値変更時に積分項をリセット */
 		// 物理パラメータを用いてフィードフォワード電圧を算出
 		targetSpeed_mm_s = targetSpeedCommand_m_s * 1000.0f;	// setTargetSpeedで保持した[m/s]を[mm/s]へ換算
-		/* control.cで計測済みのバッテリ電圧[V]を使用 */
 		crr = (float)speedFeedForwardGain * SPEED_FEEDFORWARD_CRR_SCALE;	// 転がり抵抗係数Crr
-		feedForwardPwm = calcSpeedFeedForward(targetSpeed_mm_s, batteryVoltage_V,
+		feedForwardPwm = calcSpeedFeedForward(targetSpeed_mm_s,
 				SPEED_FEEDFORWARD_PWM_MAX_DEFAULT, crr);	// フィードフォワード項
 	}
 
@@ -393,7 +385,7 @@ void motorControlSpeedLR(int16_t targetEncL, int16_t targetEncR)
 
 		// targetEncL[count/ms] -> mm/s
 		float target_mm_s_L = ((float)targetEncL / PULSE_MILLIMETER) * 1000.0f;
-		feedForwardPwmL = calcSpeedFeedForward(target_mm_s_L, batteryVoltage_V,
+		feedForwardPwmL = calcSpeedFeedForward(target_mm_s_L,
 			SPEED_FEEDFORWARD_PWM_MAX_DEFAULT, crr);
 	}
 
@@ -429,7 +421,7 @@ void motorControlSpeedLR(int16_t targetEncL, int16_t targetEncR)
 		veloCtrlR.Int = 0.0f;
 
 		float target_mm_s_R = ((float)targetEncR / PULSE_MILLIMETER) * 1000.0f;
-		feedForwardPwmR = calcSpeedFeedForward(target_mm_s_R, batteryVoltage_V,
+		feedForwardPwmR = calcSpeedFeedForward(target_mm_s_R,
 			SPEED_FEEDFORWARD_PWM_MAX_DEFAULT, crr);
 	}
 

@@ -215,8 +215,8 @@ cmake --build --preset Release
 
 ### バッテリー電圧の運用
 
-- `batteryVoltage_V` は `AD2VOLTAGE(batteryAD)` で算出した電圧 `[V]` とする。
-- `batteryVoltage_V` はログヘッダへ出力し、速度フィードフォワード計算にも使用する。
+- `batteryVoltage_V` は `AD2VOLTAGE(batteryAD)` の有効サンプルを1ms周期でLPF更新した電圧 `[V]` とする。
+- `batteryVoltage_V` はログヘッダへ出力し、モーター電圧指令から実DUTYを算出する補償にも使用する。
 - 高速走行前の下限 `7.5 V` は運用上のチェック値とする。
 - 現行コードでは、`7.5 V` 未満を理由にした自動走行禁止処理は行わない。
 
@@ -422,10 +422,11 @@ cmake --build --preset Release
 
 ### 制御出力の合成ルール
 
-- `motorPwmOutSynth(tPwm, sPwm, yrPwm, dPwm)` は速度、トレース、ヨー、距離の各制御出力を左右 PWM に合成する。
-- 右 PWM は `sPwm - tracePwm - yrPwm + dPwm` とする。
-- 左 PWM は `sPwm + tracePwm + yrPwm + dPwm` とする。
-- 左右 PWM はそれぞれ `-1000` から `1000` に飽和させる。
+- `motorCommandOutSynth(tCmd, sCmd, yrCmd, dCmd)` は速度、トレース、ヨー、距離の各制御出力を左右の正規化指令に合成し、出力層で電圧補償して実DUTYへ変換する。
+- 正規化指令 `cmd=1000` は `MOTOR_COMMAND_NOMINAL_V=7.0 V` のモーター指令電圧として扱う。
+- 右正規化指令は `sCmd - traceCmd - yrCmd + dCmd` とする。
+- 左正規化指令は `sCmd + traceCmd + yrCmd + dCmd` とする。
+- 左右の正規化指令と実DUTYはそれぞれ `-1000` から `1000` に飽和させる。
 - 走行モードごとの出力経路を変更する場合は、`control.c` と `PIDcontrol.c` を確認する。
 
 ### スリップ判定とチューニング
@@ -451,6 +452,10 @@ cmake --build --preset Release
 - 新しい緊急停止条件を追加する場合は、`robotrace_v2/Core/Inc/emergencyStop.h` に定義を追加する。
 - ログ解析では、ラップタイム、速度追従、角速度、スリップを重視する。
 - バッテリー状態はログ内パラメータ `batteryVoltage_V` を参照する。単位は `[V]`。
+- `batteryVoltage_mV` は走行中にLPF更新したバッテリー電圧 `[mV]`、`motorVoltageCmdL_mV`, `motorVoltageCmdR_mV` はバッテリー電圧で割る前の左右モーター指令電圧 `[mV]` とする。
+- `motorpwmL`, `motorpwmR` は電圧補償後に実際にタイマへ出力した飽和後DUTYとする。
+- 通常ログは `LOG_SCHEMA_PROFILE_LIGHT=1` を既定とし、ラップタイム、速度追従、角速度、マーカー、スリップフラグ、電圧指令、実DUTY、XY確認に必要な列だけを残す。
+- 加速度、電流、スリップ内部量などの詳細デバッグ列が必要な場合は、ビルド定義で `LOG_SCHEMA_PROFILE_LIGHT=0` にして一時的に出力する。
 - ログ同士を比較する場合は、`batteryVoltage_V` の差を考慮する。電圧差によるモーター出力、速度追従、加速性能、スリップ傾向の変化を無視しない。
 - ログ形式を安易に変更しない。形式変更が必要な場合は、スキーマまたはドキュメントも合わせて更新する。
 - 詳細な解析手順は `.agents/skills/robotrace-log-analysis/SKILL.md` を使う。
