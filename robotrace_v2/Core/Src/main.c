@@ -1164,7 +1164,7 @@ int _write(int file, char *ptr, int len)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-	motorPwmOut(0,0);
+	motorCommandOut(0,0);
 	/* User can add his own implementation to report the HAL error return state */
 	__disable_irq();
 	while (1)

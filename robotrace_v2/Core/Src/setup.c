@@ -219,11 +219,11 @@ static void test_motor(void)
 	data_select(&testFlags.motor_test, SW_PUSH); // モータテストの開始/停止
 	if (testFlags.motor_test == 1)
 	{
-		motorPwmOut(motorTestPwm, motorTestPwm);
+		motorCommandOut(motorTestPwm, motorTestPwm);
 	}
 	else
 	{
-		motorPwmOut(0, 0);
+		motorCommandOut(0, 0);
 	}
 
 	// testFlags.motor_test 1→0のとき 2にする
@@ -636,12 +636,12 @@ static void setup_pid_trace(void)
 	// PUSHでトレースON/OFF
 	if (testFlags.trace_test == 1)
 	{
-		motorPwmOutSynth(lineTraceCtrl.pwm, 0, 0, 0); // モータを指定PWMで駆動
+		motorCommandOutSynth(lineTraceCtrl.pwm, 0, 0, 0); // モータを指定PWMで駆動
 		powerLineSensors(1);                          // ラインセンサを有効化
 	}
 	else
 	{
-		motorPwmOutSynth(0, 0, 0, 0);                // モータ停止
+		motorCommandOutSynth(0, 0, 0, 0);                // モータ停止
 		powerLineSensors(0);                         // ラインセンサ停止
 	}
 	if (testFlags.trace_test != testFlags.beforeMotorTest && testFlags.trace_test == 0)
@@ -722,12 +722,12 @@ static void setup_pid_traceOmegaFB(void)
 	// PUSHでトレースON/OFF
 	if (testFlags.trace_test == 1)
 	{
-		motorPwmOutSynth(lineTraceOmegaFBCtrl.pwm, 0, 0, 0); // モータを指定PWMで駆動
+		motorCommandOutSynth(lineTraceOmegaFBCtrl.pwm, 0, 0, 0); // モータを指定PWMで駆動
 		powerLineSensors(1);                          // ラインセンサを有効化
 	}
 	else
 	{
-		motorPwmOutSynth(0, 0, 0, 0);                // モータ停止
+		motorCommandOutSynth(0, 0, 0, 0);                // モータ停止
 		powerLineSensors(0);                         // ラインセンサ停止
 	}
 	if (testFlags.trace_test != testFlags.beforeMotorTest && testFlags.trace_test == 0)
@@ -811,11 +811,11 @@ static void setup_pid_angular(void)
 	// PUSHでトレースON/OFF
 	if (testFlags.trace_test == 1)
 	{
-		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 	}
 	else
 	{
-		motorPwmOutSynth(0, 0, 0, 0);
+		motorCommandOutSynth(0, 0, 0, 0);
 	}
 	if (testFlags.trace_test != testFlags.beforeMotorTest && testFlags.trace_test == 0)
 	{
@@ -900,12 +900,12 @@ static void setup_pid_speed(void)
 		// トレースON時の制御
 		powerLineSensors(1); // ラインセンサを有効化
 		setTargetSpeed(0.0); // 目標速度をリセット
-		motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.kp, 0, 0); // モータを指定PWMで駆動
+		motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.kp, 0, 0); // モータを指定PWMで駆動
 	}
 	else
 	{
 		// トレースOFF時の制御
-		motorPwmOutSynth(0, 0, 0, 0); // モータ停止
+		motorCommandOutSynth(0, 0, 0, 0); // モータ停止
 		powerLineSensors(0);          // ラインセンサ停止
 	}
 
@@ -1080,9 +1080,9 @@ static void setup_pid_angle(void)
 
 	data_select(&testFlags.trace_test, SW_PUSH);       // PUSHでトレースON/OFF
 	// if ( testFlags.trace_test == 1 ) {
-	//      motorPwmOutSynth( 0, veloCtrl.pwm, distCtrl.pwm, 0 );
+	//      motorCommandOutSynth( 0, veloCtrl.pwm, distCtrl.pwm, 0 );
 	// } else {
-	//      motorPwmOutSynth( 0, 0, 0, 0 );
+	//      motorCommandOutSynth( 0, 0, 0, 0 );
 	// }
 
 	// 上下スイッチで調整対象のゲインを選択
@@ -1356,7 +1356,7 @@ static void setup_start(void)
 	case 4: // 左旋回
 	{
 		setTargetAngularVelocity(CALIBRATIONSPEED);
-		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 		if (imuVal.angle.z < -340.0)
 		{
 			pattern.calibration = 5;
@@ -1366,7 +1366,7 @@ static void setup_start(void)
 	case 5: // 初期位置に戻る
 	{
 		setTargetAngularVelocity(-400.0F);
-		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 		if (lSensor[5] < 1000)
 		{
 			modeCalLinesensors = 0;
@@ -1377,7 +1377,7 @@ static void setup_start(void)
 	}
 	case 6: // 停止
 	{
-		motorPwmOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+		motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
 		if (countdown <= 0)
 		{
 			powerLineSensors(0); // ラインセンサ消灯
@@ -1865,7 +1865,7 @@ void setupNonDisp(void)
 	case 3:
 		// 左旋回
 		setTargetAngularVelocity(CALIBRATIONSPEED);
-		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 		if (imuVal.angle.z < -35.0)
 		{
 			pattern.calibration = 4;
@@ -1875,7 +1875,7 @@ void setupNonDisp(void)
 	case 4:
 		// 停止
 		setTargetSpeed(0);
-		motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
+		motorCommandOutSynth(0, veloCtrl.pwm, 0, 0);
 		if (abs(encCurrentN) == 0)
 		{
 			pattern.calibration = 5;
@@ -1885,7 +1885,7 @@ void setupNonDisp(void)
 	case 5:
 		// 右旋回
 		setTargetAngularVelocity(-CALIBRATIONSPEED);
-		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 		if (imuVal.angle.z > 35.0)
 		{
 			pattern.calibration = 6;
@@ -1895,7 +1895,7 @@ void setupNonDisp(void)
 	case 6:
 		// 停止
 		setTargetSpeed(0);
-		motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
+		motorCommandOutSynth(0, veloCtrl.pwm, 0, 0);
 		if (abs(encCurrentN) == 0)
 		{
 			pattern.calibration = 7;
@@ -1905,7 +1905,7 @@ void setupNonDisp(void)
 	case 7:
 		// 初期位置に戻る
 		setTargetAngularVelocity(CALIBRATIONSPEED);
-		motorPwmOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 		if (lSensor[5] < 1000)
 		{
 			modeCalLinesensors = 0;
@@ -1915,7 +1915,7 @@ void setupNonDisp(void)
 
 	case 8:
 		// 停止
-		motorPwmOutSynth(0, veloCtrl.pwm, 0, 0);
+		motorCommandOutSynth(0, veloCtrl.pwm, 0, 0);
 		if (abs(encCurrentN) == 0)
 		{
 			powerLineSensors(0); // ラインセンサ消灯
@@ -1971,7 +1971,7 @@ void wheelClick(void)
 		break;
 
 	case 2:
-		motorPwmOut(-pwm * setupFlags.clickStart, 0);
+		motorCommandOut(-pwm * setupFlags.clickStart, 0);
 		cnt++;
 		if (cnt >= 3)
 		{
@@ -1981,7 +1981,7 @@ void wheelClick(void)
 		break;
 
 	case 3:
-		motorPwmOut(pwm * setupFlags.clickStart, 0);
+		motorCommandOut(pwm * setupFlags.clickStart, 0);
 		cnt++;
 		if (cnt >= 3)
 		{
@@ -1991,7 +1991,7 @@ void wheelClick(void)
 		break;
 
 	case 4:
-		motorPwmOut(0, 0);
+		motorCommandOut(0, 0);
 		setupFlags.clickStart = 0;
 		pattern.click = 1;
 		break;

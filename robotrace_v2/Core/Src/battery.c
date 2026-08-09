@@ -8,7 +8,9 @@
 //====================================//
 uint16_t batteryAD;		// バッテリ残量(AD値)
 uint8_t batteryLevel;	// バッテリ残量レベル
-float adcVref = 0.0f;	// ADC基準電圧[V]
+float adcVref = MCU_VOLTAGE;	// ADC基準電圧[V]
+float batteryVoltage_V = 0.0f;	// バッテリ電圧[V]
+bool batteryVoltageValid = false;	// バッテリ電圧が有効範囲内で初期化済みか
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getBatteryAD
@@ -19,6 +21,31 @@ float adcVref = 0.0f;	// ADC基準電圧[V]
 void getBatteryAD(uint16_t ad)
 {
 	batteryAD = ad;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 updateBatteryVoltage
+// 処理概要     バッテリAD値からLPF済み電圧を更新する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void updateBatteryVoltage(void)
+{
+	float voltage = AD2VOLTAGE(batteryAD);
+
+	if (voltage < BATTERY_VOLTAGE_MIN_VALID_V || voltage > BATTERY_VOLTAGE_MAX_VALID_V)
+	{
+		return;
+	}
+
+	if (!batteryVoltageValid)
+	{
+		batteryVoltage_V = voltage;
+		batteryVoltageValid = true;
+	}
+	else
+	{
+		batteryVoltage_V += BATTERY_VOLTAGE_LPF_COEF * (voltage - batteryVoltage_V);
+	}
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SchmittBatery

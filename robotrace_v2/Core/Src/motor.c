@@ -4,12 +4,15 @@
 #include "motor.h"
 #include "battery.h"
 #include <stdint.h>
+#include <stdlib.h>
 
 //====================================//
 // グローバル変数の宣言
 //====================================//
 int16_t motorpwmL = 0;
 int16_t motorpwmR = 0;
+float motorVoltageCmdL_V = 0.0f;
+float motorVoltageCmdR_V = 0.0f;
 
 int16_t motorCurrentADL, motorCurrentADR;
 uint16_t motorCurrentADLInt[MOTOR_AD_WINDOW], motorCurrentADRInt[MOTOR_AD_WINDOW];
@@ -20,18 +23,66 @@ float motorCurrentL, motorCurrentR; // モーター電流値[A]
 bool calibrateMotorCurrent = false; // 電流センサキャリブレーションフラグ
 int16_t motorCurrentADLoffset = 4096/2, motorCurrentADRoffset = 4096/2; // キャリブレーション用オフセット値
 /////////////////////////////////////////////////////////////////////
-// モジュール名 motorPwmOut
-// 処理概要     左右のモータにPWMを出力する
-// 引数         pwmL: 左モータへの出力(1~1000) pwmR: 右モータへの出力(1~1000)
+// モジュール名 clampCommand
+// 処理概要     正規化モータ指令を-1000..1000に制限する
+// 引数         command: 正規化モータ指令
+// 戻り値       制限後の正規化モータ指令
+/////////////////////////////////////////////////////////////////////
+static int16_t clampCommand(int32_t command)
+{
+	if (command > 1000)
+		return 1000;
+	if (command < -1000)
+		return -1000;
+	return (int16_t)command;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 clampVoltage
+// 処理概要     モータ指令電圧を許容範囲に制限する
+// 引数         voltage_V: モータ指令電圧[V]
+// 戻り値       制限後のモータ指令電圧[V]
+/////////////////////////////////////////////////////////////////////
+static float clampVoltage(float voltage_V)
+{
+	if (voltage_V > MOTOR_VOLTAGE_CMD_MAX_V)
+		return MOTOR_VOLTAGE_CMD_MAX_V;
+	if (voltage_V < -MOTOR_VOLTAGE_CMD_MAX_V)
+		return -MOTOR_VOLTAGE_CMD_MAX_V;
+	return voltage_V;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 motorVoltageToDuty
+// 処理概要     指令電圧を現在のバッテリ電圧に対するDUTYへ変換する
+// 引数         voltage_V: モータ指令電圧[V]
+// 戻り値       実DUTY指令
+/////////////////////////////////////////////////////////////////////
+static int16_t motorVoltageToDuty(float voltage_V)
+{
+	float duty;
+
+	if (!batteryVoltageValid || batteryVoltage_V <= 0.0f)
+	{
+		return 0;
+	}
+
+	duty = clampVoltage(voltage_V) / batteryVoltage_V * 1000.0f;
+	if (duty > 1000.0f)
+		duty = 1000.0f;
+	if (duty < -1000.0f)
+		duty = -1000.0f;
+
+	return (int16_t)duty;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 motorDutyOut
+// 処理概要     左右のモータに実DUTYを出力する
+// 引数         pwmL: 左モータへの実DUTY(-1000..1000) pwmR: 右モータへの実DUTY(-1000..1000)
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void motorPwmOut(int16_t pwmL, int16_t pwmR)
+static void motorDutyOut(int16_t pwmL, int16_t pwmR)
 {
-	if (pwmL > 1000) pwmL = 1000;
-	else if (pwmL < -1000) pwmL = -1000;
-	if (pwmR > 1000) pwmR = 1000;
-	else if (pwmR < -1000) pwmR = -1000;
-
+	pwmL = clampCommand(pwmL);
+	pwmR = clampCommand(pwmR);
 	motorpwmL = pwmL;
 	motorpwmR = pwmR;
 
@@ -70,44 +121,82 @@ void motorPwmOut(int16_t pwmL, int16_t pwmR)
 	}
 }
 ///////////////////////////////////////////////////////////////////////////
-// モジュール名 motorPwmOutSynth
-// 処理概要     トレースと速度制御のPID制御量をPWMとしてモータに出力する
-// 引数         tPwm: トレースのPID制御量 sPwm: 速度のPID制御量
-//              yrPwm: ヨーレートのPID制御量
-//              dPwm : 距離のPID制御量
+// モジュール名 motorCommandToVoltage_V
+// 処理概要     正規化モータ指令を公称電圧基準の指令電圧へ変換する
+// 引数         command: 正規化モータ指令(-1000..1000)
+// 戻り値       指令電圧[V]
+///////////////////////////////////////////////////////////////////////////
+float motorCommandToVoltage_V(int16_t command)
+{
+	int16_t cmd = clampCommand(command);
+	float voltage = (float)cmd / 1000.0f * MOTOR_COMMAND_NOMINAL_V;
+	return clampVoltage(voltage);
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 motorVoltageToCommand
+// 処理概要     指令電圧を公称電圧基準の正規化モータ指令へ変換する
+// 引数         voltage_V: 指令電圧[V]
+// 戻り値       正規化モータ指令(-1000..1000)
+///////////////////////////////////////////////////////////////////////////
+int16_t motorVoltageToCommand(float voltage_V)
+{
+	voltage_V = clampVoltage(voltage_V);
+	return clampCommand((int32_t)(voltage_V / MOTOR_COMMAND_NOMINAL_V * 1000.0f));
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 motorVoltageOut
+// 処理概要     左右の指令電圧を現在のバッテリ電圧で補償して出力する
+// 引数         voltageL_V: 左モータ指令電圧[V] voltageR_V: 右モータ指令電圧[V]
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
-void motorPwmOutSynth(int16_t tPwm, int16_t sPwm, int16_t yrPwm, int16_t dPwm)
+void motorVoltageOut(float voltageL_V, float voltageR_V)
 {
-	int16_t overpwm, tracePwm = tPwm;
+	motorVoltageCmdL_V = clampVoltage(voltageL_V);
+	motorVoltageCmdR_V = clampVoltage(voltageR_V);
+	motorDutyOut(motorVoltageToDuty(motorVoltageCmdL_V), motorVoltageToDuty(motorVoltageCmdR_V));
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 motorCommandOut
+// 処理概要     左右の正規化モータ指令を指令電圧に変換して出力する
+// 引数         cmdL: 左モータ正規化指令 cmdR: 右モータ正規化指令
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void motorCommandOut(int16_t cmdL, int16_t cmdR)
+{
+	motorVoltageOut(motorCommandToVoltage_V(cmdL), motorCommandToVoltage_V(cmdR));
+}
+///////////////////////////////////////////////////////////////////////////
+// モジュール名 motorCommandOutSynth
+// 処理概要     各PID制御量を正規化指令として合成し、電圧補償してモータに出力する
+// 引数         tCmd: トレース制御量 sCmd: 速度制御量
+//              yrCmd: ヨーレート制御量
+//              dCmd : 距離制御量
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void motorCommandOutSynth(int16_t tCmd, int16_t sCmd, int16_t yrCmd, int16_t dCmd)
+{
+	int16_t overCmd, traceCmd = tCmd;
 
-	if (abs(sPwm + tPwm) > 1000 || abs(sPwm - tPwm) > 1000)
+	if (abs(sCmd + tCmd) > 1000 || abs(sCmd - tCmd) > 1000)
 	{
 		// ライントレースと速度制御の合計制御量が1000を超えたとき
-		overpwm = abs(sPwm) + abs(tPwm) - 1000; // 1000を超えた分の制御量を計算
+		overCmd = abs(sCmd) + abs(tCmd) - 1000;
 
-		// トレースの内輪側から越えた分の制御量を引く 正負はtPwmと同じ
-		// tPwm が 0 の場合の 0 除算防止
-		if (tPwm != 0)
+		// トレースの内輪側から越えた分の制御量を引く。正負はtCmdと同じ。
+		if (tCmd != 0)
 		{
-			tracePwm = tPwm - (overpwm * (tPwm / abs(tPwm)));
+			traceCmd = tCmd - (overCmd * (tCmd / abs(tCmd)));
 		}
 		else
 		{
-			tracePwm = tPwm;
+			traceCmd = tCmd;
 		}
 	}
 
-	int16_t pwmR = sPwm - tracePwm - yrPwm + dPwm;
-	// PWMの飽和防止
-	if (pwmR > 1000) pwmR = 1000;
-	else if (pwmR < -1000) pwmR = -1000;
-	int16_t pwmL = sPwm + tracePwm + yrPwm + dPwm;
-	// PWMの飽和防止
-	if (pwmL > 1000) pwmL = 1000;
-	else if (pwmL < -1000) pwmL = -1000;
+	int16_t cmdR = clampCommand((int32_t)sCmd - traceCmd - yrCmd + dCmd);
+	int16_t cmdL = clampCommand((int32_t)sCmd + traceCmd + yrCmd + dCmd);
 
-	motorPwmOut(pwmL, pwmR);
+	motorCommandOut(cmdL, cmdR);
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 getMotorAD

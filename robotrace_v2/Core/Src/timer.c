@@ -4,6 +4,7 @@
 #include "timer.h"
 #include "BMI088.h"
 #include "PIDcontrol.h"
+#include "battery.h"
 #include "control.h"
 #include "lineSensor.h"
 #include <stdint.h>
@@ -40,6 +41,7 @@ void Interrupt1ms(void)
 	uint32_t freqCount = getCycleCounter();
 	resetCycleCounter();
 	bootTime = getTimeMs(freqCount);
+	updateBatteryVoltage();
 
 	// Encoder
 	getEncoder();
