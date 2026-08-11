@@ -813,7 +813,7 @@ void loopSystem(void)
 
 	case 102:
 		setTargetSpeed(0);
-		motorCommandOutSynth(0, 0, 0, 0);
+		motorCommandOutSynth(lineTraceCtrl.pwm, 0, 0, 0);
 
 		int16_t savedLogNo = 0;	// 追加: 保存実績ログ番号
 		int16_t endIdxBefore = endFileIndex;	// 追加: endLog前のログ末尾を保持
