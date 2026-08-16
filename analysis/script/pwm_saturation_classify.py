@@ -611,7 +611,7 @@ def main() -> None:
     parser.add_argument("--max90-reference", default="10782,10783,10784,10785,10787,10788,10789,10790")
     parser.add_argument("--max95-reference", default="10792-10818")
     parser.add_argument("--new", required=True)
-    parser.add_argument("--battery-min", type=float, default=7.7)
+    parser.add_argument("--battery-min", type=float, default=7.3)
     parser.add_argument("--out-dir", type=Path, default=Path("analysis"))
     args = parser.parse_args()
 

@@ -21,23 +21,30 @@ Do not adopt a change that improves finish rate or lap time but worsens reproduc
 
 ## Workflow
 
-1. Identify the target mode and compare only compatible logs:
+1. Before starting a new trial, review reusable failures in `D:\ドキュメント\codex\失敗事例`. Check whether the candidate, voltage condition, log selection, or failure mode has already been rejected.
+2. Identify the target mode and compare only compatible logs:
    - first runs with first runs
    - secondary runs with the same secondary mode
    - autoStart only against runs where all 5 runs completed
-2. Validate logs using the log-analysis skill.
-3. Use only runs with `batteryVoltage_V >= 7.6 V` for tuning comparison and adoption decisions. If voltage is below 7.6 V, charge and retry before judging the parameter change.
-4. Change at most two parameters per run.
-5. Tune in this order:
+   - compare autoStart run numbers separately (`2` with `2`, `3` with `3`, `4` with `4`, `5` with `5`)
+   - treat autoStart 1 as the first-run baseline, not as an equivalent secondary run
+   - exclude an entire autoStart set when any of its five runs is incomplete or has `emcStop != 0`
+   - do not use a lap-time average that mixes autoStart run numbers for adoption decisions
+   - autoStart target speed is adaptive: later runs may be slower or faster because the previous run's slip is fed back into the next speed plan
+3. Validate logs using the log-analysis skill.
+4. Use only runs with a start/header `batteryVoltage_V >= 7.3 V` for tuning comparison and adoption decisions. This project-specific threshold overrides the generic 7.6 V default. A running `batteryVoltage_mV` drop below 7.3 V does not invalidate the run, but remains useful for diagnosing speed tracking, acceleration, PWM saturation, and slip.
+5. Change at most two parameters per run.
+6. Tune in this order:
    - PID
    - speed feedforward
    - slip detection
    - speed
-6. When increasing speed, start from sections with smaller curvature radius.
-7. After a control change, collect at least 10 real-run logs.
-8. If a tested parameter or tuning constant is rejected and the only change is reverting it to the previous known-good value, do not require a new real-run confirmation just for the revert. Confirm the restored value by SD readback or code inspection.
-9. Compare against logs from before the code or parameter change.
-10. Adopt a change only when the goal time improves stably without reducing reproducibility.
+7. When increasing speed, start from sections with smaller curvature radius.
+8. After a control change, collect at least 10 real-run logs.
+9. If a tested parameter or tuning constant is rejected and the only change is reverting it to the previous known-good value, do not require a new real-run confirmation just for the revert. Confirm the restored value by SD readback or code inspection.
+10. Compare against logs from before the code or parameter change.
+11. Adopt a change only when the goal time improves stably without reducing reproducibility.
+12. When a trial is rejected or fails, record the reusable failure in Obsidian using the `record-failures` Skill. Include the changed values, compatible log range, objective facts, cause or uncertainty, workaround, and prevention step before starting the next trial.
 
 ## Allowed Risks
 

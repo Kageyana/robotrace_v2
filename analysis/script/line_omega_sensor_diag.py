@@ -873,7 +873,7 @@ def main() -> None:
     parser.add_argument("--expected-local-target-scale-enable", type=int, choices=(-1, 0, 1), default=LOCAL_SCALE_DEFAULT_ENABLE)
     parser.add_argument("--expected-diff-compress-enable", type=int, choices=(-1, 0, 1), default=DIFF_COMPRESS_DEFAULT_ENABLE)
     parser.add_argument("--expected-curve-ff-enable", type=int, choices=(-1, 0, 1), default=CURVE_FF_DEFAULT_ENABLE)
-    parser.add_argument("--battery-min", type=float, default=7.6)
+    parser.add_argument("--battery-min", type=float, default=7.3)
     parser.add_argument("--out-dir", type=Path, default=Path("analysis"))
     args = parser.parse_args()
 
