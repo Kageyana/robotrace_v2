@@ -488,6 +488,8 @@ cmake --build --preset Release
 - `autoStart` の連続走行では、前走のスリップを使って次走の目標速度が更新される。一般に2走目は1次走行を基準に高め、3走目は2走目のスリップ反映で低め、4走目はその反動で高め、5走目は4走目のスリップ反映で低めになり得る。
 - `autoStart` の評価は周回番号ごとに行う。`autoStart=2`, `3`, `4`, `5` を別々に比較し、異なる周回番号を混ぜた平均ラップやセット平均を採用判断の根拠にしない。`autoStart=1` は1次走行の基準・妥当性確認として別扱いにする。
 - 5走すべてが完走していないautoStartセットは、完走した個別ログがあっても採用比較からセット全体を除外する。
+- 2次走行の標準評価では、同じautoStartセットの1次走行ログからコース形状、距離、曲率を生成し、各2次走行の`targetSpeed`へ追従した場合の理論ラップを算出する。速度目標の変更は瞬時切替とせず、スタートマーカー通過後の最初のログ行にある`encCurrentN / PULSE_MILLIMETER`をその走行の実測初速とし、各ログヘッダの`tgtParam.acceleF/acceleD`で区間内の加減速時間を積算する。実測側は既存ラップ定義の最終`cntlog`とし、`theoretical_lap_ms`, `lap_gap_ms`, `lap_gap_pct`を周回番号ごとに比較する。従来の瞬時切替値は`instantaneous_theoretical_lap_ms`として併記する。
+- 理論ラップ計算は`analysis/script/theoretical_lap.py`を正とし、標準レポートは`analysis/script/theoretical_lap_report.py`を使う。PPAD相当区間は1次ログを5サンプル単位で分割し、区間の実距離は`encTotalOptimal / PULSE_MILLIMETER`から求める。
 - バッテリー電圧差が大きい場合は、充電して再トライする。
 - 制御変更後は最低 10 本の実機走行ログを取り、変更前ログと比較する。採用判断は再現性を最優先する。
 - 解析スクリプトは `analysis/script/` に置く。Python などの使用は可能。
