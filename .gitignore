@@ -27,3 +27,5 @@ fp-info-cache
 
 # analiysis
 analysis/
+# obsidian
+docs/.obsidian/**
