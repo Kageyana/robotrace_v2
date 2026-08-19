@@ -217,6 +217,7 @@ cmake --build --preset Release
 
 - `batteryVoltage_V` は `AD2VOLTAGE(batteryAD)` の有効サンプルを1ms周期でLPF更新した電圧 `[V]` とする。
 - `batteryVoltage_V` はログヘッダへ出力し、モーター電圧指令から実DUTYを算出する補償にも使用する。
+- 正規化モーター指令 `cmd=1000` の公称電圧は `MOTOR_COMMAND_NOMINAL_V=7.1 V` とする。
 - 高速走行前の下限 `7.5 V` は運用上のチェック値とする。
 - 現行コードでは、`7.5 V` 未満を理由にした自動走行禁止処理は行わない。
 
@@ -418,12 +419,13 @@ cmake --build --preset Release
 ### 速度計画と確認観点
 
 - `BOOST_DISTANCE` は `PPAD[optimalIndex].boostSpeed`、`BOOST_SHORTCUT` は `tgtParam.shortCut` と `shortCutxycie[optimalIndex]` を正とする。
+- 低速小Rカーブのライン角速度目標は、曲率FFゲイン100%とラインセンサーFB 35%を併用し、`targetSpeed <= 90 pulse/ms` のBOOST_DISTANCE区間では絶対値1200 deg/sを上限とする。これは現行採用設定である。
 - 各モードのログ確認観点と速度計画の評価は `.agents/skills/robotrace-log-analysis/SKILL.md` を使う。
 
 ### 制御出力の合成ルール
 
 - `motorCommandOutSynth(tCmd, sCmd, yrCmd, dCmd)` は速度、トレース、ヨー、距離の各制御出力を左右の正規化指令に合成し、出力層で電圧補償して実DUTYへ変換する。
-- 正規化指令 `cmd=1000` は `MOTOR_COMMAND_NOMINAL_V=7.0 V` のモーター指令電圧として扱う。
+- 正規化指令 `cmd=1000` は `MOTOR_COMMAND_NOMINAL_V=7.1 V` のモーター指令電圧として扱う。
 - 右正規化指令は `sCmd - traceCmd - yrCmd + dCmd` とする。
 - 左正規化指令は `sCmd + traceCmd + yrCmd + dCmd` とする。
 - 左右の正規化指令と実DUTYはそれぞれ `-1000` から `1000` に飽和させる。
@@ -445,6 +447,7 @@ cmake --build --preset Release
 - ログファイル名は通し番号を使う。
 - ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。実ログ側に古い形式は混在しない前提で扱う。
 - ログヘッダにはログデータ名とパラメータが含まれる。パラメータは `パラメータ名=value` 形式で記載される。
+- `courseAnalysis.c` の2次ログ再解析は、`courseMarker`, `encTotalOptimal`, `ROC`, `targetSpeed`, `optimalIndex`, `slipFlag`, `slipFlagLat` をCSVヘッダ名から解決する。ログ列追加時に固定列番号へ依存しない。
 - 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_MARKER`, `BOOST_DISTANCE`, `BOOST_SHORTCUT` を正とする。
 - 新しい走行モードを追加する場合は、`robotrace_v2/Core/Inc/courseAnalysis.h` に定義を追加する。
 - `emcStop` が 0 以外の場合は緊急停止しており、ゴールしていない走行として扱う。
@@ -502,6 +505,7 @@ cmake --build --preset Release
 
 - 2026-06-28: 誤字由来の識別子を正規化し、解析済みログ番号ファイル名を `analize.txt` から `analysis.txt` へ変更した。旧名の読み取りフォールバックは設けない。
 - 2026-06-28: ログヘッダへ `fwVersion`, `gitCommit`, `buildDate`, `buildTime`, `branch` を出力するようにした。設定ファイル欠落時のデフォルト作成、破損時の部分反映と修復、`lsval.txt` 破損時および IMU/ラインセンサー異常時の走行禁止、TIM7 ログ要求周期の命名整理を実装した。
+- 2026-08-19: 現行採用の低速小Rカーブ制御を反映した。曲率FF 100%とラインセンサーFB 35%、低速BOOST_DISTANCEの角速度目標上限1200 deg/s、正規化モーター指令の公称電圧7.1 Vを使用する。2次ログ再解析は必須列をヘッダ名で解決する。
 
 ## 15. 機体・回路変更時にコードへ反映する項目
 

@@ -12,6 +12,7 @@
 #include "sd_functions.h"
 #include "ff.h"
 #include <stdint.h>
+#include <string.h>
 
 static bool sd_remount_for_analysis(void)
 {
@@ -45,6 +46,97 @@ static void logReadSlipIoError(int logNumber, UINT lineNo, FIL *fil, const char 
 static float calcDecelLeadMmByRoc(int16_t rocPrev, int16_t rocNow);
 static void applyDecelLeadToPpad(int16_t count);
 static void applyDecelLeadToArray(float *speed, int16_t count);
+
+typedef struct
+{
+	int16_t courseMarker;
+	int16_t encTotalOptimal;
+	int16_t ROC;
+	int16_t targetSpeed;
+	int16_t optimalIndex;
+	int16_t slipFlag;
+	int16_t slipFlagLat;
+} SecondLogColumnMap;
+
+static void initSecondLogColumnMap(SecondLogColumnMap *map)
+{
+	map->courseMarker = -1;
+	map->encTotalOptimal = -1;
+	map->ROC = -1;
+	map->targetSpeed = -1;
+	map->optimalIndex = -1;
+	map->slipFlag = -1;
+	map->slipFlagLat = -1;
+}
+
+static bool csvFieldEquals(const char *start, const char *end, const char *name)
+{
+	while (start < end && (*start == ' ' || *start == '\t'))
+	{
+		start++;
+	}
+	while (end > start && (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r' || end[-1] == '\n'))
+	{
+		end--;
+	}
+
+	size_t nameLength = strlen(name);
+	return (size_t)(end - start) == nameLength && strncmp(start, name, nameLength) == 0;
+}
+
+static bool secondLogColumnMapIsValid(const SecondLogColumnMap *map)
+{
+	return map->courseMarker >= 0 && map->encTotalOptimal >= 0 && map->ROC >= 0 &&
+		map->targetSpeed >= 0 && map->optimalIndex >= 0 && map->slipFlag >= 0 &&
+		map->slipFlagLat >= 0;
+}
+
+static int16_t secondLogMaxRequiredColumn(const SecondLogColumnMap *map)
+{
+	int16_t maxColumn = map->courseMarker;
+	if (map->encTotalOptimal > maxColumn) maxColumn = map->encTotalOptimal;
+	if (map->ROC > maxColumn) maxColumn = map->ROC;
+	if (map->targetSpeed > maxColumn) maxColumn = map->targetSpeed;
+	if (map->optimalIndex > maxColumn) maxColumn = map->optimalIndex;
+	if (map->slipFlag > maxColumn) maxColumn = map->slipFlag;
+	if (map->slipFlagLat > maxColumn) maxColumn = map->slipFlagLat;
+	return maxColumn;
+}
+
+static bool parseSecondLogHeader(const char *line, SecondLogColumnMap *map)
+{
+	initSecondLogColumnMap(map);
+
+	const char *fieldStart = line;
+	const char *p = line;
+	int16_t column = 0;
+	while (*p != '\0' && *p != '\n' && *p != '\r')
+	{
+		if (*p == ',')
+		{
+			if (csvFieldEquals(fieldStart, p, "courseMarker")) map->courseMarker = column;
+			else if (csvFieldEquals(fieldStart, p, "encTotalOptimal")) map->encTotalOptimal = column;
+			else if (csvFieldEquals(fieldStart, p, "ROC")) map->ROC = column;
+			else if (csvFieldEquals(fieldStart, p, "targetSpeed")) map->targetSpeed = column;
+			else if (csvFieldEquals(fieldStart, p, "optimalIndex")) map->optimalIndex = column;
+			else if (csvFieldEquals(fieldStart, p, "slipFlag")) map->slipFlag = column;
+			else if (csvFieldEquals(fieldStart, p, "slipFlagLat")) map->slipFlagLat = column;
+			column++;
+			fieldStart = p + 1;
+		}
+		p++;
+	}
+
+	if (csvFieldEquals(fieldStart, p, "courseMarker")) map->courseMarker = column;
+	else if (csvFieldEquals(fieldStart, p, "encTotalOptimal")) map->encTotalOptimal = column;
+	else if (csvFieldEquals(fieldStart, p, "ROC")) map->ROC = column;
+	else if (csvFieldEquals(fieldStart, p, "targetSpeed")) map->targetSpeed = column;
+	else if (csvFieldEquals(fieldStart, p, "optimalIndex")) map->optimalIndex = column;
+	else if (csvFieldEquals(fieldStart, p, "slipFlag")) map->slipFlag = column;
+	else if (csvFieldEquals(fieldStart, p, "slipFlagLat")) map->slipFlagLat = column;
+
+	return secondLogColumnMapIsValid(map);
+}
 
 AnalysisData PPAD[OPT_BUFF_SIZE];
 EventPos markerPos[OPT_BUFF_SIZE];
@@ -636,8 +728,9 @@ cleanup_read:
 // 蠑墓焚	 line: 1陦梧枚蟄怜・, 蜷・・蜉帛・繝昴う繝ｳ繧ｿ
 // 謌ｻ繧雁､	 隗｣譫先・蜉溘↑繧液rue
 /////////////////////////////////////////////////////////////////////
-static bool parseSecondLogLine(const char *line, uint8_t *courseMarker, int32_t *encTotal,
-		int16_t *roc, float *targetSpeedLog, int16_t *optimalIdx, uint8_t *slipLong, uint8_t *slipLat)
+static bool parseSecondLogLine(const char *line, const SecondLogColumnMap *map,
+		uint8_t *courseMarker, int32_t *encTotal, int16_t *roc,
+		float *targetSpeedLog, int16_t *optimalIdx, uint8_t *slipLong, uint8_t *slipLat)
 {
 	// 霑ｽ蜉: 繝倥ャ繝/遨ｺ陦悟愛螳壹・縺溘ａ蜈磯ｭ縺ｮ譛牙柑譁・ｭ励ｒ遒ｺ隱阪☆繧・
 	const char *p = line;
@@ -652,6 +745,7 @@ static bool parseSecondLogLine(const char *line, uint8_t *courseMarker, int32_t 
 
 	// 霑ｽ蜉: 繧ｫ繝ｳ繝槭ｒ謨ｰ縺医↑縺後ｉ蠢・ｦ∝・縺縺代ｒ謚ｽ蜃ｺ縺吶ｋ
 	int col = 0;
+	const int16_t maxColumn = secondLogMaxRequiredColumn(map);
 	const char *field = p;
 	bool gotOptimal = false;
 	while (1)
@@ -660,37 +754,27 @@ static bool parseSecondLogLine(const char *line, uint8_t *courseMarker, int32_t 
 		if (*p == ',' || *p == '\n' || *p == '\r' || *p == '\0')
 		{
 			char *endptr = NULL;
-			switch (col)
-			{
-			case 3:
+			if (col == map->courseMarker)
 				*courseMarker = (uint8_t)strtol(field, &endptr, 10);
-				break;
-			case 4:
+			else if (col == map->encTotalOptimal)
 				*encTotal = (int32_t)strtol(field, &endptr, 10);
-				break;
-			case 5:
+			else if (col == map->ROC)
 				*roc = (int16_t)strtol(field, &endptr, 10);
-				break;
-			case 6:
+			else if (col == map->targetSpeed)
 				*targetSpeedLog = strtof(field, &endptr);
-				break;
-			case 7:
+			else if (col == map->optimalIndex)
+			{
 				*optimalIdx = (int16_t)strtol(field, &endptr, 10);
 				gotOptimal = true;
-				break;
-			case 8:
-				*slipLong = (uint8_t)strtol(field, &endptr, 10);
-				break;
-			case 9:
-				*slipLat = (uint8_t)strtol(field, &endptr, 10);
-				break;
-			default:
-				break;
 			}
+			else if (col == map->slipFlag)
+				*slipLong = (uint8_t)strtol(field, &endptr, 10);
+			else if (col == map->slipFlagLat)
+				*slipLat = (uint8_t)strtol(field, &endptr, 10);
 			if (*p == ',')
 			{
 				col++;
-				if (col > 9)
+				if (col > maxColumn)
 				{
 					break;	// 霑ｽ蜉: 蠢・ｦ∝・繧定ｶ・∴縺溘ｉ譌ｩ譛溽ｵゆｺ・
 				}
@@ -816,6 +900,7 @@ int16_t readLogDistanceSlip(int logNumber)
 	static TCHAR log[CA_SECOND_LOG_LINE_BUFSIZE];
 	const int log_len = (int)(sizeof(log) / sizeof(log[0]));
 	int16_t maxOptimalIndex = -1;
+	SecondLogColumnMap secondLogColumns;
 
 	// 1陦檎岼縺ｯ繝倥ャ繝縺ｪ縺ｮ縺ｧ隱ｭ縺ｿ鬟帙・縺・
 	TCHAR *header = f_gets(log, log_len, &fil_Read);
@@ -832,6 +917,11 @@ int16_t readLogDistanceSlip(int logNumber)
 		{
 			ret = -2; // 隗｣譫仙ｯｾ雎｡縺檎┌縺・
 		}
+		goto cleanup;
+	}
+	if (!parseSecondLogHeader((const char *)header, &secondLogColumns))
+	{
+		ret = -2; // 2次ログに必要な列がない
 		goto cleanup;
 	}
 
@@ -860,7 +950,8 @@ int16_t readLogDistanceSlip(int logNumber)
 		uint8_t slipLong = 0;
 		uint8_t slipLat = 0;
 
-		if (!parseSecondLogLine((const char *)log, &courseMarker, &encTotal, &roc,
+		if (!parseSecondLogLine((const char *)log, &secondLogColumns,
+				&courseMarker, &encTotal, &roc,
 				&targetSpeedLog, &optimalIdx, &slipLong, &slipLat))
 		{
 			continue;	// 霑ｽ蜉: 繝倥ャ繝/遨ｺ陦後・隗｣譫舌＠縺ｪ縺・

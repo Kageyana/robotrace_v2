@@ -15,6 +15,7 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - Logs are CSV, UTF-8, comma-separated, with a header.
 - The schema source is `robotrace_v2/Core/Inc/log_schema.h`.
 - The log header contains data names and `parameter=value` entries.
+- Firmware-side secondary-log parsing resolves required fields by header name, not fixed column number. Required fields are `courseMarker`, `encTotalOptimal`, `ROC`, `targetSpeed`, `optimalIndex`, `slipFlag`, and `slipFlagLat`.
 - Distinguish run mode by `optimalTrace`.
 - Exclude failed runs when `emcStop != 0`.
 - Invalidate logs with `cntlog` gaps or processing drops; identify and report the cause.
