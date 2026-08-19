@@ -527,7 +527,7 @@ cmake --build --preset Release
 ### 実装未対応箇所の扱い
 
 - 実装した項目は、実装未対応一覧から削除する。
-- 実装済み履歴は `AGENTS.md` に残す。
+- 実装済み履歴は Obsidian ノートとして `docs/実装済み履歴.md` に記述し、`AGENTS.md` には参照だけを残す。
 - 実装未対応箇所の優先順位は、現時点では自動更新しない。
 
 ### AGENTS.md 方針に対する実装未対応箇所
@@ -545,103 +545,7 @@ cmake --build --preset Release
 
 ### 実装済み履歴
 
-- 2026-06-28: 誤字由来の識別子を正規化し、解析済みログ番号ファイル名を `analize.txt` から `analysis.txt` へ変更した。旧名の読み取りフォールバックは設けない。
-- 2026-06-28: ログヘッダへ `fwVersion`, `gitCommit`, `buildDate`, `buildTime`, `branch` を出力するようにした。設定ファイル欠落時のデフォルト作成、破損時の部分反映と修復、`lsval.txt` 破損時および IMU/ラインセンサー異常時の走行禁止、TIM7 ログ要求周期の命名整理を実装した。
-- 2026-06-28: スリップ判定で実PWMを参照するようにし、IMUバイアス更新を低動的状態に限定した。ログ列 `slipRatio`, `slipRatioLat` は `slipLongResidual_mps2`, `slipLatResidual_mps2` へ変更した。
-- 2026-06-28: スリップ判定のデバッグ列 `slipThresholdHigh`, `slipThresholdLow`, `slipLatHigh`, `slipLatLow`, `slipCurScale`, `slipTurningState`, `slipAxBias`, `slipAyBias` を追加し、オフライン評価用スクリプトを追加した。
-- 2026-06-29: 縦スリップの低負荷誤検出抑制として、速度誤差と電流によるONカウントゲートを追加し、ログ列 `slipLongOnCountEnabled` を追加した。
-- 2026-06-30: 縦スリップON後に低負荷が継続した場合の保持解除を追加し、ログ列 `slipLongLowloadClearCount` を追加した。
-- 2026-06-30: PID調整のため直線用 `lineTraceOmegaFBCtrl` ゲインを定数化して `kp=1`, `kd=0` に変更し、SDから読んだ `veloCtrl` を `veloCtrlL/R` へ同期、ログヘッダへ `veloCtrlL.*`, `veloCtrlR.*` を追加した。
-- 2026-07-01: ラインPID再評価のため直線用 `lineTraceOmegaFBCtrl` ゲインを `kp=2`, `kd=1` に変更し、ログ列 `lineTraceOmegaFBCtrlkd` を追加した。
-- 2026-07-01: カーブ用ゲインが直線区間に残る時間を短くするため、直線復帰判定の先読みを `1`、直線安定距離を `10 mm` に変更した。
-- 2026-07-01: ログ容量を抑えるため、`x`, `y` の後ろに出力していたスリップ詳細デバッグ列をログスキーマから削除した。
-- 2026-07-02: 高速度帯の左右独立速度目標クリップを評価するため、片輪目標上限を `5.0 m/s` 相当に変更し、ログ列 `targetSpeedL`, `targetSpeedR`, `speedTargetClip` を追加した。
-- 2026-07-02: 高速度帯の速度FF評価のため、速度比例FF、Crr相当FF、合計FF、PID単体出力を左右別に記録するログ列を追加し、速度比例FF係数 `SPEED_FEEDFORWARD_VEL_SCALE` を追加した。
-- 2026-07-02: 高速度帯の速度追従改善試験として、速度比例FF係数 `SPEED_FEEDFORWARD_VEL_SCALE` を `1.10f` に変更した。
-- 2026-07-03: `SPEED_FEEDFORWARD_VEL_SCALE` を `1.00f` に戻し、PWM飽和前要求値と左右速度偏差を切り分けるため、ログ列 `speedErrL/R`, `speedPwmReqL/R`, `speedPwmSatL/R` とログヘッダ `speedFfVelScale` を追加した。
-- 2026-07-03: 高速度帯だけ速度比例FFを増やす試験として、`3300-3500 mm/s` で `1.00` から `1.15` へ線形補間する `SPEED_FEEDFORWARD_HIGH_VEL_SCALE` を追加し、ログヘッダへ高速度帯FF設定を追加した。
-- 2026-07-03: 高速度帯限定 `SPEED_FEEDFORWARD_HIGH_VEL_SCALE=1.15f` は速度偏差が改善せず不採用とし、`1.00f` へ戻した。直線最高速度過大の切り分けとして、SD設定の `bstStraight=3.30 m/s` 試験を開始した。
-- 2026-07-04: 充電後ログ `9930`〜`9943` で高速度帯インデックスの実速度維持とPWM余裕改善を確認し、SD設定の `bstStraight=3.30 m/s` を現行採用候補とした。次回は `120-159 pulse/ms` 帯のPWM飽和再現性を確認する。
-- 2026-07-04: 追加ログ `9945`〜`9959` で `bstStraight=3.30 m/s` の再現性と中速帯PWM余裕改善を確認し、現行設定として継続採用した。緊急停止診断用に停止判定カウンタのログ列を追加した。
-- 2026-07-04: `encCurrentL/R` 追加後のログ `9960`〜`9974` で2次走行の `targetSpeed` が固定化したため、1次走行解析の固定列順と互換になるよう `encCurrentL/R` を `ROC` の後ろへ移動した。
-- 2026-07-04: 2次ログ再解析で追加ログ列を誤読しないよう、`readLogDistanceSlip()` をヘッダ名ベースの列参照へ変更した。
-- 2026-07-04: `readLogDistanceSlip()` の速度計画反映で縦スリップと横スリップを別強度に分離し、縦スリップ単独では軽い減速に留めるよう変更した。
-- 2026-07-04: `readLogDistanceSlip()` の速度変化制限後、横スリップが無い高速度帯ストレートに `v2Max * 0.95` の下限を追加した。
-- 2026-07-04: 高速度帯ストレート下限の判定を2次ログ実測ROCから1次ログ由来の基準ROCへ変更した。
-- 2026-07-04: 高速度帯ストレート下限によるPWM飽和とライン制御負荷を下げる比較試験として、下限スケールを `0.92` に変更した。
-- 2026-07-05: 下限スケール `0.92` はPWM飽和とライン制御負荷を下げた一方で高速度帯targetが下限ぎりぎりだったため、中間比較として `0.93` に変更した。
-- 2026-07-05: 下限スケール `0.93` は高速度帯targetを戻したがlapと直線指標が改善しなかったため `0.92` に戻し、速度計画低下確認用の `targetSpeedBase`, `targetSpeedScale` を追加した。
-- 2026-07-05: `0.92` 復帰後の充電ログで高速度帯targetが約92%に張り付いたため、速度変化制限の高速度帯ストレートへの連続伝播を3 index目以降だけ `0.94` 下限で制限した。
-- 2026-07-05: 伝播保護 `steps=2` は高速度帯targetを戻したが直線 `gyroVal_Z` と `lineTraceCtrl` が悪化したため、保護を弱める比較として `CA_SLIP_SPEED_PROPAGATE_PROTECT_STEPS=3` へ変更し、ログヘッダへ `speedPropagateProtectSteps`, `speedPropagateRecoverScale` を追加した。
-- 2026-07-05: 伝播保護 `steps=3` は充電後2セットでlap、PWM飽和、直線 `gyroVal_Z`、`lineTraceCtrl` が悪化したため不採用とし、`CA_SLIP_SPEED_PROPAGATE_PROTECT_STEPS=OPT_BUFF_SIZE` で `0.94` 伝播回復を無効化して `0.92` 基準へ戻した。
-- 2026-07-05: `0.94` 伝播回復無効化後も低速カーブ側のPWM飽和とライン制御負荷が残るため、横スリップ時だけ少し安全側へ寄せる比較として `CA_SLIP_DOWN_LAT_EXTRA=0.35f` に変更した。
-- 2026-07-05: `CA_SLIP_DOWN_LAT_EXTRA=0.35f` は採用せず `0.30f` へ戻した。ログ負荷切り分けのため `LOG_SCHEMA_PROFILE_LIGHT=1` を既定にし、軽量ログ列と `logRecordSizeBytes` / `dbgOverflowFinal` / `logOverflowFinal` などの診断ヘッダを追加した。
-- 2026-07-05: ログサイズ悪化閾値を調べるため `LOG_SCHEMA_LOAD_TEST_LEVEL` を追加した。次回比較用の既定値は `1` とし、ログレコードサイズを `64 bytes` 相当にする。
-- 2026-07-08: `64 bytes` ログで処理落ちやoverflowは出ないがlapと直線指標の悪化が再現したため、中間比較用に `LOG_SCHEMA_LOAD_TEST_LEVEL=4` を追加し、ログレコードサイズを `48 bytes` 相当にした。
-- 2026-07-08: `48 bytes` ログでもPWM飽和、直線 `lineTraceCtrl`、`emcStop=5` が残ったため、次の中間比較用に `LOG_SCHEMA_LOAD_TEST_LEVEL=5` を追加し、ログレコードサイズを `40 bytes` 相当にした。
-- 2026-07-08: `40 bytes` ログでも直線 `lineTraceCtrl` と中速帯PWM飽和が `33 bytes` 基準まで戻らなかったため、中間比較用に `LOG_SCHEMA_LOAD_TEST_LEVEL=6` を追加し、ログレコードサイズを `36 bytes` 相当にした。
-- 2026-07-08: `36 bytes` ログは完走2セットで40Bより改善し33Bに近いため、現行の検証ログ上限候補とした。`emcStop=5` 診断では、必要に応じて36B内のダミー領域をライン未検出カウンタへ一時置換する方針とした。
-- 2026-07-09: `emcStop=5` 診断列版36Bはlap、PWM飽和、直線 `lineTraceCtrl` が悪化したため常用不採用とし、`LOG_SCHEMA_LOAD_TEST_LEVEL=6` をダミー3 bytesの36B基準ログへ戻した。
-- 2026-07-12: 36B dummy復帰後の追加ログ `10445`〜`10453` で2セットとも `emcStop=0`、overflow/gapなしを確認した。前回低電圧ログ `10435`〜`10443` の悪化はログサイズ起因とは見ず、常用検証ログ上限を36B dummy構成に固定する。
-- 2026-07-12: 2次走行生成までに必要なログ列を常時維持し、その他の診断列はタスク単位で一時入れ替え、タスク終了後に36B dummy基準ログへ戻す運用を追加した。
-- 2026-07-12: パラメータ調整へ戻る前に、ログサイズ調査用の `LOG_SCHEMA_LOAD_TEST_LEVEL` と40B以上の負荷試験ダミー列を削除し、36B dummy基準ログだけを残した。
-
-- 2026-07-20: カーブ側 `lineTraceOmegaFBCtrl.kd=13` は不採用、`kd=12` を現行固定とした。`kd=12` で残る直線指標悪化の切り分けとして、直線用ゲイン復帰距離 `GAIN_CHANGE_STRAIGHT_STABLE_MM` を `5 mm` に変更した。
-- 2026-07-20: 直線用ゲイン復帰距離 `5 mm` は、target curve PWM飽和と `lineTraceCtrl` が悪化したため不採用とし、`GAIN_CHANGE_STRAIGHT_STABLE_MM=10 mm` へ戻した。
-- 2026-07-20: カーブ側 `lineTraceOmegaFBCtrl` は `lineomega.txt=004,000,012` を現行固定とした。ログ `10570`〜`10588` の有効2次走行16本で、target curve PWM飽和、直線 `gyroVal_Z`、直線 `lineTraceCtrl`、lapが `kp=5,kd=12` 基準から改善した。
-- 2026-07-20: `lineomega.txt=004,000,012` 固定後も `optimalIndex=10,11,23` 付近の横スリップ率が高いため、横スリップ時の2次速度計画を少し安全側へ寄せる比較として `CA_SLIP_DOWN_LAT_EXTRA=0.33f` に変更した。
-- 2026-07-20: `CA_SLIP_DOWN_LAT_EXTRA=0.33f` は横スリップ率が下がらず、PWM飽和と `lineTraceCtrl` が悪化したため不採用とし、`0.30f` へ戻した。
-- 2026-07-20: 横スリップ原因切り分けのため、36B検証ログから `targetSpeedBase`, `targetSpeedScale`, `lineTraceOmegaFBCtrlkp/kd`, ダミー3Bを一時的に外し、`slipLatResidual_mps2`, `slipLatHigh` を記録する。タスク終了後は36B標準ログへ戻す。
-- 2026-07-22: 横スリップ診断列は役割完了のため36B標準ログへ戻した。`idx10/11/23` の実横スリップ残差が大きいため、同indexかつ `abs(baseRoc) <= 160 mm` の区間だけ `CA_SLIP_LOCAL_LAT_SPEED_SCALE=0.85f` で局所速度capする比較へ進む。
-- 2026-07-22: 局所速度cap単発適用は `idx10/11/23` の横スリップ改善が薄く、走行ごとのON/OFF交互挙動が見えたため、`CA_SLIP_LOCAL_LAT_HOLD_RUNS=2` を追加してスリップ後2回分capを保持する比較へ進む。
-- 2026-07-22: `CA_SLIP_LOCAL_LAT_HOLD_RUNS=2` は横スリップ低減に効いた一方でlap、PWM飽和、直線 `gyroVal_Z` / `lineTraceCtrl` が悪化したため不採用とし、保持を弱めた `CA_SLIP_LOCAL_LAT_HOLD_RUNS=1` の比較へ進む。
-- 2026-07-23: 局所横スリップcap方式は単発、保持2走、保持1走のいずれも横スリップ低減とlap/直線指標を両立できなかったため、`CA_SLIP_LOCAL_LAT_ENABLE=0` で無効化する。36BログはPWM飽和分類用に `targetSpeedScale` とダミー3Bを外し、`targetAngularvelo`, `speedPwmSatL/R` を追加する。
-- 2026-07-23: PWM飽和分類 profile 1 では `unknown_motor_sat` が多く残ったため、36Bログから `targetAngularvelo`, `lineTraceOmegaFBCtrlkp/kd` を一時的に外し、`speedPwmReqL/R` を追加する profile 2 へ切り替えた。
-- 2026-07-26: profile 2ログ `10690`〜`10709` で `unknown_motor_sat=1.42%` が残り、`speedPwmReqL/R` が低いのに `motorpwmL/R` が飽和する行があるため、36Bログから `targetSpeedBase`, `speedPwmSatL/R` を一時的に外し、`speedPwmOutL/R` を追加する profile 3 へ切り替えた。
-- 2026-07-26: profile 3ログ `10723`〜`10731` で `motor_out_mismatch=2.45%` が残ったため、`speedPwmOutL/R` をログ時点の `veloCtrlL/R.pwm` 直接参照から、出力適用時にラッチした速度PWM値へ変更する profile 4 へ切り替えた。
-- 2026-07-26: profile 5ログ `10747`〜`10758` でPWM飽和分類の `unknown_motor_sat=0%` を確認した。`idx10/11/23` の `targetAngularvelo - gyroVal_Z` 乖離と横スリップを切り分けるため、`BOOST_DISTANCE` の低速カーブ時だけライン角速度目標を `1200 deg/s` に制限する比較へ進む。
-- 2026-07-26: `lineomega.txt=005,000,012` と `LINE_TRACE_OMEGA_TARGET_CAP_ABS_DEG_S=1200` を比較ベースにし、`idx10/11/23` に残る `targetAngularvelo > 1200` と横スリップを下げるため、cap適用速度範囲を `90` から `95 pulse/ms` へ広げる比較へ進む。
-- 2026-07-27: `LINE_TRACE_OMEGA_TARGET_CAP_MAX_SPEED_PULSE=95` は `emcStop=3` と `idx10/11/23` 横スリップ再発があり採用保留/不採用寄りとし、`90 pulse/ms` へ戻す。36Bログは profile 6 として `targetAngularveloRaw` を追加し、cap適用漏れとcap後目標を比較する一時診断ログへ切り替える。
-- 2026-07-27: `max90 + profile6` ログ `10820`〜`10828` で `idx10/11/23` の `cap_missed_due_speed=25.64%` が残り、missed行は主に `targetSpeed=91-92 pulse/ms` だったため、cap適用範囲の中間比較として `LINE_TRACE_OMEGA_TARGET_CAP_MAX_SPEED_PULSE=93` へ変更する。
-- 2026-07-27: `LINE_TRACE_OMEGA_TARGET_CAP_MAX_SPEED_PULSE=93` は `idx10/11/23` のcap漏れと横スリップを下げたが、lap、直線 `gyroVal_Z`、target curve `lineTraceCtrl` が悪化したため不採用とし、`90 pulse/ms` へ戻す。cap適用範囲拡大は打ち切り、次はラインセンサー目標または局所経路側を切り分ける。
-- 2026-07-27: `max90` 復帰ログ `10850`〜`10858` で復帰成功を確認した。`idx10/11/23` の横スリップは残るがcap適用範囲拡大は打ち切り、36B profile 7 として `lineOmegaSensorDiff/Sum` を記録し、ライン角速度目標のセンサー内訳を診断する。
-- 2026-07-27: profile 7ログ `10860`〜`10868` では `lineOmegaSensorSum` は低すぎず、`lineOmegaSensorDiff/Sum` が大きいことを確認した。次は `idx10/11/23` 限定で、速度条件に依存しない `1200 deg/s` のライン角速度目標capを比較する。
-- 2026-07-27: `idx10/11/23` 限定ライン角速度目標capは横スリップを下げたが、lap、直線 `gyroVal_Z`、直線 `lineTraceCtrl`、target curve `lineTraceCtrl` が悪化したため不採用とし、`LINE_TRACE_OMEGA_LOCAL_TARGET_CAP_ENABLE=0` へ戻して `max90 + profile7` 復帰を確認する。
-- 2026-07-29: `lineomega.txt=006,000,012` は横スリップと直線指標が悪化したため不採用とし、`005,000,012` へ戻した。復帰後ログで `emcStop=3/5` が出たため、36B内の一時診断列で `emcStop=5` のライン未検出要因を切り分けた。
-- 2026-07-29: profile 8診断ログ `10917`〜`10936` で `emcStop=5` は再発しなかったため停止条件は変更しない。36Bログをprofile 7へ戻し、`idx10/11/23/24` 限定でライン角速度目標を `0.90` 倍にする比較へ進む。
-- 2026-07-30: 局所ライン角速度目標スケール `0.90` はログ `10938`〜`10946` で横スリップ改善が再現しなかったため不採用とし、`LINE_TRACE_OMEGA_LOCAL_TARGET_SCALE_ENABLE=0` へ戻した。次は局所対応ではなく、ラインセンサー目標生成やカーブ全体に効く制御側を検討する。
-- 2026-07-31: 復帰後ログ `10948`〜`10956` で局所スケール無効化と profile 7 の正常動作を確認した。局所対応を避ける方針に合わせ、低速カーブ全体で `abs(lineOmegaSensorDiff) / lineOmegaSensorSum` が大きいときだけライン角速度目標を最大90%まで連続圧縮する比較へ進む。
-- 2026-07-31: 差分正規化圧縮はログ `10958`〜`10966` で横スリップ、yaw誤差、PWM飽和、直線指標が改善しなかったため不採用とし、`LINE_TRACE_OMEGA_DIFF_COMPRESS_ENABLE=0` へ戻した。次は局所index指定を避け、低速小Rカーブ全体で曲率由来FFとラインセンサーFB縮小を分離する比較へ進む。
-- 2026-07-31: 曲率FF実装レビューで、`targetSpeed=0` 時はライン角速度目標のFB縮小を行わないよう修正した。profile 7解析では、曲率FF適用率をcap後差分ではなく曲率FFのpre-cap推定差分で評価し、最終cap込み差分とは分けて集計する。
-- 2026-07-31: 曲率由来FF `LINE_TRACE_OMEGA_CURVE_FF_ENABLE=1`, `LINE_TRACE_OMEGA_CURVE_FF_GAIN_PCT=100`, `LINE_TRACE_OMEGA_CURVE_FB_SCALE_PCT=35` を採用した。完走ログ `10968`〜`10991` の比較でlapと `idx10/11/23/24` 横スリップ低減を優先し、`lineTraceCtrl` RMS増加は許容扱いとする。
-- 2026-08-01: 調整終了に伴い、一時的に入れた局所横スリップ速度cap、局所ライン角速度cap/scale、差分正規化圧縮、profile 7ライン角速度センサー診断列を削除した。現行ログは36B dummy基準ログへ戻し、採用済みの `max90` ライン角速度目標capと曲率由来FFだけを残す。
-- 2026-08-01: `STOP_ENCODER_STOP` 切り分けは不要とし、緊急停止時の `encCurrentN/L/R` ラッチ getter/setter と緊急停止カウンタ getter/log列を削除した。
-- 2026-08-02: 調整完了に伴い、速度FF内訳、速度PID単体出力、速度偏差、飽和前速度PWM要求、速度PWM飽和フラグのログ用変数と常時ログ列を削除した。必要時のみ36B以内の一時診断列として再追加する。
-- 2026-08-02: 高速度帯速度比例FFスケール構造は不要とし、`SPEED_FEEDFORWARD_VEL_SCALE` / `SPEED_FEEDFORWARD_HIGH_*`、`calcSpeedFeedForwardVelScale()`、速度FFスケール用ログヘッダを削除した。速度FFは従来どおり目標速度とCrr相当バイアスから合計PWMを算出する。
-- 2026-08-12: 電圧指令化後の速度追従改善比較として、正規化モーター指令の公称電圧を `MOTOR_COMMAND_NOMINAL_V=7.0V` から `7.2V` へ変更した。速度PID、速度FF、速度表は変更しない。
-- 2026-08-16: 前走のスリップを次走の速度計画へ反映する感度を全体的に弱める比較として、`CA_SLIP_FRAC_FULL=0.60f` を `0.70f` へ変更した。局所index、速度PID、速度FF、ライン制御、SD設定は変更しない。
-- 2026-08-16: `CA_SLIP_FRAC_FULL=0.70f` の追加完走ログで目標速度の過剰低下が再現しなかったため、次の非局所速度帯比較としてSDの `bst200` を `1.70m/s` から `1.65m/s` へ変更した。`bst100=1.60m/s`、速度PID=12、速度FF=150、ライン制御は固定する。
-- 2026-08-16: `bst200=1.65m/s` はautoStart周回別のlap短縮と横スリップ改善が一貫しなかったため不採用とし、SDの `bst200` を基準値 `1.70m/s` へ復帰した。復帰はSD値確認のみで完了とする。
-- 2026-08-16: `bst200` 比較後の次候補として、速度表の減速開始先行距離 `decelLeadMm` を `60mm` から `50mm` へ変更した。速度値、速度PID、速度FF、ライン制御は固定する。
-- 2026-08-16: `decelLeadMm=50mm` はautoStart周回別に直線指標、速度誤差、lapの悪化が再現したため不採用とし、基準値 `60mm` へSD設定だけ復帰した。
-- 2026-08-16: 最新ログで速度目標未達側の速度誤差が残ったため、次の速度追従比較としてSDの速度PID `kp` を `12` から `14` へ変更した。`ki=0`、`kd=0`、速度FF=150、速度表、ライン制御は固定する。
-- 2026-08-16: `veloCtrl.kp=14` はautoStart周回別にlap、lineTraceCtrl RMS、横スリップが悪化し、速度誤差p95の改善も一貫しなかったため不採用とし、`kp=12` へSD設定だけ復帰した。
-- 2026-08-16: `speed_ff=165` は `CA_SLIP_FRAC_FULL=0.70f` 条件で `11821`〜`11835` を確認したが、autoStart周回別の速度誤差p95、lineTraceCtrl、PWM飽和、横スリップの改善が一貫しなかったため不採用とし、`speed_ff=150` へSD設定だけ復帰した。
-- 2026-08-16: `speed_ff=165` 不採用後の次候補として、正規化モーター指令の公称電圧 `MOTOR_COMMAND_NOMINAL_V` を `7.2V` から `7.1V` へ変更した。速度FF=150、速度PID=12、速度表、ライン制御は固定する。
-- 2026-08-16: `MOTOR_COMMAND_NOMINAL_V=7.1V` は6セットで候補継続とし、autoStart 2・4のライン負荷と横スリップをさらに確認するため、次候補として `7.0V` へ変更した。速度FF=150、速度PID=12、速度表、ライン制御は固定する。
-- 2026-08-16: `MOTOR_COMMAND_NOMINAL_V=7.0V` は開始電圧を揃えた4セットでautoStart 5のlapと速度誤差p95が悪化し、autoStart 4のgyroと横スリップも悪化したため不採用とし、既知候補の `7.1V` へコード値を復帰した。
-- 2026-08-16: `MOTOR_COMMAND_NOMINAL_V=7.1V` 復帰後、速度FF=165の不採用と速度PID=12を維持したまま、速度追従の中間比較としてSDの `speed_ff` を `150` から `160` へ変更した。速度表、ライン制御、公称モーター指令電圧は固定する。
-- 2026-08-16: `speed_ff=160` は `11966`〜`11970` の失敗セットを除外した追加4完走セットでも周回別の速度誤差p95とlap改善が一貫しなかったため不採用とし、SDの `speed_ff` を基準値 `150` へ復帰した。速度FFの連続比較は打ち切り、次は速度プロファイルまたはスリップ反映側を検討する。
-- 2026-08-16: 速度FF調整を打ち切った次の非局所速度計画比較として、スリップリスクの隣接indexへの伝播を弱めるため `CA_SLIP_EXPAND_1` を `0.50f` から `0.40f` へ変更した。`CA_SLIP_FRAC_FULL=0.70f`、速度PID=12、速度FF=150、速度表、ライン制御は固定する。
-- 2026-08-16: `CA_SLIP_EXPAND_1=0.40f` は `11991`〜`12005` の完走3セットで周回別の速度誤差p95、lap、横スリップ改善が一貫しなかったため不採用とし、`0.50f` へコード値を復帰した。復帰はコード確認のみで完了とする。
-- 2026-08-16: 次の非局所速度計画比較として、スリップリスクの遠方indexへの伝播を弱めるため `CA_SLIP_EXPAND_2` を `0.25f` から `0.20f` へ変更した。`CA_SLIP_EXPAND_1=0.50f`、`CA_SLIP_FRAC_FULL=0.70f`、速度PID=12、速度FF=150、速度表、ライン制御は固定する。
-- 2026-08-16: `CA_SLIP_EXPAND_2=0.20f` は `12006`〜`12040` のautoStart周回別比較で速度誤差p95の安定改善がなく、lap改善も再現しなかったため不採用とし、基準値 `0.25f` へコード値だけ復帰した。復帰後の実走行確認は不要とする。
-- 2026-08-16: `CA_SLIP_EXPAND_2=0.20f` 復帰後の次候補として、伝播ではなく横スリップ発生区間そのものの減速を弱めるため `CA_SLIP_DOWN_LAT_EXTRA` を `0.30f` から `0.25f` へ変更した。速度PID=12、速度FF=150、速度表、ライン制御、`CA_SLIP_EXPAND_1/2` は固定する。
-- 2026-08-16: `CA_SLIP_DOWN_LAT_EXTRA=0.25f` は `12041`〜`12060` のautoStart周回別比較で速度誤差p95と横スリップの安定改善がなく不採用とし、基準値 `0.30f` へコード値だけ復帰した。復帰後の実走行確認は不要とする。
-- 2026-08-16: `CA_SLIP_DOWN_LAT_EXTRA=0.25f` 復帰後の次候補として、横スリップriskの基本減速だけを弱めるため `CA_SLIP_DOWN_LAT_RISK` を `0.20f` から `0.15f` へ変更した。`CA_SLIP_DOWN_LAT_EXTRA=0.30f`、`CA_SLIP_FRAC_FULL=0.70f`、`CA_SLIP_EXPAND_1/2`、速度PID=12、速度FF=150、速度表、ライン制御は固定する。
-- 2026-08-16: `CA_SLIP_DOWN_LAT_RISK=0.15f` は `12061`〜`12075` のautoStart周回別比較でlapと速度誤差p95が全走行番号で改善しなかったため不採用とし、基準値 `0.20f` へコード値だけ復帰した。復帰後の実走行確認は不要とする。
-- 2026-08-16: 横スリップ側の `CA_SLIP_EXPAND_1/2`、`CA_SLIP_DOWN_LAT_EXTRA`、`CA_SLIP_DOWN_LAT_RISK` で安定改善が出なかったため、次の非局所速度計画比較として縦スリップriskの基本減速を `CA_SLIP_DOWN_LONG_RISK=0.04f` から `0.03f` へ変更した。縦スリップ追加減速、横スリップ側、速度PID=12、速度FF=150、速度表、ライン制御は固定する。
-- 2026-08-16: `CA_SLIP_DOWN_LONG_RISK=0.03f` は `12076`〜`12097` のautoStart周回別比較で速度誤差p95が全走行番号で悪化し、lap改善も再現しなかったため不採用とし、基準値 `0.04f` へコード値だけ復帰した。`12093`〜`12097` は `12094` の途中終了によりセット全体を除外した。復帰後の実走行確認は不要とする。
+実装済み履歴は Obsidian ノートとして `docs/実装済み履歴.md` に移行済みです。新しい履歴も Obsidian で同ノートへ追記します。
 
 ## 15. 機体・回路変更時にコードへ反映する項目
 
