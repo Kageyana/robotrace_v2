@@ -1,4 +1,4 @@
-#ifndef EMERGENCYSTOP_H_
+﻿#ifndef EMERGENCYSTOP_H_
 #define EMERGENCYSTOP_H_
 //====================================//
 // インクルード
@@ -15,6 +15,7 @@
 #define STOP_LINESENSOR_BRIGHT		4
 #define STOP_LINESENSOR_UNBRIGHT	5
 #define STOP_OVERSPEED          6
+#define STOP_LOCALIZATION       7
 
 #define STOP_COUNT_ENCODER_STOP	200		// エンコーダ停止
 #define STOP_COUNT_ANGLE_X	    100		// X方向の角速度変化

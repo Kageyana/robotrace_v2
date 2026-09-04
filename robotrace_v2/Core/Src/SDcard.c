@@ -15,7 +15,11 @@ FIL fil_W;
 FIL fil_R;
 
 // ログヘッダー
-char columnTitle[2048] = "", formatLog[256] = "";
+// 詳細デバッグ列を含むCSVのフォーマットと1行分を格納できるサイズにする。
+#define LOG_COLUMN_TITLE_BUFFER_SIZE 2048U
+#define LOG_FORMAT_BUFFER_SIZE       512U
+#define LOG_CSV_LINE_BUFFER_SIZE    1024U
+char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE] = "", formatLog[LOG_FORMAT_BUFFER_SIZE] = "";
 
 // ログバッファ
 // Log buffers
@@ -442,6 +446,12 @@ void createLog(void)
 	setLogHeaderStrF("optimalTrace", optimalTrace);
 	setLogHeaderStrF("autoStart", autoStart);
 	setLogHeaderStrF("emcStop", emcStop);
+	// ゴール誤検出調査用。行ログが終了直前で途切れても累積値を確認できる。
+	setLogHeaderStr("sgMarkerAtLogEnd", (int32_t)SGmarker);
+	setLogHeaderStr("encRightMarkerAtLogEnd_p", encRightMarker);
+	setLogHeaderStr("routeControllerVersion", PATH_ROUTE_CONTROLLER_VERSION);
+	setLogHeaderStr("routeSourceLog", pathRouteSourceLog());
+	setLogHeaderStr("shortcutLevel", pathRouteShortcutLevel());
 
 	setLogHeaderStrF("tgtParam.bstStraight", tgtParam.bstStraight);
 	setLogHeaderStrF("tgtParam.bst1500", tgtParam.bst1500);
@@ -716,7 +726,7 @@ void endLog(void)
 	FRESULT fresult;		// f_write status
 	FIL fil;
 	uint8_t log[LOG_SIZE];
-	char logStr[256];
+	char logStr[LOG_CSV_LINE_BUFFER_SIZE];
 	UINT readByte, writtenlog;
 	uint16_t j;
 	uint16_t time, beforeTime = 0;
@@ -896,7 +906,8 @@ void endLog(void)
 #define LOG_FORMAT_VALUE_F32(value) (value)
 #define LOG_CSV_ARG_STORED(type, name, fmt, expr) , LOG_FORMAT_VALUE_##type(rec.name)
 #define LOG_CSV_ARG_DERIVED(type, name, fmt, expr) , LOG_FORMAT_VALUE_##type(expr)
-		snprintf((char *)logStr, sizeof(logStr), (char *)formatLog LOG_FIELD_LIST(LOG_CSV_ARG_STORED, LOG_CSV_ARG_DERIVED));
+		int csvLength = snprintf((char *)logStr, sizeof(logStr),
+            (char *)formatLog LOG_FIELD_LIST(LOG_CSV_ARG_STORED, LOG_CSV_ARG_DERIVED));
 #undef LOG_CSV_ARG_STORED
 #undef LOG_CSV_ARG_DERIVED
 #undef LOG_FORMAT_VALUE_U8
@@ -904,6 +915,14 @@ void endLog(void)
 #undef LOG_FORMAT_VALUE_S16
 #undef LOG_FORMAT_VALUE_U32
 #undef LOG_FORMAT_VALUE_F32
+
+		if (csvLength < 0 || (size_t)csvLength >= sizeof(logStr))
+		{
+			printf("CSV log line truncated in endLog: %d bytes\r\n", csvLength);
+			f_close(&fil_W);
+			f_close(&fil);
+			return;
+		}
 
 		if (f_puts(logStr, &fil_W) < 0)
 		{

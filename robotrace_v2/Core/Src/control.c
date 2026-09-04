@@ -1,7 +1,8 @@
-﻿//====================================//
+//====================================//
 // インクルード
 //====================================//
 #include "control.h"
+#include "pathFollower.h"
 #include "BMI088.h"
 #include "PIDcontrol.h"
 #include "encoder.h"
@@ -242,6 +243,7 @@ void initSystem(void)
 
 			readLinesenval(); // ラインセンサの最大値と最小値を取得
 			readTgtspeeds();  // 目標速度を取得
+			readShortcutSettings(); // 経路追従・ショートカット設定を取得
 
 			if (modeDSP)
 			{
@@ -489,15 +491,23 @@ void loopSystem(void)
 
 			if (autoStart == 2)
 			{
-				ret = readLogDistance(autoStartAnalyze);	// 追加: 2走目は1走目ログを解析
+				// 2走目は一次走行ログからコース通りの再走行経路を生成
+				ret = routeBuildFromLog(autoStartAnalyze, 0U);
 			}
 			else
 			{
-				ret = readLogDistanceSlip(autoStartAnalyze);	// 追加: 3走目以降は直前ログをスリップ解析
-				if (ret < 0)
+				// 3走目以降は一次走行ログを再利用し、許可済みレベルまで段階的に短縮
+				uint8_t requestedLevel = (uint8_t)(autoStart - 2U);
+				if (requestedLevel > shortcutSettings.maxLevel)
 				{
-					ret = readLogDistance(autoStartAnalyze);	// 追加: 解析失敗時は距離解析へフォールバック
+					requestedLevel = shortcutSettings.maxLevel;
 				}
+				int16_t sourceLog = pathRouteSourceLog();
+				if (sourceLog <= 0)
+				{
+					sourceLog = autoStartAnalyze;
+				}
+				ret = routeBuildFromLog(sourceLog, requestedLevel);
 			}
 			if(ret > 0)
 			{
@@ -672,6 +682,10 @@ void loopSystem(void)
 			distCtrl.Int = 0.0;
 
 			clearXYcie(); // 座標計算変数初期化
+			if (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT)
+			{
+				pathFollowerReset();
+			}
 
 			if (initMSD)
 			{
@@ -734,42 +748,26 @@ void loopSystem(void)
 			// motorCommandOutSynth(lineTraceOmegaFBCtrl.pwm, veloCtrl.pwm, 0, 0);
 			motorCommandOut(veloCtrlL.pwm,veloCtrlR.pwm);
 		}
-		else if (optimalTrace == BOOST_SHORTCUT)
+		else if (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT)
 		{
-			// ショートカット2次走行
-			// スタートマーカーを超えた時から距離計測開始
-			if (SGmarker > 0 && DistanceOptimal == 0)
-			{
-				DistanceOptimal = encTotalOptimal;
-				// 初期目標値をセット
-				optimalIndex = 1;
-				setShortCutTarget();
-			}
-			boostSpeed = tgtParam.shortCut;
-			// 目標速度に設定
+			// 経路再走行。通常はヨーレート制御、ロスト時はライン制御へ連続的に切り替える。
+			boostSpeed = pathFollowerGetTargetSpeedMps();
 			setTargetSpeed(boostSpeed);
-			// ライントレース
-			motorCommandOutSynth(0, veloCtrl.pwm, yawCtrl.pwm, distCtrl.pwm);
+			uint16_t pathBlend = pathFollowerGetPathBlendPermille();
+			int32_t steeringPwm = ((int32_t)yawRateCtrl.pwm * pathBlend)
+				+ ((int32_t)lineTraceOmegaFBCtrl.pwm * (1000 - pathBlend));
+			steeringPwm /= 1000;
+			motorCommandOutSynth(0, veloCtrl.pwm, steeringPwm, 0);
 		}
 
-		// ゴール判定
-		if (optimalTrace != BOOST_SHORTCUT)
+		// 通常走行はゴールマーカーを正とする。PATH系は経路終端付近でのみ有効にする。
+		if (SGmarker >= COUNT_GOAL &&
+			((optimalTrace != BOOST_PATH_REPLAY && optimalTrace != BOOST_SHORTCUT) ||
+			 pathFollowerGoalWindowOpen()))
 		{
-			if (SGmarker >= COUNT_GOAL)
-			{
-				goalTime = cntRun;
-				enc1 = 0;
-				patternTrace = 101;
-			}
-		}
-		else
-		{
-			if (numPPADarry > 0 && optimalIndex >= numPPADarry - 1)
-			{
-				goalTime = cntRun;
-				enc1 = 0;
-				patternTrace = 101;
-			}
+			goalTime = cntRun;
+			enc1 = 0;
+			patternTrace = 101;
 		}
 		break;
 

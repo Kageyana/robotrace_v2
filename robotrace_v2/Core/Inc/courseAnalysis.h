@@ -1,4 +1,4 @@
-#ifndef COURSEANALYSIS_H_
+﻿#ifndef COURSEANALYSIS_H_
 #define COURSEANALYSIS_H_
 //====================================//
 // インクルード
@@ -11,7 +11,6 @@
 // シンボル定義
 //====================================//
 #define OPT_BUFF_SIZE 1000
-#define OPT_SHORT_BUFF_SIZE 1000
 #define CALCDISTANCE 50				// 距離解析ステップ[mm]
 #define CALCDISTANCE_SHORTCUT 10 	// 距離解析ステップ(ショートカット走行)[mm]
 #define MACHINEACCELE 3.4F			// 加速度[m/s^2]
@@ -21,6 +20,7 @@
 #define BOOST_MARKER 1				// マーカー基準2次走行
 #define BOOST_DISTANCE 2			// 距離基準2次走行
 #define BOOST_SHORTCUT 3			// ショートカット2次走行
+#define BOOST_PATH_REPLAY 4			// 一次走行経路のセンサレス再走行
 
 #define SEARCHRANGE 150				// 距離補正時の距離検索範囲[mm]
 
@@ -107,7 +107,6 @@ extern uint8_t straightMarkerPendingLog;
 extern AnalysisData PPAD[OPT_BUFF_SIZE];
 extern EventPos markerPos[OPT_BUFF_SIZE];
 extern Courseplot xycie;
-extern Courseplot shortCutxycie[OPT_SHORT_BUFF_SIZE];
 //====================================//
 // プロトタイプ宣言
 //====================================//
@@ -122,7 +121,6 @@ int16_t readLogTest(int logNumber);
 int16_t calcXYcies(int logNumber);
 void calcXYcie(int16_t encpulse, float angVelo, float dt);
 void clearXYcie(void);
-void setShortCutTarget(void);
 void processMarkerEvent(void);
 void clearMarkerProcessState(void);
 

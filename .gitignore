@@ -27,5 +27,10 @@ fp-info-cache
 
 # analiysis
 analysis/
+!analysis/
+analysis/*
+!analysis/script/
+analysis/script/*
+!analysis/script/*.py
 # obsidian
 docs/.obsidian/**

@@ -7,6 +7,7 @@
 #include "battery.h"
 #include "control.h"
 #include "lineSensor.h"
+#include "pathFollower.h"
 #include <stdint.h>
 #define STRAIGHT_STATE_THRESHOLD_MM	70	// 直線判定の距離閾値[mm]
 //====================================//
@@ -66,14 +67,23 @@ void Interrupt1ms(void)
 		}
 	}
 
-	// PID制御処理
-	if(patternTrace < 12 || patternTrace > 100)
+	// 経路モードは平均速度PIDとヨーレートPIDを使用する。
+	bool pathModeActive = (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT);
+	if (pathModeActive && patternTrace >= 12 && patternTrace < 100)
+	{
+		pathFollowerUpdatePose1ms(Control_GetEncCurrentCorr_p(), imuVal.gyro.z);
+		motorControlTraceOmegaFB();
+		motorControlSpeed();
+		log_targetAngularVelocity = (int32_t)targetAngularVelocity;
+		motorControlYawRate();
+	}
+	else if(patternTrace < 12 || patternTrace > 100)
 	{
 		// スタート直後とゴール後は通常のライン制御
 		motorControlTrace();
 		motorControlSpeed();
 	}
-	else 
+	else
 	{
 		// ライン追従＋左右独立速度制御
 		motorControlTraceOmegaFB();
@@ -81,23 +91,14 @@ void Interrupt1ms(void)
 		int16_t delta = lineTraceOmegaFBCtrl.pwm;
 		int16_t targetL = (int16_t)targetSpeed + delta;
 		int16_t targetR = (int16_t)targetSpeed - delta;
-		// クリップ（例：目標が大きくなりすぎないように。上限は実機で調整）
-		const int16_t TARGET_MAX = (int16_t)PULSE_MILLIMETER * 4;	// 4.0m/s
-		if (targetL >  TARGET_MAX) targetL =  TARGET_MAX;
+		const int16_t TARGET_MAX = (int16_t)PULSE_MILLIMETER * 4;
+		if (targetL > TARGET_MAX) targetL = TARGET_MAX;
 		if (targetL < -TARGET_MAX) targetL = -TARGET_MAX;
-		if (targetR >  TARGET_MAX) targetR =  TARGET_MAX;
+		if (targetR > TARGET_MAX) targetR = TARGET_MAX;
 		if (targetR < -TARGET_MAX) targetR = -TARGET_MAX;
 
 		motorControlSpeedLR(targetL, targetR);
 	}
-	
-	
-
-	if(optimalTrace == BOOST_SHORTCUT)
-	{
-		motorControldist();
-	}
-
 	if (patternTrace > 10 && patternTrace < 100)
 	{
 		// 走行中に処理
@@ -106,12 +107,14 @@ void Interrupt1ms(void)
 		// if (cntEmcStopAngleY()) emcStop = STOP_ANGLE_Y;
 		if (cntEmcStopEncStop())
 			emcStop = STOP_ENCODER_STOP;
-		if (cntEmcStopLineSensorBright() && optimalTrace != BOOST_SHORTCUT)
+		if (cntEmcStopLineSensorBright() && !pathModeActive)
 			emcStop = STOP_LINESENSOR_BRIGHT;
-		if (cntEmcStopLineSensorUnbright() && optimalTrace != BOOST_SHORTCUT)
+		if (cntEmcStopLineSensorUnbright() && !pathModeActive)
 			emcStop = STOP_LINESENSOR_UNBRIGHT;
 		if (judgeOverSpeed())
 			emcStop = STOP_OVERSPEED;
+		if (pathModeActive && pathFollowerGetStatus() == PATH_STATE_LOCALIZATION_LOST)
+			emcStop = STOP_LOCALIZATION;
 
 		changeGain();		// ROCに応じてゲインを切り替える
 		checkCrossLine();	// クロスライン確認
@@ -172,27 +175,10 @@ void Interrupt1ms(void)
 	switch (cnt5)
 	{
 	case 1:
-		// xy座標計算
-		// // ショートカット走行の目標値インデックスを更新
-		if (optimalTrace == BOOST_SHORTCUT && DistanceOptimal > 0)
+		// 経路投影と目標更新は5ms周期で実行し、1ms割り込み負荷を抑える。
+		if (pathModeActive && patternTrace >= 12 && patternTrace < 100)
 		{
-			calcXYcie(encPulse5ms, BMI088val.gyro.z, DEFF_TIME); // 累積パルスを使用してxy座標計算
-			// distLen = (float)encCurrentN * PULSE_MILLIMETER * 0.005; // 現在速度から5ms後の移動距離を計算
-			optimalIndex = (int32_t)(encTotalOptimal / PULSE_MILLIMETER) / CALCDISTANCE_SHORTCUT; // 50mmごとにショートカット配列を作っているので移動距離[mm]を50mmで割った商がインデクス
-			if (optimalIndex + 1 < numPPADarry)
-			{
-				optimalIndex++;
-			}
-
-			if (targetDist - encPID < 200)
-			{
-				if (optimalIndex + 1 < numPPADarry)
-				{
-					optimalIndex++;
-				}
-			}
-
-			setShortCutTarget(); // 目標値更新
+			pathFollowerUpdateTarget5ms();
 		}
 		encPulse5ms = 0; // 累積値をリセット
 		break;

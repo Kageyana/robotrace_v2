@@ -1146,7 +1146,7 @@ static void setup_log(void)
 		ssd1306_SetCursor(30, 16);
 		ssd1306_printf(Font_6x8, "Dist <");
 		ssd1306_SetCursor(80, 16);
-		ssd1306_printf(Font_6x8, "> XYcalc");
+		ssd1306_printf(Font_6x8, "> Path");
 		ssd1306_SetCursor(46, 25);
 		ssd1306_printf(Font_6x8, "indexD:%4d", numPPADarry);
 		ssd1306_SetCursor(46, 34);
@@ -1267,6 +1267,9 @@ static void setup_start(void)
 			break;
 		case BOOST_SHORTCUT:
 			ssd1306_printf(Font_6x8, "BOOST SHORTCUT");
+			break;
+		case BOOST_PATH_REPLAY:
+			ssd1306_printf(Font_6x8, "PATH REPLAY");
 			break;
 		}
 		pattern.calibration = 1;

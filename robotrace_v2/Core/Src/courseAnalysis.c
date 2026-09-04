@@ -1,4 +1,4 @@
-﻿//====================================//
+//====================================//
 // 繧､繝ｳ繧ｯ繝ｫ繝ｼ繝・
 //====================================//
 #include "courseAnalysis.h"
@@ -8,6 +8,7 @@
 #include "markerSensor.h"
 #include "BMI088.h"
 #include "SDcard.h"
+#include "pathFollower.h"
 #include "sd_diskio_spi.h"
 #include "sd_functions.h"
 #include "ff.h"
@@ -141,7 +142,6 @@ static bool parseSecondLogHeader(const char *line, SecondLogColumnMap *map)
 AnalysisData PPAD[OPT_BUFF_SIZE];
 EventPos markerPos[OPT_BUFF_SIZE];
 Courseplot xycie;							   // xy蠎ｧ讓吝､(襍ｰ陦御ｸｭ險育ｮ励√Ο繧ｰ菫晏ｭ倡畑)
-Courseplot shortCutxycie[OPT_SHORT_BUFF_SIZE]; // xy蠎ｧ讓吝､(逶ｮ讓吝､縲√Ο繧ｰ菫晏ｭ倡畑)
 
 /////////////////////////////////////////////////////////////////////
 // 繝｢繧ｸ繝･繝ｼ繝ｫ蜷・calcROC
@@ -1332,229 +1332,36 @@ int16_t readLogTest(int logNumber)
 
 	return ret;
 }
-/////////////////////////////////////////////////////////////////////
-// 繝｢繧ｸ繝･繝ｼ繝ｫ蜷・calcXYcies (cie=Coordinate)
-// 蜃ｦ逅・ｦりｦ・    繝ｭ繧ｰ縺九ｉ襍ｰ陦瑚ｻ瑚ｷ｡縺ｮXY蠎ｧ讓吶ｒ險育ｮ励☆繧・
-// 蠑墓焚         繝ｭ繧ｰ逡ｪ蜿ｷ(繝輔ぃ繧､繝ｫ蜷・
-// 謌ｻ繧雁､       隗｣譫舌＠縺滄・蛻励・隕∫ｴ謨ｰ
+// モジュール名 calcXYcies
+// 処理概要     一次走行ログから再走行またはショートカット経路を生成する
+// 引数         logNumber: 解析するログ番号
+// 戻り値       経路点数、負値はエラー
 /////////////////////////////////////////////////////////////////////
 int16_t calcXYcies(int logNumber)
 {
-	FIL fil_Read, fil_Plot;
-	FRESULT fresult1, fresult2;
-	char fileName[10];
-	int16_t ret = 0;
-	bool lock_acquired = sd_fatfs_lock(200);
-
-	if (!lock_acquired)
-	{
-		return -9; // SD/FatFs菴ｿ逕ｨ荳ｭ
-	}
-
-	// 繝輔ぃ繧､繝ｫ隱ｭ縺ｿ霎ｼ縺ｿ
-	snprintf(fileName, sizeof(fileName), "%d", logNumber);				// 謨ｰ蛟､繧呈枚蟄怜・縺ｫ螟画鋤
-	strcat(fileName, ".csv");											// 諡｡蠑ｵ蟄舌ｒ霑ｽ蜉
-	fresult1 = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // 繝ｭ繧ｰ繝輔ぃ繧､繝ｫ繧帝幕縺・
-	if (fresult1 != FR_OK)
-	{
-		// 繝ｭ繧ｰ繝輔ぃ繧､繝ｫ縺ｮ繧ｪ繝ｼ繝励Φ縺ｫ螟ｱ謨励＠縺溷ｴ蜷医・繧ｨ繝ｩ繝ｼ繧定ｿ斐☆
-		ret = -5;       // 繝ｭ繧ｰ繝輔ぃ繧､繝ｫ繧ｪ繝ｼ繝励Φ繧ｨ繝ｩ繝ｼ
-		if (lock_acquired)
-		{
-			sd_fatfs_unlock();
-		}
-		return ret;
-	}
-	fresult2 = f_open(&fil_Plot, "./plot/plot.csv", FA_CREATE_ALWAYS | FA_WRITE); // csv繝輔ぃ繧､繝ｫ繧帝幕縺・
-	if (fresult2 != FR_OK)
-	{
-		// 繝励Ο繝・ヨ繝輔ぃ繧､繝ｫ縺ｮ繧ｪ繝ｼ繝励Φ縺ｫ螟ｱ謨励＠縺溷ｴ蜷医・繧ｨ繝ｩ繝ｼ繧定ｿ斐☆
-		f_close(&fil_Read);
-		ret = -6;       // 繝励Ο繝・ヨ繝輔ぃ繧､繝ｫ繧ｪ繝ｼ繝励Φ繧ｨ繝ｩ繝ｼ
-		if (lock_acquired)
-		{
-			sd_fatfs_unlock();
-		}
-		return ret;
-	}
-
-	// 繝励Ο繝・ヨ繝輔ぃ繧､繝ｫ縺碁幕縺代◆縺ｮ縺ｧ隗｣譫舌ｒ髢句ｧ・
-	// 繝ｭ繧ｰ繝・・繧ｿ縺ｮ蜿門ｾ・
-	TCHAR log[512];
-	const int log_len = (int)(sizeof(log) / sizeof(log[0]));
-	uint8_t plotStr[128];
-	int32_t time, marker, velo, distance;
-	float angVelo;
-	int32_t beforeTime = 0, startEnc = 0, distEnc = 0;
-	float degz = 0, degzR, velocity = 0, dt;
-	float x = 0, y = 0, xm = 0, ym = 0, degzm = 0;
-	float xValues[SHORTCUTWINDOW], yValues[SHORTCUTWINDOW], degzValues[SHORTCUTWINDOW];
-	int16_t i = 0, j = 0;
-
-	// 驟榊・縺ｮ蛻晄悄蛹・
-	memset(&xValues, 0, sizeof(float) * SHORTCUTWINDOW);
-	memset(&yValues, 0, sizeof(float) * SHORTCUTWINDOW);
-	memset(&degzValues, 0, sizeof(float) * SHORTCUTWINDOW);
-	indexSC = 0;
-
-	// 繧ｷ繝ｧ繝ｼ繝医き繝・ヨ霆瑚ｷ｡蛻晄悄蛟､縺ｮ險ｭ螳・
-	shortCutxycie[indexSC].x = 0;
-	shortCutxycie[indexSC].y = 0;
-	shortCutxycie[indexSC].w = 0;
-	indexSC++;
-
-	// plot繝輔ぃ繧､繝ｫ縺ｮ繝倥ャ繝譖ｸ縺崎ｾｼ縺ｿ
-	f_printf(&fil_Plot, "xm,ym,degzm\n");
-	
-	f_gets(log, log_len, &fil_Read); // 1陦檎岼縺ｯ繝倥ャ繝縺ｪ縺ｮ縺ｧ隱ｭ縺ｿ鬟帙・縺・
-
-	// 繝ｭ繧ｰ繝・・繧ｿ蜿門ｾ鈴幕蟋・
-	while (f_gets(log, log_len, &fil_Read) != NULL)
-	{
-		sscanf(log, "%d,%d,%f,%d,%d", &time, &velo, &angVelo, &marker, &distance);
-
-		dt = (float)(time - beforeTime) / 1000;		// 譎る俣[s]
-
-		degz = degz + (angVelo * dt);			   	// 隗貞ｺｦ
-		degzR = degz * DEG2RAD;					   	// [rad]縺ｫ螟画鋤
-		velocity = (float)velo / PULSE_MILLIMETER;	// 騾溷ｺｦ
-		distEnc += velo * (time - beforeTime);		// 霍晞屬險域ｸｬ
-
-		// 蠎ｧ讓呵ｨ育ｮ・
-		x = x + (velocity * sin(degzR));
-		y = y + (velocity * cos(degzR));
-
-		// 繝ｪ繝ｳ繧ｰ繝舌ャ繝輔ぃ縺ｫ蠎ｧ讓吶ｒ菫晏ｭ・
-		xValues[i & (SHORTCUTWINDOW - 1)] = x;
-		yValues[i & (SHORTCUTWINDOW - 1)] = y;
-		degzValues[i & (SHORTCUTWINDOW - 1)] = degz;
-
-		// 繝ｪ繝ｳ繧ｰ繝舌ャ繝輔ぃ縺ｮ邱丞柱險育ｮ怜燕縺ｫ蛻晄悄蛹・
-		xm = ym = degzm = 0.0f; // 蜷・捉蝗槭〒豁｣縺励＞蟷ｳ蝮・､繧貞ｾ励ｋ縺溘ａ繝ｪ繧ｻ繝・ヨ
-		// 繝ｪ繝ｳ繧ｰ繝舌ャ繝輔ぃ縺ｮ邱丞柱繧定ｨ育ｮ・
-		for (j = 0; j < SHORTCUTWINDOW; j++)
-		{
-			xm += xValues[j];
-			ym += yValues[j];
-			degzm += degzValues[j];
-		}
-
-		// 遘ｻ蜍募ｹｳ蝮・ｒ險育ｮ・繧ｷ繝ｧ繝ｼ繝医き繝・ヨ蠎ｧ讓・
-		xm /= SHORTCUTWINDOW;
-		ym /= SHORTCUTWINDOW;
-		degzm /= SHORTCUTWINDOW;
-		if (distEnc - startEnc >= encMM(CALCDISTANCE_SHORTCUT))
-		{
-			// 繝舌ャ繝輔ぃ荳企剞縺ｫ驕斐＠縺ｦ縺・↑縺・°遒ｺ隱・
-			if (indexSC < OPT_SHORT_BUFF_SIZE)
-			{
-				shortCutxycie[indexSC].x = xm;
-				shortCutxycie[indexSC].y = ym;
-				startEnc = distEnc; // 霍晞屬險域ｸｬ髢句ｧ倶ｽ咲ｽｮ繧呈峩譁ｰ
-				indexSC++; // 繝舌ャ繝輔ぃ縺ｮ谺｡縺ｮ菴咲ｽｮ縺ｸ
-			}
-			else
-			{
-				// 荳企剞雜・℃: 繧ｨ繝ｩ繝ｼ逡ｪ蜿ｷ-7繧定ｨｭ螳壹＠繝ｫ繝ｼ繝励ｒ邨ゆｺ・
-				ret = -7;
-				break;
-			}
-		}
-
-		i++;
-		beforeTime = time;
-	}
-
-	// 繧ｷ繝ｧ繝ｼ繝医き繝・ヨ蠎ｧ讓吶°繧謁aw霆ｸ隗貞ｺｦ繧定ｨ育ｮ・
-	float xe = 0, ye = 0;
-	float theta = 0, thetaBefore = 90, thetae;
-
-	degz = 0;
-	// plot繝輔ぃ繧､繝ｫ縺ｫ蛻晄悄蛟､險倬鹸
-	f_printf(&fil_Plot, "%d,%d,%d\n", (int32_t)(shortCutxycie[0].x * 10000), (int32_t)(shortCutxycie[0].y * 10000), (int32_t)(shortCutxycie[0].w * 10000));
-
-	for (i = 1; i < indexSC; i++)
-	{
-		xe = shortCutxycie[i].x - shortCutxycie[i - 1].x; // x蠎ｧ讓吶・遘ｻ蜍暮㍼
-		ye = shortCutxycie[i].y - shortCutxycie[i - 1].y; // y蠎ｧ讓吶・遘ｻ蜍暮㍼
-
-		theta = atan2(ye, xe) * RAD2DEG; // [deg]縺ｫ螟画鋤
-
-		// 2逶ｴ邱壹・縺ｪ縺呵ｧ偵ｒ險育ｮ・
-		thetae = thetaBefore - theta;
-		if (thetae > 180)
-		{
-			thetae -= 360;
-		}
-		else if (thetae < -180)
-		{
-			thetae += 360;
-		}
-		degz += thetae;
-
-		shortCutxycie[i].w = degz; // yaw霆ｸ隗貞ｺｦ
-		// plot繝輔ぃ繧､繝ｫ縺ｫ譖ｸ縺崎ｾｼ縺ｿ
-		int snlen = snprintf((char *)plotStr, sizeof(plotStr), "%f,%f,%f\n", shortCutxycie[i].x, shortCutxycie[i].y, shortCutxycie[i].w); // 謌ｻ繧雁､縺ｧ譖ｸ縺崎ｾｼ縺ｿ髟ｷ繧堤｢ｺ隱・
-		if (snlen < 0 || snlen >= sizeof(plotStr))
-		{
-			// snprintf縺悟､ｱ謨励＠縺溷ｴ蜷医ｄ繝舌ャ繝輔ぃ縺御ｸ崎ｶｳ縺励◆蝣ｴ蜷医・繧ｨ繝ｩ繝ｼ逡ｪ蜿ｷ-8繧定ｨｭ螳壹＠縺ｦ蜃ｦ逅・ｒ荳ｭ譁ｭ縺吶ｋ
-			ret = -8;
-			break;
-		}
-		f_puts((TCHAR *)plotStr, &fil_Plot);
-		
-		thetaBefore = theta; // 蜑榊屓縺ｮyaw霆ｸ隗貞ｺｦ繧呈峩譁ｰ
-	}
-
-	if (ret >= 0)
-	{
-		// 繝ｫ繝ｼ繝怜・縺ｧ繧ｨ繝ｩ繝ｼ縺後↑縺代ｌ縺ｰ隗｣譫舌＠縺溯ｦ∫ｴ謨ｰ繧定ｿ斐☆
-		ret = indexSC;
-	}
-
-	// 繝輔ぃ繧､繝ｫ繧ｯ繝ｭ繝ｼ繧ｺ
-	f_close(&fil_Read);
-	f_close(&fil_Plot);
-	if (lock_acquired)
-	{
-		sd_fatfs_unlock();
-	}
-
-	// 繧ｨ繝ｩ繝ｼ譎ゅ↓縺ｯ繝ｭ繧ｰ逡ｪ蜿ｷ菫晏ｭ倥ｄ繝輔Λ繧ｰ險ｭ螳壹ｒ繧ｹ繧ｭ繝・・縺吶ｋ
-	if (ret >= 0)
-	{
-		// 隗｣譫先ｸ医∩縺ｮ繝ｭ繧ｰ逡ｪ蜿ｷ繧剃ｿ晏ｭ・
-		saveLogNumber(logNumber);
-		analyzedNumber = logNumber;
-
-		// 2谺｡襍ｰ陦後ヵ繝ｩ繧ｰ 霍晞屬蝓ｺ貅・谺｡襍ｰ陦・
-		optimalTrace = BOOST_SHORTCUT;
-	}
-
-	return ret;
+	return routeBuildFromLog(logNumber, shortcutSettings.maxLevel);
 }
 /////////////////////////////////////////////////////////////////////
-// 繝｢繧ｸ繝･繝ｼ繝ｫ蜷・calcXYcie (cie=Coordinate)
-// 蜃ｦ逅・ｦりｦ・    襍ｰ陦御ｸｭ縺ｫxy蠎ｧ讓吶ｒ險育ｮ励＠繧ｰ繝ｭ繝ｼ繝舌Ν螟画焚縺ｫ菫晏ｭ倥☆繧・
-// 蠑墓焚         encpulse:繧ｨ繝ｳ繧ｳ繝ｼ繝繝代Ν繧ｹ angVelo:隗帝溷ｺｦ[deg/s]
-// 謌ｻ繧雁､       縺ｪ縺・
+// モジュール名 calcXYcie
+// 処理概要     エンコーダと角速度からログ用XY座標を積分する
+// 引数         encpulse: 移動パルス, angVelo: 角速度[deg/s], dt: 経過時間[s]
+// 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void calcXYcie(int16_t encpulse, float angVelo, float dt)
 {
 	static float velocity, degzR;
 
-	xydegz = xydegz + (angVelo * dt);		// 隗貞ｺｦ
-	degzR = xydegz * (M_PI / 180.0F);		// [rad]縺ｫ螟画鋤
-	velocity = (float)encpulse / PULSE_MILLIMETER * 1000; // 騾溷ｺｦ
+	xydegz = xydegz + (angVelo * dt);		// 積算角度[deg]
+	degzR = xydegz * (M_PI / 180.0F);		// radへ変換
+	velocity = (float)encpulse / PULSE_MILLIMETER * 1000; // 移動速度[mm/s]
 
 	xycie.x = xycie.x + (velocity * sin(degzR) * dt);
 	xycie.y = xycie.y + (velocity * cos(degzR) * dt);
 }
-/////////////////////////////////////////////////////////////////////
-// 繝｢繧ｸ繝･繝ｼ繝ｫ蜷・clearXYcie (cie=Coordinate)
-// 蜃ｦ逅・ｦりｦ・    繧ｰ繝ｭ繝ｼ繝舌Ν螟画焚xycie縺ｮ蛻晄悄蛹・
-// 蠑墓焚         縺ｪ縺・
-// 謌ｻ繧雁､       縺ｪ縺・
+// モジュール名 clearXYcie
+// 処理概要     ログ用XY座標と積算角度を初期化する
+// 引数         なし
+// 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void clearXYcie(void)
 {
@@ -1563,29 +1370,10 @@ void clearXYcie(void)
 	xydegz = 0;
 }
 /////////////////////////////////////////////////////////////////////
-// 繝｢繧ｸ繝･繝ｼ繝ｫ蜷・setShortCutTarget
-// 蜃ｦ逅・ｦりｦ・    繧ｰ繝ｭ繝ｼ繝舌Ν螟画焚xycie縺ｮ蛻晄悄蛹・
-// 蠑墓焚         縺ｪ縺・
-// 謌ｻ繧雁､       縺ｪ縺・
-/////////////////////////////////////////////////////////////////////
-void setShortCutTarget(void)
-{
-	float xe, ye, dist;
-	setTargetAngle(shortCutxycie[optimalIndex].w);
-
-	xe = shortCutxycie[optimalIndex].x - xycie.x;
-	ye = shortCutxycie[optimalIndex].y - xycie.y;
-
-	dist = sqrt(pow(xe, 2) + pow(ye, 2));
-
-        setTargetDist(dist);
-}
-
-/////////////////////////////////////////////////////////////////////
-// 繝ｭ繝ｼ繧ｫ繝ｫ髢｢謨ｰ clampMarkerIndex
-// 蜃ｦ逅・ｦりｦ・ 繝槭・繧ｫ繝ｼ繧､繝ｳ繝・ャ繧ｯ繧ｹ繧貞ｮ牙・縺ｪ遽・峇縺ｫ蜿弱ａ繧・
-// 蠑墓焚	 idx: 蛟呵｣懊う繝ｳ繝・ャ繧ｯ繧ｹ
-// 謌ｻ繧雁､	 遽・峇蜀・↓繧ｯ繝ｩ繝ｳ繝励＠縺溘う繝ｳ繝・ャ繧ｯ繧ｹ
+// ローカル関数 clampMarkerIndex
+// 処理概要     マーカーインデックスを有効範囲へ制限する
+// 引数         idx: 制限前のインデックス
+// 戻り値       制限後のインデックス
 /////////////////////////////////////////////////////////////////////
 static int16_t clampMarkerIndex(int16_t idx)
 {

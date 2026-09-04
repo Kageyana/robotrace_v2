@@ -513,11 +513,11 @@ void motorControlYawRate(void)
 
 	Dev = (targetAngularVelocity - imuVal.gyro.z) * 1; // 目標値-現在値
 	// I成分積算
-	yawRateCtrl.Int += Dev * 0.005;
+	yawRateCtrl.Int += Dev * 0.001f;
 	// 目標値を変更したらI成分リセット
 	if (targetAngularVelocity != targetAngularVelocityBefore)
 		yawRateCtrl.Int = 0;
-	Dif = (Dev - angularVelocityBefore) * 2; // dゲイン1/500倍
+	Dif = Dev - angularVelocityBefore; // 1ms周期の偏差差分
 
 	iP = yawRateCtrl.kp * Dev;			   // 比例
 	iI = yawRateCtrl.ki * yawRateCtrl.Int; // 積分

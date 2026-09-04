@@ -7,6 +7,7 @@
 #include "SDcard.h"
 #include "battery.h"
 #include "motor.h"
+#include "pathFollower.h"
 //====================================//
 // シンボル定義
 //====================================//
@@ -38,12 +39,23 @@
 	STORED(S16, motorVoltageCmdL_mV, "%d", (int16_t)(motorVoltageCmdL_V * 1000.0f)) \
 	STORED(S16, motorVoltageCmdR_mV, "%d", (int16_t)(motorVoltageCmdR_V * 1000.0f)) \
 	STORED(U32, encCurrentCorr_p, "%d", (uint32_t)Control_GetEncCurrentCorr_p()) \
+	STORED(F32, linePointX_mm, "%f", pathLogLinePointX_mm) \
+	STORED(F32, linePointY_mm, "%f", pathLogLinePointY_mm) \
+	STORED(U8, lineValid, "%d", pathLogLineValid) \
+	STORED(F32, pathErrorY_mm, "%f", pathLogErrorY_mm) \
+	STORED(S16, pathErrorHeading_cdeg, "%d", pathLogErrorHeading_cdeg) \
+	STORED(U8, pathState, "%d", pathLogState) \
+	STORED(F32, pathLegalMargin_mm, "%f", pathLogLegalMargin_mm) \
 	DERIVED(F32, x, "%f", log_x) \
 	DERIVED(F32, y, "%f", log_y)
 
 #define LOG_FIELD_LIST_DEBUG(STORED, DERIVED) \
 	STORED(F32, acceleVal_X, "%f", imuVal.accele.x) \
 	STORED(F32, acceleVal_Y, "%f", imuVal.accele.y) \
+	STORED(U8, markerSensor, "%d", (uint8_t)markerSensor) \
+	STORED(U8, sgMarkerCount, "%d", (uint8_t)SGmarker) \
+	STORED(U32, encRightMarker_p, "%d", (uint32_t)encRightMarker) \
+	STORED(U8, patternTrace, "%d", (uint8_t)patternTrace) \
 	STORED(F32, slipRatio, "%f", getSlipIndicatorRaw()) \
 	STORED(F32, slipRatioLat, "%f", getSlipIndicatorFiltered()) \
 	STORED(F32, motorCurrentL, "%f", motorCurrentL) \

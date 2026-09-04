@@ -57,6 +57,18 @@ File: `targetSpeeds.txt`
 - `acceleF`, `acceleD` are accelerations `[m/s^2]`.
 - `decelLeadMm` is distance `[mm]`.
 
+### Path Replay and Shortcut
+
+File: `shortcut.txt`
+
+- Implementation: `pathFollower.c`, `writeShortcutSettings()`, `readShortcutSettings()`
+- Format: `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000`
+- Write format: `%u,%03u,%03u,%04u,%04u,%03u`
+- No newline.
+- `maxLevel` is `0..3`; SD absent keeps Level 0.
+- Until machine footprint and sensor coordinates are verified, keep `PATH_SHORTCUT_GEOMETRY_ENABLE=0` and `lineAlpha_x1000=000`.
+- Partial reads apply valid fields; invalid or missing fields use defaults and the file is repaired.
+
 ### Line Sensor Calibration
 
 File: `lsval.txt`

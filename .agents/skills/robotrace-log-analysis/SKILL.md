@@ -55,14 +55,20 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - `targetAngularvelo`: log target angular velocity, `[deg/s]`.
 - `motorpwmL`, `motorpwmR`: left/right motor PWM.
 - `x`, `y`: estimated position from the start marker origin, `[mm]`.
+- `linePointX_mm`, `linePointY_mm`: corresponding first-run line point, `[mm]`.
+- `pathErrorY_mm`: signed lateral path error, `[mm]`.
+- `pathErrorHeading_cdeg`: heading error, `[0.01 deg]`.
+- `pathState`: 1 tracking, 2 line fallback, 3 rejoin blend, 4 localization lost.
+- `pathLegalMargin_mm`: remaining line-overlap margin after the tracking-error budget, `[mm]`.
 
 ## Run Mode Checks
 
 - `BOOST_NONE`: verify distance, angular velocity, markers, curvature radius, and XY plot. Pay special attention to angle drift.
 - `BOOST_MARKER`: verify all markers detected in the first run are detected.
 - `BOOST_DISTANCE`: verify current course position matches the estimated position and first-run distance.
-- `BOOST_SHORTCUT`: verify the robot follows the planned optimal path and does not fully leave the line.
-- Do not directly compare `BOOST_DISTANCE` and `BOOST_SHORTCUT` as equivalent modes.
+- `BOOST_PATH_REPLAY`: verify path lateral/heading error, fallback count, and line correction validity against the first-run route.
+- `BOOST_SHORTCUT`: verify the robot follows the validated shortcut, `pathLegalMargin_mm` remains non-negative, and no localization fallback occurs.
+- Compare only logs with the same run mode; distance, path replay, and shortcut modes are not equivalent.
 
 ## Output Rules
 

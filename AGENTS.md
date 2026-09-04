@@ -352,6 +352,7 @@ cmake --build --preset Release
 - SD カード未挿入でも走行は可能とする。ただし、警告を画面に表示する。
 - SD カードが挿入されていて設定ファイルが存在しない場合は、対象ファイルを作成し、コード内デフォルト値を書き込む。
 - 設定ファイルの読み書き処理を変更する場合は、ファイル欠落時にデフォルト値でファイルが作成されることを確認する。
+- `shortcut.txt` は `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000` の順で保存し、改行は付けない。実測確認前の既定値は `1,080,040,3000,0600,000` とする。
 
 設定ファイルの保存先は `./setting/` です。詳細なファイル形式、読み書き関数、破損時の扱いは `.agents/skills/robotrace-sd-settings/SKILL.md` を使います。
 
@@ -414,11 +415,13 @@ cmake --build --preset Release
 - `BOOST_NONE`: 1次走行。距離、角速度、マーカー、曲率半径を記録し、2次走行用のログを取る。
 - `BOOST_MARKER`: マーカー位置によって区間速度を決定するモード。現在は使用していない。
 - `BOOST_DISTANCE`: 1次走行の走行距離と比較し、現在の走行位置と曲率半径から速度を決定して走行する。
-- `BOOST_SHORTCUT`: 1次走行の距離と角速度から走行コースをプロットし、最短経路を算出して走行する。イン側を走る、スラロームを直線として走行する、などを含む。
+- `BOOST_SHORTCUT`: `BOOST_PATH_REPLAY` の経路へ制約付きElastic Bandを適用し、合法余裕を検証した短縮経路をヨーレート制御で走行する。機体投影寸法の実測完了までは安全ゲートで生成禁止とする。
+- `BOOST_PATH_REPLAY`: 1次走行ログの `x`, `y`, `courseMarker` をヘッダ名で読み、40 mm間隔に再標本化した経路をラインセンサー非依存で再走行する。ラインセンサーは限定的な位置補正とロスト時フォールバックにだけ使う。
+- `BOOST_PATH_REPLAY` / `BOOST_SHORTCUT` のゴール判定は、通常右マーカーの誤カウントによる早期終了を防ぐため経路終端付近でのみ有効とする。
 
 ### 速度計画と確認観点
 
-- `BOOST_DISTANCE` は `PPAD[optimalIndex].boostSpeed`、`BOOST_SHORTCUT` は `tgtParam.shortCut` と `shortCutxycie[optimalIndex]` を正とする。
+- `BOOST_DISTANCE` は `PPAD[optimalIndex].boostSpeed`、`BOOST_PATH_REPLAY` と `BOOST_SHORTCUT` は `pathFollower.c` の `driveRoute[optimalIndex]` と速度プロファイルを正とする。
 - 低速小Rカーブのライン角速度目標は、曲率FFゲイン100%とラインセンサーFB 35%を併用し、`targetSpeed <= 90 pulse/ms` のBOOST_DISTANCE区間では絶対値1200 deg/sを上限とする。これは現行採用設定である。
 - 各モードのログ確認観点と速度計画の評価は `.agents/skills/robotrace-log-analysis/SKILL.md` を使う。
 
@@ -448,15 +451,17 @@ cmake --build --preset Release
 - ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。実ログ側に古い形式は混在しない前提で扱う。
 - ログヘッダにはログデータ名とパラメータが含まれる。パラメータは `パラメータ名=value` 形式で記載される。
 - `courseAnalysis.c` の2次ログ再解析は、`courseMarker`, `encTotalOptimal`, `ROC`, `targetSpeed`, `optimalIndex`, `slipFlag`, `slipFlagLat` をCSVヘッダ名から解決する。ログ列追加時に固定列番号へ依存しない。
-- 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_MARKER`, `BOOST_DISTANCE`, `BOOST_SHORTCUT` を正とする。
+- 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_MARKER`, `BOOST_DISTANCE`, `BOOST_SHORTCUT`, `BOOST_PATH_REPLAY` を正とする。
 - 新しい走行モードを追加する場合は、`robotrace_v2/Core/Inc/courseAnalysis.h` に定義を追加する。
 - `emcStop` が 0 以外の場合は緊急停止しており、ゴールしていない走行として扱う。
-- 緊急停止条件は `robotrace_v2/Core/Inc/emergencyStop.h` の `STOP_COUNT_ENCODER_STOP`, `STOP_COUNT_ANGLE_X`, `STOP_COUNT_TIME` などを正とする。
+- 緊急停止条件は `robotrace_v2/Core/Inc/emergencyStop.h` の定義を正とする。経路追従中に自己位置を喪失し、ライン追従へ移行できない場合は `STOP_LOCALIZATION` とする。
 - 新しい緊急停止条件を追加する場合は、`robotrace_v2/Core/Inc/emergencyStop.h` に定義を追加する。
 - ログ解析では、ラップタイム、速度追従、角速度、スリップを重視する。
 - バッテリー状態はログ内パラメータ `batteryVoltage_V` を参照する。単位は `[V]`。
 - `batteryVoltage_mV` は走行中にLPF更新したバッテリー電圧 `[mV]`、`motorVoltageCmdL_mV`, `motorVoltageCmdR_mV` はバッテリー電圧で割る前の左右モーター指令電圧 `[mV]` とする。
 - `motorpwmL`, `motorpwmR` は電圧補償後に実際にタイマへ出力した飽和後DUTYとする。
+- `LOG_SCHEMA_PROFILE_LIGHT=0` のデバッグログでは `markerSensor`（LED差分から得たマーカー状態）、`sgMarkerCount`（スタート・ゴールマーカー累積数）、`encRightMarker_p`（右マーカーからの補正後エンコーダパルス）、`patternTrace`（走行状態）を追加出力する。ログヘッダには終了時の `sgMarkerAtLogEnd` と `encRightMarkerAtLogEnd_p` も出力する。
+- 経路追従ログの `linePointX_mm`, `linePointY_mm` は対応する一次走行ライン点 [mm]、`lineValid` は限定補正可能状態、`pathErrorY_mm` は経路横偏差 [mm]、`pathErrorHeading_cdeg` は方位偏差 [0.01 deg]、`pathState` は追従状態、`pathLegalMargin_mm` は追従誤差予算差引後のライン重なり余裕 [mm] とする。
 - 通常ログは `LOG_SCHEMA_PROFILE_LIGHT=1` を既定とし、ラップタイム、速度追従、角速度、マーカー、スリップフラグ、電圧指令、実DUTY、XY確認に必要な列だけを残す。
 - 加速度、電流、スリップ内部量などの詳細デバッグ列が必要な場合は、ビルド定義で `LOG_SCHEMA_PROFILE_LIGHT=0` にして一時的に出力する。
 - ログ同士を比較する場合は、`batteryVoltage_V` の差を考慮する。電圧差によるモーター出力、速度追従、加速性能、スリップ傾向の変化を無視しない。
@@ -467,7 +472,7 @@ cmake --build --preset Release
 
 - ログ列の正、物理量、マーカー値、ログ周期、失敗走行分類、必須グラフ・表、解析出力命名は `.agents/skills/robotrace-log-analysis/SKILL.md` を使う。
 - 失敗走行は `emcStop != 0` で除外する。`cntlog` 欠落や処理落ちがあるログも無効とし、原因を特定して修正する。
-- `BOOST_DISTANCE` と `BOOST_SHORTCUT` は比較しない。1 次走行は 1 次走行同士、2 次走行は同じ種類同士、autoStart は 5 回すべて走行したログ同士で比較する。
+- `BOOST_DISTANCE`, `BOOST_PATH_REPLAY`, `BOOST_SHORTCUT` は相互に比較しない。1次走行は1次走行同士、2次走行は同じ種類同士、autoStartは5回すべて走行したログ同士で比較する。
 - バッテリー電圧差が大きい場合は、充電して再トライする。
 - 制御変更後は最低 10 本の実機走行ログを取り、変更前ログと比較する。採用判断は再現性を最優先する。
 - 解析スクリプトは `analysis/script/` に置く。Python などの使用は可能。
@@ -490,11 +495,15 @@ cmake --build --preset Release
 
 ### AGENTS.md 方針に対する実装未対応箇所
 
-現時点で、方針として明記済みだが実装未対応または要確認の項目はありません。
+現時点の要確認項目:
+
+- ラインセンサー10個の実座標と `sensor[0]` からの配線順を照合し、センサー位置補正モデルを確定する。完了までは `shortcut.txt` の `lineAlpha_x1000=000` を維持する。
 
 ### 実装未対応箇所の対応優先順位
 
-現時点では未対応項目がないため、優先順位は設定しません。
+1. 低速の `BOOST_PATH_REPLAY` を10本検証し、再現性を確認する。
+2. 低速のLevel 1ショートカットを10本検証し、再現性と合法余裕を確認する。
+3. ラインセンサー実座標と配線順の照合後、`lineAlpha_x1000` を段階的に調整する。
 
 ### `AGENTS.md` 更新タイミング
 
@@ -506,6 +515,8 @@ cmake --build --preset Release
 - 2026-06-28: 誤字由来の識別子を正規化し、解析済みログ番号ファイル名を `analize.txt` から `analysis.txt` へ変更した。旧名の読み取りフォールバックは設けない。
 - 2026-06-28: ログヘッダへ `fwVersion`, `gitCommit`, `buildDate`, `buildTime`, `branch` を出力するようにした。設定ファイル欠落時のデフォルト作成、破損時の部分反映と修復、`lsval.txt` 破損時および IMU/ラインセンサー異常時の走行禁止、TIM7 ログ要求周期の命名整理を実装した。
 - 2026-08-19: 現行採用の低速小Rカーブ制御を反映した。曲率FF 100%とラインセンサーFB 35%、低速BOOST_DISTANCEの角速度目標上限1200 deg/s、正規化モーター指令の公称電圧7.1 Vを使用する。2次ログ再解析は必須列をヘッダ名で解決する。
+- 2026-08-23: `BOOST_PATH_REPLAY`、40 mm経路、ヨーレート経路追従、ライン追従フォールバック、`STOP_LOCALIZATION`、`shortcut.txt`、経路追従ログ列を追加した。ショートカット形状生成は機体寸法実測完了まで安全ゲートで無効とした。
+- 2026-08-23: 機体投影半幅65 mm、外接半径100 mm、走行可能領域端まで200 mmを入力した。許容オフセット49.5 mm、境界残余50.5 mmを確認し、経路制御バージョン2でLevel 1のショートカット形状生成を有効化した。
 
 ## 15. 機体・回路変更時にコードへ反映する項目
 
