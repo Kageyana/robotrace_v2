@@ -1,0 +1,220 @@
+{
+  "main": {
+    "id": "2b41cbf201176251",
+    "type": "split",
+    "children": [
+      {
+        "id": "3555b6ccf6969047",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "a3e887851256e1ae",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "2026-09-03-stlink-target-not-found-marker-debug.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "2026-09-03-stlink-target-not-found-marker-debug"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "339bc2c3e2534a4d",
+    "type": "split",
+    "children": [
+      {
+        "id": "13e5d6817e6f29a1",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "1455bf7fc53ef788",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "ファイルエクスプローラ"
+            }
+          },
+          {
+            "id": "1392365975dab1ed",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "検索"
+            }
+          },
+          {
+            "id": "74fdeed8a9c0470d",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "ブックマーク"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "992b464fb5273c56",
+    "type": "split",
+    "children": [
+      {
+        "id": "d24138fa7dc6eb65",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "08d58fa8e7076168",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "2026-08-11-pwm-saturation-correlation-misinterpretation.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "バックリンク"
+            }
+          },
+          {
+            "id": "69f801914f1a353f",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "2026-08-11-pwm-saturation-correlation-misinterpretation.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "アウトゴーイングリンク"
+            }
+          },
+          {
+            "id": "cf10430ad969df37",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "タグ"
+            }
+          },
+          {
+            "id": "e2cf091cdb2bc45b",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "すべてのプロパティ"
+            }
+          },
+          {
+            "id": "79ef8f4b7e6f0d46",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "2026-08-11-pwm-saturation-correlation-misinterpretation.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "アウトライン"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:クイックスイッチャーを開く": false,
+      "graph:グラフビューを開く": false,
+      "canvas:新規キャンバスを作成": false,
+      "daily-notes:今日のデイリーノートを開く": false,
+      "templates:テンプレートを挿入": false,
+      "command-palette:コマンドパレットを開く": false,
+      "bases:新規ベースを作成": false
+    }
+  },
+  "active": "a3e887851256e1ae",
+  "lastOpenFiles": [
+    "2026-09-03-path-replay-false-goal-localization.md",
+    "2026-09-03-path-csv-line-truncation-error-7.md",
+    "2026-09-03-stlink-target-not-found-marker-debug.md",
+    "2026-08-23-exec-helper-setup-refresh-error.md",
+    "2026-08-23-path-replay-kheading400-worse.md",
+    "2026-08-23-path-replay-autostart5-encoder-stop.md",
+    "2026-08-23-path-replay-yaw-oscillation-hairpin.md",
+    "2026-08-23-path-replay-localization-false-stop.md",
+    "2026-08-23-path-replay-log-11-with-valid-csv.md",
+    "2026-08-23-stlink-erase-needs-under-reset-100khz.md",
+    "2026-08-23-shortcut-gate-requires-explicit-approval.md",
+    "2026-08-23-multiline-regex-deleted-course-functions.md",
+    "2026-08-22-shell-helper-setup-refresh-error.md",
+    "2026-08-16-theoretical-lap-test-missing-math-import.md",
+    "2026-08-22-main-flash-old-gitcommit.md",
+    "2026-08-19-git-index-lock-permission-denied.md",
+    "2026-08-16-speed-ff160-no-stable-improvement.md",
+    "2026-08-16-powershell-python-quote-error.md",
+    "2026-08-16-slip-long-risk030-no-stable-improvement.md",
+    "2026-08-11-motor-voltage-merge-conflicts.md",
+    "2026-08-11-revert-confirmation-overtested.md",
+    "2026-08-16-autostart-11966-11970-emcstop3.md",
+    "2026-08-11-windows-rg-glob-not-expanded.md",
+    "2026-08-16-slip-expand1-040-no-stable-improvement.md",
+    "2026-08-16-slip-expand2-020-no-stable-improvement.md",
+    "2026-08-16-slip-lat-extra025-no-stable-improvement.md"
+  ]
+}
