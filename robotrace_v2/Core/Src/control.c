@@ -60,7 +60,8 @@ speedParam tgtParam = {
 	MACHINEACCELE,
 	MACHINEDECREACE,
 	PARAM_SHORTCUT,
-	PARAM_DECEL_LEAD_MM};
+	PARAM_DECEL_LEAD_MM,
+	PARAM_PATH_REPLAY};
 // スリップ検出用の状態（1ms割り込みで軽量に処理するためここで管理）
 static float slipEncSpeedHist[SLIP_WINDOW_SAMPLES];		// 時間窓の開始時点のエンコーダ由来速度[m/s]（リングバッファ）
 static uint16_t slipBufIndex = 0;						// リングバッファの書き込み位置
@@ -1910,6 +1911,7 @@ static void applyTargetSpeedStoredValue(int16_t index, int16_t value)
 	case 15: tgtParam.acceleD = converted; break;
 	case 16: tgtParam.shortCut = converted; break;
 	case 17: tgtParam.decelLeadMm = converted; break;
+	case 18: tgtParam.pathReplay = converted; break;
 	default: break;
 	}
 }
@@ -1993,7 +1995,8 @@ void writeTgtspeeds(void)
 										(int32_t)(round(tgtParam.acceleF * 100)),
 										(int32_t)(round(tgtParam.acceleD * 100)),
 										(int32_t)(round(tgtParam.shortCut * 100)),
-										(int32_t)(round(tgtParam.decelLeadMm * 100)));
+										(int32_t)(round(tgtParam.decelLeadMm * 100)),
+										(int32_t)(round(tgtParam.pathReplay * 100)));
 		f_close(&fil);
 	}
 }

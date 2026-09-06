@@ -364,6 +364,7 @@ cmake --build --preset Release
 - SD カード未挿入でも走行は可能とする。ただし、警告を画面に表示する。
 - SD カードが挿入されていて設定ファイルが存在しない場合は、対象ファイルを作成し、コード内デフォルト値を書き込む。
 - 設定ファイルの読み書き処理を変更する場合は、ファイル欠落時にデフォルト値でファイルが作成されることを確認する。
+- `targetSpeeds.txt` は既存18項目の末尾へLevel 0専用速度`pathReplay`を追加した19項目とする。`pathReplay`は実値の100倍を第19項目へ保存し、既定値は`0100`（1.00 m/s）とする。旧18項目ファイルは既存値を保持し、`pathReplay`の既定値を末尾へ追加して修復する。
 - `shortcut.txt` は `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000` の順で保存し、改行は付けない。既定値は `1,080,040,3000,0600,010` とする。ライン位置補正の初期実機検証はLevel 0固定の `0,080,040,1500,1600,010` とする。
 
 設定ファイルの保存先は `./setting/` です。詳細なファイル形式、読み書き関数、破損時の扱いは `.agents/skills/robotrace-sd-settings/SKILL.md` を使います。
@@ -437,6 +438,7 @@ cmake --build --preset Release
 ### 速度計画と確認観点
 
 - `BOOST_DISTANCE` は `PPAD[optimalIndex].boostSpeed`、`BOOST_PATH_REPLAY` と `BOOST_SHORTCUT` は `pathFollower.c` の `driveRoute[optimalIndex]` と速度プロファイルを正とする。
+- 経路制御バージョン10では、Level 0 `BOOST_PATH_REPLAY`の速度上限に`tgtParam.pathReplay`を使用し、一次走行の`tgtParam.search`から分離する。Level 1 `BOOST_SHORTCUT`は従来どおり`tgtParam.shortCut`を使用する。各上限と曲率別`bst*`速度の低い方を採用し、`acceleF`、`acceleD`の制約を適用する。
 - 低速小Rカーブのライン角速度目標は、曲率FFゲイン100%とラインセンサーFB 35%を併用し、`targetSpeed <= 90 pulse/ms` のBOOST_DISTANCE区間では絶対値1200 deg/sを上限とする。これは現行採用設定である。
 - 各モードのログ確認観点と速度計画の評価は `.agents/skills/robotrace-log-analysis/SKILL.md` を使う。
 
@@ -477,6 +479,7 @@ cmake --build --preset Release
 - `motorpwmL`, `motorpwmR` は電圧補償後に実際にタイマへ出力した飽和後DUTYとする。
 - `LOG_SCHEMA_PROFILE_LIGHT=0` のデバッグログでは `markerSensor`（LED差分から得たマーカー状態）、`sgMarkerCount`（スタート・ゴールマーカー累積数）、`encRightMarker_p`（右マーカーからの補正後エンコーダパルス）、`patternTrace`（走行状態）を追加出力する。ログヘッダには終了時の `sgMarkerAtLogEnd` と `encRightMarkerAtLogEnd_p` も出力する。
 - 経路追従ログの `linePointX_mm`, `linePointY_mm` は対応する一次走行ライン点 [mm]、`lineValid` は限定補正可能状態、`pathErrorY_mm` は経路横偏差 [mm]、`pathErrorHeading_cdeg` は経路制御バージョン4以降では最近傍経路点との方位偏差 [0.01 deg]、`pathState` は追従状態、`pathLegalMargin_mm` は追従誤差予算差引後のライン重なり余裕 [mm] とする。バージョン3以前の`pathErrorHeading_cdeg`は先読み方位との偏差であり、バージョン4以降とp95を直接比較しない。
+- ログヘッダの`tgtParam.pathReplay`はLevel 0 PATH REPLAY速度上限[m/s]とする。
 - 通常ログは `LOG_SCHEMA_PROFILE_LIGHT=1` を既定とし、ラップタイム、速度追従、角速度、マーカー、スリップフラグ、電圧指令、実DUTY、XY確認に必要な列だけを残す。
 - 加速度、電流、スリップ内部量などの詳細デバッグ列が必要な場合は、ビルド定義で `LOG_SCHEMA_PROFILE_LIGHT=0` にして一時的に出力する。
 - ログ同士を比較する場合は、`batteryVoltage_V` の差を考慮する。電圧差によるモーター出力、速度追従、加速性能、スリップ傾向の変化を無視しない。
@@ -515,7 +518,7 @@ cmake --build --preset Release
 
 ### 実装未対応箇所の対応優先順位
 
-1. 経路制御バージョン9のLevel 0 `BOOST_PATH_REPLAY`を、`shortcut.txt`の`maxLevel=0`、`lineAlpha_x1000=010`で最低10本検証する。小Rでのコースアウトなし、5点以上のindexジャンプ0回、フォールバック・自己位置喪失0回、一次走行終端から原点方向へ500 mm進んだ位置での正常停止を確認する。その後は3系列計12本で全コースの採用判定を行う。
+1. 経路制御バージョン10のLevel 0 `BOOST_PATH_REPLAY`を、`shortcut.txt`の`maxLevel=0`、`lineAlpha_x1000=010`、`targetSpeeds.txt`の`pathReplay=1.00 m/s`で最低10本検証する。小Rでのコースアウトなし、5点以上のindexジャンプ0回、フォールバック・自己位置喪失0回、一次走行終端から原点方向へ500 mm進んだ位置での正常停止を確認する。その後は3系列計12本で全コースの採用判定を行う。
 2. 低速のLevel 1ショートカットを10本検証し、再現性と合法余裕を確認する。
 3. Level 0の実機ログで補正方向と再現性を確認後、`lineAlpha_x1000` を段階的に調整する。
 
@@ -538,6 +541,7 @@ cmake --build --preset Release
 - 2026-09-06: 経路制御バージョン7で、PATH系の実走行経路を一次走行終端から座標原点 `(0, 0)` へ向かう直線方向に500 mm延長し、その延長終端を停止開始位置とした。原点近傍を通る途中区間は停止判定に使わない。
 - 2026-09-06: 経路制御バージョン8で、終端延長部を`driveRoute`と`lineRoute`の双方へ追加し、追加区間の方位、ライン参照ログ、ライン有効判定、合法余裕計算が同じ延長経路を参照するようにした。
 - 2026-09-06: 実機のラインセンサー配線順とKiCad基板座標を照合した。経路制御バージョン9で10個の実受光中心横座標を位置補正へ使用し、`lineAlpha_x1000=010`を補正有効時の初期値とした。
+- 2026-09-06: 経路制御バージョン10でLevel 0専用速度`tgtParam.pathReplay`を追加し、一次走行の`tgtParam.search`から分離した。`targetSpeeds.txt`の第19項目として保存し、旧18項目ファイルは既存値を保持したまま既定値を追記して修復する。
 
 ## 15. 機体・回路変更時にコードへ反映する項目
 

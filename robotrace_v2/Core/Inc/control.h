@@ -17,6 +17,7 @@
 #define PARAM_SEARCH 1.0F
 #define PARAM_STOP 0.8F
 #define PARAM_SHORTCUT 0.5F
+#define PARAM_PATH_REPLAY 1.0F
 #define PARAM_BOOST_STRAIGHT 2.8F
 #define PARAM_BOOST_1500 2.6F
 #define PARAM_BOOST_1300 2.4F
@@ -125,6 +126,7 @@ typedef struct
 	float acceleD;
 	float shortCut;
 	float decelLeadMm;
+	float pathReplay;
 } speedParam;
 //====================================//
 // グローバル変数の宣言

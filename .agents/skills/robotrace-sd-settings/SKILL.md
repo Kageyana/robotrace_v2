@@ -47,15 +47,16 @@ File: `speed_ff.txt`
 File: `targetSpeeds.txt`
 
 - Implementation: `control.c`, `writeTgtspeeds()`, `readTgtspeeds()`
-- Format: 18 fixed-width comma-separated fields.
+- Format: 19 fixed-width comma-separated fields.
 - Write format: each item `%04d,`
 - Read format: each item `%04hd,`
 - No newline.
 - Stored values are rounded real values multiplied by 100, then divided by 100 on read.
-- Order: `search`, `stop`, `bstStraight`, `bst1500`, `bst1300`, `bst1000`, `bst800`, `bst700`, `bst600`, `bst500`, `bst400`, `bst300`, `bst200`, `bst100`, `acceleF`, `acceleD`, `shortCut`, `decelLeadMm`.
-- `search`, `stop`, `bst*`, `shortCut` are speeds `[m/s]`.
+- Order: `search`, `stop`, `bstStraight`, `bst1500`, `bst1300`, `bst1000`, `bst800`, `bst700`, `bst600`, `bst500`, `bst400`, `bst300`, `bst200`, `bst100`, `acceleF`, `acceleD`, `shortCut`, `decelLeadMm`, `pathReplay`.
+- `search`, `stop`, `bst*`, `shortCut`, `pathReplay` are speeds `[m/s]`.
 - `acceleF`, `acceleD` are accelerations `[m/s^2]`.
 - `decelLeadMm` is distance `[mm]`.
+- `pathReplay` is the Level 0 PATH REPLAY speed cap. Existing 18-field files retain all existing values and are repaired by appending its code default.
 
 ### Path Replay and Shortcut
 

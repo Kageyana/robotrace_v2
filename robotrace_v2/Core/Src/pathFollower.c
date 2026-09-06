@@ -298,8 +298,8 @@ static void pathComputeHeadings(RoutePoint *route, uint16_t count)
 static void pathBuildSpeedProfile(RoutePoint *route, uint16_t count, uint8_t shortcutLevel)
 {
 	if (count == 0U) return;
-	float speedCap = (shortcutLevel == 0U) ? tgtParam.search : tgtParam.shortCut;
-	if (speedCap <= 0.0f) speedCap = tgtParam.search;
+	float speedCap = (shortcutLevel == 0U) ? tgtParam.pathReplay : tgtParam.shortCut;
+	if (speedCap <= 0.0f) speedCap = tgtParam.pathReplay;
 	for (uint16_t i = 0U; i < count; i++)
 	{
 		float speed = speedCap;
