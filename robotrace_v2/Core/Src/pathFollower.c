@@ -356,13 +356,21 @@ static bool pathExtendDriveRouteTowardOrigin(uint8_t shortcutLevel)
 	{
 		float nextAdvancedMm = fminf(PATH_GOAL_EXTENSION_MM,
 			advancedMm + PATH_ROUTE_SPACING_MM);
-		driveRoute[routeCount].x_mm = pathFloatToInt16(endX + (unitX * nextAdvancedMm));
-		driveRoute[routeCount].y_mm = pathFloatToInt16(endY + (unitY * nextAdvancedMm));
+		int16_t extensionX = pathFloatToInt16(endX + (unitX * nextAdvancedMm));
+		int16_t extensionY = pathFloatToInt16(endY + (unitY * nextAdvancedMm));
+		driveRoute[routeCount].x_mm = extensionX;
+		driveRoute[routeCount].y_mm = extensionY;
 		driveRoute[routeCount].heading_cdeg = 0;
 		driveRoute[routeCount].speed_cms = 0U;
+		lineRoute[routeCount].x_mm = extensionX;
+		lineRoute[routeCount].y_mm = extensionY;
+		lineRoute[routeCount].heading_cdeg = 0;
+		lineRoute[routeCount].speed_cms = 0U;
+		routeFlags[routeCount] = PATH_FLAG_ANCHOR;
 		routeCount++;
 		advancedMm = nextAdvancedMm;
 	}
+	pathComputeHeadings(lineRoute, routeCount);
 	pathComputeHeadings(driveRoute, routeCount);
 	pathBuildSpeedProfile(driveRoute, routeCount, shortcutLevel);
 	return true;
