@@ -817,10 +817,10 @@ void loopSystem(void)
 			motorCommandOutSynth(0, veloCtrl.pwm, steeringPwm, 0);
 		}
 
-		// 通常走行はゴールマーカーを正とする。PATH系は経路終端付近でのみ有効にする。
-		if (SGmarker >= COUNT_GOAL &&
-			((optimalTrace != BOOST_PATH_REPLAY && optimalTrace != BOOST_SHORTCUT) ||
-			 pathFollowerGoalWindowOpen()))
+		// 通常走行はゴールマーカー、PATH系は実走行経路終端の500mm手前をゴールとする。
+		bool pathGoalMode = (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT);
+		if ((!pathGoalMode && SGmarker >= COUNT_GOAL) ||
+			(pathGoalMode && pathFollowerGoalReached()))
 		{
 			goalTime = cntRun;
 			enc1 = 0;

@@ -50,8 +50,8 @@
 #define PATH_LINE_LOST_COUNT_5MS              20U
 #define PATH_ASSOCIATION_PROGRESS_MARGIN_MM   120.0f
 #define PATH_ASSOCIATION_HEADING_MAX_DEG      60.0f
-// 走行中の自己位置を維持できる範囲で、終端付近だけゴールマーカーを有効にする。
-#define PATH_GOAL_MIN_PROGRESS_PERMILLE      800U
+// 一次走行の記録経路終端をスタート位置への帰着点とし、その手前で停止を開始する。
+#define PATH_GOAL_LEAD_MM                     500U
 #define PATH_REJOIN_BLEND_STEP                50U
 #define PATH_SENSOR_ACTIVE_TH                 800U
 #define PATH_SENSOR_MIN_SUM                   1200U
@@ -924,15 +924,18 @@ bool pathFollowerLineIsValid(void) { return currentLineValid; }
 /////////////////////////////////////////////////////////////////////
 uint16_t pathRouteCount(void) { return routeCount; }
 /////////////////////////////////////////////////////////////////////
-// モジュール名 pathFollowerGoalWindowOpen
-// 処理概要     経路終端付近に到達してゴールマーカー終了を許可できるか判定する
+// モジュール名 pathFollowerGoalReached
+// 処理概要     経路終端の500mm手前に到達したか判定する
 // 引数         なし
-// 戻り値       true:終端付近 false:走行途中
+// 戻り値       true:停止開始位置へ到達 false:走行途中
 /////////////////////////////////////////////////////////////////////
-bool pathFollowerGoalWindowOpen(void)
+bool pathFollowerGoalReached(void)
 {
 	if (routeCount < 2U) return false;
-	return ((uint32_t)routeIndex * 1000U) >= ((uint32_t)(routeCount - 1U) * PATH_GOAL_MIN_PROGRESS_PERMILLE);
+	uint16_t routeEndArcMm = driveRouteArcMm[routeCount - 1U];
+	if (routeEndArcMm <= PATH_GOAL_LEAD_MM) return false;
+	uint16_t goalArcMm = (uint16_t)(routeEndArcMm - PATH_GOAL_LEAD_MM);
+	return driveRouteArcMm[routeIndex] >= goalArcMm;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathRouteSourceLog
