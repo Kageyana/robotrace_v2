@@ -817,7 +817,7 @@ void loopSystem(void)
 			motorCommandOutSynth(0, veloCtrl.pwm, steeringPwm, 0);
 		}
 
-		// 通常走行はゴールマーカー、PATH系は座標原点への帰着点の500mm手前をゴールとする。
+		// 通常走行はゴールマーカー、PATH系は一次走行終端から原点方向へ500mm進んだ点をゴールとする。
 		bool pathGoalMode = (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT);
 		if ((!pathGoalMode && SGmarker >= COUNT_GOAL) ||
 			(pathGoalMode && pathFollowerGoalReached()))
