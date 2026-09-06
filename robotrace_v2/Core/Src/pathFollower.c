@@ -7,6 +7,7 @@
 #include "ff.h"
 #include "lineSensor.h"
 #include "sd_functions.h"
+#include <float.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,8 +51,8 @@
 #define PATH_LINE_LOST_COUNT_5MS              20U
 #define PATH_ASSOCIATION_PROGRESS_MARGIN_MM   120.0f
 #define PATH_ASSOCIATION_HEADING_MAX_DEG      60.0f
-// 一次走行の記録経路終端をスタート位置への帰着点とし、その手前で停止を開始する。
 #define PATH_GOAL_LEAD_MM                     500U
+#define PATH_GOAL_RETURN_SEARCH_PERMILLE      800U
 #define PATH_REJOIN_BLEND_STEP                50U
 #define PATH_SENSOR_ACTIVE_TH                 800U
 #define PATH_SENSOR_MIN_SUM                   1200U
@@ -93,6 +94,8 @@ static uint16_t lineLostCount = 0U;
 static uint16_t pathBlendPermille = 1000U;
 static float targetSpeedMps = 0.0f;
 static float pathTravelMm = 0.0f;
+static uint16_t pathGoalArcMm = 0U;
+static bool pathGoalValid = false;
 static bool currentLineValid = false;
 
 ShortcutSettings shortcutSettings = {0U, PATH_DEFAULT_LOOKAHEAD_BASE_MM,
@@ -141,6 +144,8 @@ static float pathPointDistance(float x0, float y0, float x1, float y1)
 static void pathBuildDriveRouteArcLength(void)
 {
 	memset(driveRouteArcMm, 0, sizeof(driveRouteArcMm));
+	pathGoalArcMm = 0U;
+	pathGoalValid = false;
 	float accumulatedMm = 0.0f;
 	for (uint16_t i = 1U; i < routeCount; i++)
 	{
@@ -148,6 +153,42 @@ static void pathBuildDriveRouteArcLength(void)
 			driveRoute[i].x_mm, driveRoute[i].y_mm);
 		float storedMm = fminf(accumulatedMm, (float)UINT16_MAX);
 		driveRouteArcMm[i] = (uint16_t)lroundf(storedMm);
+	}
+
+	if (routeCount < 2U) return;
+	uint16_t searchStart = (uint16_t)(((uint32_t)(routeCount - 1U) *
+		PATH_GOAL_RETURN_SEARCH_PERMILLE) / 1000U);
+	if (searchStart == 0U) searchStart = 1U;
+	float nearestOriginDistanceSq = FLT_MAX;
+	float returnArcMm = 0.0f;
+	for (uint16_t i = searchStart; i < routeCount; i++)
+	{
+		float x0 = (float)driveRoute[i - 1U].x_mm;
+		float y0 = (float)driveRoute[i - 1U].y_mm;
+		float dx = (float)driveRoute[i].x_mm - x0;
+		float dy = (float)driveRoute[i].y_mm - y0;
+		float segmentLengthSq = (dx * dx) + (dy * dy);
+		float ratio = 0.0f;
+		if (segmentLengthSq > 0.0f)
+		{
+			ratio = -((x0 * dx) + (y0 * dy)) / segmentLengthSq;
+			if (ratio < 0.0f) ratio = 0.0f;
+			if (ratio > 1.0f) ratio = 1.0f;
+		}
+		float nearestX = x0 + (dx * ratio);
+		float nearestY = y0 + (dy * ratio);
+		float distanceSq = (nearestX * nearestX) + (nearestY * nearestY);
+		if (distanceSq < nearestOriginDistanceSq)
+		{
+			nearestOriginDistanceSq = distanceSq;
+			returnArcMm = (float)driveRouteArcMm[i - 1U]
+				+ (((float)driveRouteArcMm[i] - (float)driveRouteArcMm[i - 1U]) * ratio);
+		}
+	}
+	if (returnArcMm > (float)PATH_GOAL_LEAD_MM)
+	{
+		pathGoalArcMm = (uint16_t)lroundf(returnArcMm - (float)PATH_GOAL_LEAD_MM);
+		pathGoalValid = true;
 	}
 }
 
@@ -925,17 +966,14 @@ bool pathFollowerLineIsValid(void) { return currentLineValid; }
 uint16_t pathRouteCount(void) { return routeCount; }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathFollowerGoalReached
-// 処理概要     経路終端の500mm手前に到達したか判定する
+// 処理概要     座標原点への帰着点の500mm手前に到達したか判定する
 // 引数         なし
 // 戻り値       true:停止開始位置へ到達 false:走行途中
 /////////////////////////////////////////////////////////////////////
 bool pathFollowerGoalReached(void)
 {
-	if (routeCount < 2U) return false;
-	uint16_t routeEndArcMm = driveRouteArcMm[routeCount - 1U];
-	if (routeEndArcMm <= PATH_GOAL_LEAD_MM) return false;
-	uint16_t goalArcMm = (uint16_t)(routeEndArcMm - PATH_GOAL_LEAD_MM);
-	return driveRouteArcMm[routeIndex] >= goalArcMm;
+	if (!pathGoalValid || routeIndex >= routeCount) return false;
+	return driveRouteArcMm[routeIndex] >= pathGoalArcMm;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathRouteSourceLog
