@@ -9,11 +9,15 @@
 #include "motor.h"
 #include "fatfs.h"
 #include "battery.h"
+#include "firmware_version.h"
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #define DISPLAY_INIT_DMA_TIMEOUT_MS 200U
+#define DISPLAY_BRANCH_CHARS_PER_LINE 21U
+#define DISPLAY_BRANCH_MAX_LINES 3U
 
 //====================================//
 // グローバル変数の宣言
@@ -135,6 +139,54 @@ static bool updateDisplayDmaAndWait(uint32_t timeout_ms)
 	}
 
 	return true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 showFirmwareIdentity
+// 処理概要     書き込まれたファームウェアのブランチ名とコミットIDを表示する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void showFirmwareIdentity(void)
+{
+	char branchLine[DISPLAY_BRANCH_CHARS_PER_LINE + 1U];
+	size_t branchLength = strlen(GIT_BRANCH);
+	size_t branchOffset = 0U;
+
+	if (!modeDSP)
+	{
+		return;
+	}
+
+	ssd1306_FillRectangle(0, 15, 127, 63, Black);
+	ssd1306_SetCursor(0, 16);
+	ssd1306_printf(Font_6x8, "Branch:");
+
+	for (uint8_t line = 0U; line < DISPLAY_BRANCH_MAX_LINES; line++)
+	{
+		size_t remaining = branchLength - branchOffset;
+		size_t copyLength = remaining;
+
+		if (copyLength > DISPLAY_BRANCH_CHARS_PER_LINE)
+		{
+			copyLength = DISPLAY_BRANCH_CHARS_PER_LINE;
+		}
+		memcpy(branchLine, &GIT_BRANCH[branchOffset], copyLength);
+		branchLine[copyLength] = '\0';
+
+		ssd1306_SetCursor(0, (uint8_t)(24U + (line * 8U)));
+		ssd1306_WriteString(branchLine, Font_6x8, White);
+
+		branchOffset += copyLength;
+		if (branchOffset >= branchLength)
+		{
+			break;
+		}
+	}
+
+	ssd1306_SetCursor(0, 52);
+	ssd1306_printf(Font_6x8, "Commit: %.12s", GIT_COMMIT);
+	updateDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS);
 }
 // タイマ関連
 uint32_t cntRun = 0;
@@ -332,6 +384,11 @@ void initSystem(void)
 	}
 	
 	HAL_Delay(1000);
+	if (modeDSP)
+	{
+		showFirmwareIdentity();
+		HAL_Delay(1000);
+	}
 
 	// Sd card未挿入の警告
 	if (!insertSD())
