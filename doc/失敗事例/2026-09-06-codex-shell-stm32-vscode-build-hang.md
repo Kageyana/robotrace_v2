@@ -24,6 +24,7 @@ VS Code拡張「STM32CubeIDE for Visual Studio Code」が管理するプロジ�
 - VS Code拡張環境: CMake 4.0.1、Ninja 1.13.1、GNU Arm 13.3.1
 - 比較環境: STM32CubeCLT 1.20.0同梱CMake、Ninja、GNU Arm 13.3.1
 - 対象preset: DebugMarker、Release
+- 2026-09-06の起動時ファームウェア識別表示追加でも、Debug presetのビルドが無出力で停止し、再構成は`Detecting C compiler ABI info`で停止した。
 
 ## 結果・エラー
 
@@ -31,6 +32,7 @@ VS Code拡張「STM32CubeIDE for Visual Studio Code」が管理するプロジ�
 - `cube-cmake --preset DebugMarker`は`Detecting C compiler ABI info`で停止した。
 - `cube-cmake`に必要な`cube` wrapperと`CUBE_BUNDLE_PATH`を設定しても同じだった。
 - 生成済みの全60ビルドコマンドを直列実行すると、コンパイルとリンクは終了コード0で完了した。
+- 起動時ファームウェア識別表示追加では、停止したCMake再構成後も`build.ninja`の`GIT_COMMIT`が親コミットのままであり、その設定を使ったELFを採用できなかった。
 
 ## 原因または未確定事項
 
@@ -41,6 +43,7 @@ Codexの非対話シェルから起動したNinja固有の停止であること�
 - DebugMarkerは生成済みビルドコマンドを直列実行し、ELF生成、警告、RAM/FLASHを確認した。
 - Releaseは同じGNU Armコンパイラへ`-Os -g0`を指定し、変更対象`pathFollower.c`のコンパイルを確認した。
 - Codexセッションではネイティブアプリ制御が無効だったため、VS Code拡張タスクの実行は行っていない。
+- 起動時ファームウェア識別表示追加では、生成済みDebugビルドコマンド60件へ現行コミットIDを明示して直列実行し、終了コード0、RAM 75,720 B、FLASH 205,892 BでELFを生成した。新規warningはなかった。
 
 ## 今後の予防策
 
