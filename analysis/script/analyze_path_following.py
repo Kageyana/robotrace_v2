@@ -13,6 +13,7 @@ from typing import Iterable
 
 REQUIRED_COLUMNS = {
     "cntlog",
+    "optimalIndex",
     "x",
     "y",
     "linePointX_mm",
@@ -36,6 +37,8 @@ class RunSummary:
     samples: int
     lap_time_ms: int
     cntlog_valid: bool
+    max_index_jump: int
+    index_jump_ge5_count: int
     lateral_p95_mm: float
     lateral_max_mm: float
     heading_p95_deg: float
@@ -106,6 +109,8 @@ def read_log(path: Path) -> tuple[RunSummary, list[dict[str, float]]]:
 
     cntlog = [int(row["cntlog"]) for row in rows]
     cntlog_valid = all(now > before and now - before <= 1000 for before, now in zip(cntlog, cntlog[1:]))
+    route_indices = [int(row["optimalIndex"]) for row in rows]
+    index_jumps = [now - before for before, now in zip(route_indices, route_indices[1:])]
     lateral = [abs(row["pathErrorY_mm"]) for row in rows]
     heading = [abs(row["pathErrorHeading_cdeg"]) * 0.01 for row in rows]
     margins = [row["pathLegalMargin_mm"] for row in rows]
@@ -124,6 +129,8 @@ def read_log(path: Path) -> tuple[RunSummary, list[dict[str, float]]]:
         samples=len(rows),
         lap_time_ms=cntlog[-1],
         cntlog_valid=cntlog_valid,
+        max_index_jump=max([0, *index_jumps]),
+        index_jump_ge5_count=sum(jump >= 5 for jump in index_jumps),
         lateral_p95_mm=percentile(lateral, 0.95),
         lateral_max_mm=max(lateral),
         heading_p95_deg=percentile(heading, 0.95),
@@ -176,6 +183,8 @@ def main() -> int:
     parser.add_argument("logs", nargs="+", type=Path)
     parser.add_argument("--output-dir", type=Path, default=Path("analysis"))
     parser.add_argument("--require-autostart-five", action="store_true")
+    parser.add_argument("--allow-invalid", action="store_true",
+                        help="緊急停止、cntlog異常、5点以上のindexジャンプがあっても解析結果を出力する")
     args = parser.parse_args()
 
     runs = [read_log(path) for path in args.logs]
@@ -185,8 +194,18 @@ def main() -> int:
         raise SystemExit(f"path mode only (3 or 4), got {sorted(modes)}")
     if len(modes) != 1:
         raise SystemExit(f"do not compare different modes: {sorted(modes)}")
-    invalid = [summary.path.name for summary in summaries if summary.emc_stop != 0 or not summary.cntlog_valid]
-    if invalid:
+    invalid: list[str] = []
+    for summary in summaries:
+        reasons: list[str] = []
+        if summary.emc_stop != 0:
+            reasons.append(f"emcStop={summary.emc_stop}")
+        if not summary.cntlog_valid:
+            reasons.append("cntlog")
+        if summary.index_jump_ge5_count > 0:
+            reasons.append(f"indexJump>=5:{summary.index_jump_ge5_count}")
+        if reasons:
+            invalid.append(f"{summary.path.name} ({', '.join(reasons)})")
+    if invalid and not args.allow_invalid:
         raise SystemExit(f"invalid runs: {', '.join(invalid)}")
     if args.require_autostart_five:
         auto_starts = sorted(summary.auto_start for summary in summaries)
@@ -205,7 +224,8 @@ def main() -> int:
         print(
             f"{summary.path.name}: mode={summary.optimal_trace} emc={summary.emc_stop} "
             f"lat_p95={summary.lateral_p95_mm:.2f}mm heading_p95={summary.heading_p95_deg:.2f}deg "
-            f"margin_min={summary.legal_margin_min_mm:.2f}mm fallback={summary.fallback_samples}"
+            f"margin_min={summary.legal_margin_min_mm:.2f}mm fallback={summary.fallback_samples} "
+            f"jump_max={summary.max_index_jump} jump_ge5={summary.index_jump_ge5_count}"
         )
     print(summary_path)
     if plotted:

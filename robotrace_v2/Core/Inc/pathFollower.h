@@ -8,7 +8,7 @@
 // 60mコースを40mm間隔で保持する。1501点で開始点を含む60mまでを表現できる。
 #define PATH_ROUTE_SPACING_MM              40.0f
 #define PATH_ROUTE_MAX_POINTS              1501U
-#define PATH_ROUTE_CONTROLLER_VERSION      2U
+#define PATH_ROUTE_CONTROLLER_VERSION      3U
 
 // 実測した機体投影寸法と合法余裕を確認済みのため、形状変更を許可する。
 #define PATH_SHORTCUT_GEOMETRY_ENABLE      1

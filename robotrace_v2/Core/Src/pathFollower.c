@@ -48,6 +48,8 @@
 #define PATH_LOST_COUNT_5MS                   20U
 #define PATH_REJOIN_COUNT_5MS                 40U
 #define PATH_LINE_LOST_COUNT_5MS              20U
+#define PATH_ASSOCIATION_PROGRESS_MARGIN_MM   120.0f
+#define PATH_ASSOCIATION_HEADING_MAX_DEG      60.0f
 // 走行中の自己位置を維持できる範囲で、終端付近だけゴールマーカーを有効にする。
 #define PATH_GOAL_MIN_PROGRESS_PERMILLE      800U
 #define PATH_REJOIN_BLEND_STEP                50U
@@ -75,6 +77,7 @@ typedef struct
 
 static RoutePoint lineRoute[PATH_ROUTE_MAX_POINTS];
 static RoutePoint driveRoute[PATH_ROUTE_MAX_POINTS];
+static uint16_t driveRouteArcMm[PATH_ROUTE_MAX_POINTS];
 static uint8_t routeFlags[PATH_ROUTE_MAX_POINTS];
 static uint8_t routeAnchorScratch[PATH_ROUTE_MAX_POINTS];
 static char routeCsvLine[PATH_CSV_LINE_SIZE];
@@ -89,6 +92,7 @@ static uint16_t rejoinCount = 0U;
 static uint16_t lineLostCount = 0U;
 static uint16_t pathBlendPermille = 1000U;
 static float targetSpeedMps = 0.0f;
+static float pathTravelMm = 0.0f;
 static bool currentLineValid = false;
 
 ShortcutSettings shortcutSettings = {0U, PATH_DEFAULT_LOOKAHEAD_BASE_MM,
@@ -126,6 +130,25 @@ static float pathPointDistance(float x0, float y0, float x1, float y1)
 	float dx = x1 - x0;
 	float dy = y1 - y0;
 	return sqrtf((dx * dx) + (dy * dy));
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathBuildDriveRouteArcLength
+// 処理概要     実走行経路の各点までの累積弧長を算出する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void pathBuildDriveRouteArcLength(void)
+{
+	memset(driveRouteArcMm, 0, sizeof(driveRouteArcMm));
+	float accumulatedMm = 0.0f;
+	for (uint16_t i = 1U; i < routeCount; i++)
+	{
+		accumulatedMm += pathPointDistance(driveRoute[i - 1U].x_mm, driveRoute[i - 1U].y_mm,
+			driveRoute[i].x_mm, driveRoute[i].y_mm);
+		float storedMm = fminf(accumulatedMm, (float)UINT16_MAX);
+		driveRouteArcMm[i] = (uint16_t)lroundf(storedMm);
+	}
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -618,6 +641,7 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	{
 		optimalTrace = BOOST_SHORTCUT;
 	}
+	pathBuildDriveRouteArcLength();
 	indexSC = (int16_t)routeCount;
 	optimalIndex = 0U;
 	saveLogNumber((int16_t)logNumber);
@@ -671,6 +695,7 @@ void pathFollowerReset(void)
 	rejoinCount = 0U;
 	lineLostCount = 0U;
 	pathBlendPermille = 1000U;
+	pathTravelMm = 0.0f;
 	targetSpeedMps = (routeCount > 0U) ? (float)driveRoute[0].speed_cms * 0.01f : 0.0f;
 	followerState = (routeCount > 1U) ? PATH_STATE_TRACKING : PATH_STATE_INACTIVE;
 	pathLogLinePointX_mm = 0.0f;
@@ -693,6 +718,7 @@ void pathFollowerUpdatePose1ms(int32_t encoderPulse, float gyroDegPerSec)
 	if (followerState == PATH_STATE_INACTIVE || followerState == PATH_STATE_LOCALIZATION_LOST) return;
 	pathPose.heading_deg = pathWrapDeg(pathPose.heading_deg + (gyroDegPerSec * 0.001f));
 	float distanceMm = (float)encoderPulse / PULSE_MILLIMETER;
+	if (distanceMm > 0.0f) pathTravelMm += distanceMm;
 	float headingRad = pathPose.heading_deg * DEG2RAD;
 	pathPose.x_mm += distanceMm * sinf(headingRad);
 	pathPose.y_mm += distanceMm * cosf(headingRad);
@@ -707,20 +733,33 @@ void pathFollowerUpdatePose1ms(int32_t encoderPulse, float gyroDegPerSec)
 void pathFollowerUpdateTarget5ms(void)
 {
 	if (routeCount < 2U || followerState == PATH_STATE_INACTIVE || followerState == PATH_STATE_LOCALIZATION_LOST) return;
-	uint16_t begin = (routeIndex > 4U) ? (uint16_t)(routeIndex - 4U) : 0U;
+	uint16_t begin = (routeIndex > 2U) ? (uint16_t)(routeIndex - 2U) : 0U;
 	uint16_t end = (routeIndex + 24U < routeCount) ? (uint16_t)(routeIndex + 24U) : (uint16_t)(routeCount - 1U);
-	uint16_t nearest = begin;
-	float nearestDistance = pathPointDistance(pathPose.x_mm, pathPose.y_mm, driveRoute[begin].x_mm, driveRoute[begin].y_mm);
-	for (uint16_t i = (uint16_t)(begin + 1U); i <= end; i++)
+	uint16_t nearest = routeIndex;
+	float nearestDistance = pathPointDistance(pathPose.x_mm, pathPose.y_mm,
+		driveRoute[routeIndex].x_mm, driveRoute[routeIndex].y_mm);
+	float maximumArcMm = pathTravelMm + PATH_ASSOCIATION_PROGRESS_MARGIN_MM;
+	bool associationValid = false;
+	for (uint16_t i = begin; i <= end; i++)
 	{
+		if ((float)driveRouteArcMm[i] > maximumArcMm) continue;
+		float candidateHeadingError = pathWrapDeg(
+			((float)driveRoute[i].heading_cdeg * 0.01f) - pathPose.heading_deg);
+		if (fabsf(candidateHeadingError) > PATH_ASSOCIATION_HEADING_MAX_DEG) continue;
 		float distance = pathPointDistance(pathPose.x_mm, pathPose.y_mm, driveRoute[i].x_mm, driveRoute[i].y_mm);
-		if (distance < nearestDistance)
+		if (!associationValid || distance < nearestDistance)
 		{
 			nearestDistance = distance;
 			nearest = i;
+			associationValid = true;
 		}
 	}
-	if (nearest + 2U < routeIndex) nearest = routeIndex - 2U;
+	if (!associationValid)
+	{
+		nearest = routeIndex;
+		nearestDistance = pathPointDistance(pathPose.x_mm, pathPose.y_mm,
+			driveRoute[nearest].x_mm, driveRoute[nearest].y_mm);
+	}
 	routeIndex = nearest;
 	optimalIndex = routeIndex;
 
@@ -779,7 +818,8 @@ void pathFollowerUpdateTarget5ms(void)
 	 * 接線方位差を使う。急カーブでは先読み方位差が大きくなるため、
 	 * これをロスト判定へ流用すると経路近傍でも誤って停止する。
 	 */
-	if (nearestDistance > PATH_LOST_DISTANCE_MM || fabsf(nearestHeadingError) > PATH_LOST_HEADING_DEG)
+	if (!associationValid || nearestDistance > PATH_LOST_DISTANCE_MM ||
+		fabsf(nearestHeadingError) > PATH_LOST_HEADING_DEG)
 	{
 		if (lostCount < UINT16_MAX) lostCount++;
 	}

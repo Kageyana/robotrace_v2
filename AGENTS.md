@@ -177,6 +177,8 @@ Codex は主にファームウェア開発に使用します。必要に応じ�
 
 主な開発環境は VS Code、STM32CubeIDE for Visual Studio Code 拡張機能、STM32CubeCLT、STM32CubeMX です。`.vscode/` には CMake、Flash、ST-Link デバッグ用の設定があります。
 
+このPCの通常ビルドはVS Code拡張「STM32CubeIDE for Visual Studio Code」から実行し、`robotrace_v2/.vscode/settings.json`の`cube-cmake`とSTM32Cube bundle環境を正とします。
+
 想定ツールは CMake 3.22 以上、Ninja、ARM GCC、STM32CubeCLT、`STM32_Programmer_CLI` です。
 
 ### 書き込み・デバッグの実行可否
@@ -427,6 +429,7 @@ cmake --build --preset Release
 - `BOOST_SHORTCUT`: `BOOST_PATH_REPLAY` の経路へ制約付きElastic Bandを適用し、合法余裕を検証した短縮経路をヨーレート制御で走行する。機体投影寸法の実測完了までは安全ゲートで生成禁止とする。
 - `BOOST_PATH_REPLAY`: 1次走行ログの `x`, `y`, `courseMarker` をヘッダ名で読み、40 mm間隔に再標本化した経路をラインセンサー非依存で再走行する。ラインセンサーは限定的な位置補正とロスト時フォールバックにだけ使う。
 - `BOOST_PATH_REPLAY` / `BOOST_SHORTCUT` のゴール判定は、通常右マーカーの誤カウントによる早期終了を防ぐため経路終端付近でのみ有効とする。
+- 経路制御バージョン3では、`BOOST_PATH_REPLAY` / `BOOST_SHORTCUT` の対応点候補を補正後エンコーダ累積進行距離の120 mm先まで、かつ推定機体方位との差60 deg以内に制限する。候補がない5 ms周期ではindexを保持してロスト回数を加算し、100 ms継続した場合だけ既存のラインフォールバックまたは`STOP_LOCALIZATION`へ移る。累積弧長はLevel 0、Level 1とも実際の`driveRoute`から算出する。
 
 ### 速度計画と確認観点
 
@@ -453,7 +456,7 @@ cmake --build --preset Release
 
 ## 13. ログ、ファームウェアバージョン、解析
 
-実機走行ログは `F:\Dropbox\Document\robotrace\Log\v2` に保存されています。
+このPCの実機走行ログは `C:\Users\ucawa\Dropbox\Document\robotrace\Log\v2` に保存されています。
 
 - ログファイルは CSV 形式、ヘッダ有り、文字コード UTF-8、区切り文字はカンマ。
 - ログファイル名は通し番号を使う。
@@ -481,6 +484,7 @@ cmake --build --preset Release
 
 - ログ列の正、物理量、マーカー値、ログ周期、失敗走行分類、必須グラフ・表、解析出力命名は `.agents/skills/robotrace-log-analysis/SKILL.md` を使う。
 - 失敗走行は `emcStop != 0` で除外する。`cntlog` 欠落や処理落ちがあるログも無効とし、原因を特定して修正する。
+- PATH系ログで`optimalIndex`が1サンプル間に5点以上前進した走行も無効とし、`max_index_jump`と`index_jump_ge5_count`で対応点ジャンプを確認する。
 - `BOOST_DISTANCE`, `BOOST_PATH_REPLAY`, `BOOST_SHORTCUT` は相互に比較しない。1次走行は1次走行同士、2次走行は同じ種類同士、autoStartは5回すべて走行したログ同士で比較する。
 - バッテリー電圧差が大きい場合は、充電して再トライする。
 - 制御変更後は最低 10 本の実機走行ログを取り、変更前ログと比較する。採用判断は再現性を最優先する。
@@ -510,7 +514,7 @@ cmake --build --preset Release
 
 ### 実装未対応箇所の対応優先順位
 
-1. 低速の `BOOST_PATH_REPLAY` を10本検証し、再現性を確認する。
+1. 経路制御バージョン3のLevel 0 `BOOST_PATH_REPLAY`を、`shortcut.txt`の`maxLevel=0`、`lineAlpha_x1000=000`で3系列計12本検証する。12/12完走、5点以上のindexジャンプ0回、フォールバック・自己位置喪失0回を確認する。
 2. 低速のLevel 1ショートカットを10本検証し、再現性と合法余裕を確認する。
 3. ラインセンサー実座標と配線順の照合後、`lineAlpha_x1000` を段階的に調整する。
 
@@ -526,6 +530,7 @@ cmake --build --preset Release
 - 2026-08-19: 現行採用の低速小Rカーブ制御を反映した。曲率FF 100%とラインセンサーFB 35%、低速BOOST_DISTANCEの角速度目標上限1200 deg/s、正規化モーター指令の公称電圧7.1 Vを使用する。2次ログ再解析は必須列をヘッダ名で解決する。
 - 2026-08-23: `BOOST_PATH_REPLAY`、40 mm経路、ヨーレート経路追従、ライン追従フォールバック、`STOP_LOCALIZATION`、`shortcut.txt`、経路追従ログ列を追加した。ショートカット形状生成は機体寸法実測完了まで安全ゲートで無効とした。
 - 2026-08-23: 機体投影半幅65 mm、外接半径100 mm、走行可能領域端まで200 mmを入力した。許容オフセット49.5 mm、境界残余50.5 mmを確認し、経路制御バージョン2でLevel 1のショートカット形状生成を有効化した。
+- 2026-09-06: 経路制御バージョン3で、実走行経路の累積弧長と推定機体方位による対応点候補制限を追加した。ヘアピン出口や近接並走区間へのindexジャンプを防ぎ、候補がない場合はindexを保持して既存の100 msロスト判定へ渡す。
 
 ## 15. 機体・回路変更時にコードへ反映する項目
 
