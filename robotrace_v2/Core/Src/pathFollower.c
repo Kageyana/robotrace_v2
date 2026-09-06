@@ -794,7 +794,6 @@ void pathFollowerUpdateTarget5ms(void)
 	float dx = pathPose.x_mm - (float)driveRoute[nearest].x_mm;
 	float dy = pathPose.y_mm - (float)driveRoute[nearest].y_mm;
 	float lateralError = (dx * cosf(nearestHeadingRad)) - (dy * sinf(nearestHeadingRad));
-	float headingError = pathWrapDeg(targetHeadingDeg - pathPose.heading_deg);
 	float segmentLength = pathPointDistance(driveRoute[nearest].x_mm, driveRoute[nearest].y_mm,
 		driveRoute[targetIndex].x_mm, driveRoute[targetIndex].y_mm);
 	float curvature = 0.0f;
@@ -807,16 +806,16 @@ void pathFollowerUpdateTarget5ms(void)
 	float feedForwardDegPerSec = (targetSpeedMps * 1000.0f) * curvature * RAD2DEG;
 	float kLateral = (float)shortcutSettings.kLateral_x100 * 0.01f;
 	float kHeading = (float)shortcutSettings.kHeading_x100 * 0.01f;
-	float targetYawRate = feedForwardDegPerSec - (kLateral * lateralError) + (kHeading * headingError);
+	float targetYawRate = feedForwardDegPerSec - (kLateral * lateralError) + (kHeading * nearestHeadingError);
 	if (targetYawRate > 1800.0f) targetYawRate = 1800.0f;
 	if (targetYawRate < -1800.0f) targetYawRate = -1800.0f;
 	setTargetAngularVelocity(targetYawRate);
 	log_targetAngularVelocity = (int32_t)targetYawRate;
 
 	/*
-	 * 先読み方位差は操舵目標専用とし、ロスト判定には最近傍経路点の
-	 * 接線方位差を使う。急カーブでは先読み方位差が大きくなるため、
-	 * これをロスト判定へ流用すると経路近傍でも誤って停止する。
+	 * 先読み方位は曲率FFだけに使い、方位FB、ロスト判定、再合流判定には
+	 * 最近傍経路点の接線方位差を使う。急カーブ手前で先読み方位差を
+	 * 方位FBへ加えると、経路の接線が曲がる前から旋回して内側へ外れる。
 	 */
 	if (!associationValid || nearestDistance > PATH_LOST_DISTANCE_MM ||
 		fabsf(nearestHeadingError) > PATH_LOST_HEADING_DEG)
@@ -850,7 +849,7 @@ void pathFollowerUpdateTarget5ms(void)
 		else
 		{
 			lineLostCount = 0U;
-			if (nearestDistance < PATH_REJOIN_DISTANCE_MM && fabsf(headingError) < PATH_REJOIN_HEADING_DEG)
+			if (nearestDistance < PATH_REJOIN_DISTANCE_MM && fabsf(nearestHeadingError) < PATH_REJOIN_HEADING_DEG)
 			{
 				if (rejoinCount < UINT16_MAX) rejoinCount++;
 				if (rejoinCount >= PATH_REJOIN_COUNT_5MS)
@@ -883,7 +882,7 @@ void pathFollowerUpdateTarget5ms(void)
 	float lineOffset = pathPointDistance(lineRoute[nearest].x_mm, lineRoute[nearest].y_mm,
 		driveRoute[nearest].x_mm, driveRoute[nearest].y_mm);
 	pathLogErrorY_mm = lateralError;
-	pathLogErrorHeading_cdeg = pathFloatToInt16(headingError * 100.0f);
+	pathLogErrorHeading_cdeg = pathFloatToInt16(nearestHeadingError * 100.0f);
 	pathLogState = (uint8_t)followerState;
 	pathLogLegalMargin_mm = PATH_LINE_HALF_WIDTH_MM + PATH_OCCUPIED_HALF_WIDTH_MM -
 		lineOffset - PATH_TRACKING_ERROR_BUDGET_MM;

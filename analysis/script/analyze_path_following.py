@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import math
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -34,6 +35,7 @@ class RunSummary:
     auto_start: int
     emc_stop: int
     battery_voltage_v: float
+    route_controller_version: int
     samples: int
     lap_time_ms: int
     cntlog_valid: bool
@@ -126,6 +128,7 @@ def read_log(path: Path) -> tuple[RunSummary, list[dict[str, float]]]:
         auto_start=auto_start,
         emc_stop=emc_stop,
         battery_voltage_v=parameter_number(parameters, "batteryVoltage_V"),
+        route_controller_version=int(round(parameter_number(parameters, "routeControllerVersion", -1))),
         samples=len(rows),
         lap_time_ms=cntlog[-1],
         cntlog_valid=cntlog_valid,
@@ -194,6 +197,13 @@ def main() -> int:
         raise SystemExit(f"path mode only (3 or 4), got {sorted(modes)}")
     if len(modes) != 1:
         raise SystemExit(f"do not compare different modes: {sorted(modes)}")
+    controller_versions = {summary.route_controller_version for summary in summaries}
+    if 4 in controller_versions and any(version != 4 for version in controller_versions):
+        print(
+            "warning: pathErrorHeading_cdeg is lookahead-heading error through controller version 3 "
+            "and nearest-heading error from version 4; do not compare heading percentiles directly",
+            file=sys.stderr,
+        )
     invalid: list[str] = []
     for summary in summaries:
         reasons: list[str] = []
@@ -222,7 +232,8 @@ def main() -> int:
 
     for summary in summaries:
         print(
-            f"{summary.path.name}: mode={summary.optimal_trace} emc={summary.emc_stop} "
+            f"{summary.path.name}: mode={summary.optimal_trace} controller={summary.route_controller_version} "
+            f"emc={summary.emc_stop} "
             f"lat_p95={summary.lateral_p95_mm:.2f}mm heading_p95={summary.heading_p95_deg:.2f}deg "
             f"margin_min={summary.legal_margin_min_mm:.2f}mm fallback={summary.fallback_samples} "
             f"jump_max={summary.max_index_jump} jump_ge5={summary.index_jump_ge5_count}"

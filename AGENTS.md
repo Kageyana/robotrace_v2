@@ -431,6 +431,7 @@ cmake --build --preset Release
 - `BOOST_PATH_REPLAY`: 1次走行ログの `x`, `y`, `courseMarker` をヘッダ名で読み、40 mm間隔に再標本化した経路をラインセンサー非依存で再走行する。ラインセンサーは限定的な位置補正とロスト時フォールバックにだけ使う。
 - `BOOST_PATH_REPLAY` / `BOOST_SHORTCUT` のゴール判定は、通常右マーカーの誤カウントによる早期終了を防ぐため経路終端付近でのみ有効とする。
 - 経路制御バージョン3では、`BOOST_PATH_REPLAY` / `BOOST_SHORTCUT` の対応点候補を補正後エンコーダ累積進行距離の120 mm先まで、かつ推定機体方位との差60 deg以内に制限する。候補がない5 ms周期ではindexを保持してロスト回数を加算し、100 ms継続した場合だけ既存のラインフォールバックまたは`STOP_LOCALIZATION`へ移る。累積弧長はLevel 0、Level 1とも実際の`driveRoute`から算出する。
+- 経路制御バージョン4では、方位FB、ロスト判定、再合流判定に最近傍経路点の接線方位差を使用し、先読み方位は曲率FFの算出だけに使用する。小R手前で先読み方位FBによって早期旋回しないようにする。
 
 ### 速度計画と確認観点
 
@@ -474,7 +475,7 @@ cmake --build --preset Release
 - `batteryVoltage_mV` は走行中にLPF更新したバッテリー電圧 `[mV]`、`motorVoltageCmdL_mV`, `motorVoltageCmdR_mV` はバッテリー電圧で割る前の左右モーター指令電圧 `[mV]` とする。
 - `motorpwmL`, `motorpwmR` は電圧補償後に実際にタイマへ出力した飽和後DUTYとする。
 - `LOG_SCHEMA_PROFILE_LIGHT=0` のデバッグログでは `markerSensor`（LED差分から得たマーカー状態）、`sgMarkerCount`（スタート・ゴールマーカー累積数）、`encRightMarker_p`（右マーカーからの補正後エンコーダパルス）、`patternTrace`（走行状態）を追加出力する。ログヘッダには終了時の `sgMarkerAtLogEnd` と `encRightMarkerAtLogEnd_p` も出力する。
-- 経路追従ログの `linePointX_mm`, `linePointY_mm` は対応する一次走行ライン点 [mm]、`lineValid` は限定補正可能状態、`pathErrorY_mm` は経路横偏差 [mm]、`pathErrorHeading_cdeg` は方位偏差 [0.01 deg]、`pathState` は追従状態、`pathLegalMargin_mm` は追従誤差予算差引後のライン重なり余裕 [mm] とする。
+- 経路追従ログの `linePointX_mm`, `linePointY_mm` は対応する一次走行ライン点 [mm]、`lineValid` は限定補正可能状態、`pathErrorY_mm` は経路横偏差 [mm]、`pathErrorHeading_cdeg` は経路制御バージョン4以降では最近傍経路点との方位偏差 [0.01 deg]、`pathState` は追従状態、`pathLegalMargin_mm` は追従誤差予算差引後のライン重なり余裕 [mm] とする。バージョン3以前の`pathErrorHeading_cdeg`は先読み方位との偏差であり、バージョン4以降とp95を直接比較しない。
 - 通常ログは `LOG_SCHEMA_PROFILE_LIGHT=1` を既定とし、ラップタイム、速度追従、角速度、マーカー、スリップフラグ、電圧指令、実DUTY、XY確認に必要な列だけを残す。
 - 加速度、電流、スリップ内部量などの詳細デバッグ列が必要な場合は、ビルド定義で `LOG_SCHEMA_PROFILE_LIGHT=0` にして一時的に出力する。
 - ログ同士を比較する場合は、`batteryVoltage_V` の差を考慮する。電圧差によるモーター出力、速度追従、加速性能、スリップ傾向の変化を無視しない。
@@ -515,7 +516,7 @@ cmake --build --preset Release
 
 ### 実装未対応箇所の対応優先順位
 
-1. 経路制御バージョン3のLevel 0 `BOOST_PATH_REPLAY`を、`shortcut.txt`の`maxLevel=0`、`lineAlpha_x1000=000`で3系列計12本検証する。12/12完走、5点以上のindexジャンプ0回、フォールバック・自己位置喪失0回を確認する。
+1. 経路制御バージョン4のLevel 0 `BOOST_PATH_REPLAY`を、`shortcut.txt`の`maxLevel=0`、`lineAlpha_x1000=000`で最低10本検証する。小Rでのコースアウトなし、5点以上のindexジャンプ0回、フォールバック・自己位置喪失0回を確認する。早期ゴール問題の修正後は3系列計12本で全コースの採用判定を行う。
 2. 低速のLevel 1ショートカットを10本検証し、再現性と合法余裕を確認する。
 3. ラインセンサー実座標と配線順の照合後、`lineAlpha_x1000` を段階的に調整する。
 
@@ -532,6 +533,7 @@ cmake --build --preset Release
 - 2026-08-23: `BOOST_PATH_REPLAY`、40 mm経路、ヨーレート経路追従、ライン追従フォールバック、`STOP_LOCALIZATION`、`shortcut.txt`、経路追従ログ列を追加した。ショートカット形状生成は機体寸法実測完了まで安全ゲートで無効とした。
 - 2026-08-23: 機体投影半幅65 mm、外接半径100 mm、走行可能領域端まで200 mmを入力した。許容オフセット49.5 mm、境界残余50.5 mmを確認し、経路制御バージョン2でLevel 1のショートカット形状生成を有効化した。
 - 2026-09-06: 経路制御バージョン3で、実走行経路の累積弧長と推定機体方位による対応点候補制限を追加した。ヘアピン出口や近接並走区間へのindexジャンプを防ぎ、候補がない場合はindexを保持して既存の100 msロスト判定へ渡す。
+- 2026-09-06: 経路制御バージョン4で、方位FBと再合流判定を先読み方位差から最近傍経路点の接線方位差へ変更した。先読み方位は曲率FF専用とし、小R手前の早期旋回を抑える。
 
 ## 15. 機体・回路変更時にコードへ反映する項目
 
