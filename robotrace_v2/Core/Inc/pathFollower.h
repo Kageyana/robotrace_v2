@@ -8,7 +8,7 @@
 // 60mコースと終端から原点方向への500mm延長を40mm間隔で保持する。
 #define PATH_ROUTE_SPACING_MM              40.0f
 #define PATH_ROUTE_MAX_POINTS              1514U
-#define PATH_ROUTE_CONTROLLER_VERSION      8U
+#define PATH_ROUTE_CONTROLLER_VERSION      9U
 
 // 実測した機体投影寸法と合法余裕を確認済みのため、形状変更を許可する。
 #define PATH_SHORTCUT_GEOMETRY_ENABLE      1

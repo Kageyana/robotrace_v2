@@ -17,7 +17,7 @@
 #define PATH_DEFAULT_LOOKAHEAD_PER_MPS_MM     40U
 #define PATH_DEFAULT_KLATERAL_X100            3000U
 #define PATH_DEFAULT_KHEADING_X100            600U
-#define PATH_DEFAULT_LINE_ALPHA_X1000         0U
+#define PATH_DEFAULT_LINE_ALPHA_X1000         10U
 
 #define PATH_LEVEL_MAX                        1U // 初期実機検証はLevel 1だけを許可する
 #define PATH_LOOKAHEAD_BASE_MIN_MM            40U
@@ -56,7 +56,6 @@
 #define PATH_SENSOR_ACTIVE_TH                 800U
 #define PATH_SENSOR_MIN_SUM                   1200U
 #define PATH_SENSOR_MAX_CLUSTER_WIDTH         3U
-#define PATH_SENSOR_PITCH_MM                  9.5f   // 隣接ラインセンサーの受光中心間隔
 #define PATH_SENSOR_FOV_MM                    35.0f  // ライン位置補正を許可する予測横偏差範囲
 
 #define PATH_FLAG_ANCHOR                      0x01U
@@ -96,6 +95,12 @@ static float pathTravelMm = 0.0f;
 static uint16_t pathGoalArcMm = 0U;
 static bool pathGoalValid = false;
 static bool currentLineValid = false;
+
+// KiCad基板座標と実機のsensor[0]=左端、sensor[9]=右端を照合した受光中心横座標[mm]。
+static const float pathSensorLateralMm[NUM_SENSORS] = {
+	-41.70f, -35.04f, -27.29f, -18.68f, -9.49f,
+	9.50f, 18.68f, 27.29f, 35.05f, 41.70f
+};
 
 ShortcutSettings shortcutSettings = {0U, PATH_DEFAULT_LOOKAHEAD_BASE_MM,
 	PATH_DEFAULT_LOOKAHEAD_PER_MPS_MM, PATH_DEFAULT_KLATERAL_X100,
@@ -726,10 +731,10 @@ static bool pathSenseLine(float predictedErrorMm, float *measuredErrorMm)
 			active++;
 		}
 		sum += value;
-		weighted += (float)value * (float)i;
+		weighted += (float)value * pathSensorLateralMm[i];
 	}
 	if (sum < PATH_SENSOR_MIN_SUM || active == 0U || (uint8_t)(last - first + 1U) > PATH_SENSOR_MAX_CLUSTER_WIDTH) return false;
-	float linePositionMm = ((weighted / (float)sum) - 4.5f) * PATH_SENSOR_PITCH_MM;
+	float linePositionMm = weighted / (float)sum;
 	*measuredErrorMm = -linePositionMm;
 	return true;
 }
