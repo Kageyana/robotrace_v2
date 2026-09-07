@@ -45,12 +45,14 @@ Codexの非対話シェルから起動したNinja固有の停止であること�
 - Codexセッションではネイティブアプリ制御が無効だったため、VS Code拡張タスクの実行は行っていない。
 - 起動時ファームウェア識別表示追加では、生成済みDebugビルドコマンド60件へ現行コミットIDを明示して直列実行し、終了コード0、RAM 75,720 B、FLASH 205,892 BでELFを生成した。新規warningはなかった。
 - 経路制御バージョン4の確認では、Release presetの通常構成が再びコンパイラABI確認で停止した。`CMAKE_C_COMPILER_WORKS`、`CMAKE_CXX_COMPILER_WORKS`、`CMAKE_C_COMPILER_FORCED`、`CMAKE_CXX_COMPILER_FORCED`を`TRUE`として既知のコンパイラ確認だけを省略すると構成が完了し、生成済み全コマンドの直列実行でRelease ELFを生成できた。
+- 経路制御バージョン11の確認では、通常サンドボックス内のNinjaが子コンパイラを起動せず停止した。同じ`cmake --build --preset Debug/Release -- -j1`をサンドボックス外で実行すると、DebugとReleaseの全60コマンドが終了コード0で完了した。
 
 ## 今後の予防策
 
 - このPCでは通常の最終ビルドをVS Code拡張のCMakeタスクから実行する。
 - Codexシェルで確認する場合は、先に`robotrace_v2/.vscode/settings.json`とbundleの実体を確認し、CubeCLT環境と混同しない。
 - Ninjaが30秒以上無出力かつCPU 0のときは中断し、ARM GCCの直接実行でソース由来か環境由来かを切り分ける。
+- 通常サンドボックス内だけで停止し、ARM GCC単体が応答する場合は、同じCMake presetをサンドボックス外で再実行する。preset、作業ディレクトリ、生成先は変更しない。
 - Release構成が`Detecting C compiler ABI info`で停止し、同じコンパイラのDebug全ビルドが成功済みの場合に限り、コンパイラ動作確認済みフラグを明示してABI試行を省略する。生成後は全コンパイル・リンクコマンドを実行して実体を検証する。
 - VS Code拡張からDebugMarkerとReleaseが成功した後に、本記録を`resolved`へ変更する。
 

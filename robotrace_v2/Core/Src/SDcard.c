@@ -452,6 +452,9 @@ void createLog(void)
 	setLogHeaderStr("routeControllerVersion", PATH_ROUTE_CONTROLLER_VERSION);
 	setLogHeaderStr("routeSourceLog", pathRouteSourceLog());
 	setLogHeaderStr("shortcutLevel", pathRouteShortcutLevel());
+	setLogHeaderStr("shortcutBuildStatus", pathRouteShortcutBuildStatus());
+	setLogHeaderStr("shortcutCorridorCount", pathRouteShortcutCorridorCount());
+	setLogHeaderStrF("shortcutReduction_mm", pathRouteShortcutReductionMm());
 
 	setLogHeaderStrF("tgtParam.bstStraight", tgtParam.bstStraight);
 	setLogHeaderStrF("tgtParam.bst1500", tgtParam.bst1500);

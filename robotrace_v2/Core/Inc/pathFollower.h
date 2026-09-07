@@ -8,7 +8,7 @@
 // 60mコースと終端から原点方向への500mm延長を40mm間隔で保持する。
 #define PATH_ROUTE_SPACING_MM              40.0f
 #define PATH_ROUTE_MAX_POINTS              1514U
-#define PATH_ROUTE_CONTROLLER_VERSION      10U
+#define PATH_ROUTE_CONTROLLER_VERSION      12U
 
 // 実測した機体投影寸法と合法余裕を確認済みのため、形状変更を許可する。
 #define PATH_SHORTCUT_GEOMETRY_ENABLE      1
@@ -42,6 +42,18 @@ typedef enum
 	PATH_STATE_LOCALIZATION_LOST = 4
 } PathFollowerState;
 
+typedef enum
+{
+	PATH_SHORTCUT_BUILD_NOT_REQUESTED = 0,
+	PATH_SHORTCUT_BUILD_SUCCESS = 1,
+	PATH_SHORTCUT_BUILD_DISABLED_BY_SETTING = 2,
+	PATH_SHORTCUT_BUILD_LEGAL_GEOMETRY_INVALID = 3,
+	PATH_SHORTCUT_BUILD_NO_CORRIDOR = 4,
+	PATH_SHORTCUT_BUILD_OFFSET_VIOLATION = 5,
+	PATH_SHORTCUT_BUILD_NEW_INTERSECTION = 6,
+	PATH_SHORTCUT_BUILD_INSUFFICIENT_REDUCTION = 7
+} PathShortcutBuildStatus;
+
 extern ShortcutSettings shortcutSettings;
 extern float pathLogLinePointX_mm;
 extern float pathLogLinePointY_mm;
@@ -57,6 +69,9 @@ uint16_t pathRouteCount(void);
 bool pathFollowerGoalReached(void);
 int16_t pathRouteSourceLog(void);
 uint8_t pathRouteShortcutLevel(void);
+uint8_t pathRouteShortcutBuildStatus(void);
+uint8_t pathRouteShortcutCorridorCount(void);
+float pathRouteShortcutReductionMm(void);
 void pathFollowerReset(void);
 void pathFollowerUpdatePose1ms(int32_t encoderPulse, float gyroDegPerSec);
 void pathFollowerUpdateTarget5ms(void);

@@ -28,10 +28,20 @@
 #define PATH_LINE_ALPHA_MAX_X1000             100U
 
 #define PATH_CSV_LINE_SIZE                    2048U
-#define PATH_ANCHOR_HALF_WIDTH_MM             100.0f
-#define PATH_SMOOTH_MOVE_MAX_MM               2.0f
-#define PATH_SMOOTH_CONVERGED_MM              0.1f
-#define PATH_SMOOTH_ITERATIONS                100U
+#define PATH_CORRIDOR_MIN_SPAN_POINTS         15U   // 600mm
+#define PATH_CORRIDOR_MAX_SPAN_POINTS         40U   // 1600mm
+#define PATH_CORRIDOR_TRANSITION_POINTS       3U    // 120mm
+#define PATH_CORRIDOR_END_GUARD_POINTS        4U
+#define PATH_CORRIDOR_OVERLAP_GUARD_POINTS    5U
+#define PATH_CORRIDOR_MAX_COUNT               16U
+#define PATH_CORRIDOR_HEADING_LIMIT_DEG       12.0f
+#define PATH_CORRIDOR_TURN_THRESHOLD_DEG      2.0f
+#define PATH_CORRIDOR_MIN_SIGN_CHANGES        3U
+#define PATH_CORRIDOR_MAX_OFFSET_MM           34.0f
+#define PATH_CORRIDOR_OFFSET_TOLERANCE_MM     0.5f
+#define PATH_CORRIDOR_MIN_PROJECTION          -0.02f
+#define PATH_CORRIDOR_MAX_PROJECTION          1.02f
+#define PATH_CORRIDOR_MIN_SAVING_MM           5.0f
 
 // 寸法入力値はすべて[mm]。機体座標の原点は左右駆動輪の車軸中心とし、
 // 上面から見て右を+X、左を-X、前方を+Y、後方を-Yとする。
@@ -58,7 +68,8 @@
 #define PATH_SENSOR_MAX_CLUSTER_WIDTH         3U
 #define PATH_SENSOR_FOV_MM                    35.0f  // ライン位置補正を許可する予測横偏差範囲
 
-#define PATH_FLAG_ANCHOR                      0x01U
+#define PATH_FLAG_CORRIDOR_RESERVED           0x01U
+#define PATH_FLAG_CORRIDOR_APPLIED            0x02U
 
 typedef struct
 {
@@ -78,11 +89,13 @@ static RoutePoint lineRoute[PATH_ROUTE_MAX_POINTS];
 static RoutePoint driveRoute[PATH_ROUTE_MAX_POINTS];
 static uint16_t driveRouteArcMm[PATH_ROUTE_MAX_POINTS];
 static uint8_t routeFlags[PATH_ROUTE_MAX_POINTS];
-static uint8_t routeAnchorScratch[PATH_ROUTE_MAX_POINTS];
 static char routeCsvLine[PATH_CSV_LINE_SIZE];
 static uint16_t routeCount = 0U;
 static int16_t routeSourceLog = 0;
 static uint8_t routeShortcutLevel = 0U;
+static uint8_t routeShortcutBuildStatus = PATH_SHORTCUT_BUILD_NOT_REQUESTED;
+static uint8_t routeShortcutCorridorCount = 0U;
+static float routeShortcutReductionMm = 0.0f;
 static PathPose pathPose;
 static PathFollowerState followerState = PATH_STATE_INACTIVE;
 static uint16_t routeIndex = 0U;
@@ -371,7 +384,7 @@ static bool pathExtendDriveRouteTowardOrigin(uint8_t shortcutLevel)
 		lineRoute[routeCount].y_mm = extensionY;
 		lineRoute[routeCount].heading_cdeg = 0;
 		lineRoute[routeCount].speed_cms = 0U;
-		routeFlags[routeCount] = PATH_FLAG_ANCHOR;
+		routeFlags[routeCount] = 0U;
 		routeCount++;
 		advancedMm = nextAdvancedMm;
 	}
@@ -381,26 +394,188 @@ static bool pathExtendDriveRouteTowardOrigin(uint8_t shortcutLevel)
 	return true;
 }
 
+#if PATH_SHORTCUT_GEOMETRY_ENABLE
+typedef struct
+{
+	uint16_t begin;
+	uint16_t end;
+	float saving_mm;
+	bool valid;
+} PathCorridorCandidate;
+
 /////////////////////////////////////////////////////////////////////
-// モジュール名 pathExpandAnchors
-// 処理概要     マーカー前後100mmを形状変更禁止区間へ展開する
+// モジュール名 pathCorridorSmoothstep
+// 処理概要     直線回廊の入口と出口を滑らかに接続する係数を算出する
+// 引数         value: 0～1の進捗
+// 戻り値       0～1の補間係数
+/////////////////////////////////////////////////////////////////////
+static float pathCorridorSmoothstep(float value)
+{
+	value = fminf(1.0f, fmaxf(0.0f, value));
+	return value * value * (3.0f - (2.0f * value));
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathComputeCorridorHeadings
+// 処理概要     直線回廊抽出用に前後2点から一次経路の接線方位を算出する
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-static void pathExpandAnchors(void)
+static void pathComputeCorridorHeadings(void)
 {
-	memcpy(routeAnchorScratch, routeFlags, routeCount);
-	uint16_t radius = (uint16_t)ceilf(PATH_ANCHOR_HALF_WIDTH_MM / PATH_ROUTE_SPACING_MM);
 	for (uint16_t i = 0U; i < routeCount; i++)
 	{
-		if ((routeAnchorScratch[i] & PATH_FLAG_ANCHOR) == 0U) continue;
-		uint16_t begin = (i > radius) ? (uint16_t)(i - radius) : 0U;
-		uint16_t end = (i + radius < routeCount) ? (uint16_t)(i + radius) : (uint16_t)(routeCount - 1U);
-		for (uint16_t j = begin; j <= end; j++) routeFlags[j] |= PATH_FLAG_ANCHOR;
+		uint16_t before = (i > 2U) ? (uint16_t)(i - 2U) : 0U;
+		uint16_t after = (i + 2U < routeCount) ? (uint16_t)(i + 2U) : (uint16_t)(routeCount - 1U);
+		float dx = (float)lineRoute[after].x_mm - (float)lineRoute[before].x_mm;
+		float dy = (float)lineRoute[after].y_mm - (float)lineRoute[before].y_mm;
+		driveRoute[i].heading_cdeg = pathFloatToInt16(pathWrapDeg(atan2f(dx, dy) * RAD2DEG) * 100.0f);
 	}
 }
 
-#if PATH_SHORTCUT_GEOMETRY_ENABLE
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathCorridorRangeIsFree
+// 処理概要     候補区間が既採用回廊の保護範囲と重ならないことを確認する
+// 引数         begin,end: 候補区間の先頭と終端index
+// 戻り値       true:重なりなし false:重なりあり
+/////////////////////////////////////////////////////////////////////
+static bool pathCorridorRangeIsFree(uint16_t begin, uint16_t end)
+{
+	for (uint16_t i = begin; i <= end; i++)
+	{
+		if ((routeFlags[i] & PATH_FLAG_CORRIDOR_RESERVED) != 0U) return false;
+	}
+	return true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathEvaluateCorridorCandidate
+// 処理概要     一次経路の区間が直線回廊の抽出条件を満たすか評価する
+// 引数         begin,end: 候補区間の先頭と終端index, savingMm:短縮量格納先[mm]
+// 戻り値       true:候補成立 false:候補不成立
+/////////////////////////////////////////////////////////////////////
+static bool pathEvaluateCorridorCandidate(uint16_t begin, uint16_t end, float *savingMm)
+{
+	float dx = (float)lineRoute[end].x_mm - (float)lineRoute[begin].x_mm;
+	float dy = (float)lineRoute[end].y_mm - (float)lineRoute[begin].y_mm;
+	float chordLengthSquared = (dx * dx) + (dy * dy);
+	if (chordLengthSquared <= 0.0f) return false;
+	float chordHeadingDeg = atan2f(dx, dy) * RAD2DEG;
+	float beginHeadingDeg = (float)driveRoute[begin].heading_cdeg * 0.01f;
+	float endHeadingDeg = (float)driveRoute[end].heading_cdeg * 0.01f;
+	if (fabsf(pathWrapDeg(beginHeadingDeg - chordHeadingDeg)) > PATH_CORRIDOR_HEADING_LIMIT_DEG ||
+		fabsf(pathWrapDeg(endHeadingDeg - chordHeadingDeg)) > PATH_CORRIDOR_HEADING_LIMIT_DEG) return false;
+
+	float sourceLength = 0.0f;
+	for (uint16_t i = begin; i <= end; i++)
+	{
+		float pointX = (float)lineRoute[i].x_mm - (float)lineRoute[begin].x_mm;
+		float pointY = (float)lineRoute[i].y_mm - (float)lineRoute[begin].y_mm;
+		float progress = ((pointX * dx) + (pointY * dy)) / chordLengthSquared;
+		if (progress < PATH_CORRIDOR_MIN_PROJECTION || progress > PATH_CORRIDOR_MAX_PROJECTION) return false;
+		float projectedX = (float)lineRoute[begin].x_mm + (progress * dx);
+		float projectedY = (float)lineRoute[begin].y_mm + (progress * dy);
+		float offset = pathPointDistance(lineRoute[i].x_mm, lineRoute[i].y_mm, projectedX, projectedY);
+		if (offset > PATH_CORRIDOR_MAX_OFFSET_MM) return false;
+		if (i > begin)
+		{
+			sourceLength += pathPointDistance(lineRoute[i - 1U].x_mm, lineRoute[i - 1U].y_mm,
+				lineRoute[i].x_mm, lineRoute[i].y_mm);
+		}
+	}
+
+	uint8_t signChanges = 0U;
+	int8_t previousSign = 0;
+	for (uint16_t i = (uint16_t)(begin + 2U); i < (uint16_t)(end - 1U); i++)
+	{
+		float beforeHeading = (float)driveRoute[i - 2U].heading_cdeg * 0.01f;
+		float afterHeading = (float)driveRoute[i + 2U].heading_cdeg * 0.01f;
+		float delta = pathWrapDeg(afterHeading - beforeHeading);
+		if (fabsf(delta) < PATH_CORRIDOR_TURN_THRESHOLD_DEG) continue;
+		int8_t sign = (delta > 0.0f) ? 1 : -1;
+		if (previousSign != 0 && sign != previousSign) signChanges++;
+		previousSign = sign;
+	}
+	if (signChanges < PATH_CORRIDOR_MIN_SIGN_CHANGES) return false;
+
+	*savingMm = sourceLength - sqrtf(chordLengthSquared);
+	return *savingMm >= PATH_CORRIDOR_MIN_SAVING_MM;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathFindBestCorridorCandidate
+// 処理概要     未使用区間から短縮量が最大の直線回廊候補を取得する
+// 引数         candidate:候補格納先
+// 戻り値       true:候補あり false:候補なし
+/////////////////////////////////////////////////////////////////////
+static bool pathFindBestCorridorCandidate(PathCorridorCandidate *candidate)
+{
+	candidate->valid = false;
+	for (uint16_t begin = PATH_CORRIDOR_END_GUARD_POINTS;
+		begin + PATH_CORRIDOR_MIN_SPAN_POINTS + PATH_CORRIDOR_END_GUARD_POINTS < routeCount; begin++)
+	{
+		for (uint16_t span = PATH_CORRIDOR_MIN_SPAN_POINTS; span <= PATH_CORRIDOR_MAX_SPAN_POINTS; span++)
+		{
+			uint16_t end = (uint16_t)(begin + span);
+			if (end + PATH_CORRIDOR_END_GUARD_POINTS >= routeCount) break;
+			if (!pathCorridorRangeIsFree(begin, end)) continue;
+			float savingMm = 0.0f;
+			if (!pathEvaluateCorridorCandidate(begin, end, &savingMm)) continue;
+			uint16_t bestSpan = candidate->valid ? (uint16_t)(candidate->end - candidate->begin) : 0U;
+			if (!candidate->valid || savingMm > candidate->saving_mm ||
+				(savingMm == candidate->saving_mm && span > bestSpan))
+			{
+				candidate->begin = begin;
+				candidate->end = end;
+				candidate->saving_mm = savingMm;
+				candidate->valid = true;
+			}
+		}
+	}
+	return candidate->valid;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathApplyCorridorCandidate
+// 処理概要     候補区間を直線へ寄せて入口と出口を120mmで滑らかに接続する
+// 引数         candidate:適用する直線回廊候補
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void pathApplyCorridorCandidate(const PathCorridorCandidate *candidate)
+{
+	uint16_t span = (uint16_t)(candidate->end - candidate->begin);
+	for (uint16_t i = candidate->begin; i <= candidate->end; i++)
+	{
+		float progress = (float)(i - candidate->begin) / (float)span;
+		float chordX = (float)lineRoute[candidate->begin].x_mm +
+			((float)(lineRoute[candidate->end].x_mm - lineRoute[candidate->begin].x_mm) * progress);
+		float chordY = (float)lineRoute[candidate->begin].y_mm +
+			((float)(lineRoute[candidate->end].y_mm - lineRoute[candidate->begin].y_mm) * progress);
+		float entryWeight = pathCorridorSmoothstep((float)(i - candidate->begin) /
+			(float)PATH_CORRIDOR_TRANSITION_POINTS);
+		float exitWeight = pathCorridorSmoothstep((float)(candidate->end - i) /
+			(float)PATH_CORRIDOR_TRANSITION_POINTS);
+		float weight = fminf(entryWeight, exitWeight);
+		float moveX = (chordX - (float)lineRoute[i].x_mm) * weight;
+		float moveY = (chordY - (float)lineRoute[i].y_mm) * weight;
+		float move = sqrtf((moveX * moveX) + (moveY * moveY));
+		if (move > PATH_CORRIDOR_MAX_OFFSET_MM)
+		{
+			moveX *= PATH_CORRIDOR_MAX_OFFSET_MM / move;
+			moveY *= PATH_CORRIDOR_MAX_OFFSET_MM / move;
+		}
+		driveRoute[i].x_mm = pathFloatToInt16((float)lineRoute[i].x_mm + moveX);
+		driveRoute[i].y_mm = pathFloatToInt16((float)lineRoute[i].y_mm + moveY);
+		routeFlags[i] |= PATH_FLAG_CORRIDOR_APPLIED;
+	}
+
+	uint16_t reserveBegin = (candidate->begin > PATH_CORRIDOR_OVERLAP_GUARD_POINTS) ?
+		(uint16_t)(candidate->begin - PATH_CORRIDOR_OVERLAP_GUARD_POINTS) : 0U;
+	uint16_t reserveEnd = (candidate->end + PATH_CORRIDOR_OVERLAP_GUARD_POINTS < routeCount) ?
+		(uint16_t)(candidate->end + PATH_CORRIDOR_OVERLAP_GUARD_POINTS) : (uint16_t)(routeCount - 1U);
+	for (uint16_t i = reserveBegin; i <= reserveEnd; i++) routeFlags[i] |= PATH_FLAG_CORRIDOR_RESERVED;
+}
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathSegmentsIntersect
 // 処理概要     離れた2経路区間の交差を判定する
@@ -444,83 +619,90 @@ static float pathLength(const RoutePoint *route)
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 routeGenerateShortcut
-// 処理概要     一次経路を制約付きElastic Bandで短縮する
-// 引数         shortcutLevel:短縮レベル(1..3)
+// 処理概要     一次経路のスラローム区間を直線回廊へ置換する
+// 引数         shortcutLevel:短縮レベル(1)
 // 戻り値       true:短縮経路生成成功 false:再走行経路を使用
 /////////////////////////////////////////////////////////////////////
 bool routeGenerateShortcut(uint8_t shortcutLevel)
 {
 	memcpy(driveRoute, lineRoute, sizeof(RoutePoint) * routeCount);
 	routeShortcutLevel = 0U;
-	if (shortcutLevel == 0U || routeCount < 3U) return false;
+	routeShortcutBuildStatus = PATH_SHORTCUT_BUILD_NOT_REQUESTED;
+	routeShortcutCorridorCount = 0U;
+	routeShortcutReductionMm = 0.0f;
+	if (shortcutLevel == 0U) return false;
+	if (routeCount < (PATH_CORRIDOR_MIN_SPAN_POINTS + (2U * PATH_CORRIDOR_END_GUARD_POINTS) + 1U))
+	{
+		routeShortcutBuildStatus = PATH_SHORTCUT_BUILD_NO_CORRIDOR;
+		return false;
+	}
 #if !PATH_SHORTCUT_GEOMETRY_ENABLE
 	(void)shortcutLevel;
+	routeShortcutBuildStatus = PATH_SHORTCUT_BUILD_LEGAL_GEOMETRY_INVALID;
 	return false;
 #else
 	if (shortcutLevel > PATH_LEVEL_MAX) shortcutLevel = PATH_LEVEL_MAX;
 	float legalOffsetMm = PATH_LINE_HALF_WIDTH_MM + PATH_OCCUPIED_HALF_WIDTH_MM -
 		PATH_TRACKING_ERROR_BUDGET_MM - PATH_LEGAL_RESERVE_MM;
-	if (legalOffsetMm <= 0.0f || PATH_OUTER_RADIUS_MM + legalOffsetMm > PATH_BOARD_CLEARANCE_MM) return false;
-	float maxOffsetMm = legalOffsetMm * ((float)shortcutLevel * 0.25f);
-	for (uint16_t iteration = 0U; iteration < PATH_SMOOTH_ITERATIONS; iteration++)
+	if (legalOffsetMm <= 0.0f || PATH_CORRIDOR_MAX_OFFSET_MM > legalOffsetMm ||
+		PATH_OUTER_RADIUS_MM + legalOffsetMm > PATH_BOARD_CLEARANCE_MM)
 	{
-		float maxMove = 0.0f;
-		for (uint16_t i = 1U; i + 1U < routeCount; i++)
-		{
-			if ((routeFlags[i] & PATH_FLAG_ANCHOR) != 0U) continue;
-			float x = driveRoute[i].x_mm;
-			float y = driveRoute[i].y_mm;
-			float targetX = 0.5f * ((float)driveRoute[i - 1U].x_mm + (float)driveRoute[i + 1U].x_mm);
-			float targetY = 0.5f * ((float)driveRoute[i - 1U].y_mm + (float)driveRoute[i + 1U].y_mm);
-			float dx = targetX - x;
-			float dy = targetY - y;
-			float move = sqrtf((dx * dx) + (dy * dy));
-			if (move > PATH_SMOOTH_MOVE_MAX_MM)
-			{
-				dx *= PATH_SMOOTH_MOVE_MAX_MM / move;
-				dy *= PATH_SMOOTH_MOVE_MAX_MM / move;
-				move = PATH_SMOOTH_MOVE_MAX_MM;
-			}
-			x += dx;
-			y += dy;
-			float fromLineX = x - (float)lineRoute[i].x_mm;
-			float fromLineY = y - (float)lineRoute[i].y_mm;
-			float fromLine = sqrtf((fromLineX * fromLineX) + (fromLineY * fromLineY));
-			if (fromLine > maxOffsetMm)
-			{
-				x = (float)lineRoute[i].x_mm + (fromLineX * maxOffsetMm / fromLine);
-				y = (float)lineRoute[i].y_mm + (fromLineY * maxOffsetMm / fromLine);
-			}
-			driveRoute[i].x_mm = pathFloatToInt16(x);
-			driveRoute[i].y_mm = pathFloatToInt16(y);
-			if (move > maxMove) maxMove = move;
-		}
-		if (maxMove < PATH_SMOOTH_CONVERGED_MM) break;
+		routeShortcutBuildStatus = PATH_SHORTCUT_BUILD_LEGAL_GEOMETRY_INVALID;
+		return false;
+	}
+
+	memset(routeFlags, 0, sizeof(routeFlags));
+	pathComputeCorridorHeadings();
+	for (uint8_t count = 0U; count < PATH_CORRIDOR_MAX_COUNT; count++)
+	{
+		PathCorridorCandidate candidate;
+		if (!pathFindBestCorridorCandidate(&candidate)) break;
+		pathApplyCorridorCandidate(&candidate);
+		routeShortcutCorridorCount++;
+	}
+	if (routeShortcutCorridorCount == 0U)
+	{
+		memcpy(driveRoute, lineRoute, sizeof(RoutePoint) * routeCount);
+		routeShortcutBuildStatus = PATH_SHORTCUT_BUILD_NO_CORRIDOR;
+		return false;
 	}
 
 	for (uint16_t i = 0U; i < routeCount; i++)
 	{
 		float offset = pathPointDistance(lineRoute[i].x_mm, lineRoute[i].y_mm,
 			driveRoute[i].x_mm, driveRoute[i].y_mm);
-		if (offset > maxOffsetMm + 0.5f) return false;
+		if (offset > PATH_CORRIDOR_MAX_OFFSET_MM + PATH_CORRIDOR_OFFSET_TOLERANCE_MM)
+		{
+			memcpy(driveRoute, lineRoute, sizeof(RoutePoint) * routeCount);
+			routeShortcutBuildStatus = PATH_SHORTCUT_BUILD_OFFSET_VIOLATION;
+			return false;
+		}
 	}
 	for (uint16_t i = 0U; i + 1U < routeCount; i++)
 	{
 		for (uint16_t j = (uint16_t)(i + 3U); j + 1U < routeCount; j++)
 		{
-			if (pathSegmentsIntersect(driveRoute, i, j) && !pathSegmentsIntersect(lineRoute, i, j)) return false;
+			if (pathSegmentsIntersect(driveRoute, i, j) && !pathSegmentsIntersect(lineRoute, i, j))
+			{
+				memcpy(driveRoute, lineRoute, sizeof(RoutePoint) * routeCount);
+				routeShortcutBuildStatus = PATH_SHORTCUT_BUILD_NEW_INTERSECTION;
+				return false;
+			}
 		}
 	}
 	float sourceLength = pathLength(lineRoute);
 	float shortcutLength = pathLength(driveRoute);
-	if (sourceLength <= 0.0f || shortcutLength > sourceLength * 0.995f)
+	routeShortcutReductionMm = sourceLength - shortcutLength;
+	if (sourceLength <= 0.0f || routeShortcutReductionMm < PATH_CORRIDOR_MIN_SAVING_MM)
 	{
 		memcpy(driveRoute, lineRoute, sizeof(RoutePoint) * routeCount);
+		routeShortcutBuildStatus = PATH_SHORTCUT_BUILD_INSUFFICIENT_REDUCTION;
 		return false;
 	}
 	pathComputeHeadings(driveRoute, routeCount);
 	pathBuildSpeedProfile(driveRoute, routeCount, shortcutLevel);
 	routeShortcutLevel = shortcutLevel;
+	routeShortcutBuildStatus = PATH_SHORTCUT_BUILD_SUCCESS;
 	return true;
 #endif
 }
@@ -612,7 +794,7 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	routeCount = 1U;
 	lineRoute[0].x_mm = 0;
 	lineRoute[0].y_mm = 0;
-	routeFlags[0] = PATH_FLAG_ANCHOR;
+	routeFlags[0] = 0U;
 	float rawTraversed = 0.0f;
 	float accumulated = 0.0f;
 	float previousRawX = 0.0f;
@@ -620,7 +802,6 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	float previousCorrectedX = 0.0f;
 	float previousCorrectedY = 0.0f;
 	bool firstCorrected = true;
-	bool markerPending = false;
 	bool routeOverflow = false;
 	while (f_gets(routeCsvLine, sizeof(routeCsvLine), &file) != NULL)
 	{
@@ -636,7 +817,6 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 		float blend = progress * progress * (3.0f - (2.0f * progress));
 		float correctedX = (rawX - firstX) + (closureX * blend);
 		float correctedY = (rawY - firstY) + (closureY * blend);
-		if (marker != 0U) markerPending = true;
 		if (firstCorrected)
 		{
 			previousCorrectedX = correctedX;
@@ -661,11 +841,6 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 			segmentStartY += (correctedY - segmentStartY) * ratio;
 			lineRoute[routeCount].x_mm = pathFloatToInt16(segmentStartX);
 			lineRoute[routeCount].y_mm = pathFloatToInt16(segmentStartY);
-			if (markerPending)
-			{
-				routeFlags[routeCount] |= PATH_FLAG_ANCHOR;
-				markerPending = false;
-			}
 			routeCount++;
 			remainingSegment -= needed;
 			accumulated = 0.0f;
@@ -681,14 +856,24 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	if (routeCount < 2U) return -11;
 	lineRoute[routeCount - 1U].x_mm = pathFloatToInt16(lastX - firstX);
 	lineRoute[routeCount - 1U].y_mm = pathFloatToInt16(lastY - firstY);
-	routeFlags[routeCount - 1U] |= PATH_FLAG_ANCHOR;
-	pathExpandAnchors();
 	pathComputeHeadings(lineRoute, routeCount);
 	pathBuildSpeedProfile(lineRoute, routeCount, 0U);
 	memcpy(driveRoute, lineRoute, sizeof(RoutePoint) * routeCount);
 	routeSourceLog = (int16_t)logNumber;
-	if (shortcutLevel > shortcutSettings.maxLevel) shortcutLevel = shortcutSettings.maxLevel;
-	bool shortcutOk = routeGenerateShortcut(shortcutLevel);
+	uint8_t requestedShortcutLevel = shortcutLevel;
+	bool shortcutOk = false;
+	if (requestedShortcutLevel > 0U && shortcutSettings.maxLevel == 0U)
+	{
+		routeShortcutLevel = 0U;
+		routeShortcutBuildStatus = PATH_SHORTCUT_BUILD_DISABLED_BY_SETTING;
+		routeShortcutCorridorCount = 0U;
+		routeShortcutReductionMm = 0.0f;
+	}
+	else
+	{
+		if (shortcutLevel > shortcutSettings.maxLevel) shortcutLevel = shortcutSettings.maxLevel;
+		shortcutOk = routeGenerateShortcut(shortcutLevel);
+	}
 	if (!shortcutOk)
 	{
 		pathBuildSpeedProfile(driveRoute, routeCount, 0U);
@@ -828,7 +1013,9 @@ void pathFollowerUpdateTarget5ms(void)
 	float lineError = (lineDx * cosf(lineHeadingRad)) - (lineDy * sinf(lineHeadingRad));
 	float measuredError = 0.0f;
 	currentLineValid = pathSenseLine(lineError, &measuredError);
-	if (currentLineValid)
+	bool corridorLineCorrectionBlocked = routeShortcutLevel > 0U &&
+		((routeFlags[nearest] & PATH_FLAG_CORRIDOR_APPLIED) != 0U);
+	if (currentLineValid && !corridorLineCorrectionBlocked)
 	{
 		float alpha = (float)shortcutSettings.lineAlpha_x1000 * 0.001f;
 		float correction = alpha * (measuredError - lineError);
@@ -1006,6 +1193,30 @@ int16_t pathRouteSourceLog(void) { return routeSourceLog; }
 // 戻り値       ショートカットレベル
 /////////////////////////////////////////////////////////////////////
 uint8_t pathRouteShortcutLevel(void) { return routeShortcutLevel; }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathRouteShortcutBuildStatus
+// 処理概要     Level 1経路生成結果を取得する
+// 引数         なし
+// 戻り値       PathShortcutBuildStatus
+/////////////////////////////////////////////////////////////////////
+uint8_t pathRouteShortcutBuildStatus(void) { return routeShortcutBuildStatus; }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathRouteShortcutCorridorCount
+// 処理概要     生成した直線回廊数を取得する
+// 引数         なし
+// 戻り値       直線回廊数
+/////////////////////////////////////////////////////////////////////
+uint8_t pathRouteShortcutCorridorCount(void) { return routeShortcutCorridorCount; }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathRouteShortcutReductionMm
+// 処理概要     Level 1経路の全長短縮量を取得する
+// 引数         なし
+// 戻り値       短縮量[mm]
+/////////////////////////////////////////////////////////////////////
+float pathRouteShortcutReductionMm(void) { return routeShortcutReductionMm; }
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathSettingInRange

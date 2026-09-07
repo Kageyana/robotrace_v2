@@ -26,6 +26,17 @@ REQUIRED_COLUMNS = {
     "pathLegalMargin_mm",
 }
 PATH_MODES = {3, 4}
+SHORTCUT_MODE = 3
+SHORTCUT_BUILD_STATUS_NAMES = {
+    0: "not_requested",
+    1: "success",
+    2: "disabled_by_setting",
+    3: "legal_geometry_invalid",
+    4: "no_corridor",
+    5: "offset_violation",
+    6: "new_intersection",
+    7: "insufficient_reduction",
+}
 
 
 @dataclass
@@ -36,6 +47,9 @@ class RunSummary:
     emc_stop: int
     battery_voltage_v: float
     route_controller_version: int
+    shortcut_build_status: int
+    shortcut_corridor_count: int
+    shortcut_reduction_mm: float
     samples: int
     lap_time_ms: int
     cntlog_valid: bool
@@ -76,6 +90,33 @@ def parameter_number(parameters: dict[str, str], name: str, default: float = mat
         return default
 
 
+def unwrap_cntlog_u16(values: list[int]) -> tuple[list[int], bool]:
+    """16 bitのcntlog折り返しを展開し、時間差の妥当性も返す。"""
+    if not values:
+        return [], False
+
+    unwrapped: list[int] = []
+    offset = 0
+    previous_raw = values[0]
+    previous_unwrapped: int | None = None
+    valid = True
+    for raw in values:
+        if raw < previous_raw:
+            if previous_raw - raw > 0x8000:
+                offset += 0x10000
+            else:
+                valid = False
+        current = raw + offset
+        if previous_unwrapped is not None:
+            delta = current - previous_unwrapped
+            if delta <= 0 or delta > 1000:
+                valid = False
+        unwrapped.append(current)
+        previous_raw = raw
+        previous_unwrapped = current
+    return unwrapped, valid
+
+
 def read_log(path: Path) -> tuple[RunSummary, list[dict[str, float]]]:
     with path.open("r", encoding="utf-8-sig", newline="") as source:
         reader = csv.reader(source)
@@ -109,8 +150,8 @@ def read_log(path: Path) -> tuple[RunSummary, list[dict[str, float]]]:
     if not rows:
         raise ValueError(f"{path}: no data rows")
 
-    cntlog = [int(row["cntlog"]) for row in rows]
-    cntlog_valid = all(now > before and now - before <= 1000 for before, now in zip(cntlog, cntlog[1:]))
+    cntlog_raw = [int(row["cntlog"]) for row in rows]
+    cntlog, cntlog_valid = unwrap_cntlog_u16(cntlog_raw)
     route_indices = [int(row["optimalIndex"]) for row in rows]
     index_jumps = [now - before for before, now in zip(route_indices, route_indices[1:])]
     lateral = [abs(row["pathErrorY_mm"]) for row in rows]
@@ -129,6 +170,9 @@ def read_log(path: Path) -> tuple[RunSummary, list[dict[str, float]]]:
         emc_stop=emc_stop,
         battery_voltage_v=parameter_number(parameters, "batteryVoltage_V"),
         route_controller_version=int(round(parameter_number(parameters, "routeControllerVersion", -1))),
+        shortcut_build_status=int(round(parameter_number(parameters, "shortcutBuildStatus", -1))),
+        shortcut_corridor_count=int(round(parameter_number(parameters, "shortcutCorridorCount", -1))),
+        shortcut_reduction_mm=parameter_number(parameters, "shortcutReduction_mm"),
         samples=len(rows),
         lap_time_ms=cntlog[-1],
         cntlog_valid=cntlog_valid,
@@ -213,6 +257,13 @@ def main() -> int:
             reasons.append("cntlog")
         if summary.index_jump_ge5_count > 0:
             reasons.append(f"indexJump>=5:{summary.index_jump_ge5_count}")
+        if summary.route_controller_version >= 11 and summary.optimal_trace == SHORTCUT_MODE:
+            if summary.shortcut_build_status != 1:
+                reasons.append(f"shortcutBuildStatus={summary.shortcut_build_status}")
+            if summary.shortcut_corridor_count < 1:
+                reasons.append(f"shortcutCorridorCount={summary.shortcut_corridor_count}")
+            if summary.shortcut_reduction_mm < 5.0:
+                reasons.append(f"shortcutReduction={summary.shortcut_reduction_mm}")
         if reasons:
             invalid.append(f"{summary.path.name} ({', '.join(reasons)})")
     if invalid and not args.allow_invalid:
@@ -231,8 +282,13 @@ def main() -> int:
     plotted = write_xy_plot(plot_path, runs)
 
     for summary in summaries:
+        shortcut_status_name = SHORTCUT_BUILD_STATUS_NAMES.get(
+            summary.shortcut_build_status, str(summary.shortcut_build_status)
+        )
         print(
             f"{summary.path.name}: mode={summary.optimal_trace} controller={summary.route_controller_version} "
+            f"shortcut_status={shortcut_status_name} corridors={summary.shortcut_corridor_count} "
+            f"reduction={summary.shortcut_reduction_mm:.2f}mm "
             f"emc={summary.emc_stop} "
             f"lat_p95={summary.lateral_p95_mm:.2f}mm heading_p95={summary.heading_p95_deg:.2f}deg "
             f"margin_min={summary.legal_margin_min_mm:.2f}mm fallback={summary.fallback_samples} "
