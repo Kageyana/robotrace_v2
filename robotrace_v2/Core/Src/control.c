@@ -673,6 +673,9 @@ void loopSystem(void)
 				writeTgtspeeds();  // 目標速度を保存
 			}
 
+			// SDカードの使用可否に依存せず、走行ごとの解析元と設定を固定する。
+			analysisCaptureRunStart(optimalTrace);
+			pathFollowerCaptureRunStartSettings();
 			if (initMSD)
 			{
 				initLog(); // ログ一時ファイル作成

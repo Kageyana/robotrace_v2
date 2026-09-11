@@ -8,6 +8,8 @@ import csv
 import math
 from pathlib import Path
 
+from path_log_recovery import read_csv_log, recover_path_columns
+
 
 CNTLOG_MODULUS = 1 << 16
 PULSE_MILLIMETER = 54.324
@@ -97,23 +99,42 @@ def repair_log(source_path: Path, destination_path: Path) -> dict[str, float | i
     }
 
 
-def plot_route(csv_path: Path, plot_path: Path) -> None:
+def plot_route(csv_path: Path, plot_path: Path, source_log_dir: Path | None = None) -> None:
     try:
         import matplotlib.pyplot as plt
     except ImportError as exc:
         raise RuntimeError("Matplotlibが必要です") from exc
 
-    with csv_path.open("r", encoding="utf-8-sig", newline="") as source:
-        reader = csv.DictReader(source)
-        rows = list(reader)
+    log = read_csv_log(csv_path)
+    rows = log.rows
 
     robot_x = [float(row["x"]) for row in rows]
     robot_y = [float(row["y"]) for row in rows]
-    line_x = [float(row["linePointX_mm"]) for row in rows]
-    line_y = [float(row["linePointY_mm"]) for row in rows]
+    recovery = recover_path_columns(log, source_log_dir)
+    reference_segments: list[list[tuple[float, float]]] = []
+    current_segment: list[tuple[float, float]] = []
+    for value in recovery.row_values:
+        x = float(value["linePointX_mm"])
+        y = float(value["linePointY_mm"])
+        if math.isfinite(x) and math.isfinite(y):
+            current_segment.append((x, y))
+        elif current_segment:
+            reference_segments.append(current_segment)
+            current_segment = []
+    if current_segment:
+        reference_segments.append(current_segment)
 
     figure, axis = plt.subplots(figsize=(9, 8))
-    axis.plot(line_x, line_y, "--", linewidth=1.2, color="tab:orange", label="First-run source route")
+    if reference_segments:
+        for segment_index, segment in enumerate(reference_segments):
+            axis.plot([point[0] for point in segment], [point[1] for point in segment], "--", linewidth=1.2,
+                      color="tab:orange", label=f"Reference route ({recovery.status})" if segment_index == 0 else None)
+    else:
+        axis.text(0.02, 0.98, f"reference route unavailable: {recovery.reason}",
+                  transform=axis.transAxes, va="top", color="tab:red", wrap=True)
+    if recovery.missing_samples > 0:
+        axis.text(0.02, 0.90, f"reference missing {recovery.missing_samples} samples",
+                  transform=axis.transAxes, va="top", color="tab:red")
     axis.plot(robot_x, robot_y, linewidth=1.1, color="tab:blue", label="Robot route (repaired)")
     axis.scatter([robot_x[0]], [robot_y[0]], marker="o", s=45, color="green", label="Start")
     axis.scatter([robot_x[-1]], [robot_y[-1]], marker="x", s=55, color="red", label="Stop")
@@ -134,11 +155,13 @@ def main() -> int:
     parser.add_argument("source", type=Path)
     parser.add_argument("destination", type=Path)
     parser.add_argument("--plot", type=Path)
+    parser.add_argument("--source-log-dir", type=Path,
+                        help="復元元ログを探すフォルダ。既定は補修ログと同じフォルダ")
     args = parser.parse_args()
 
     result = repair_log(args.source, args.destination)
     if args.plot is not None:
-        plot_route(args.destination, args.plot)
+        plot_route(args.destination, args.plot, args.source_log_dir)
 
     for name, value in result.items():
         print(f"{name}={value}")

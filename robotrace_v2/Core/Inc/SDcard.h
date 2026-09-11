@@ -54,6 +54,7 @@ int16_t getFileNumbers(void);
 int16_t getNextLogNumber(void);
 void setLogStr(char *column, char *format);
 void setLogHeaderStr(char *name, int32_t value);
+void setLogHeaderStrU(char *name, uint32_t value);
 void setLogHeaderStrF(char *name, float value);
 void setLogHeaderStrS(char *name, const char *value);
 void SDtest(void);

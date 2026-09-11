@@ -31,6 +31,10 @@ int16_t pathedMarker = 0;
 float boostSpeed;
 int32_t DistanceOptimal = 0; // 2谺｡襍ｰ陦檎畑襍ｰ陦瑚ｷ晞屬螟画焚
 int16_t analyzedNumber = 0;	 // 蜑榊屓隗｣譫舌＠縺溘Ο繧ｰ逡ｪ蜿ｷ
+static int16_t analysisSourceLog = 0;
+static int16_t slipSourceLog = 0;
+static int16_t runAnalysisSourceLog = 0;
+static int16_t runSlipSourceLog = 0;
 int32_t encTotalOptimal = 0; // 2谺｡襍ｰ陦檎畑縺ｮ霍晞屬螟画焚(霍晞屬陬懈ｭ｣繧偵☆繧・
 int32_t encPID = 0;			 // 霍晞屬蛻ｶ蠕｡逕ｨ縺ｮ霍晞屬螟画焚
 float xydegz = 0;
@@ -48,6 +52,67 @@ static float calcDecelLeadMmByRoc(int16_t rocPrev, int16_t rocNow);
 static void applyDecelLeadToPpad(int16_t count);
 static void applyDecelLeadToArray(float *speed, int16_t count);
 
+/////////////////////////////////////////////////////////////////////
+// モジュール名 analysisSetSourceLog
+// 処理概要     基礎解析に実際に使用したログ番号を確定する
+// 引数         logNumber:解析元ログ番号。不明時は0
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void analysisSetSourceLog(int16_t logNumber)
+{
+	analysisSourceLog = (logNumber > 0) ? logNumber : 0;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 analysisSetSlipSourceLog
+// 処理概要     追加スリップ解析に実際に使用したログ番号を確定する
+// 引数         logNumber:スリップ解析元ログ番号。不明時は0
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void analysisSetSlipSourceLog(int16_t logNumber)
+{
+	slipSourceLog = (logNumber > 0) ? logNumber : 0;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 analysisCaptureRunStart
+// 処理概要     走行開始時の解析元情報をモードに応じて固定する
+// 引数         runMode:走行モード
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void analysisCaptureRunStart(uint8_t runMode)
+{
+	runAnalysisSourceLog = 0;
+	runSlipSourceLog = 0;
+	if (runMode != BOOST_NONE)
+	{
+		runAnalysisSourceLog = analysisSourceLog;
+		runSlipSourceLog = slipSourceLog;
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 analysisRunSourceLog
+// 処理概要     走行開始時に固定した基礎解析元ログ番号を返す
+// 引数         なし
+// 戻り値       ログ番号。不明時は0
+/////////////////////////////////////////////////////////////////////
+int16_t analysisRunSourceLog(void)
+{
+	return runAnalysisSourceLog;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 analysisRunSlipSourceLog
+// 処理概要     走行開始時に固定した追加スリップ解析元ログ番号を返す
+// 引数         なし
+// 戻り値       ログ番号。不明または未使用時は0
+/////////////////////////////////////////////////////////////////////
+int16_t analysisRunSlipSourceLog(void)
+{
+	return runSlipSourceLog;
+}
+
 typedef struct
 {
 	int16_t courseMarker;
@@ -58,6 +123,113 @@ typedef struct
 	int16_t slipFlag;
 	int16_t slipFlagLat;
 } SecondLogColumnMap;
+
+static bool csvFieldEquals(const char *start, const char *end, const char *name);
+
+typedef struct
+{
+	int16_t encCurrentN;
+	int16_t gyroVal_Z;
+	int16_t courseMarker;
+	int16_t encTotalOptimal;
+	int16_t ROC;
+} PrimaryLogColumnMap;
+
+static void initPrimaryLogColumnMap(PrimaryLogColumnMap *map)
+{
+	map->encCurrentN = -1;
+	map->gyroVal_Z = -1;
+	map->courseMarker = -1;
+	map->encTotalOptimal = -1;
+	map->ROC = -1;
+}
+
+static bool primaryLogColumnMapIsValid(const PrimaryLogColumnMap *map)
+{
+	return map->encCurrentN >= 0 && map->gyroVal_Z >= 0 &&
+		map->courseMarker >= 0 && map->encTotalOptimal >= 0 && map->ROC >= 0;
+}
+
+static int16_t primaryLogMaxRequiredColumn(const PrimaryLogColumnMap *map)
+{
+	int16_t maxColumn = map->encCurrentN;
+	if (map->gyroVal_Z > maxColumn) maxColumn = map->gyroVal_Z;
+	if (map->courseMarker > maxColumn) maxColumn = map->courseMarker;
+	if (map->encTotalOptimal > maxColumn) maxColumn = map->encTotalOptimal;
+	if (map->ROC > maxColumn) maxColumn = map->ROC;
+	return maxColumn;
+}
+
+static bool parsePrimaryLogHeader(const char *line, PrimaryLogColumnMap *map)
+{
+	initPrimaryLogColumnMap(map);
+
+	const char *fieldStart = line;
+	const char *p = line;
+	int16_t column = 0;
+	while (*p != '\0' && *p != '\n' && *p != '\r')
+	{
+		if (*p == ',')
+		{
+			if (csvFieldEquals(fieldStart, p, "encCurrentN")) map->encCurrentN = column;
+			else if (csvFieldEquals(fieldStart, p, "gyroVal_Z")) map->gyroVal_Z = column;
+			else if (csvFieldEquals(fieldStart, p, "courseMarker")) map->courseMarker = column;
+			else if (csvFieldEquals(fieldStart, p, "encTotalOptimal")) map->encTotalOptimal = column;
+			else if (csvFieldEquals(fieldStart, p, "ROC")) map->ROC = column;
+			column++;
+			fieldStart = p + 1;
+		}
+		p++;
+	}
+
+	if (csvFieldEquals(fieldStart, p, "encCurrentN")) map->encCurrentN = column;
+	else if (csvFieldEquals(fieldStart, p, "gyroVal_Z")) map->gyroVal_Z = column;
+	else if (csvFieldEquals(fieldStart, p, "courseMarker")) map->courseMarker = column;
+	else if (csvFieldEquals(fieldStart, p, "encTotalOptimal")) map->encTotalOptimal = column;
+	else if (csvFieldEquals(fieldStart, p, "ROC")) map->ROC = column;
+
+	return primaryLogColumnMapIsValid(map);
+}
+
+static bool parsePrimaryLogLine(const char *line, const PrimaryLogColumnMap *map,
+	int32_t *velo, float *angVelo, int32_t *marker, int32_t *distance, int32_t *roc)
+{
+	const char *p = line;
+	while (*p == ' ' || *p == '\t') p++;
+	if (!((*p >= '0' && *p <= '9') || *p == '-' || *p == '+')) return false;
+
+	int column = 0;
+	const int16_t maxColumn = primaryLogMaxRequiredColumn(map);
+	const char *field = p;
+	bool gotAll = false;
+	while (1)
+	{
+		if (*p == ',' || *p == '\n' || *p == '\r' || *p == '\0')
+		{
+			char *endptr = NULL;
+			if (column == map->encCurrentN) *velo = (int32_t)strtol(field, &endptr, 10);
+			else if (column == map->gyroVal_Z) *angVelo = strtof(field, &endptr);
+			else if (column == map->courseMarker) *marker = (int32_t)strtol(field, &endptr, 10);
+			else if (column == map->encTotalOptimal) *distance = (int32_t)strtol(field, &endptr, 10);
+			else if (column == map->ROC)
+			{
+				*roc = (int32_t)strtol(field, &endptr, 10);
+				gotAll = true;
+			}
+			if (*p == ',')
+			{
+				column++;
+				if (column > maxColumn) break;
+				p++;
+				field = p;
+				continue;
+			}
+			break;
+		}
+		p++;
+	}
+	return gotAll;
+}
 
 static void initSecondLogColumnMap(SecondLogColumnMap *map)
 {
@@ -420,6 +592,8 @@ static void applyDecelLeadToArray(float *speed, int16_t count)
 /////////////////////////////////////////////////////////////////////
 int16_t readLogDistance(int logNumber)
 {
+	analysisSetSourceLog(0);
+	analysisSetSlipSourceLog(0);
 	// 繝輔ぃ繧､繝ｫ隱ｭ縺ｿ霎ｼ縺ｿ
 	FIL fil_Read;
 	FRESULT fresult;
@@ -450,9 +624,9 @@ int16_t readLogDistance(int logNumber)
 	{
 		fileOpened = true; // 豁｣蟶ｸ縺ｫ髢九￠縺溷ｴ蜷医・縺ｿ繧ｯ繝ｭ繝ｼ繧ｺ蜃ｦ逅・ｒ譛牙柑蛹・
 		// 繝ｭ繧ｰ繝・・繧ｿ縺ｮ蜿門ｾ・
-		TCHAR log[512];
+		static TCHAR log[CA_LOG_HEADER_BUFSIZE];
 		const int log_len = (int)(sizeof(log) / sizeof(log[0]));
-		int32_t time, marker, velo, distance, roc, i = 0;
+		int32_t marker, velo, distance, roc, i = 0;
 		float angVelo;
 		int32_t numD = 0, numM = 0, cntCurR = 0, numStraight = 0;
 		static int16_t ROCbuff[600] = {0};
@@ -464,12 +638,14 @@ int16_t readLogDistance(int logNumber)
 		// 讒矩菴馴・蛻励・蛻晄悄蛹・
 		memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
 
-		TCHAR *header = f_gets(log, log_len, &fil_Read); // 1陦檎岼縺ｯ繝倥ャ繝縺ｪ縺ｮ縺ｧ隱ｭ縺ｿ鬟帙・縺・
-		if (!header && f_error(&fil_Read))
+		PrimaryLogColumnMap primaryColumns;
+		TCHAR *header = f_gets(log, log_len, &fil_Read); // 1行目はヘッダー
+		if (!header || (strchr((const char *)header, '\n') == NULL && strchr((const char *)header, '\r') == NULL) ||
+			!parsePrimaryLogHeader((const char *)header, &primaryColumns))
 		{
-			ret = -5;
+			ret = -10;
 			errorDetected = true;
-			logReadSlipIoError(logNumber, 0, &fil_Read, "io_fail");
+			if (f_error(&fil_Read)) logReadSlipIoError(logNumber, 0, &fil_Read, "io_fail");
 		}
 
 		UINT lineNo = 0;
@@ -489,7 +665,11 @@ int16_t readLogDistance(int logNumber)
 			}
 			lineNo++;
 
-			sscanf(log, "%d,%d,%f,%d,%d,%d,", &time, &velo, &angVelo, &marker, &distance, &roc);
+			if (!parsePrimaryLogLine((const char *)log, &primaryColumns,
+				&velo, &angVelo, &marker, &distance, &roc))
+			{
+				continue;
+			}
 			// 隗｣譫仙・逅・
 			// marker==3: 莠､蟾ｮ邱壹・繝ｼ繧ｫ繝ｼ
 			// marker==2: 蟾ｦ繝槭・繧ｫ繝ｼ縲ら峩邱夊ｵｰ陦御ｸｭ縺ｮ縺ｿ繧ｫ繝ｼ繝悶・繝ｼ繧ｫ繝ｼ縺ｨ縺励※謇ｱ縺・
@@ -711,6 +891,8 @@ cleanup_read:
 		// 豁｣蟶ｸ邨ゆｺ・凾縺ｮ縺ｿ隗｣譫先ｸ医∩諠・ｱ繧呈峩譁ｰ
 		saveLogNumber(logNumber);
 		analyzedNumber = logNumber;
+		analysisSetSourceLog((int16_t)logNumber);
+		analysisSetSlipSourceLog(0);
 
 		// 2谺｡襍ｰ陦後ヵ繝ｩ繧ｰ 霍晞屬蝓ｺ貅・谺｡襍ｰ陦・
 		optimalTrace = BOOST_DISTANCE;
@@ -823,6 +1005,8 @@ static void logReadSlipIoError(int logNumber, UINT lineNo, FIL *fil, const char 
 /////////////////////////////////////////////////////////////////////
 int16_t readLogDistanceSlip(int logNumber)
 {
+	analysisSetSourceLog(0);
+	analysisSetSlipSourceLog(0);
 	int16_t baseLogNumber = analyzedNumber;
 	if (baseLogNumber <= 0)
 	{
@@ -919,7 +1103,8 @@ int16_t readLogDistanceSlip(int logNumber)
 		}
 		goto cleanup;
 	}
-	if (!parseSecondLogHeader((const char *)header, &secondLogColumns))
+	if ((strchr((const char *)header, '\n') == NULL && strchr((const char *)header, '\r') == NULL) ||
+		!parseSecondLogHeader((const char *)header, &secondLogColumns))
 	{
 		ret = -2; // 2次ログに必要な列がない
 		goto cleanup;
@@ -1170,6 +1355,7 @@ cleanup:
 	}
 
 	ret = numPPADarry;
+	analysisSetSlipSourceLog((int16_t)logNumber);
 
 #ifdef WRITE_BOOSTSPEED_LOG
 	// 蟷ｳ貊大喧蠕後・逶ｮ讓咎溷ｺｦ驟榊・繧担D繧ｫ繝ｼ繝峨∈險倬鹸縺吶ｋ
@@ -1262,11 +1448,14 @@ int cmpfloat(const void *n1, const void *n2)
 /////////////////////////////////////////////////////////////////////
 int16_t readLogTest(int logNumber)
 {
+	analysisSetSourceLog(0);
+	analysisSetSlipSourceLog(0);
 	// 繝輔ぃ繧､繝ｫ隱ｭ縺ｿ霎ｼ縺ｿ
 	FIL fil_Read;
 	FRESULT fresult;
 	char fileName[10];
 	int16_t ret = 0;
+	bool fileOpened = false;
 	bool lock_acquired = sd_fatfs_lock(200);
 
 	if (!lock_acquired)
@@ -1280,21 +1469,29 @@ int16_t readLogTest(int logNumber)
 
 	if (fresult == FR_OK)
 	{
-		TCHAR log[512];
+		fileOpened = true;
+		static TCHAR log[CA_LOG_HEADER_BUFSIZE];
 		const int log_len = (int)(sizeof(log) / sizeof(log[0]));
-		int32_t time, marker, velo, distance;
+		int32_t marker, velo, distance, roc;
 		float angVelo;
 		int32_t startEnc = 0, numD = 0, numM = 0, beforeMarker = 0;
 		bool analysis = false;
+		PrimaryLogColumnMap primaryColumns;
 
 		// 蜑榊・逅・
 		// 讒矩菴馴・蛻励・蛻晄悄蛹・
 		memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
 
-		// 繝ｭ繧ｰ繝・・繧ｿ蜿門ｾ鈴幕蟋・
-		while (f_gets(log, log_len, &fil_Read))
+		TCHAR *header = f_gets(log, log_len, &fil_Read);
+		if (!header || (strchr((const char *)header, '\n') == NULL && strchr((const char *)header, '\r') == NULL) ||
+			!parsePrimaryLogHeader((const char *)header, &primaryColumns))
 		{
-			sscanf(log, "%d,%d,%f,%d,%d", &time, &velo, &angVelo, &marker, &distance);
+			ret = -10;
+		}
+		else while (f_gets(log, log_len, &fil_Read))
+		{
+			if (!parsePrimaryLogLine((const char *)log, &primaryColumns,
+				&velo, &angVelo, &marker, &distance, &roc)) continue;
 
 			// 隗｣譫仙・逅・
 			if (marker == 1 && beforeMarker == 0)
@@ -1314,21 +1511,29 @@ int16_t readLogTest(int logNumber)
 				break;
 			numD++;
 		}
-		ret = numD;
+		if (ret != -10 && f_error(&fil_Read) != 0)
+			ret = -5;
+		else if (ret == 0)
+			ret = numD;
 	}
 	else
 	{
 		ret = -1;
 	}
-	f_close(&fil_Read);
+	if (fileOpened)
+		f_close(&fil_Read);
 	if (lock_acquired)
 	{
 		sd_fatfs_unlock();
 	}
 
-	// 隗｣譫先ｸ医∩縺ｮ繝ｭ繧ｰ逡ｪ蜿ｷ繧剃ｿ晏ｭ・
-	// saveLogNumber(logNumber);
-	analyzedNumber = logNumber;
+	// 解析成功時だけ、生成データの元ログ番号を公開する。
+	if (ret >= 0)
+	{
+		analyzedNumber = logNumber;
+		analysisSetSourceLog((int16_t)logNumber);
+		analysisSetSlipSourceLog(0);
+	}
 
 	return ret;
 }

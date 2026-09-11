@@ -27,7 +27,7 @@
 #define PATH_KHEADING_MAX_X100                3000U
 #define PATH_LINE_ALPHA_MAX_X1000             100U
 
-#define PATH_CSV_LINE_SIZE                    2048U
+#define PATH_CSV_LINE_SIZE                    4096U
 #define PATH_CORRIDOR_MIN_SPAN_POINTS         15U   // 600mm
 #define PATH_CORRIDOR_MAX_SPAN_POINTS         40U   // 1600mm
 #define PATH_CORRIDOR_TRANSITION_POINTS       3U    // 120mm
@@ -92,10 +92,24 @@ static uint8_t routeFlags[PATH_ROUTE_MAX_POINTS];
 static char routeCsvLine[PATH_CSV_LINE_SIZE];
 static uint16_t routeCount = 0U;
 static int16_t routeSourceLog = 0;
+static uint8_t routeShortcutRequestedLevel = 0U;
 static uint8_t routeShortcutLevel = 0U;
 static uint8_t routeShortcutBuildStatus = PATH_SHORTCUT_BUILD_NOT_REQUESTED;
 static uint8_t routeShortcutCorridorCount = 0U;
 static float routeShortcutReductionMm = 0.0f;
+static uint32_t routeGeometryCrc32 = 0U;
+static ShortcutSettings routeGenerationSettings = {0U, 0U, 0U, 0U, 0U, 0U};
+static ShortcutSettings runStartSettings = {0U, 0U, 0U, 0U, 0U, 0U};
+static ShortcutSettings runGenerationSettings = {0U, 0U, 0U, 0U, 0U, 0U};
+static int16_t runRouteSourceLog = 0;
+static uint8_t runRouteRequestedLevel = 0U;
+static uint8_t runRouteShortcutLevel = 0U;
+static uint8_t runRouteShortcutBuildStatus = PATH_SHORTCUT_BUILD_NOT_REQUESTED;
+static uint8_t runRouteShortcutCorridorCount = 0U;
+static float runRouteShortcutReductionMm = 0.0f;
+static uint16_t runRouteCount = 0U;
+static uint32_t runRouteGeometryCrc32 = 0U;
+static bool runStartSettingsValid = false;
 static PathPose pathPose;
 static PathFollowerState followerState = PATH_STATE_INACTIVE;
 static uint16_t routeIndex = 0U;
@@ -108,6 +122,54 @@ static float pathTravelMm = 0.0f;
 static uint16_t pathGoalArcMm = 0U;
 static bool pathGoalValid = false;
 static bool currentLineValid = false;
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathCrc32UpdateByte
+// 処理概要     CRC32へ1バイトをリトルエンディアン順で追加する
+// 引数         crc:現在のCRC, value:追加するバイト
+// 戻り値       更新後のCRC
+/////////////////////////////////////////////////////////////////////
+static uint32_t pathCrc32UpdateByte(uint32_t crc, uint8_t value)
+{
+	crc ^= value;
+	for (uint8_t bit = 0U; bit < 8U; bit++)
+	{
+		crc = (crc & 1U) ? ((crc >> 1U) ^ 0xEDB88320UL) : (crc >> 1U);
+	}
+	return crc;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathCrc32UpdateU16LE
+// 処理概要     16bit値を固定リトルエンディアン形式でCRC32へ追加する
+// 引数         crc:現在のCRC, value:追加する16bit値
+// 戻り値       更新後のCRC
+/////////////////////////////////////////////////////////////////////
+static uint32_t pathCrc32UpdateU16LE(uint32_t crc, uint16_t value)
+{
+	crc = pathCrc32UpdateByte(crc, (uint8_t)(value & 0xFFU));
+	return pathCrc32UpdateByte(crc, (uint8_t)(value >> 8U));
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathComputeRouteGeometryCrc32
+// 処理概要    生成済み点数と元経路・走行経路の整数XY座標からCRC32を計算する
+// 引数         なし
+// 戻り値       経路形状CRC32
+/////////////////////////////////////////////////////////////////////
+static uint32_t pathComputeRouteGeometryCrc32(void)
+{
+	uint32_t crc = 0xFFFFFFFFUL;
+	crc = pathCrc32UpdateU16LE(crc, routeCount);
+	for (uint16_t i = 0U; i < routeCount; i++)
+	{
+		crc = pathCrc32UpdateU16LE(crc, (uint16_t)lineRoute[i].x_mm);
+		crc = pathCrc32UpdateU16LE(crc, (uint16_t)lineRoute[i].y_mm);
+		crc = pathCrc32UpdateU16LE(crc, (uint16_t)driveRoute[i].x_mm);
+		crc = pathCrc32UpdateU16LE(crc, (uint16_t)driveRoute[i].y_mm);
+	}
+	return crc ^ 0xFFFFFFFFUL;
+}
 
 // KiCad基板座標と実機のsensor[0]=左端、sensor[9]=右端を照合した受光中心横座標[mm]。
 static const float pathSensorLateralMm[NUM_SENSORS] = {
@@ -715,9 +777,13 @@ bool routeGenerateShortcut(uint8_t shortcutLevel)
 /////////////////////////////////////////////////////////////////////
 int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 {
+	analysisSetSourceLog(0);
+	analysisSetSlipSourceLog(0);
 	FIL file;
 	FRESULT result;
 	RouteCsvColumns columns;
+	ShortcutSettings generationSettings = shortcutSettings;
+	uint8_t requestedShortcutLevel = shortcutLevel;
 	char fileName[16];
 	float firstX = 0.0f, firstY = 0.0f, lastX = 0.0f, lastY = 0.0f;
 	float previousX = 0.0f, previousY = 0.0f, totalLength = 0.0f;
@@ -733,7 +799,9 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 		sd_fatfs_unlock();
 		return -5;
 	}
-	if (f_gets(routeCsvLine, sizeof(routeCsvLine), &file) == NULL || !pathParseHeader(routeCsvLine, &columns))
+	if (f_gets(routeCsvLine, sizeof(routeCsvLine), &file) == NULL ||
+		(strchr(routeCsvLine, '\n') == NULL && strchr(routeCsvLine, '\r') == NULL) ||
+		!pathParseHeader(routeCsvLine, &columns))
 	{
 		f_close(&file);
 		sd_fatfs_unlock();
@@ -782,6 +850,7 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 		return -13;
 	}
 	if (f_gets(routeCsvLine, sizeof(routeCsvLine), &file) == NULL ||
+		(strchr(routeCsvLine, '\n') == NULL && strchr(routeCsvLine, '\r') == NULL) ||
 		!pathParseHeader(routeCsvLine, &columns))
 	{
 		f_close(&file);
@@ -859,10 +928,8 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	pathComputeHeadings(lineRoute, routeCount);
 	pathBuildSpeedProfile(lineRoute, routeCount, 0U);
 	memcpy(driveRoute, lineRoute, sizeof(RoutePoint) * routeCount);
-	routeSourceLog = (int16_t)logNumber;
-	uint8_t requestedShortcutLevel = shortcutLevel;
 	bool shortcutOk = false;
-	if (requestedShortcutLevel > 0U && shortcutSettings.maxLevel == 0U)
+	if (requestedShortcutLevel > 0U && generationSettings.maxLevel == 0U)
 	{
 		routeShortcutLevel = 0U;
 		routeShortcutBuildStatus = PATH_SHORTCUT_BUILD_DISABLED_BY_SETTING;
@@ -871,7 +938,7 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	}
 	else
 	{
-		if (shortcutLevel > shortcutSettings.maxLevel) shortcutLevel = shortcutSettings.maxLevel;
+		if (shortcutLevel > generationSettings.maxLevel) shortcutLevel = generationSettings.maxLevel;
 		shortcutOk = routeGenerateShortcut(shortcutLevel);
 	}
 	if (!shortcutOk)
@@ -885,6 +952,12 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	}
 	if (!pathExtendDriveRouteTowardOrigin(routeShortcutLevel)) return -15;
 	pathBuildDriveRouteArcLength();
+	routeSourceLog = (int16_t)logNumber;
+	routeShortcutRequestedLevel = requestedShortcutLevel;
+	routeGenerationSettings = generationSettings;
+	routeGeometryCrc32 = pathComputeRouteGeometryCrc32();
+	analysisSetSourceLog((int16_t)logNumber);
+	analysisSetSlipSourceLog(0);
 	indexSC = (int16_t)routeCount;
 	optimalIndex = 0U;
 	saveLogNumber((int16_t)logNumber);
@@ -976,6 +1049,7 @@ void pathFollowerUpdatePose1ms(int32_t encoderPulse, float gyroDegPerSec)
 void pathFollowerUpdateTarget5ms(void)
 {
 	if (routeCount < 2U || followerState == PATH_STATE_INACTIVE || followerState == PATH_STATE_LOCALIZATION_LOST) return;
+	const ShortcutSettings *activeSettings = runStartSettingsValid ? &runStartSettings : &shortcutSettings;
 	uint16_t begin = (routeIndex > 2U) ? (uint16_t)(routeIndex - 2U) : 0U;
 	uint16_t end = (routeIndex + 24U < routeCount) ? (uint16_t)(routeIndex + 24U) : (uint16_t)(routeCount - 1U);
 	uint16_t nearest = routeIndex;
@@ -1017,7 +1091,7 @@ void pathFollowerUpdateTarget5ms(void)
 		((routeFlags[nearest] & PATH_FLAG_CORRIDOR_APPLIED) != 0U);
 	if (currentLineValid && !corridorLineCorrectionBlocked)
 	{
-		float alpha = (float)shortcutSettings.lineAlpha_x1000 * 0.001f;
+		float alpha = (float)activeSettings->lineAlpha_x1000 * 0.001f;
 		float correction = alpha * (measuredError - lineError);
 		pathPose.x_mm += correction * cosf(lineHeadingRad);
 		pathPose.y_mm -= correction * sinf(lineHeadingRad);
@@ -1027,8 +1101,8 @@ void pathFollowerUpdateTarget5ms(void)
 	pathLogLinePointX_mm = lineRoute[nearest].x_mm;
 	pathLogLinePointY_mm = lineRoute[nearest].y_mm;
 
-	float lookaheadMm = (float)shortcutSettings.lookaheadBaseMm +
-		((float)shortcutSettings.lookaheadPerMpsMm * targetSpeedMps);
+	float lookaheadMm = (float)activeSettings->lookaheadBaseMm +
+		((float)activeSettings->lookaheadPerMpsMm * targetSpeedMps);
 	uint16_t lookaheadPoints = (uint16_t)fmaxf(1.0f, ceilf(lookaheadMm / PATH_ROUTE_SPACING_MM));
 	uint16_t targetIndex = (nearest + lookaheadPoints < routeCount) ?
 		(uint16_t)(nearest + lookaheadPoints) : (uint16_t)(routeCount - 1U);
@@ -1049,8 +1123,8 @@ void pathFollowerUpdateTarget5ms(void)
 	}
 	targetSpeedMps = (float)driveRoute[nearest].speed_cms * 0.01f;
 	float feedForwardDegPerSec = (targetSpeedMps * 1000.0f) * curvature * RAD2DEG;
-	float kLateral = (float)shortcutSettings.kLateral_x100 * 0.01f;
-	float kHeading = (float)shortcutSettings.kHeading_x100 * 0.01f;
+	float kLateral = (float)activeSettings->kLateral_x100 * 0.01f;
+	float kHeading = (float)activeSettings->kHeading_x100 * 0.01f;
 	float targetYawRate = feedForwardDegPerSec - (kLateral * lateralError) + (kHeading * nearestHeadingError);
 	if (targetYawRate > 1800.0f) targetYawRate = 1800.0f;
 	if (targetYawRate < -1800.0f) targetYawRate = -1800.0f;
@@ -1217,6 +1291,127 @@ uint8_t pathRouteShortcutCorridorCount(void) { return routeShortcutCorridorCount
 // 戻り値       短縮量[mm]
 /////////////////////////////////////////////////////////////////////
 float pathRouteShortcutReductionMm(void) { return routeShortcutReductionMm; }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathFollowerCaptureRunStartSettings
+// 処理概要     走行開始時のショートカット設定と経路生成情報を固定する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void pathFollowerCaptureRunStartSettings(void)
+{
+	runStartSettings = shortcutSettings;
+	runStartSettingsValid = true;
+	runRouteSourceLog = 0;
+	runRouteRequestedLevel = 0U;
+	runRouteShortcutLevel = 0U;
+	runRouteShortcutBuildStatus = PATH_SHORTCUT_BUILD_NOT_REQUESTED;
+	runRouteShortcutCorridorCount = 0U;
+	runRouteShortcutReductionMm = 0.0f;
+	runRouteCount = 0U;
+	runRouteGeometryCrc32 = 0U;
+	runGenerationSettings = (ShortcutSettings){0U, 0U, 0U, 0U, 0U, 0U};
+	if (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT)
+	{
+		runRouteSourceLog = routeSourceLog;
+		runRouteRequestedLevel = routeShortcutRequestedLevel;
+		runRouteShortcutLevel = routeShortcutLevel;
+		runRouteShortcutBuildStatus = routeShortcutBuildStatus;
+		runRouteShortcutCorridorCount = routeShortcutCorridorCount;
+		runRouteShortcutReductionMm = routeShortcutReductionMm;
+		runRouteCount = routeCount;
+		runRouteGeometryCrc32 = routeGeometryCrc32;
+		runGenerationSettings = routeGenerationSettings;
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathRouteGenerationSettings
+// 処理概要     経路生成成功時に保存したショートカット設定を返す
+// 引数         なし
+// 戻り値       経路生成時設定
+/////////////////////////////////////////////////////////////////////
+ShortcutSettings pathRouteGenerationSettings(void) { return routeGenerationSettings; }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathRunStartSettings
+// 処理概要     走行開始時に固定したショートカット設定を返す
+// 引数         なし
+// 戻り値       走行開始時設定
+/////////////////////////////////////////////////////////////////////
+ShortcutSettings pathRunStartSettings(void) { return runStartSettings; }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathRunGenerationSettings
+// 処理概要     走行開始時に固定した経路生成時設定を返す
+// 引数         なし
+// 戻り値       経路生成時設定
+/////////////////////////////////////////////////////////////////////
+ShortcutSettings pathRunGenerationSettings(void) { return runGenerationSettings; }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathRunRouteSourceLog
+// 処理概要     走行開始時に固定した経路元ログ番号を返す
+// 引数         なし
+// 戻り値       ログ番号。不明または非PATH走行は0
+/////////////////////////////////////////////////////////////////////
+int16_t pathRunRouteSourceLog(void) { return runRouteSourceLog; }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathRunRouteRequestedLevel
+// 処理概要     走行開始時に固定した要求ショートカットレベルを返す
+// 引数         なし
+// 戻り値       要求レベル
+/////////////////////////////////////////////////////////////////////
+uint8_t pathRunRouteRequestedLevel(void) { return runRouteRequestedLevel; }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathRunRouteShortcutLevel
+// 処理概要     走行開始時に固定した採用ショートカットレベルを返す
+// 引数         なし
+// 戻り値       採用レベル
+/////////////////////////////////////////////////////////////////////
+uint8_t pathRunRouteShortcutLevel(void) { return runRouteShortcutLevel; }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathRunRouteShortcutBuildStatus
+// 処理概要     走行開始時に固定した経路生成結果を返す
+// 引数         なし
+// 戻り値       生成結果
+/////////////////////////////////////////////////////////////////////
+uint8_t pathRunRouteShortcutBuildStatus(void) { return runRouteShortcutBuildStatus; }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathRunRouteShortcutCorridorCount
+// 処理概要     走行開始時に固定した直線回廊数を返す
+// 引数         なし
+// 戻り値       回廊数
+/////////////////////////////////////////////////////////////////////
+uint8_t pathRunRouteShortcutCorridorCount(void) { return runRouteShortcutCorridorCount; }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathRunRouteShortcutReductionMm
+// 処理概要     走行開始時に固定した経路短縮量を返す
+// 引数         なし
+// 戻り値       短縮量[mm]
+/////////////////////////////////////////////////////////////////////
+float pathRunRouteShortcutReductionMm(void) { return runRouteShortcutReductionMm; }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathRunRouteCount
+// 処理概要     走行開始時に固定した経路点数を返す
+// 引数         なし
+// 戻り値       経路点数
+/////////////////////////////////////////////////////////////////////
+uint16_t pathRunRouteCount(void) { return runRouteCount; }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathRunRouteGeometryCrc32
+// 処理概要     走行開始時に固定した経路形状CRC32を返す
+// 引数         なし
+// 戻り値       経路形状CRC32。不明または非PATH走行は0
+/////////////////////////////////////////////////////////////////////
+uint32_t pathRunRouteGeometryCrc32(void) { return runRouteGeometryCrc32; }
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathSettingInRange

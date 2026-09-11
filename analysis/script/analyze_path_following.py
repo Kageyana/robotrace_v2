@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""経路再走行・ショートカット走行ログを同一モード内で検証する。"""
+"""PATH REPLAY/SHORTCUTログを検証し、旧保存列または新形式の復元列を解析する。"""
 
 from __future__ import annotations
 
@@ -9,33 +9,28 @@ import math
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
+
+from path_log_recovery import (
+    PATH_MODES,
+    CsvLog,
+    parameter_int,
+    parameter_number,
+    parse_optimal_index,
+    read_csv_log,
+    recover_path_columns,
+)
 
 
 REQUIRED_COLUMNS = {
-    "cntlog",
-    "optimalIndex",
-    "x",
-    "y",
-    "linePointX_mm",
-    "linePointY_mm",
-    "lineValid",
-    "pathErrorY_mm",
-    "pathErrorHeading_cdeg",
-    "pathState",
-    "pathLegalMargin_mm",
+    "cntlog", "optimalIndex", "x", "y", "lineValid", "pathErrorY_mm",
+    "pathErrorHeading_cdeg", "pathState",
 }
-PATH_MODES = {3, 4}
 SHORTCUT_MODE = 3
 SHORTCUT_BUILD_STATUS_NAMES = {
-    0: "not_requested",
-    1: "success",
-    2: "disabled_by_setting",
-    3: "legal_geometry_invalid",
-    4: "no_corridor",
-    5: "offset_violation",
-    6: "new_intersection",
-    7: "insufficient_reduction",
+    0: "not_requested", 1: "success", 2: "disabled_by_setting",
+    3: "legal_geometry_invalid", 4: "no_corridor", 5: "offset_violation",
+    6: "new_intersection", 7: "insufficient_reduction",
 }
 
 
@@ -63,16 +58,10 @@ class RunSummary:
     fallback_samples: int
     localization_lost_samples: int
     line_valid_ratio: float
-
-
-def parse_parameter(cell: str) -> tuple[str, str] | None:
-    if "=" not in cell:
-        return None
-    name, value = cell.split("=", 1)
-    name = name.strip()
-    if not name:
-        return None
-    return name, value.strip()
+    recovery_status: str
+    recovery_reason: str
+    recovery_source_log: int
+    recovery_missing_samples: int
 
 
 def percentile(values: list[float], ratio: float) -> float:
@@ -83,18 +72,10 @@ def percentile(values: list[float], ratio: float) -> float:
     return ordered[index]
 
 
-def parameter_number(parameters: dict[str, str], name: str, default: float = math.nan) -> float:
-    try:
-        return float(parameters[name])
-    except (KeyError, ValueError):
-        return default
-
-
 def unwrap_cntlog_u16(values: list[int]) -> tuple[list[int], bool]:
     """16 bitのcntlog折り返しを展開し、時間差の妥当性も返す。"""
     if not values:
         return [], False
-
     unwrapped: list[int] = []
     offset = 0
     previous_raw = values[0]
@@ -117,62 +98,64 @@ def unwrap_cntlog_u16(values: list[int]) -> tuple[list[int], bool]:
     return unwrapped, valid
 
 
-def read_log(path: Path) -> tuple[RunSummary, list[dict[str, float]]]:
-    with path.open("r", encoding="utf-8-sig", newline="") as source:
-        reader = csv.reader(source)
+def _float_values(log: CsvLog) -> list[dict[str, Any]]:
+    missing = sorted(REQUIRED_COLUMNS - set(log.fields))
+    if missing:
+        raise ValueError(f"{log.path}: missing columns: {', '.join(missing)}")
+    values: list[dict[str, Any]] = []
+    for line_number, row in enumerate(log.rows, start=2):
         try:
-            header = next(reader)
-        except StopIteration as exc:
-            raise ValueError(f"{path}: empty CSV") from exc
+            current = {
+                name: (math.nan if name == "optimalIndex" and row[name].strip() == ""
+                       else float(row[name]))
+                for name in REQUIRED_COLUMNS
+                if name != "optimalIndex"
+            }
+            raw_index = row["optimalIndex"].strip()
+            current["optimalIndex"] = math.nan if raw_index == "" else float(raw_index)
+        except (KeyError, ValueError, OverflowError) as exc:
+            raise ValueError(f"{log.path}:{line_number}: invalid numeric field") from exc
+        values.append(current)
+    return values
 
-        columns = {name.strip(): index for index, name in enumerate(header) if name.strip() in REQUIRED_COLUMNS}
-        missing = sorted(REQUIRED_COLUMNS - columns.keys())
-        if missing:
-            raise ValueError(f"{path}: missing columns: {', '.join(missing)}")
 
-        parameters: dict[str, str] = {}
-        for cell in header:
-            parsed = parse_parameter(cell)
-            if parsed is not None:
-                parameters[parsed[0]] = parsed[1]
-
-        rows: list[dict[str, float]] = []
-        max_index = max(columns.values())
-        for line_number, row in enumerate(reader, start=2):
-            if len(row) <= max_index:
-                continue
-            try:
-                values = {name: float(row[index]) for name, index in columns.items()}
-            except ValueError as exc:
-                raise ValueError(f"{path}:{line_number}: invalid numeric field") from exc
-            rows.append(values)
-
-    if not rows:
-        raise ValueError(f"{path}: no data rows")
+def read_log(
+    path: Path,
+    source_log_dir: Path | None = None,
+    shortcut_level: int | None = None,
+    max_level: int | None = None,
+) -> tuple[RunSummary, list[dict[str, Any]]]:
+    log = read_csv_log(path)
+    rows = _float_values(log)
+    recovery = recover_path_columns(log, source_log_dir, shortcut_level, max_level)
+    for row, restored in zip(rows, recovery.row_values):
+        row.update(restored)
 
     cntlog_raw = [int(row["cntlog"]) for row in rows]
     cntlog, cntlog_valid = unwrap_cntlog_u16(cntlog_raw)
-    route_indices = [int(row["optimalIndex"]) for row in rows]
-    index_jumps = [now - before for before, now in zip(route_indices, route_indices[1:])]
-    lateral = [abs(row["pathErrorY_mm"]) for row in rows]
-    heading = [abs(row["pathErrorHeading_cdeg"]) * 0.01 for row in rows]
-    margins = [row["pathLegalMargin_mm"] for row in rows]
+    route_count = recovery.route.route_count if recovery.route is not None else None
+    route_indices = [parse_optimal_index(row["optimalIndex"], route_count) for row in rows]
+    index_jumps = [now - before for before, now in zip(route_indices, route_indices[1:])
+                   if now is not None and before is not None]
+    lateral = [abs(float(row["pathErrorY_mm"])) for row in rows]
+    heading = [abs(float(row["pathErrorHeading_cdeg"])) * 0.01 for row in rows]
+    margins = [float(row["pathLegalMargin_mm"]) for row in rows if math.isfinite(float(row["pathLegalMargin_mm"]))]
     states = [int(row["pathState"]) for row in rows]
     line_valid = [int(row["lineValid"]) != 0 for row in rows]
 
-    optimal_trace = int(round(parameter_number(parameters, "optimalTrace", -1)))
-    auto_start = int(round(parameter_number(parameters, "autoStart", 0)))
-    emc_stop = int(round(parameter_number(parameters, "emcStop", -1)))
+    optimal_trace = parameter_int(log.parameters, "optimalTrace", -1)
+    auto_start = parameter_int(log.parameters, "autoStart", 0)
+    emc_stop = parameter_int(log.parameters, "emcStop", -1)
     summary = RunSummary(
         path=path,
-        optimal_trace=optimal_trace,
-        auto_start=auto_start,
-        emc_stop=emc_stop,
-        battery_voltage_v=parameter_number(parameters, "batteryVoltage_V"),
-        route_controller_version=int(round(parameter_number(parameters, "routeControllerVersion", -1))),
-        shortcut_build_status=int(round(parameter_number(parameters, "shortcutBuildStatus", -1))),
-        shortcut_corridor_count=int(round(parameter_number(parameters, "shortcutCorridorCount", -1))),
-        shortcut_reduction_mm=parameter_number(parameters, "shortcutReduction_mm"),
+        optimal_trace=-1 if optimal_trace is None else optimal_trace,
+        auto_start=0 if auto_start is None else auto_start,
+        emc_stop=-1 if emc_stop is None else emc_stop,
+        battery_voltage_v=parameter_number(log.parameters, "batteryVoltage_V"),
+        route_controller_version=parameter_int(log.parameters, "routeControllerVersion", -1),
+        shortcut_build_status=parameter_int(log.parameters, "shortcutBuildStatus", -1),
+        shortcut_corridor_count=parameter_int(log.parameters, "shortcutCorridorCount", -1),
+        shortcut_reduction_mm=parameter_number(log.parameters, "shortcutReduction_mm"),
         samples=len(rows),
         lap_time_ms=cntlog[-1],
         cntlog_valid=cntlog_valid,
@@ -182,10 +165,14 @@ def read_log(path: Path) -> tuple[RunSummary, list[dict[str, float]]]:
         lateral_max_mm=max(lateral),
         heading_p95_deg=percentile(heading, 0.95),
         heading_max_deg=max(heading),
-        legal_margin_min_mm=min(margins),
+        legal_margin_min_mm=(math.nan if recovery.missing_samples > 0 else (min(margins) if margins else math.nan)),
         fallback_samples=sum(state in (2, 3) for state in states),
         localization_lost_samples=sum(state == 4 for state in states),
         line_valid_ratio=sum(line_valid) / len(line_valid),
+        recovery_status=recovery.status,
+        recovery_reason=recovery.reason,
+        recovery_source_log=recovery.source_log,
+        recovery_missing_samples=recovery.missing_samples,
     )
     return summary, rows
 
@@ -201,19 +188,57 @@ def write_summary(path: Path, summaries: Iterable[RunSummary]) -> None:
             writer.writerow(row)
 
 
-def write_xy_plot(path: Path, runs: list[tuple[RunSummary, list[dict[str, float]]]]) -> bool:
+def reference_segments(rows: list[dict[str, Any]]) -> list[list[tuple[float, float]]]:
+    """欠測行を跨がずに参照経路を連続区間へ分割する。"""
+    segments: list[list[tuple[float, float]]] = []
+    current: list[tuple[float, float]] = []
+    for row in rows:
+        x = float(row["linePointX_mm"])
+        y = float(row["linePointY_mm"])
+        if math.isfinite(x) and math.isfinite(y):
+            current.append((x, y))
+        elif current:
+            segments.append(current)
+            current = []
+    if current:
+        segments.append(current)
+    return segments
+
+
+def write_xy_plot(path: Path, runs: list[tuple[RunSummary, list[dict[str, Any]]]]) -> bool:
     try:
+        import os
+        import tempfile
+        os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "robotrace-matplotlib"))
+        import matplotlib
+        matplotlib.use("Agg")  # ファイル出力ではGUIやTcl/Tkを必要としない。
         import matplotlib.pyplot as plt
     except ImportError:
         return False
 
     figure, axis = plt.subplots(figsize=(7, 7))
+    reference_available = False
+    missing_notes: list[str] = []
     for summary, rows in runs:
         label = summary.path.stem
-        axis.plot([row["linePointX_mm"] for row in rows], [row["linePointY_mm"] for row in rows],
-                  linestyle="--", linewidth=1.0, label=f"{label} line")
-        axis.plot([row["x"] for row in rows], [row["y"] for row in rows],
-                  linewidth=1.0, label=f"{label} robot")
+        axis.plot([row["x"] for row in rows], [row["y"] for row in rows], linewidth=1.0, label=f"{label} robot")
+        segments = reference_segments(rows)
+        for segment_index, segment in enumerate(segments):
+            reference_available = True
+            axis.plot([point[0] for point in segment], [point[1] for point in segment],
+                      linestyle="--", linewidth=1.0,
+                      label=f"{label} reference" if segment_index == 0 else None)
+        if summary.recovery_missing_samples > 0:
+            missing_notes.append(f"{label}: reference missing {summary.recovery_missing_samples} samples")
+    if not reference_available:
+        if runs and all(summary.recovery_status == "not_applicable" for summary, _ in runs):
+            note = "reference route not applicable"
+        else:
+            note = "reference route unavailable"
+        axis.text(0.02, 0.98, note, transform=axis.transAxes, va="top", color="tab:red")
+    elif missing_notes:
+        axis.text(0.02, 0.98, "\n".join(missing_notes), transform=axis.transAxes,
+                  va="top", color="tab:red")
     axis.set_aspect("equal", adjustable="box")
     axis.set_xlabel("x [mm]")
     axis.set_ylabel("y [mm]")
@@ -229,12 +254,15 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("logs", nargs="+", type=Path)
     parser.add_argument("--output-dir", type=Path, default=Path("analysis"))
+    parser.add_argument("--source-log-dir", type=Path, help="元ログを探すフォルダ。既定は二次ログと同じフォルダ")
+    parser.add_argument("--shortcut-level", type=int, help="旧形式または設定欠落時の復元試験用要求Level")
+    parser.add_argument("--max-level", type=int, help="経路生成時maxLevelが欠落した復元試験用設定")
     parser.add_argument("--require-autostart-five", action="store_true")
     parser.add_argument("--allow-invalid", action="store_true",
                         help="緊急停止、cntlog異常、5点以上のindexジャンプがあっても解析結果を出力する")
     args = parser.parse_args()
 
-    runs = [read_log(path) for path in args.logs]
+    runs = [read_log(path, args.source_log_dir, args.shortcut_level, args.max_level) for path in args.logs]
     summaries = [run[0] for run in runs]
     modes = {summary.optimal_trace for summary in summaries}
     if not modes <= PATH_MODES:
@@ -285,14 +313,21 @@ def main() -> int:
         shortcut_status_name = SHORTCUT_BUILD_STATUS_NAMES.get(
             summary.shortcut_build_status, str(summary.shortcut_build_status)
         )
+        if summary.recovery_status == "not_applicable":
+            margin = "対象外"
+        elif math.isnan(summary.legal_margin_min_mm):
+            margin = "判定不能"
+        else:
+            margin = f"{summary.legal_margin_min_mm:.2f}mm"
         print(
             f"{summary.path.name}: mode={summary.optimal_trace} controller={summary.route_controller_version} "
             f"shortcut_status={shortcut_status_name} corridors={summary.shortcut_corridor_count} "
-            f"reduction={summary.shortcut_reduction_mm:.2f}mm "
-            f"emc={summary.emc_stop} "
+            f"reduction={summary.shortcut_reduction_mm:.2f}mm emc={summary.emc_stop} "
             f"lat_p95={summary.lateral_p95_mm:.2f}mm heading_p95={summary.heading_p95_deg:.2f}deg "
-            f"margin_min={summary.legal_margin_min_mm:.2f}mm fallback={summary.fallback_samples} "
-            f"jump_max={summary.max_index_jump} jump_ge5={summary.index_jump_ge5_count}"
+            f"margin_min={margin} fallback={summary.fallback_samples} "
+            f"jump_max={summary.max_index_jump} jump_ge5={summary.index_jump_ge5_count} "
+            f"recovery={summary.recovery_status} missing={summary.recovery_missing_samples} "
+            f"source={summary.recovery_source_log} reason={summary.recovery_reason}"
         )
     print(summary_path)
     if plotted:

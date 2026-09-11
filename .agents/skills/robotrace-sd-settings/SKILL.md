@@ -112,6 +112,14 @@ File: `boost_%05d.csv`
 - Row format: `index,boost_speed`, with `boost_speed` as `%.3f`.
 - Slip-analysis SD read errors can append diagnostic rows to the same file.
 
+### Log provenance and schema version 2
+
+- Firmware logs set `logSchemaVersion=2` and omit `linePointX_mm`, `linePointY_mm`, and `pathLegalMargin_mm` from both CSV and binary records. The internal path values remain available to the controller.
+- Every run records `analysisSourceLog` and `slipSourceLog`. Primary runs, unknown sources, failed analysis, and unused slip analysis use `0`; a successful PATH analysis also keeps `routeSourceLog` for compatibility and the two values must match.
+- PATH headers record `routePointCount`, `routeGeometryCrc32`, `shortcutRequestedLevel`, applied `shortcutLevel`, `shortcutBuildStatus`, `shortcutCorridorCount`, `shortcutReduction_mm`, and both the run-start `shortcutSettings.*` and generation-time `routeShortcutSettings.*` values. The six setting fields are `maxLevel`, `lookaheadBaseMm`, `lookaheadPerMpsMm`, `kLateral_x100`, `kHeading_x100`, and `lineAlpha_x1000`.
+- PC analysis searches the secondary log directory for `analysisSourceLog` and regenerates the Version 12 route in memory. It must verify point count, CRC, generator result headers, and `optimalIndex` before restoring the three fields. It never overwrites the original CSV or silently replaces the source with a cntlog-repaired copy.
+- Missing source logs, unsupported schema/controller versions, CRC mismatches, and invalid indices are reported as missing with a reason and source number. Non-PATH runs are outside route-following evaluation. Store primary and secondary logs together for PC recovery; do not change the existing SD log deletion policy.
+
 ## Corruption Handling
 
 - If a setting file is partially readable, apply only readable values.

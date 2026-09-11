@@ -16,10 +16,11 @@ FIL fil_R;
 
 // ログヘッダー
 // 詳細デバッグ列を含むCSVのフォーマットと1行分を格納できるサイズにする。
-#define LOG_COLUMN_TITLE_BUFFER_SIZE 2048U
+#define LOG_COLUMN_TITLE_BUFFER_SIZE 4096U
 #define LOG_FORMAT_BUFFER_SIZE       512U
 #define LOG_CSV_LINE_BUFFER_SIZE    1024U
 char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE] = "", formatLog[LOG_FORMAT_BUFFER_SIZE] = "";
+static bool logHeaderOverflow = false;
 
 // ログバッファ
 // Log buffers
@@ -78,6 +79,7 @@ static uint32_t logReadU32(void);
 static float logReadF32(void);
 static void logReadRecord(LogRecord *rec);
 static void logBuildColumns(void);
+static bool logAppendText(char *buffer, size_t bufferSize, const char *text);
 static uint8_t *logGetFreeBuffer(void);
 static bool readSavedLogNumber(int16_t *outNumber);
 static void writeSavedLogNumber(int16_t fileNumber);
@@ -431,6 +433,7 @@ void createLog(void)
 
 	columnTitle[0] = 0; // バッファを安全に初期化
 	formatLog[0] = 0;   // バッファを安全に初期化
+	logHeaderOverflow = false;
 
 	updateBatteryVoltage(); // ログヘッダへ停止時点の電圧を残す
 
@@ -441,20 +444,40 @@ void createLog(void)
 	setLogHeaderStrS("buildDate", BUILD_DATE);
 	setLogHeaderStrS("buildTime", BUILD_TIME);
 	setLogHeaderStrS("branch", GIT_BRANCH);
+	setLogHeaderStr("logSchemaVersion", LOG_SCHEMA_VERSION);
 	// 制御パラメータ
 	setLogHeaderStrF("batteryVoltage_V", batteryVoltage_V);
 	setLogHeaderStrF("optimalTrace", optimalTrace);
 	setLogHeaderStrF("autoStart", autoStart);
 	setLogHeaderStrF("emcStop", emcStop);
+	setLogHeaderStr("analysisSourceLog", analysisRunSourceLog());
+	setLogHeaderStr("slipSourceLog", analysisRunSlipSourceLog());
 	// ゴール誤検出調査用。行ログが終了直前で途切れても累積値を確認できる。
 	setLogHeaderStr("sgMarkerAtLogEnd", (int32_t)SGmarker);
 	setLogHeaderStr("encRightMarkerAtLogEnd_p", encRightMarker);
 	setLogHeaderStr("routeControllerVersion", PATH_ROUTE_CONTROLLER_VERSION);
-	setLogHeaderStr("routeSourceLog", pathRouteSourceLog());
-	setLogHeaderStr("shortcutLevel", pathRouteShortcutLevel());
-	setLogHeaderStr("shortcutBuildStatus", pathRouteShortcutBuildStatus());
-	setLogHeaderStr("shortcutCorridorCount", pathRouteShortcutCorridorCount());
-	setLogHeaderStrF("shortcutReduction_mm", pathRouteShortcutReductionMm());
+	setLogHeaderStr("routeSourceLog", pathRunRouteSourceLog());
+	setLogHeaderStr("routePointCount", pathRunRouteCount());
+	setLogHeaderStrU("routeGeometryCrc32", pathRunRouteGeometryCrc32());
+	setLogHeaderStr("shortcutRequestedLevel", pathRunRouteRequestedLevel());
+	setLogHeaderStr("shortcutLevel", pathRunRouteShortcutLevel());
+	setLogHeaderStr("shortcutBuildStatus", pathRunRouteShortcutBuildStatus());
+	setLogHeaderStr("shortcutCorridorCount", pathRunRouteShortcutCorridorCount());
+	setLogHeaderStrF("shortcutReduction_mm", pathRunRouteShortcutReductionMm());
+	ShortcutSettings runSettings = pathRunStartSettings();
+	ShortcutSettings generationSettings = pathRunGenerationSettings();
+	setLogHeaderStr("shortcutSettings.maxLevel", runSettings.maxLevel);
+	setLogHeaderStr("shortcutSettings.lookaheadBaseMm", runSettings.lookaheadBaseMm);
+	setLogHeaderStr("shortcutSettings.lookaheadPerMpsMm", runSettings.lookaheadPerMpsMm);
+	setLogHeaderStr("shortcutSettings.kLateral_x100", runSettings.kLateral_x100);
+	setLogHeaderStr("shortcutSettings.kHeading_x100", runSettings.kHeading_x100);
+	setLogHeaderStr("shortcutSettings.lineAlpha_x1000", runSettings.lineAlpha_x1000);
+	setLogHeaderStr("routeShortcutSettings.maxLevel", generationSettings.maxLevel);
+	setLogHeaderStr("routeShortcutSettings.lookaheadBaseMm", generationSettings.lookaheadBaseMm);
+	setLogHeaderStr("routeShortcutSettings.lookaheadPerMpsMm", generationSettings.lookaheadPerMpsMm);
+	setLogHeaderStr("routeShortcutSettings.kLateral_x100", generationSettings.kLateral_x100);
+	setLogHeaderStr("routeShortcutSettings.kHeading_x100", generationSettings.kHeading_x100);
+	setLogHeaderStr("routeShortcutSettings.lineAlpha_x1000", generationSettings.lineAlpha_x1000);
 
 	setLogHeaderStrF("tgtParam.bstStraight", tgtParam.bstStraight);
 	setLogHeaderStrF("tgtParam.bst1500", tgtParam.bst1500);
@@ -492,8 +515,19 @@ void createLog(void)
 	setLogHeaderStrF("distCtrl.kp", distCtrl.kp);
 	setLogHeaderStrF("distCtrl.ki", distCtrl.ki);
 	setLogHeaderStrF("distCtrl.kd", distCtrl.kd);
-    strncat((char *)columnTitle, "\n", sizeof(columnTitle) - strlen((char *)columnTitle) - 1); // バッファサイズを指定して安全に改行を追加
-    strncat((char *)formatLog, "\n", sizeof(formatLog) - strlen((char *)formatLog) - 1);       // バッファサイズを指定して安全に改行を追加
+	if (!logAppendText(columnTitle, sizeof(columnTitle), "\n") ||
+		!logAppendText(formatLog, sizeof(formatLog), "\n"))
+	{
+		logHeaderOverflow = true;
+	}
+	if (logHeaderOverflow)
+	{
+		printf("createLog header truncated\r\n");
+		f_close(&fil_W);
+		f_unlink(fileName);
+		create_log_ready = false;
+		return;
+	}
 	total = (UINT)strlen(columnTitle);
 	fresult = f_write(&fil_W, columnTitle, total, &written);
 	if (fresult != FR_OK || written != total)
@@ -1036,9 +1070,27 @@ int16_t getFileNumbers(void)
 	return endFileIndex;
 }
 /////////////////////////////////////////////////////////////////////
+// モジュール名 logAppendText
+// 処理概要     文字列をバッファーへ境界チェック付きで追記する
+// 引数         buffer:追記先, bufferSize:追記先サイズ, text:追記文字列
+// 戻り値       true:追記成功 false:容量不足
+/////////////////////////////////////////////////////////////////////
+static bool logAppendText(char *buffer, size_t bufferSize, const char *text)
+{
+	size_t currentLength = strlen(buffer);
+	size_t textLength = strlen(text);
+	if (currentLength >= bufferSize || textLength >= (bufferSize - currentLength))
+	{
+		return false;
+	}
+	memcpy(&buffer[currentLength], text, textLength + 1U);
+	return true;
+}
+
+/////////////////////////////////////////////////////////////////////
 // モジュール名 setLogStr
-// 処理概要     ログCSVファイルのヘッダーとprintfのフォーマット文字列を生成
-// 引数         column: ヘッダー文字列 format: フォーマット文字列
+// 処理概要     ヘッダー文字列に列名とフォーマットを追加する
+// 引数         column:ヘッダー文字列 format:フォーマット文字列
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void setLogStr(char *column, char *format)
@@ -1046,14 +1098,19 @@ void setLogStr(char *column, char *format)
 	char columnStr[30];	// ヘッダー文字列を一時的に格納するバッファ
 	char formatStr[30];	// フォーマット文字列を一時的に格納するバッファ
 
-	// copy str to local variable
-       snprintf((char *)columnStr, sizeof(columnStr), "%s", column); // バッファサイズを指定して安全にコピー
-       snprintf((char *)formatStr, sizeof(formatStr), "%s", format); // バッファサイズを指定して安全にコピー
-
-       strncat((char *)columnStr, ",", sizeof(columnStr) - strlen((char *)columnStr) - 1); // バッファサイズを指定して安全に結合
-       strncat((char *)formatStr, ",", sizeof(formatStr) - strlen((char *)formatStr) - 1); // バッファサイズを指定して安全に結合
-       strncat((char *)columnTitle, (char *)columnStr, sizeof(columnTitle) - strlen((char *)columnTitle) - 1); // バッファサイズを指定して安全に結合
-       strncat((char *)formatLog, (char *)formatStr, sizeof(formatLog) - strlen((char *)formatLog) - 1);       // バッファサイズを指定して安全に結合
+	int columnLength = snprintf(columnStr, sizeof(columnStr), "%s,", column);
+	int formatLength = snprintf(formatStr, sizeof(formatStr), "%s,", format);
+	if (columnLength < 0 || (size_t)columnLength >= sizeof(columnStr) ||
+		formatLength < 0 || (size_t)formatLength >= sizeof(formatStr))
+	{
+		logHeaderOverflow = true;
+		return;
+	}
+	if (!logAppendText(columnTitle, sizeof(columnTitle), columnStr) ||
+		!logAppendText(formatLog, sizeof(formatLog), formatStr))
+	{
+		logHeaderOverflow = true;
+	}
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setLogHeaderStr
@@ -1066,7 +1123,20 @@ void setLogHeaderStr(char *name, int32_t value)
 	char headerStr[64];
 
 	snprintf((char *)headerStr, sizeof(headerStr), "%s=%ld,", name, (long)value); // バッファサイズを指定して安全に変換
-	strncat((char *)columnTitle, (char *)headerStr, sizeof(columnTitle) - strlen((char *)columnTitle) - 1); // バッファサイズを指定して安全に結合
+	if (!logAppendText(columnTitle, sizeof(columnTitle), headerStr)) logHeaderOverflow = true;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 setLogHeaderStrU
+// 処理概要     ログCSVのヘッダーに符号なし整数の"変数名=値"を追記する
+// 引数         name:変数名 value:値
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void setLogHeaderStrU(char *name, uint32_t value)
+{
+	char headerStr[64];
+
+	snprintf(headerStr, sizeof(headerStr), "%s=%lu,", name, (unsigned long)value);
+	if (!logAppendText(columnTitle, sizeof(columnTitle), headerStr)) logHeaderOverflow = true;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setLogHeaderStrF
@@ -1079,7 +1149,7 @@ void setLogHeaderStrF(char *name, float value)
     char headerStr[64];
 
     snprintf((char *)headerStr, sizeof(headerStr), "%s=%4.2f,", name, (double)value);
-    strncat((char *)columnTitle, (char *)headerStr, sizeof(columnTitle) - strlen((char *)columnTitle) - 1);
+	if (!logAppendText(columnTitle, sizeof(columnTitle), headerStr)) logHeaderOverflow = true;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setLogHeaderStrS
@@ -1092,7 +1162,7 @@ void setLogHeaderStrS(char *name, const char *value)
 	char headerStr[96];
 
 	snprintf(headerStr, sizeof(headerStr), "%s=%s,", name, value);
-	strncat(columnTitle, headerStr, sizeof(columnTitle) - strlen(columnTitle) - 1);
+	if (!logAppendText(columnTitle, sizeof(columnTitle), headerStr)) logHeaderOverflow = true;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SDtest

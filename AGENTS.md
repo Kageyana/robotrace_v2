@@ -467,7 +467,7 @@ cmake --build --preset Release
 
 - ログファイルは CSV 形式、ヘッダ有り、文字コード UTF-8、区切り文字はカンマ。
 - ログファイル名は通し番号を使う。
-- ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。実ログ側に古い形式は混在しない前提で扱う。
+- ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。`logSchemaVersion=2` は `linePointX_mm`, `linePointY_mm`, `pathLegalMargin_mm` を保存しない形式で、通常バイナリレコードは旧形式より12バイト短い。旧CSVは3列が存在する場合に保存値を優先して扱う。
 - ログヘッダにはログデータ名とパラメータが含まれる。パラメータは `パラメータ名=value` 形式で記載される。
 - `courseAnalysis.c` の2次ログ再解析は、`courseMarker`, `encTotalOptimal`, `ROC`, `targetSpeed`, `optimalIndex`, `slipFlag`, `slipFlagLat` をCSVヘッダ名から解決する。ログ列追加時に固定列番号へ依存しない。
 - 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_MARKER`, `BOOST_DISTANCE`, `BOOST_SHORTCUT`, `BOOST_PATH_REPLAY` を正とする。
@@ -475,18 +475,23 @@ cmake --build --preset Release
 - `emcStop` が 0 以外の場合は緊急停止しており、ゴールしていない走行として扱う。
 - 緊急停止条件は `robotrace_v2/Core/Inc/emergencyStop.h` の定義を正とする。経路追従中に自己位置を喪失し、ライン追従へ移行できない場合は `STOP_LOCALIZATION` とする。
 - Version 11以降のLevel 1生成結果はログヘッダの`shortcutBuildStatus`、`shortcutCorridorCount`、`shortcutReduction_mm`で確認する。生成成功は`shortcutBuildStatus=1`とする。
+- 全走行ログのヘッダには`logSchemaVersion`、`analysisSourceLog`、`slipSourceLog`を残す。一次走行、解析元不明、解析失敗時の番号は0とし、PATH系では`analysisSourceLog`と`routeSourceLog`を一致させる。走行開始時に固定した値を停止後のヘッダへ出力し、保存前の解析番号やUI変更で置き換えない。
+- PATH系ログの復元情報として、`routePointCount`、`routeGeometryCrc32`、`shortcutRequestedLevel`、実採用値の`shortcutLevel`、`shortcutSettings.*`（走行開始時）と`routeShortcutSettings.*`（経路生成時）を記録する。`routeGeometryCrc32`はVersion 12の整数XY経路を固定リトルエンディアンでCRC32化した値とする。
 - 新しい緊急停止条件を追加する場合は、`robotrace_v2/Core/Inc/emergencyStop.h` に定義を追加する。
 - ログ解析では、ラップタイム、速度追従、角速度、スリップを重視する。
 - バッテリー状態はログ内パラメータ `batteryVoltage_V` を参照する。単位は `[V]`。
 - `batteryVoltage_mV` は走行中にLPF更新したバッテリー電圧 `[mV]`、`motorVoltageCmdL_mV`, `motorVoltageCmdR_mV` はバッテリー電圧で割る前の左右モーター指令電圧 `[mV]` とする。
 - `motorpwmL`, `motorpwmR` は電圧補償後に実際にタイマへ出力した飽和後DUTYとする。
 - `LOG_SCHEMA_PROFILE_LIGHT=0` のデバッグログでは `markerSensor`（LED差分から得たマーカー状態）、`sgMarkerCount`（スタート・ゴールマーカー累積数）、`encRightMarker_p`（右マーカーからの補正後エンコーダパルス）、`patternTrace`（走行状態）を追加出力する。ログヘッダには終了時の `sgMarkerAtLogEnd` と `encRightMarkerAtLogEnd_p` も出力する。
-- 経路追従ログの `linePointX_mm`, `linePointY_mm` は対応する一次走行ライン点 [mm]、`lineValid` は限定補正可能状態、`pathErrorY_mm` は経路横偏差 [mm]、`pathErrorHeading_cdeg` は経路制御バージョン4以降では最近傍経路点との方位偏差 [0.01 deg]、`pathState` は追従状態、`pathLegalMargin_mm` は追従誤差予算差引後のライン重なり余裕 [mm] とする。バージョン3以前の`pathErrorHeading_cdeg`は先読み方位との偏差であり、バージョン4以降とp95を直接比較しない。
+- 経路追従ログの `lineValid` は限定補正可能状態、`pathErrorY_mm` は経路横偏差 [mm]、`pathErrorHeading_cdeg` は経路制御バージョン4以降では最近傍経路点との方位偏差 [0.01 deg]、`pathState` は追従状態とする。バージョン3以前の`pathErrorHeading_cdeg`は先読み方位との偏差であり、バージョン4以降とp95を直接比較しない。`linePointX_mm`, `linePointY_mm`, `pathLegalMargin_mm`は新形式ではPC上で元一次ログ・設定・`optimalIndex`から復元する。
 - ログヘッダの`tgtParam.pathReplay`はLevel 0 PATH REPLAY速度上限[m/s]とする。
 - 通常ログは `LOG_SCHEMA_PROFILE_LIGHT=1` を既定とし、ラップタイム、速度追従、角速度、マーカー、スリップフラグ、電圧指令、実DUTY、XY確認に必要な列だけを残す。
 - 加速度、電流、スリップ内部量などの詳細デバッグ列が必要な場合は、ビルド定義で `LOG_SCHEMA_PROFILE_LIGHT=0` にして一時的に出力する。
 - ログ同士を比較する場合は、`batteryVoltage_V` の差を考慮する。電圧差によるモーター出力、速度追従、加速性能、スリップ傾向の変化を無視しない。
 - ログ形式を安易に変更しない。形式変更が必要な場合は、スキーマまたはドキュメントも合わせて更新する。
+- 新形式PATHログは二次ログと同じフォルダの元一次ログを探索し、必要なら`--source-log-dir`を指定する。Version 12の経路点数・CRC・生成結果ヘッダが一致するまで3項目を復元せず、元ログ欠落、未対応版、CRC不一致、index範囲外は欠測として扱う。元CSVは上書きせず、cntlog補修済みXYを元ログの代わりに自動使用しない。
+- 解析結果には3項目を「保存値／復元値／欠測」、理由、参照元ログ番号とともに出力する。非PATH走行では経路追従評価の対象外とし、元経路が欠けても実走行推定XYを描画する。
+- 一次ログと二次ログは自動削除方針を変えず、PCへ一緒に保存してから新形式の復元解析を行う。今回のログ形式確認とLevel 1最低10本の採用検証は別管理とする。
 - 詳細な解析手順は `.agents/skills/robotrace-log-analysis/SKILL.md` を使う。
 
 ### ログ解析、比較、出力

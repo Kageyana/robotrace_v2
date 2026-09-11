@@ -15,6 +15,9 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - Logs are CSV, UTF-8, comma-separated, with a header.
 - The schema source is `robotrace_v2/Core/Inc/log_schema.h`.
 - The log header contains data names and `parameter=value` entries.
+- `logSchemaVersion=2` omits `linePointX_mm`, `linePointY_mm`, and `pathLegalMargin_mm` from CSV and binary records. Old CSVs containing all three columns use the saved values first.
+- For new PATH logs, recover the three omitted values in memory from `analysisSourceLog` (or `routeSourceLog` only for old logs), the source CSV, the Version 12 generator settings, and `optimalIndex`. Search beside the secondary log by default; use `--source-log-dir` for another folder.
+- Do not substitute a cntlog-repaired source CSV automatically. Require route point-count, `routeGeometryCrc32`, controller version, and generated-result header checks before recovery. Missing source, unsupported version, CRC mismatch, or out-of-range index produces missing values, not zero or a normal value.
 - Firmware-side secondary-log parsing resolves required fields by header name, not fixed column number. Required fields are `courseMarker`, `encTotalOptimal`, `ROC`, `targetSpeed`, `optimalIndex`, `slipFlag`, and `slipFlagLat`.
 - Distinguish run mode by `optimalTrace`.
 - Exclude failed runs when `emcStop != 0`.
@@ -55,11 +58,11 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - `targetAngularvelo`: log target angular velocity, `[deg/s]`.
 - `motorpwmL`, `motorpwmR`: left/right motor PWM.
 - `x`, `y`: estimated position from the start marker origin, `[mm]`.
-- `linePointX_mm`, `linePointY_mm`: corresponding first-run line point, `[mm]`.
+- `linePointX_mm`, `linePointY_mm`: corresponding first-run line point, `[mm]`; stored in old CSVs and reconstructed in memory for schema version 2.
 - `pathErrorY_mm`: signed lateral path error, `[mm]`.
 - `pathErrorHeading_cdeg`: heading error, `[0.01 deg]`.
 - `pathState`: 1 tracking, 2 line fallback, 3 rejoin blend, 4 localization lost.
-- `pathLegalMargin_mm`: remaining line-overlap margin after the tracking-error budget, `[mm]`.
+- `pathLegalMargin_mm`: remaining line-overlap margin after the tracking-error budget, `[mm]`; stored in old CSVs and reconstructed in memory for schema version 2.
 
 ## Run Mode Checks
 
@@ -68,6 +71,9 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - `BOOST_DISTANCE`: verify current course position matches the estimated position and first-run distance.
 - `BOOST_PATH_REPLAY`: verify path lateral/heading error, fallback count, and line correction validity against the first-run route.
 - `BOOST_SHORTCUT`: verify the robot follows the validated shortcut, `pathLegalMargin_mm` remains non-negative, and no localization fallback occurs.
+- For schema version 2, report each reconstructed field as `saved`, `restored`, `partial`, or `missing`, including the reason, source log number, and `recovery_missing_samples`. `restored` requires every row to succeed; mixed row results are `partial`, and no successful row is `missing`.
+- Accept `optimalIndex` only when it is finite, integer-valued, non-negative, and within the regenerated route. Blank, fractional, NaN, infinity, negative, and out-of-range values are missing. Compute index differences only between adjacent valid rows; never bridge across a missing row.
+- If any reconstructed row is missing, report the whole-run legal margin as indeterminate rather than taking the minimum of only valid rows. Continue speed, slip, state, and recorded path-error analysis. Plot reference-route segments separately so missing intervals are not connected, and annotate the missing sample count.
 - Compare only logs with the same run mode; distance, path replay, and shortcut modes are not equivalent.
 
 ## Output Rules

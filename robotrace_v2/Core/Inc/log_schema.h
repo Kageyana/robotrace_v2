@@ -20,6 +20,9 @@
 #define LOG_SCHEMA_PROFILE_LIGHT 1
 #endif
 
+// linePointX/YとpathLegalMarginを保存しないログ形式。
+#define LOG_SCHEMA_VERSION 2U
+
 #define LOG_FIELD_LIST_CORE(STORED, DERIVED) \
 	STORED(U16, cntlog, "%d", (uint16_t)cntRun) \
 	STORED(U16, encCurrentN, "%d", (uint16_t)encCurrentN) \
@@ -39,13 +42,10 @@
 	STORED(S16, motorVoltageCmdL_mV, "%d", (int16_t)(motorVoltageCmdL_V * 1000.0f)) \
 	STORED(S16, motorVoltageCmdR_mV, "%d", (int16_t)(motorVoltageCmdR_V * 1000.0f)) \
 	STORED(U32, encCurrentCorr_p, "%d", (uint32_t)Control_GetEncCurrentCorr_p()) \
-	STORED(F32, linePointX_mm, "%f", pathLogLinePointX_mm) \
-	STORED(F32, linePointY_mm, "%f", pathLogLinePointY_mm) \
 	STORED(U8, lineValid, "%d", pathLogLineValid) \
 	STORED(F32, pathErrorY_mm, "%f", pathLogErrorY_mm) \
 	STORED(S16, pathErrorHeading_cdeg, "%d", pathLogErrorHeading_cdeg) \
 	STORED(U8, pathState, "%d", pathLogState) \
-	STORED(F32, pathLegalMargin_mm, "%f", pathLogLegalMargin_mm) \
 	DERIVED(F32, x, "%f", log_x) \
 	DERIVED(F32, y, "%f", log_y)
 

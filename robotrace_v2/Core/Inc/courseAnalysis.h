@@ -30,7 +30,8 @@
 #define ROC_STRAIGHT_MAX 3000.0F		// 直線とみなす曲率半径の閾値[mm]
 
 // 3次走行用スリップ解析(2次ログ)の調整用定数
-#define CA_SECOND_LOG_LINE_BUFSIZE 1600		// 2次ログ1行バッファサイズ
+#define CA_LOG_HEADER_BUFSIZE 4096U			// CSVヘッダーを切らずに読むバッファサイズ
+#define CA_SECOND_LOG_LINE_BUFSIZE 4096U		// 2次ログ1行バッファサイズ
 #define CA_SLIP_CNT_MIN 3				// スリップ回数のノイズ除外閾値(値↑で判定が厳しくなりリスク↓→減速弱)
 #define CA_SLIP_FRAC_FULL 0.60f			// risk=1.0とみなすスリップ割合(値↑でフルリスク到達しにくく減速弱、例:0.60→0.70)
 #define CA_SLIP_EXPAND_1 0.50f			// 近傍拡張係数(±1)(値↑で周辺にもリスク拡散→減速範囲広、例:0.25→0.40)
@@ -113,6 +114,11 @@ extern Courseplot xycie;
 float calcROC(int16_t velo, float angvelo, float dt);
 void saveLogNumber(int16_t fileNumber);
 void getLogNumber(void);
+void analysisSetSourceLog(int16_t logNumber);
+void analysisSetSlipSourceLog(int16_t logNumber);
+void analysisCaptureRunStart(uint8_t runMode);
+int16_t analysisRunSourceLog(void);
+int16_t analysisRunSlipSourceLog(void);
 int16_t readLogDistance(int logNumber);
 int16_t readLogDistanceSlip(int logNumber);
 float asignVelocity(int16_t ROC);

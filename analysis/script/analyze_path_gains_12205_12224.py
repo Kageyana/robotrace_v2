@@ -7,21 +7,12 @@ import math
 from pathlib import Path
 from statistics import mean
 
+from path_log_recovery import read_csv_log, recover_path_columns
+
 
 LOG_DIR = Path(r"F:\Dropbox\Document\robotrace\Log\v2")
 OUT_DIR = Path(__file__).resolve().parents[1] / "path_gains_12205_12224"
 LOG_NUMBERS = range(12205, 12225)
-DATA_FIELDS = [
-    "cntlog", "encCurrentN", "gyroVal_Z", "courseMarker", "encTotalOptimal",
-    "ROC", "targetSpeed", "optimalIndex", "slipFlag", "slipFlagLat",
-    "lineTraceCtrl", "targetAngularvelo", "motorpwmL", "motorpwmR",
-    "batteryVoltage_mV", "motorVoltageCmdL_mV", "motorVoltageCmdR_mV",
-    "encCurrentCorr_p", "linePointX_mm", "linePointY_mm", "lineValid",
-    "pathErrorY_mm", "pathErrorHeading_cdeg", "pathState", "pathLegalMargin_mm",
-    "x", "y",
-]
-
-
 def f(row: dict[str, str], key: str) -> float:
     return float(row[key])
 
@@ -40,24 +31,16 @@ def p95(values: list[float]) -> float:
 
 def load_log(number: int):
     path = LOG_DIR / f"{number}.csv"
-    with path.open("r", encoding="utf-8-sig", newline="") as stream:
-        reader = csv.reader(stream)
-        header = next(reader)
-        params = {}
-        for field in header:
-            if "=" in field:
-                key, value = field.split("=", 1)
-                params[key] = value
-        rows = []
-        for raw in reader:
-            if len(raw) < len(DATA_FIELDS):
-                continue
-            rows.append(dict(zip(DATA_FIELDS, raw[: len(DATA_FIELDS)])))
-    return path, params, rows
+    log = read_csv_log(path)
+    rows = log.rows
+    recovery = recover_path_columns(log)
+    for row, restored in zip(rows, recovery.row_values):
+        row.update({key: str(value) for key, value in restored.items() if key.endswith("_mm")})
+    return path, log.parameters, rows, recovery
 
 
 def summarize(number: int):
-    path, params, rows = load_log(number)
+    path, params, rows, recovery = load_log(number)
     cnt = [f(row, "cntlog") for row in rows]
     x = [f(row, "x") for row in rows]
     y = [f(row, "y") for row in rows]
@@ -70,6 +53,8 @@ def summarize(number: int):
     states = [int(float(row["pathState"])) for row in rows]
     line_valid = [int(float(row["lineValid"])) for row in rows]
     slips = [int(float(row["slipFlag"])) != 0 or int(float(row["slipFlagLat"])) != 0 for row in rows]
+    margins = [float(row["pathLegalMargin_mm"]) for row in rows
+               if math.isfinite(float(row["pathLegalMargin_mm"]))]
     diffs = [b - a for a, b in zip(cnt, cnt[1:])]
     state_counts = {str(state): states.count(state) for state in sorted(set(states))}
     return {
@@ -80,7 +65,14 @@ def summarize(number: int):
         "emcStop": params.get("emcStop", ""),
         "batteryVoltage_V": params.get("batteryVoltage_V", ""),
         "routeSourceLog": params.get("routeSourceLog", ""),
+        "analysisSourceLog": params.get("analysisSourceLog", ""),
+        "slipSourceLog": params.get("slipSourceLog", ""),
         "shortcutLevel": params.get("shortcutLevel", ""),
+        "recovery_status": recovery.status,
+        "recovery_reason": recovery.reason,
+        "recovery_source_log": recovery.source_log,
+        "recovery_missing_samples": recovery.missing_samples,
+        "legal_margin_min_mm": (math.nan if recovery.missing_samples > 0 else (min(margins) if margins else math.nan)),
         "cnt_first": cnt[0] if cnt else "",
         "cnt_last": cnt[-1] if cnt else "",
         "duration_s": cnt[-1] / 1000.0 if cnt else "",
