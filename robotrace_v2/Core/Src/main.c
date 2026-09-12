@@ -22,6 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "imu_temp_log.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -1065,6 +1066,10 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *AdcHandle)
 {
+	if (imuTempMeasurementIsChamberMode())
+	{
+		return;
+	}
 	if (AdcHandle->Instance == ADC1)
 	{
 		getMarkerSensor();
@@ -1083,7 +1088,7 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 	if(htim->Instance==TIM1){
 		datasentflag = false;
 	}
-	if(htim->Instance==TIM3 && htim->Channel==HAL_TIM_ACTIVE_CHANNEL_3){
+	if(!imuTempMeasurementIsChamberMode() && htim->Instance==TIM3 && htim->Channel==HAL_TIM_ACTIVE_CHANNEL_3){
 		// LED消灯
 		if ((hadc1.State & HAL_ADC_STATE_BUSY_REG) == 0U && lineSensorPower)
 		{
@@ -1099,7 +1104,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	// タイマ割り込み処理 更新イベント
 
-	if(htim->Instance==TIM3)
+	if(!imuTempMeasurementIsChamberMode() && htim->Instance==TIM3)
 	{
 		// LED点灯
 		if ((hadc1.State & HAL_ADC_STATE_BUSY_REG) == 0U && lineSensorPower)
@@ -1122,7 +1127,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
 	// タイマ割り込み処理 比較一致イベント
-    if(htim->Instance==TIM3 && htim->Channel==HAL_TIM_ACTIVE_CHANNEL_1){
+    if(!imuTempMeasurementIsChamberMode() && htim->Instance==TIM3 && htim->Channel==HAL_TIM_ACTIVE_CHANNEL_1){
 		__HAL_TIM_DISABLE_IT(&htim3, TIM_IT_CC1);  // ワンショット完了
 		// ラインセンサのADC変換開始
 		if(lineSensorState){

@@ -74,6 +74,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 	${CMAKE_SOURCE_DIR}/Core/Src/battery.c
 	${CMAKE_SOURCE_DIR}/Core/Src/BMI088.c
 	${CMAKE_SOURCE_DIR}/Core/Src/IMU.c
+	${CMAKE_SOURCE_DIR}/Core/Src/imu_temp_log.c
 	${CMAKE_SOURCE_DIR}/Core/Src/control.c
 	${CMAKE_SOURCE_DIR}/Core/Src/courseAnalysis.c
 	${CMAKE_SOURCE_DIR}/Core/Src/pathFollower.c

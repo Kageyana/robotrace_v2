@@ -40,7 +40,8 @@ typedef enum
 	TEST_SWITCH,          // タクトスイッチ
 	TEST_BATTERY,         // バッテリ電圧
 	TEST_LINESENSOR,      // ラインセンサ
-	TEST_RGBLED           // RGBLED
+	TEST_RGBLED,          // RGBLED
+	TEST_IMU_TEMP         // IMU温度係数計測
 } SensorTestId;
 
 // パターン構造体
@@ -79,6 +80,7 @@ typedef struct
 	uint8_t trace_test;      // トレーステスト
 	uint8_t beforeMotorTest; // テスト状態保存用
 	uint8_t lineSensor_test; // ラインセンサテスト
+	uint8_t imu_temp_test;   // IMU温度係数計測
 } TestFlags;
 
 //======================================//

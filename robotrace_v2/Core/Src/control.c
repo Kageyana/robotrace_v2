@@ -4,6 +4,7 @@
 #include "control.h"
 #include "pathFollower.h"
 #include "BMI088.h"
+#include "imu_temp_log.h"
 #include "PIDcontrol.h"
 #include "encoder.h"
 #include "motor.h"
@@ -515,6 +516,11 @@ static bool blockRunStartIfNeeded(void)
 void loopSystem(void)
 {
 	int16_t ret = 0;
+	imuTempMeasurementTask();
+	if (imuTempMeasurementHandleMainButtons())
+	{
+		return;
+	}
 
     // 緊急停止処理
 	if (patternTrace > 10 && patternTrace < 100 && emcStop > 0)

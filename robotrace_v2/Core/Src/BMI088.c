@@ -198,21 +198,40 @@ void BMI088getTemp(void)
 		return;
 	}
 	uint8_t rawData[3];
-	uint16_t tempValu;
-	int16_t tempVal;
+	uint16_t temperatureCode;
+	float temperatureC = BMI088_TEMP_INVALID_C;
 
-	// 温度の生データを取得
+	// 加速度センサーのSPI読み出しは先頭1バイトがダミーのため破棄する
 	BMI088readAxisData(ACCELE, REG_TEMP_MSB, rawData, 3);
-	// LSBとMSBを結合
-	tempValu = (rawData[1] << 3) | (rawData[2] >> 5);
-	if (tempValu > 1023)
+	temperatureCode = ((uint16_t)rawData[1] << 3) | ((uint16_t)rawData[2] >> 5);
+	BMI088val.tempRaw = temperatureCode;
+	BMI088val.tempValid = BMI088DecodeTemperature(rawData[1], rawData[2], &temperatureC);
+	BMI088val.temp = BMI088val.tempValid ? temperatureC : BMI088_TEMP_INVALID_C;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 BMI088DecodeTemperature
+// 処理概要     BMI088温度レジスタを11ビット2の補数で摂氏へ復号する
+// 引数         tempMsb: 温度MSB、tempLsb: 温度LSB、temperatureC: 復号結果[°C]
+// 戻り値       true: 有効、false: 無効値
+/////////////////////////////////////////////////////////////////////
+bool BMI088DecodeTemperature(uint8_t tempMsb, uint8_t tempLsb, float *temperatureC)
+{
+	uint16_t temperatureCode = ((uint16_t)tempMsb << 3) | ((uint16_t)tempLsb >> 5);
+	int16_t signedCode;
+
+	if (temperatureC == NULL || temperatureCode == BMI088_TEMP_INVALID_CODE)
 	{
-		tempVal = ~tempValu + 0x8000;
+		return false;
+	}
+
+	if ((temperatureCode & 0x0400U) != 0U)
+	{
+		signedCode = (int16_t)temperatureCode - 2048;
 	}
 	else
 	{
-		tempVal = tempValu;
+		signedCode = (int16_t)temperatureCode;
 	}
-
-	BMI088val.temp = ((float)tempVal * 0.125F) + 23.0F;
+	*temperatureC = 23.0F + ((float)signedCode * 0.125F);
+	return true;
 }

@@ -69,9 +69,11 @@ uint8_t getSWMainTact(void)
 {
 	uint8_t ret = SW_NONE;
 
-	if (BTN_R == 0)
+	if (BTN_R == 0 && BTN_L == 0)
+		ret = SW_TACT_BOTH;
+	else if (BTN_R == 0)
 		ret = SW_TACT_R;
-	if (BTN_L == 0)
+	else if (BTN_L == 0)
 		ret = SW_TACT_L;
 
 	return ret;

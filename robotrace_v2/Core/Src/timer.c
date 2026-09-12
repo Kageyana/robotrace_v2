@@ -8,6 +8,7 @@
 #include "control.h"
 #include "lineSensor.h"
 #include "pathFollower.h"
+#include "imu_temp_log.h"
 #include <stdint.h>
 #define STRAIGHT_STATE_THRESHOLD_MM	70	// 直線判定の距離閾値[mm]
 //====================================//
@@ -18,6 +19,38 @@ int32_t cnt10 = 0;
 int32_t encPulse5ms = 0; // 5ms間のエンコーダパルスを累積
 float bootTime;
 static volatile bool logWriteReq = false;
+/////////////////////////////////////////////////////////////////////
+// モジュール名 interruptImuTempChamber1ms
+// 処理概要     恒温槽計測中にBMI088とmainボードボタンだけを1ms周期で処理する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void interruptImuTempChamber1ms(void)
+{
+	if (initIMU)
+	{
+		// 温度係数算出には走行時オフセット・温度補正前のBMI088値を使用する。
+		BMI088getGyro();
+		if (cnt5 == 2)
+		{
+			BMI088getTemp();
+			imuVal.temp = BMI088val.temp;
+		}
+	}
+
+	imuTempMeasurement1ms();
+	swValMainTact = getSWMainTact();
+
+	if (cnt5 >= 5)
+	{
+		cnt5 = 0;
+	}
+	if (cnt10 >= 10)
+	{
+		cnt10 = 0;
+	}
+}
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 Interrupt1ms
 // 処理概要     タイマー割り込み(1ms)
@@ -37,6 +70,11 @@ void Interrupt1ms(void)
 	uint32_t freqCount = getCycleCounter();
 	resetCycleCounter();
 	bootTime = getTimeMs(freqCount);
+	if (imuTempMeasurementIsChamberMode())
+	{
+		interruptImuTempChamber1ms();
+		return;
+	}
 	updateBatteryVoltage();
 
 	// Encoder
@@ -66,6 +104,7 @@ void Interrupt1ms(void)
 			calibrationIMU();
 		}
 	}
+	imuTempMeasurement1ms();
 
 	// 経路モードは平均速度PIDとヨーレートPIDを使用する。
 	bool pathModeActive = (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT);

@@ -4,6 +4,8 @@
 #include "setup.h"
 #include "battery.h"
 #include "motor.h"
+#include "BMI088.h"
+#include "imu_temp_log.h"
 #include <stdint.h>
 //====================================//
 // グローバル変数の宣言
@@ -76,6 +78,7 @@ static void test_switch(void); 			// タクトスイッチ
 static void test_battery(void);			// バッテリ電圧
 static void test_linesensor(void); 		// ラインセンサ
 static void test_rgbled(void); 			// RGBLED
+static void test_imu_temp(void);			// IMU温度係数計測
 static void init_sensor_test(const char* title, FontDef font, uint8_t x); // 表示初期化
 
 // センサテストで使用する関数ポインタ型
@@ -96,7 +99,8 @@ static const SensorTest sensorTestTable[] = {
 	{TEST_SWITCH, test_switch}, // タクトスイッチ
 	{TEST_BATTERY, test_battery}, // バッテリ電圧
 	{TEST_LINESENSOR, test_linesensor}, // ラインセンサ
-	{TEST_RGBLED, test_rgbled} // RGBLED
+	{TEST_RGBLED, test_rgbled}, // RGBLED
+	{TEST_IMU_TEMP, test_imu_temp} // IMU温度係数計測
 }; // IDと処理の対応テーブル
 
 // 速度パラメータの情報を保持する構造体
@@ -512,7 +516,53 @@ static void test_rgbled(void)
 
 	testFlags.beforeMotorTest = testFlags.motor_test;
 }
-/////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
+// モジュール名 test_imu_temp
+// 処理概要     BMI088の温度ドリフト計測を開始・停止する
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////////////////
+static void test_imu_temp(void)
+{
+	static uint8_t beforeState = 0U;
+
+	if (pattern.sensors != pattern.beforeSensors)
+	{
+		init_sensor_test("IMU TEMP", Font_6x8, 34);
+		imuTempMeasurementStop();
+		testFlags.imu_temp_test = 0U;
+		beforeState = 0U;
+	}
+
+	data_select(&testFlags.imu_temp_test, SW_PUSH);
+	if (testFlags.imu_temp_test != beforeState)
+	{
+		if (testFlags.imu_temp_test != 0U)
+		{
+			// 計測開始時はモーターと吸引ファンを停止する。
+			motorCommandOut(0, 0);
+			MotorFanPwmOut(0);
+			if (!imuTempMeasurementStart())
+			{
+				testFlags.imu_temp_test = 0U;
+			}
+		}
+		else
+		{
+			imuTempMeasurementStop();
+		}
+		beforeState = testFlags.imu_temp_test;
+	}
+
+	ssd1306_SetCursor(0, 30);
+	ssd1306_printf(Font_6x8, "RUN:%d T:%4.1f", imuTempMeasurementIsActive() ? 1 : 0,
+		BMI088val.tempValid ? BMI088val.temp : BMI088_TEMP_INVALID_C);
+	ssd1306_SetCursor(0, 42);
+	ssd1306_printf(Font_6x8, "time:%6lus", (unsigned long)(imuTempMeasurementElapsedMs() / 1000U));
+	ssd1306_SetCursor(0, 54);
+	ssd1306_printf(Font_6x8, "Z:%6.2f", BMI088val.gyro.z);
+}
+///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_sensors
 // 処理概要     センサ表示とテストメニューを制御
 // 引数         なし
@@ -528,7 +578,7 @@ static void setup_sensors(void)
 	}
 
         // センサメニューの項目切替（範囲は列挙体で指定）
-        dataTuningLR(&pattern.sensors, 1, TEST_MOTOR, TEST_RGBLED); // センサメニュー項目切替
+        dataTuningLR(&pattern.sensors, 1, TEST_MOTOR, TEST_IMU_TEMP); // センサメニュー項目切替
         // テーブルを走査して該当テストを探索
         for (uint8_t i = 0; i < sizeof(sensorTestTable) / sizeof(sensorTestTable[0]); i++)
         {
@@ -1811,13 +1861,18 @@ void dataTuningUDF(float *data, float add, float min, float max)
 void setupNonDisp(void)
 {
 	static uint8_t mode = 0;
+	uint8_t mainButtonAction = imuTempMeasurementTakeMainButtonShortPress();
 
 	switch (pattern.calibration)
 	{
 	case 1:
 		setTargetSpeed(0);
 
-		led_out(0x9);
+		if (!imuTempMeasurementOwnsIndicators())
+		{
+			led_out(0x9);
+		}
+
 		if (!initIMU)
 		{
 			led_out(0xe);
@@ -1825,13 +1880,13 @@ void setupNonDisp(void)
 		}
 
 		// スイッチ入力待ち
-		if (swValMainTact == SW_TACT_L || swValMainTact == SW_TACT_R)
+		if (mainButtonAction == SW_TACT_L || mainButtonAction == SW_TACT_R)
 		{
-			if (swValMainTact == SW_TACT_L)
+			if (mainButtonAction == SW_TACT_L)
 			{
 				mode = START_SERACH;
 			}
-			else if (swValMainTact == SW_TACT_R)
+			else if (mainButtonAction == SW_TACT_R)
 			{
 				mode = START_OPTIMAL;
 			}
@@ -1941,6 +1996,7 @@ void setupNonDisp(void)
 		break;
 	}
 }
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setupCount
 // 処理概要     セットアップ用タイマを加算

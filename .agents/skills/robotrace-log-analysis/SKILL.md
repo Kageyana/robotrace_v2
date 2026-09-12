@@ -24,6 +24,16 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - Invalidate logs with `cntlog` gaps or processing drops; identify and report the cause.
 - If battery voltage differs significantly, recommend charging and retrying instead of comparing as equal conditions.
 
+## BMI088 Temperature-Chamber Measurement
+
+- Firmware measurement files are `./setting/imu_temp_%05d.csv` with columns `elapsed_ms,temp_C,gyroZMean_dps,gyroZStd_dps`.
+- `gyroZMean_dps` is the raw BMI088 gyro-Z mean before the run offset and temperature compensation. New chamber files do not contain encoder movement because both encoders are disconnected.
+- Use `analysis/script/fit_imu_temp_compensation.py FIT.csv VALIDATION.csv` with the chamber heating file as `FIT.csv` and the cooling file as `VALIDATION.csv`. New four-column files use `gyroZStd_dps<=0.5` as the stationary-data filter. Legacy five-column files remain readable and additionally require `encoderMovement=0`. The script requires at least 10 points and a temperature span of at least 3 °C, and applies the fit coefficient unchanged to validation data.
+- Adopt only when validation corrected temperature slope is at most 30% of the raw slope, corrected RMS does not worsen by more than 10%, and the integer setting is within `±100000` in `zSlope_x1000000` units. Do not adopt a run with a temperature span below 3 °C.
+- The script reports raw/corrected slopes, RMS, temperature span, and point counts. Invalid temperature sentinel rows are excluded.
+- For chamber acquisition, remove the extended UI board, LiPo, motors, rotary encoders, marker sensors, and line sensors. Fix the main board horizontally in a constant direction and supply rated external power through a chamber feedthrough. Insert the SD card before power-on. While waiting to run, hold the left main-board button for one second to enter the latched chamber mode and start recording; hold the right main-board button for one second to stop. Detection is independent of the extended-UI presence result, and another left-button hold after close starts the next sequential file. Green blinks twice after file creation, blue blinks twice after SD sync/close, and red blinks twice on error. The mode exits only by power cycling. Keep all LEDs off outside notifications.
+- Record heating at chamber settings 15, 25, 35, and 45 °C, waiting at each step until the BMI088-reported temperature changes by at most 0.25 °C over five minutes and then holding for another three minutes. Stop after heating, create a separate cooling file, and repeat 45, 35, 25, and 15 °C. Use BMI088 `temp_C`, not the chamber setpoint, for regression. Raise the lower setting to 20 °C if needed to avoid condensation.
+
 ## Workflow
 
 1. Inspect available logs and identify target log numbers.

@@ -41,6 +41,8 @@
 #define REG_ACC_SOFTRESET 0x7E
 
 #define REG_TEMP_MSB 0x22
+#define BMI088_TEMP_INVALID_CODE 0x0400U
+#define BMI088_TEMP_INVALID_C (-999.0F)
 
 #define USE_ACCELE	// 加速度センサ使用
 
@@ -64,6 +66,8 @@ typedef struct
 	axis gyro;
 	axis angle;
 	float temp;
+	uint16_t tempRaw;
+	bool tempValid;
 	uint8_t Aid;
 	uint8_t Gid;
 	uint8_t Initialized;
@@ -79,5 +83,6 @@ bool initBMI088(void);
 void BMI088getGyro(void);
 void BMI088getAccele(void);
 void BMI088getTemp(void);
+bool BMI088DecodeTemperature(uint8_t tempMsb, uint8_t tempLsb, float *temperatureC);
 
 #endif // BMI088_H_
