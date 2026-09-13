@@ -63,12 +63,12 @@ File: `targetSpeeds.txt`
 File: `shortcut.txt`
 
 - Implementation: `pathFollower.c`, `writeShortcutSettings()`, `readShortcutSettings()`
-- Format: `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000`
-- Write format: `%u,%03u,%03u,%04u,%04u,%03u`
+- Format: `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000,lineThetaGain_x1e9`
+- Write format: `%u,%03u,%03u,%04u,%04u,%03u,%04u`
 - No newline.
 - `maxLevel` is `0..3`; SD absent keeps Level 0.
-- Until machine footprint and sensor coordinates are verified, keep `PATH_SHORTCUT_GEOMETRY_ENABLE=0` and `lineAlpha_x1000=000`.
-- Partial reads apply valid fields; invalid or missing fields use defaults and the file is repaired.
+- The default is `1,080,040,3000,0600,010,0000`; `lineThetaGain_x1e9` stores the heading correction gain as `b x 10^9 [rad/mm^2]` and is OFF by default.
+- Partial reads apply valid fields; invalid or missing fields use defaults and the file is repaired. Existing six-field files preserve their valid values and append `0000`.
 
 ### Line Sensor Calibration
 
@@ -112,12 +112,12 @@ File: `boost_%05d.csv`
 - Row format: `index,boost_speed`, with `boost_speed` as `%.3f`.
 - Slip-analysis SD read errors can append diagnostic rows to the same file.
 
-### Log provenance and schema version 2
+### Log provenance and schema version 4
 
-- Firmware logs set `logSchemaVersion=2` and omit `linePointX_mm`, `linePointY_mm`, and `pathLegalMargin_mm` from both CSV and binary records. The internal path values remain available to the controller.
+- Firmware logs set `logSchemaVersion=4`. The normal light profile remains 38 bytes. The detailed profile appends `lineMatchResidual_mm`, `poseCorrection_um`, and `poseCorrectionHeading_cdeg`; older schema 2 and 3 logs remain readable.
 - Every run records `analysisSourceLog` and `slipSourceLog`. Primary runs, unknown sources, failed analysis, and unused slip analysis use `0`; a successful PATH analysis also keeps `routeSourceLog` for compatibility and the two values must match.
-- PATH headers record `routePointCount`, `routeGeometryCrc32`, `shortcutRequestedLevel`, applied `shortcutLevel`, `shortcutBuildStatus`, `shortcutCorridorCount`, `shortcutReduction_mm`, and both the run-start `shortcutSettings.*` and generation-time `routeShortcutSettings.*` values. The six setting fields are `maxLevel`, `lookaheadBaseMm`, `lookaheadPerMpsMm`, `kLateral_x100`, `kHeading_x100`, and `lineAlpha_x1000`.
-- PC analysis searches the secondary log directory for `analysisSourceLog` and regenerates the Version 12 route in memory. It must verify point count, CRC, generator result headers, and `optimalIndex` before restoring the three fields. It never overwrites the original CSV or silently replaces the source with a cntlog-repaired copy.
+- PATH headers record `routePointCount`, `routeGeometryCrc32`, `shortcutRequestedLevel`, applied `shortcutLevel`, `shortcutBuildStatus`, `shortcutCorridorCount`, `shortcutReduction_mm`, and both the run-start `shortcutSettings.*` and generation-time `routeShortcutSettings.*` values. The seven setting fields are `maxLevel`, `lookaheadBaseMm`, `lookaheadPerMpsMm`, `kLateral_x100`, `kHeading_x100`, `lineAlpha_x1000`, and `lineThetaGain_x1e9`.
+- PC analysis searches the secondary log directory for `analysisSourceLog` and regenerates the Version 12 or 13 route in memory. It must verify point count, CRC, generator result headers, and `optimalIndex` before restoring the three fields. It never overwrites the original CSV or silently replaces the source with a cntlog-repaired copy.
 - Missing source logs, unsupported schema/controller versions, CRC mismatches, and invalid indices are reported as missing with a reason and source number. Non-PATH runs are outside route-following evaluation. Store primary and secondary logs together for PC recovery; do not change the existing SD log deletion policy.
 
 ## Corruption Handling

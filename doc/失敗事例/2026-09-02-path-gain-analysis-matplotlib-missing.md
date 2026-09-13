@@ -40,3 +40,10 @@ task: PATH REPLAYのゲイン変更前後ログ解析
 - 前回のキャッシュ対策は個別プロットスクリプトのみで、既存の`write_xy_plot()`には未反映だった。
 - `write_xy_plot()`でも一時フォルダへのキャッシュ保存と`Agg`バックエンドを設定した。ファイル保存専用のためGUIは不要。
 - 同じ4ログのコマンドを再実行し、終了コード0、CSV・PNGの生成、画像の表示を確認した。resolvedを維持する。
+
+## 2026-09-13 再発
+
+- ログ12384～12394の一次走行解析で、`load_workspace_dependencies`が返した同梱Pythonを依存確認なしで使用し、`ModuleNotFoundError: No module named 'matplotlib'`が再発した。
+- 既存の再発防止策どおり、通常Pythonの`py -3 -c "import matplotlib"`でmatplotlib 3.11.1を確認し、同じ解析スクリプトを再実行してCSVとPNGを生成した。
+- 原因と回避策は既知であり、通常Pythonで成果物生成まで検証できたため`resolved`を維持する。
+- 次回は同梱Pythonを優先する前提にせず、描画を伴う解析の最初に実際に使うPythonごとのimport確認を行う。

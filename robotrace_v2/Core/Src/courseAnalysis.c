@@ -125,6 +125,8 @@ typedef struct
 } SecondLogColumnMap;
 
 static bool csvFieldEquals(const char *start, const char *end, const char *name);
+static bool csvLineHasField(const char *line, const char *name);
+static TCHAR *readLogColumnHeader(FIL *file, TCHAR *line, int lineLength);
 
 typedef struct
 {
@@ -255,6 +257,53 @@ static bool csvFieldEquals(const char *start, const char *end, const char *name)
 
 	size_t nameLength = strlen(name);
 	return (size_t)(end - start) == nameLength && strncmp(start, name, nameLength) == 0;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 csvLineHasField
+// 処理概要     CSV行に指定した項目名があるか確認する
+// 引数         line:CSV行, name:項目名
+// 戻り値       true:項目あり false:項目なし
+/////////////////////////////////////////////////////////////////////
+static bool csvLineHasField(const char *line, const char *name)
+{
+	const char *fieldStart = line;
+	const char *p = line;
+	while (*p != '\0' && *p != '\n' && *p != '\r')
+	{
+		if (*p == ',')
+		{
+			if (csvFieldEquals(fieldStart, p, name)) return true;
+			fieldStart = p + 1;
+		}
+		p++;
+	}
+	return csvFieldEquals(fieldStart, p, name);
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 readLogColumnHeader
+// 処理概要     旧混在形式または新2行形式からログ列名行を読み込む
+// 引数         file:読込ファイル, line:行バッファ, lineLength:バッファ長
+// 戻り値       列名行、読込失敗または行切れ時はNULL
+/////////////////////////////////////////////////////////////////////
+static TCHAR *readLogColumnHeader(FIL *file, TCHAR *line, int lineLength)
+{
+	TCHAR *header = f_gets(line, lineLength, file);
+	if (!header || (strchr((const char *)header, '\n') == NULL && strchr((const char *)header, '\r') == NULL))
+	{
+		return NULL;
+	}
+	if (csvLineHasField((const char *)header, "cntlog") || strchr((const char *)header, '=') == NULL)
+	{
+		return header;
+	}
+	header = f_gets(line, lineLength, file);
+	if (!header || (strchr((const char *)header, '\n') == NULL && strchr((const char *)header, '\r') == NULL))
+	{
+		return NULL;
+	}
+	return header;
 }
 
 static bool secondLogColumnMapIsValid(const SecondLogColumnMap *map)
@@ -639,9 +688,8 @@ int16_t readLogDistance(int logNumber)
 		memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
 
 		PrimaryLogColumnMap primaryColumns;
-		TCHAR *header = f_gets(log, log_len, &fil_Read); // 1行目はヘッダー
-		if (!header || (strchr((const char *)header, '\n') == NULL && strchr((const char *)header, '\r') == NULL) ||
-			!parsePrimaryLogHeader((const char *)header, &primaryColumns))
+		TCHAR *header = readLogColumnHeader(&fil_Read, log, log_len);
+		if (!header || !parsePrimaryLogHeader((const char *)header, &primaryColumns))
 		{
 			ret = -10;
 			errorDetected = true;
@@ -1086,8 +1134,8 @@ int16_t readLogDistanceSlip(int logNumber)
 	int16_t maxOptimalIndex = -1;
 	SecondLogColumnMap secondLogColumns;
 
-	// 1陦檎岼縺ｯ繝倥ャ繝縺ｪ縺ｮ縺ｧ隱ｭ縺ｿ鬟帙・縺・
-	TCHAR *header = f_gets(log, log_len, &fil_Read);
+	// 旧混在形式と新2行形式のどちらでも列名行まで読み進める。
+	TCHAR *header = readLogColumnHeader(&fil_Read, log, log_len);
 	if (!header)
 	{
 		int eof = f_eof(&fil_Read);
@@ -1103,8 +1151,7 @@ int16_t readLogDistanceSlip(int logNumber)
 		}
 		goto cleanup;
 	}
-	if ((strchr((const char *)header, '\n') == NULL && strchr((const char *)header, '\r') == NULL) ||
-		!parseSecondLogHeader((const char *)header, &secondLogColumns))
+	if (!parseSecondLogHeader((const char *)header, &secondLogColumns))
 	{
 		ret = -2; // 2次ログに必要な列がない
 		goto cleanup;
@@ -1482,9 +1529,8 @@ int16_t readLogTest(int logNumber)
 		// 讒矩菴馴・蛻励・蛻晄悄蛹・
 		memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
 
-		TCHAR *header = f_gets(log, log_len, &fil_Read);
-		if (!header || (strchr((const char *)header, '\n') == NULL && strchr((const char *)header, '\r') == NULL) ||
-			!parsePrimaryLogHeader((const char *)header, &primaryColumns))
+		TCHAR *header = readLogColumnHeader(&fil_Read, log, log_len);
+		if (!header || !parsePrimaryLogHeader((const char *)header, &primaryColumns))
 		{
 			ret = -10;
 		}

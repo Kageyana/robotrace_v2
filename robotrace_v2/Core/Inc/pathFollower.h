@@ -8,7 +8,7 @@
 // 60mコースと終端から原点方向への500mm延長を40mm間隔で保持する。
 #define PATH_ROUTE_SPACING_MM              40.0f
 #define PATH_ROUTE_MAX_POINTS              1514U
-#define PATH_ROUTE_CONTROLLER_VERSION      12U
+#define PATH_ROUTE_CONTROLLER_VERSION      13U
 
 // 実測した機体投影寸法と合法余裕を確認済みのため、形状変更を許可する。
 #define PATH_SHORTCUT_GEOMETRY_ENABLE      1
@@ -31,6 +31,7 @@ typedef struct
 	uint16_t kLateral_x100;
 	uint16_t kHeading_x100;
 	uint16_t lineAlpha_x1000;
+	uint16_t lineThetaGain_x1e9;
 } ShortcutSettings;
 
 typedef enum
@@ -62,6 +63,9 @@ extern float pathLogErrorY_mm;
 extern int16_t pathLogErrorHeading_cdeg;
 extern uint8_t pathLogState;
 extern float pathLogLegalMargin_mm;
+extern float pathLogLineMatchResidual_mm;
+extern uint16_t pathLogPoseCorrection_um;
+extern int16_t pathLogPoseCorrectionHeading_cdeg;
 
 int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel);
 bool routeGenerateShortcut(uint8_t shortcutLevel);

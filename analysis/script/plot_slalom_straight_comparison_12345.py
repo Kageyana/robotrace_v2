@@ -9,6 +9,7 @@ import math
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from path_log_recovery import read_csv_log
 
 from compare_shortcut_routes_12345 import (
     c_round,
@@ -35,17 +36,16 @@ def smoothstep(value: float) -> float:
 def read_interval(path: Path, start_ms: int, end_ms: int) -> tuple[tuple[float, float], tuple[float, float]]:
     first: tuple[float, float] | None = None
     interval: list[tuple[float, float]] = []
-    with path.open("r", encoding="utf-8-sig", newline="") as source:
-        for row in csv.DictReader(source):
-            try:
-                point = (float(row["x"]), float(row["y"]))
-                time_ms = int(float(row["cntlog"]))
-            except (KeyError, TypeError, ValueError):
-                continue
-            if first is None:
-                first = point
-            if start_ms <= time_ms <= end_ms:
-                interval.append(point)
+    for row in read_csv_log(path).rows:
+        try:
+            point = (float(row["x"]), float(row["y"]))
+            time_ms = int(float(row["cntlog"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+        if first is None:
+            first = point
+        if start_ms <= time_ms <= end_ms:
+            interval.append(point)
     if first is None or len(interval) < 2:
         raise ValueError("指定時間範囲の経路点が不足しています")
     return ((interval[0][0] - first[0], interval[0][1] - first[1]),

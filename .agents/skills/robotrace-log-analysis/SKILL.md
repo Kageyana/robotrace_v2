@@ -12,13 +12,14 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 ## Inputs
 
 - Logs live under `F:\Dropbox\Document\robotrace\Log\v2` when accessible.
-- Logs are CSV, UTF-8, comma-separated, with a header.
+- Logs are CSV, UTF-8, comma-separated. The current format stores `name=value` metadata on line 1, column names on line 2, and data from line 3 onward. Readers must also accept legacy mixed headers containing column names and metadata on line 1, and old metadata-free column headers.
 - The schema source is `robotrace_v2/Core/Inc/log_schema.h`.
 - The log header contains data names and `parameter=value` entries.
-- `logSchemaVersion=2` omits `linePointX_mm`, `linePointY_mm`, and `pathLegalMargin_mm` from CSV and binary records. `logSchemaVersion=3` adds the unsigned 16-bit BMI088 `imuTempRaw` code, replaces normal-light `motorpwmL`/`motorpwmR` with signed `encCurrentL`/`encCurrentR` after `ROC`, and also omits `slipFlag`, `slipFlagLat`, `lineTraceCtrl`, `motorVoltageCmdL_mV`, and `motorVoltageCmdR_mV` from the normal light profile, making one binary record 38 bytes. Existing schema 2 CSVs remain readable by header name; their motor PWM columns are retained and encoder-side/temperature columns are reported as not recorded. Old CSVs containing the three reconstructable columns use the saved values first.
-- For new PATH logs, recover the three omitted values in memory from `analysisSourceLog` (or `routeSourceLog` only for old logs), the source CSV, the Version 12 generator settings, and `optimalIndex`. Search beside the secondary log by default; use `--source-log-dir` for another folder.
+- `logSchemaVersion=2` omits `linePointX_mm`, `linePointY_mm`, and `pathLegalMargin_mm` from CSV and binary records. `logSchemaVersion=3` adds the unsigned 16-bit BMI088 `imuTempRaw` code, replaces normal-light `motorpwmL`/`motorpwmR` with signed `encCurrentL`/`encCurrentR` after `ROC`, and also omits `slipFlag`, `slipFlagLat`, `lineTraceCtrl`, `motorVoltageCmdL_mV`, and `motorVoltageCmdR_mV` from the normal light profile, making one binary record 38 bytes. `logSchemaVersion=4` keeps that 38-byte light record and appends `lineMatchResidual_mm`, `poseCorrection_um`, and `poseCorrectionHeading_cdeg` only to the detailed profile. Existing schema 2 and 3 CSVs remain readable by header name. Old CSVs containing the three reconstructable columns use the saved values first.
+- For new PATH logs, recover the three omitted values in memory from `analysisSourceLog` (or `routeSourceLog` only for old logs), the source CSV, the Version 12/13 generator settings, and `optimalIndex`. Search beside the secondary log by default; use `--source-log-dir` for another folder.
 - Do not substitute a cntlog-repaired source CSV automatically. Require route point-count, `routeGeometryCrc32`, controller version, and generated-result header checks before recovery. Missing source, unsupported version, CRC mismatch, or out-of-range index produces missing values, not zero or a normal value.
 - Firmware-side route parsing resolves required fields by header name, not fixed column number. Normal route generation requires `courseMarker`, `encTotalOptimal`, and `ROC`. The optional additional slip analysis requires a legacy or debug log containing `targetSpeed`, `optimalIndex`, `slipFlag`, and `slipFlagLat`.
+- Do not treat the metadata line as a data header. Resolve the column-name row first, then map data by header name.
 - Distinguish run mode by `optimalTrace`.
 - Exclude failed runs when `emcStop != 0`.
 - Invalidate logs with `cntlog` gaps or processing drops; identify and report the cause.
@@ -46,7 +47,7 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 
 - `cntlog`: time after run start, based on `cntRun`, `[ms]`.
 - `encCurrentN`: average left/right encoder pulse count per 1 ms.
-- `encCurrentL`, `encCurrentR`: signed left/right encoder pulse counts per 1 ms; schema version 3 normal-light logs store them immediately after `ROC`.
+- `encCurrentL`, `encCurrentR`: signed left/right encoder pulse counts per 1 ms; schema version 3/4 normal-light logs store them immediately after `ROC`.
 - `gyroVal_Z`: IMU Z angular velocity, `[deg/s]`.
 - `imuTempRaw`: BMI088 temperature register raw 11-bit code stored in a `uint16_t`; `0x400` is the invalid code. Convert with `temperature_C = signed_code * 0.125 + 23` after 11-bit two's-complement decoding.
 - `courseMarker`: confirmed marker state while running.
@@ -54,18 +55,21 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - `ROC`: curvature radius, `[mm]`.
 - `targetSpeed`: target speed in encoder converted units, `[pulse/ms]`.
 - `optimalIndex`: index into `PPAD[]` or `shortCutxycie[]`.
-- `slipFlag`: longitudinal slip flag; schema version 3 light logs omit it.
-- `slipFlagLat`: lateral slip flag; schema version 3 light logs omit it.
-- `lineTraceCtrl`: value is `lineTraceOmegaFBCtrl.pwm`; schema version 3 light logs omit it.
+- `slipFlag`: longitudinal slip flag; schema version 3/4 light logs omit it.
+- `slipFlagLat`: lateral slip flag; schema version 3/4 light logs omit it.
+- `lineTraceCtrl`: value is `lineTraceOmegaFBCtrl.pwm`; schema version 3/4 light logs omit it.
 - `targetAngularvelo`: log target angular velocity, `[deg/s]`.
-- `motorpwmL`, `motorpwmR`: left/right motor PWM; schema version 3 normal-light logs omit them, while detailed debug logs retain them. Schema version 2 normal-light CSVs contain them in their original positions.
-- `motorVoltageCmdL_mV`, `motorVoltageCmdR_mV`: motor voltage commands before duty conversion; schema version 3 light logs omit them.
+- `motorpwmL`, `motorpwmR`: left/right motor PWM; schema version 3/4 normal-light logs omit them, while detailed debug logs retain them. Schema version 2 normal-light CSVs contain them in their original positions.
+- `motorVoltageCmdL_mV`, `motorVoltageCmdR_mV`: motor voltage commands before duty conversion; schema version 3/4 light logs omit them.
+- `lineMatchResidual_mm`: observed line point to matched continuous first-run route segment distance `[mm]`; schema version 4 detailed logs only.
+- `poseCorrection_um`: translation correction magnitude applied in one 5 ms update `[um]`; schema version 4 detailed logs only.
+- `poseCorrectionHeading_cdeg`: heading correction applied in one 5 ms update `[0.01 deg]`; schema version 4 detailed logs only.
 - `x`, `y`: estimated position from the start marker origin, `[mm]`.
-- `linePointX_mm`, `linePointY_mm`: corresponding first-run line point, `[mm]`; stored in old CSVs and reconstructed in memory for schema version 2.
+- `linePointX_mm`, `linePointY_mm`: corresponding first-run line point, `[mm]`; stored in old CSVs and reconstructed in memory for schema version 2/3/4.
 - `pathErrorY_mm`: signed lateral path error, `[mm]`.
 - `pathErrorHeading_cdeg`: heading error, `[0.01 deg]`.
 - `pathState`: 1 tracking, 2 line fallback, 3 rejoin blend, 4 localization lost.
-- `pathLegalMargin_mm`: remaining line-overlap margin after the tracking-error budget, `[mm]`; stored in old CSVs and reconstructed in memory for schema version 2.
+- `pathLegalMargin_mm`: remaining line-overlap margin after the tracking-error budget, `[mm]`; stored in old CSVs and reconstructed in memory for schema version 2/3/4.
 
 ## Run Mode Checks
 
@@ -74,7 +78,7 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - `BOOST_DISTANCE`: verify current course position matches the estimated position and first-run distance.
 - `BOOST_PATH_REPLAY`: verify path lateral/heading error, fallback count, and line correction validity against the first-run route.
 - `BOOST_SHORTCUT`: verify the robot follows the validated shortcut, `pathLegalMargin_mm` remains non-negative, and no localization fallback occurs.
-- For schema version 2, report each reconstructed field as `saved`, `restored`, `partial`, or `missing`, including the reason, source log number, and `recovery_missing_samples`. `restored` requires every row to succeed; mixed row results are `partial`, and no successful row is `missing`.
+- For schema version 2/3/4, report each reconstructed field as `saved`, `restored`, `partial`, or `missing`, including the reason, source log number, and `recovery_missing_samples`. `restored` requires every row to succeed; mixed row results are `partial`, and no successful row is `missing`.
 - Accept `optimalIndex` only when it is finite, integer-valued, non-negative, and within the regenerated route. Blank, fractional, NaN, infinity, negative, and out-of-range values are missing. Compute index differences only between adjacent valid rows; never bridge across a missing row.
 - If any reconstructed row is missing, report the whole-run legal margin as indeterminate rather than taking the minimum of only valid rows. Continue speed, slip, state, and recorded path-error analysis. Plot reference-route segments separately so missing intervals are not connected, and annotate the missing sample count.
 - Compare only logs with the same run mode; distance, path replay, and shortcut modes are not equivalent.

@@ -283,7 +283,7 @@ static void test_imu_deg(void)
 
 		calibratIMU = true;
 		calibrateMotorCurrent =true;
-		HAL_Delay(1000);
+		HAL_Delay(2000);
 	}
 }
 

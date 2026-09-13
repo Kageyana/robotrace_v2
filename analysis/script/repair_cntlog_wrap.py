@@ -27,7 +27,14 @@ def repair_log(source_path: Path, destination_path: Path) -> dict[str, float | i
     if len(rows) < 2:
         raise ValueError(f"{source_path}: データ行がありません")
 
-    header = rows[0]
+    first_nonempty = [cell for cell in rows[0] if cell]
+    header_index = 1 if first_nonempty and all("=" in cell for cell in first_nonempty) else 0
+    if header_index >= len(rows):
+        raise ValueError(f"{source_path}: 列名行がありません")
+    header = rows[header_index]
+    data_start = header_index + 1
+    if len(rows) <= data_start:
+        raise ValueError(f"{source_path}: データ行がありません")
     columns = {name.strip(): index for index, name in enumerate(header)}
     missing = sorted(REQUIRED_COLUMNS - columns.keys())
     if missing:
@@ -49,7 +56,7 @@ def repair_log(source_path: Path, destination_path: Path) -> dict[str, float | i
     max_step_mm = 0.0
     wrap_row = -1
 
-    for row_number, row in enumerate(rows[1:], start=2):
+    for row_number, row in enumerate(rows[data_start:], start=data_start + 1):
         raw_time = int(float(row[cnt_index]))
         if previous_raw is not None and raw_time < previous_raw:
             if previous_raw - raw_time <= CNTLOG_MODULUS // 2:
@@ -88,11 +95,11 @@ def repair_log(source_path: Path, destination_path: Path) -> dict[str, float | i
         csv.writer(destination, lineterminator="\n").writerows(rows)
 
     return {
-        "samples": len(rows) - 1,
+        "samples": len(rows) - data_start,
         "wrap_count": wrap_count,
         "wrap_csv_row": wrap_row,
         "last_cntlog_ms": previous_time,
-        "duration_ms": previous_time - int(float(rows[1][cnt_index])),
+        "duration_ms": previous_time - int(float(rows[data_start][cnt_index])),
         "final_x_mm": x_mm,
         "final_y_mm": y_mm,
         "max_step_mm": max_step_mm,

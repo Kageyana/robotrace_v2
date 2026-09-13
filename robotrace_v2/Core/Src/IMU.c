@@ -199,7 +199,8 @@ void clearIMUval(void)
 /////////////////////////////////////////////////////////////////////
 void calibrationIMU(void)
 {
-	static uint16_t i = 0;
+	static uint16_t sampleCount = 0;
+	static uint16_t sampleIntervalMs = 0;
 	static float angleInt[3];
 #ifdef USE_ACCELE
 	static float acceleInt[3];
@@ -210,56 +211,63 @@ void calibrationIMU(void)
 		return;
 	}
 
-	if (i < (uint32_t)(1.0 / DEFF_TIME))
+	sampleIntervalMs++;
+	if (sampleIntervalMs < IMU_CALIBRATION_SAMPLE_INTERVAL_MS)
 	{
-		// ジャイロの物理量を積算
-		BMI088getGyro();
-		angleInt[0] += BMI088val.gyro.x;
-		angleInt[1] += BMI088val.gyro.y;
-		angleInt[2] += BMI088val.gyro.z;
-#ifdef USE_ACCELE
-		// 加速度の物理量を積算
-		BMI088getAccele();
-		acceleInt[0] += BMI088val.accele.x;
-		acceleInt[1] += BMI088val.accele.y;
-		acceleInt[2] += BMI088val.accele.z;
-#endif
-		i++;
+		return;
 	}
-	else
+	sampleIntervalMs = 0;
+
+	// 20msごとにジャイロの物理量を積算する
+	BMI088getGyro();
+	angleInt[0] += BMI088val.gyro.x;
+	angleInt[1] += BMI088val.gyro.y;
+	angleInt[2] += BMI088val.gyro.z;
+#ifdef USE_ACCELE
+	// 加速度の物理量を積算する
+	BMI088getAccele();
+	acceleInt[0] += BMI088val.accele.x;
+	acceleInt[1] += BMI088val.accele.y;
+	acceleInt[2] += BMI088val.accele.z;
+#endif
+	sampleCount++;
+	if (sampleCount < IMU_CALIBRATION_SAMPLE_COUNT)
 	{
-		angleOffset[0] = angleInt[0] / i;
-		angleOffset[1] = angleInt[1] / i;
-		angleOffset[2] = angleInt[2] / i;
-		angleInt[0] = 0;
-		angleInt[1] = 0;
-		angleInt[2] = 0;
-#ifdef USE_ACCELE
-		// 平均加速度から重力成分を差し引いてオフセットを算出
-		float acceleAvgX = acceleInt[0] / i;
-		float acceleAvgY = acceleInt[1] / i;
-		float acceleAvgZ = acceleInt[2] / i;
-		float gravityScale = sqrtf((acceleAvgX * acceleAvgX) + (acceleAvgY * acceleAvgY) + (acceleAvgZ * acceleAvgZ));
-		float gravityCompX = 0.0f;
-		float gravityCompY = 0.0f;
-		float gravityCompZ = 0.0f;
-
-		if (gravityScale > 0.0f)
-		{
-			float normCoef = 1.0f / gravityScale;
-			gravityCompX = acceleAvgX * normCoef;
-			gravityCompY = acceleAvgY * normCoef;
-			gravityCompZ = acceleAvgZ * normCoef;
-		}
-
-		acceleOffset[0] = acceleAvgX - gravityCompX;
-		acceleOffset[1] = acceleAvgY - gravityCompY;
-		acceleOffset[2] = acceleAvgZ - gravityCompZ;
-		acceleInt[0] = 0;
-		acceleInt[1] = 0;
-		acceleInt[2] = 0;
-#endif
-		i = 0;
-		calibratIMU = false;
+		return;
 	}
+
+	angleOffset[0] = angleInt[0] / sampleCount;
+	angleOffset[1] = angleInt[1] / sampleCount;
+	angleOffset[2] = angleInt[2] / sampleCount;
+	angleInt[0] = 0;
+	angleInt[1] = 0;
+	angleInt[2] = 0;
+#ifdef USE_ACCELE
+	// 平均加速度から重力成分を差し引いてオフセットを算出
+	float acceleAvgX = acceleInt[0] / sampleCount;
+	float acceleAvgY = acceleInt[1] / sampleCount;
+	float acceleAvgZ = acceleInt[2] / sampleCount;
+	float gravityScale = sqrtf((acceleAvgX * acceleAvgX) + (acceleAvgY * acceleAvgY) + (acceleAvgZ * acceleAvgZ));
+	float gravityCompX = 0.0f;
+	float gravityCompY = 0.0f;
+	float gravityCompZ = 0.0f;
+
+	if (gravityScale > 0.0f)
+	{
+		float normCoef = 1.0f / gravityScale;
+		gravityCompX = acceleAvgX * normCoef;
+		gravityCompY = acceleAvgY * normCoef;
+		gravityCompZ = acceleAvgZ * normCoef;
+	}
+
+	acceleOffset[0] = acceleAvgX - gravityCompX;
+	acceleOffset[1] = acceleAvgY - gravityCompY;
+	acceleOffset[2] = acceleAvgZ - gravityCompZ;
+	acceleInt[0] = 0;
+	acceleInt[1] = 0;
+	acceleInt[2] = 0;
+#endif
+	sampleCount = 0;
+	sampleIntervalMs = 0;
+	calibratIMU = false;
 }

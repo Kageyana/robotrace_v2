@@ -437,8 +437,7 @@ void createLog(void)
 
 	updateBatteryVoltage(); // ログヘッダへ停止時点の電圧を残す
 
-	// ログヘッダー
-	logBuildColumns();
+	// 1行目: メタデータ
 	setLogHeaderStrS("fwVersion", FW_VERSION);
 	setLogHeaderStrS("gitCommit", GIT_COMMIT);
 	setLogHeaderStrS("buildDate", BUILD_DATE);
@@ -472,12 +471,14 @@ void createLog(void)
 	setLogHeaderStr("shortcutSettings.kLateral_x100", runSettings.kLateral_x100);
 	setLogHeaderStr("shortcutSettings.kHeading_x100", runSettings.kHeading_x100);
 	setLogHeaderStr("shortcutSettings.lineAlpha_x1000", runSettings.lineAlpha_x1000);
+	setLogHeaderStr("shortcutSettings.lineThetaGain_x1e9", runSettings.lineThetaGain_x1e9);
 	setLogHeaderStr("routeShortcutSettings.maxLevel", generationSettings.maxLevel);
 	setLogHeaderStr("routeShortcutSettings.lookaheadBaseMm", generationSettings.lookaheadBaseMm);
 	setLogHeaderStr("routeShortcutSettings.lookaheadPerMpsMm", generationSettings.lookaheadPerMpsMm);
 	setLogHeaderStr("routeShortcutSettings.kLateral_x100", generationSettings.kLateral_x100);
 	setLogHeaderStr("routeShortcutSettings.kHeading_x100", generationSettings.kHeading_x100);
 	setLogHeaderStr("routeShortcutSettings.lineAlpha_x1000", generationSettings.lineAlpha_x1000);
+	setLogHeaderStr("routeShortcutSettings.lineThetaGain_x1e9", generationSettings.lineThetaGain_x1e9);
 
 	setLogHeaderStrF("tgtParam.bstStraight", tgtParam.bstStraight);
 	setLogHeaderStrF("tgtParam.bst1500", tgtParam.bst1500);
@@ -515,8 +516,7 @@ void createLog(void)
 	setLogHeaderStrF("distCtrl.kp", distCtrl.kp);
 	setLogHeaderStrF("distCtrl.ki", distCtrl.ki);
 	setLogHeaderStrF("distCtrl.kd", distCtrl.kd);
-	if (!logAppendText(columnTitle, sizeof(columnTitle), "\n") ||
-		!logAppendText(formatLog, sizeof(formatLog), "\n"))
+	if (!logAppendText(columnTitle, sizeof(columnTitle), "\n"))
 	{
 		logHeaderOverflow = true;
 	}
@@ -532,8 +532,37 @@ void createLog(void)
 	fresult = f_write(&fil_W, columnTitle, total, &written);
 	if (fresult != FR_OK || written != total)
 	{
-		printf("createLog header write error: %d (%lu/%lu)\r\n", fresult, (unsigned long)written, (unsigned long)total);
+		printf("createLog metadata write error: %d (%lu/%lu)\r\n", fresult, (unsigned long)written, (unsigned long)total);
 		f_close(&fil_W);
+		f_unlink(fileName);
+		return;
+	}
+
+	// 2行目: ログ列名。フォーマット文字列も同時に生成する。
+	columnTitle[0] = 0;
+	formatLog[0] = 0;
+	logHeaderOverflow = false;
+	logBuildColumns();
+	if (!logAppendText(columnTitle, sizeof(columnTitle), "\n") ||
+		!logAppendText(formatLog, sizeof(formatLog), "\n"))
+	{
+		logHeaderOverflow = true;
+	}
+	if (logHeaderOverflow)
+	{
+		printf("createLog column header truncated\r\n");
+		f_close(&fil_W);
+		f_unlink(fileName);
+		return;
+	}
+	total = (UINT)strlen(columnTitle);
+	written = 0;
+	fresult = f_write(&fil_W, columnTitle, total, &written);
+	if (fresult != FR_OK || written != total)
+	{
+		printf("createLog column header write error: %d (%lu/%lu)\r\n", fresult, (unsigned long)written, (unsigned long)total);
+		f_close(&fil_W);
+		f_unlink(fileName);
 		return;
 	}
 	fresult = f_sync(&fil_W);
@@ -541,6 +570,7 @@ void createLog(void)
 	{
 		printf("createLog f_sync error: %d\r\n", fresult);
 		f_close(&fil_W);
+		f_unlink(fileName);
 		return;
 	}
 	create_log_ready = true;

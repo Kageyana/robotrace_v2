@@ -150,7 +150,7 @@ Codex は主にファームウェア開発に使用します。必要に応じ�
 ### ラインセンサー・マーカーセンサーの並び
 
 - ラインセンサーの `sensor[0]` は左端とする。
-- 実機で `sensor[0]` が左端、`sensor[9]` が右端であることを確認済みとする。KiCad基板座標から得た受光中心横座標は、左端から `-41.70, -35.04, -27.29, -18.68, -9.49, 9.50, 18.68, 27.29, 35.05, 41.70 mm` とする。
+- 実機で `sensor[0]` が左端、`sensor[9]` が右端であることを確認済みとする。KiCad基板座標から得た受光中心横座標は、左端から `-41.70, -35.04, -27.29, -18.68, -9.49, 9.50, 18.68, 27.29, 35.05, 41.70 mm` とする。受光中心の機体前方座標は、中央2センサーの実測値95 mmとKiCad上の相対配置から、左端から `76.07, 82.88, 88.42, 92.50, 95.00, 95.00, 92.50, 88.42, 82.88, 76.07 mm` とする。
 - `markerSensorL` は実機左側のマーカーセンサーとする。
 - `markerSensorR` は実機右側のマーカーセンサーとする。
 
@@ -367,7 +367,7 @@ cmake --build --preset Release
 - SD カードが挿入されていて設定ファイルが存在しない場合は、対象ファイルを作成し、コード内デフォルト値を書き込む。
 - 設定ファイルの読み書き処理を変更する場合は、ファイル欠落時にデフォルト値でファイルが作成されることを確認する。
 - `targetSpeeds.txt` は既存18項目の末尾へLevel 0専用速度`pathReplay`を追加した19項目とする。`pathReplay`は実値の100倍を第19項目へ保存し、既定値は`0100`（1.00 m/s）とする。旧18項目ファイルは既存値を保持し、`pathReplay`の既定値を末尾へ追加して修復する。
-- `shortcut.txt` は `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000` の順で保存し、改行は付けない。既定値は `1,080,040,3000,0600,010` とする。ライン位置補正の初期実機検証はLevel 0固定の `0,080,040,1500,1600,010` とする。
+- `shortcut.txt` は `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000,lineThetaGain_x1e9` の順で保存し、改行は付けない。既定値は `1,080,040,3000,0600,010,0000` とする。`lineThetaGain_x1e9`はヨー角補正ゲインを`b × 10^9 [rad/mm^2]`で保持し、既定では無効とする。ライン位置・ヨー角補正の初期実機検証はLevel 0固定の `0,080,040,1500,1600,010,0100` とする。旧6項目ファイルは既存の有効値を保持し、末尾へ`0000`を追加して修復する。
 
 設定ファイルの保存先は `./setting/` です。詳細なファイル形式、読み書き関数、破損時の扱いは `.agents/skills/robotrace-sd-settings/SKILL.md` を使います。
 
@@ -438,6 +438,7 @@ cmake --build --preset Release
 - 経路制御バージョン4では、方位FB、ロスト判定、再合流判定に最近傍経路点の接線方位差を使用し、先読み方位は曲率FFの算出だけに使用する。小R手前で先読み方位FBによって早期旋回しないようにする。
 - 経路制御バージョン11では、Level 1の制約付きElastic Bandを廃止し、600～1600 mm、曲率符号変化3回以上、端点方位差12 deg以下の区間を最大34 mm移動させる直線回廊方式へ変更した。入口と出口は120 mmで滑らかに接続し、新規自己交差、合法余裕、全長5 mm以上の短縮を検査する。マーカー位置は直線回廊の固定点にしない。
 - 経路制御バージョン12では、Level 1で採用した直線回廊の本体区間だけ、元の一次経路を基準とするライン位置補正を適用しない。ライン検出、ロスト判定、ラインフォールバックは維持し、回廊外とLevel 0では従来どおりライン位置補正を使用する。
+- 経路制御バージョン13では、10個の受光中心の横・前方座標からライン観測点を求め、一次走行`lineRoute`の連続線分上へ投影した対応点との残差を勾配降下で`x`、`y`、`heading`へ反映する。探索進捗と接線方位差60 degの制約、ライン有効判定、クロスライン除外、残差・1周期補正量の上限を維持し、補正後状態から横偏差、方位偏差、最近傍距離を再計算する。Level 1直線回廊内では並進・ヨー角補正をともに禁止する。
 
 ### 速度計画と確認観点
 
@@ -467,10 +468,10 @@ cmake --build --preset Release
 
 このPCの実機走行ログは `C:\Users\ucawa\Dropbox\Document\robotrace\Log\v2` に保存されています。
 
-- ログファイルは CSV 形式、ヘッダ有り、文字コード UTF-8、区切り文字はカンマ。
+- ログファイルは CSV 形式、ヘッダ有り、文字コード UTF-8、区切り文字はカンマ。1行目は`パラメータ名=value`形式のメタデータ、2行目はログデータ名、3行目以降はデータとする。旧ログの「ログデータ名とメタデータが同じ1行目に混在する形式」とメタデータなし形式も、列名で解決して読み取り可能とする。
 - ログファイル名は通し番号を使う。
-- ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。`logSchemaVersion=3` の通常軽量ログは1レコード38バイト固定とし、BMI088温度の生11ビットコードを`imuTempRaw`として保存し、`ROC`の直後に符号付き16ビットの`encCurrentL`, `encCurrentR`を保存する。`imuTempRaw=0x400`は無効値とする。Version 2で省略した`linePointX_mm`, `linePointY_mm`, `pathLegalMargin_mm`に加えて、通常ログでは`motorpwmL`, `motorpwmR`, `slipFlag`, `slipFlagLat`, `lineTraceCtrl`, `motorVoltageCmdL_mV`, `motorVoltageCmdR_mV`を保存しない。旧CSVはヘッダ名で列を解決し、復元対象3列が存在する場合に保存値を優先して扱う。スキーマ2の通常CSVにある`motorpwmL`, `motorpwmR`は読み取り可能で、`encCurrentL`, `encCurrentR`, `imuTempRaw`は未記録として扱う。
-- ログヘッダにはログデータ名とパラメータが含まれる。パラメータは `パラメータ名=value` 形式で記載される。
+- ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。`logSchemaVersion=4` の通常軽量ログは1レコード38バイト固定とし、BMI088温度の生11ビットコードを`imuTempRaw`として保存し、`ROC`の直後に符号付き16ビットの`encCurrentL`, `encCurrentR`を保存する。`imuTempRaw=0x400`は無効値とする。詳細ログには`lineMatchResidual_mm`、`poseCorrection_um`、`poseCorrectionHeading_cdeg`を末尾へ追加する。Version 2で省略した`linePointX_mm`, `linePointY_mm`, `pathLegalMargin_mm`に加えて、通常ログでは`motorpwmL`, `motorpwmR`, `slipFlag`, `slipFlagLat`, `lineTraceCtrl`, `motorVoltageCmdL_mV`, `motorVoltageCmdR_mV`と新規補正診断列を保存しない。旧CSVはヘッダ名で列を解決し、復元対象3列が存在する場合に保存値を優先して扱う。スキーマ2、3は引き続き読み取り可能とする。
+- ログヘッダの1行目にはパラメータを `パラメータ名=value` 形式で記載し、2行目にはログデータ名だけを記載する。
 - `courseAnalysis.c` の通常経路生成は、`courseMarker`, `encTotalOptimal`, `ROC`をCSVヘッダ名から解決する。追加スリップ解析を行う場合だけ、旧形式または詳細デバッグログの`targetSpeed`, `optimalIndex`, `slipFlag`, `slipFlagLat`も必要とする。ログ列追加時に固定列番号へ依存しない。
 - 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_MARKER`, `BOOST_DISTANCE`, `BOOST_SHORTCUT`, `BOOST_PATH_REPLAY` を正とする。
 - 新しい走行モードを追加する場合は、`robotrace_v2/Core/Inc/courseAnalysis.h` に定義を追加する。
@@ -478,7 +479,7 @@ cmake --build --preset Release
 - 緊急停止条件は `robotrace_v2/Core/Inc/emergencyStop.h` の定義を正とする。経路追従中に自己位置を喪失し、ライン追従へ移行できない場合は `STOP_LOCALIZATION` とする。
 - Version 11以降のLevel 1生成結果はログヘッダの`shortcutBuildStatus`、`shortcutCorridorCount`、`shortcutReduction_mm`で確認する。生成成功は`shortcutBuildStatus=1`とする。
 - 全走行ログのヘッダには`logSchemaVersion`、`analysisSourceLog`、`slipSourceLog`を残す。一次走行、解析元不明、解析失敗時の番号は0とし、PATH系では`analysisSourceLog`と`routeSourceLog`を一致させる。走行開始時に固定した値を停止後のヘッダへ出力し、保存前の解析番号やUI変更で置き換えない。
-- PATH系ログの復元情報として、`routePointCount`、`routeGeometryCrc32`、`shortcutRequestedLevel`、実採用値の`shortcutLevel`、`shortcutSettings.*`（走行開始時）と`routeShortcutSettings.*`（経路生成時）を記録する。`routeGeometryCrc32`はVersion 12の整数XY経路を固定リトルエンディアンでCRC32化した値とする。
+- PATH系ログの復元情報として、`routePointCount`、`routeGeometryCrc32`、`shortcutRequestedLevel`、実採用値の`shortcutLevel`、`shortcutSettings.*`（走行開始時）と`routeShortcutSettings.*`（経路生成時）を記録する。`routeGeometryCrc32`はVersion 12/13で共通の整数XY経路を固定リトルエンディアンでCRC32化した値とする。
 - 新しい緊急停止条件を追加する場合は、`robotrace_v2/Core/Inc/emergencyStop.h` に定義を追加する。
 - 通常ログ解析では、ラップタイム、速度追従、角速度、経路追従状態を重視する。スリップは該当列を含む旧形式または詳細デバッグログでのみ評価する。
 - バッテリー状態はログ内パラメータ `batteryVoltage_V` を参照する。単位は `[V]`。
@@ -492,7 +493,7 @@ cmake --build --preset Release
 - 加速度、電流、スリップ内部量などの詳細デバッグ列が必要な場合は、ビルド定義で `LOG_SCHEMA_PROFILE_LIGHT=0` にして一時的に出力する。
 - ログ同士を比較する場合は、`batteryVoltage_V` の差を考慮する。電圧差によるモーター出力、速度追従、加速性能、スリップ傾向の変化を無視しない。
 - ログ形式を安易に変更しない。形式変更が必要な場合は、スキーマまたはドキュメントも合わせて更新する。
-- 新形式PATHログは二次ログと同じフォルダの元一次ログを探索し、必要なら`--source-log-dir`を指定する。Version 12の経路点数・CRC・生成結果ヘッダが一致するまで3項目を復元せず、元ログ欠落、未対応版、CRC不一致、index範囲外は欠測として扱う。元CSVは上書きせず、cntlog補修済みXYを元ログの代わりに自動使用しない。
+- 新形式PATHログは二次ログと同じフォルダの元一次ログを探索し、必要なら`--source-log-dir`を指定する。Version 12/13の経路点数・CRC・生成結果ヘッダが一致するまで3項目を復元せず、元ログ欠落、未対応版、CRC不一致、index範囲外は欠測として扱う。元CSVは上書きせず、cntlog補修済みXYを元ログの代わりに自動使用しない。
 - 解析結果には3項目を「保存値／復元値／欠測」、理由、参照元ログ番号とともに出力する。非PATH走行では経路追従評価の対象外とし、元経路が欠けても実走行推定XYを描画する。
 - 一次ログと二次ログは自動削除方針を変えず、PCへ一緒に保存してから新形式の復元解析を行う。今回のログ形式確認とLevel 1最低10本の採用検証は別管理とする。
 - 詳細な解析手順は `.agents/skills/robotrace-log-analysis/SKILL.md` を使う。
@@ -529,9 +530,9 @@ cmake --build --preset Release
 
 ### 実装未対応箇所の対応優先順位
 
-1. 経路制御バージョン10のLevel 0 `BOOST_PATH_REPLAY`を、`shortcut.txt`の`maxLevel=0`、`lineAlpha_x1000=010`、`targetSpeeds.txt`の`pathReplay=1.00 m/s`で最低10本検証する。小Rでのコースアウトなし、5点以上のindexジャンプ0回、フォールバック・自己位置喪失0回、一次走行終端から原点方向へ500 mm進んだ位置での正常停止を確認する。その後は3系列計12本で全コースの採用判定を行う。
+1. 経路制御バージョン13のLevel 0 `BOOST_PATH_REPLAY`を、同じ一次走行ログ、速度設定、7.5 V以上の近い電圧条件で、ヨー角補正OFFを基準として取得する。`shortcut.txt`を`0,080,040,1500,1600,010,0100`へ変更したAutoStart 5走を2系列、計10本確認し、10/10完走、`STOP_LOCALIZATION=0`、ラインフォールバック0、5点以上のindexジャンプ0を必須とする。基準比でheading誤差p95が改善し、横誤差p95が悪化せず、最大誤差が10%以上増えない場合だけ採用する。効果不足時は他パラメータを固定して`lineThetaGain_x1e9=0300`を別の10本で評価する。
 2. 低速のLevel 1ショートカットを10本検証し、再現性と合法余裕を確認する。
-3. Level 0の実機ログで補正方向と再現性を確認後、`lineAlpha_x1000` を段階的に調整する。
+3. Level 0採用後にLevel 1を10本確認し、直線回廊内の並進・ヨー角補正がゼロで、回廊外のドリフトが低減することを確認する。
 
 ### `AGENTS.md` 更新タイミング
 
@@ -556,6 +557,7 @@ cmake --build --preset Release
 - 2026-09-06: 経路制御バージョン10でLevel 0専用速度`tgtParam.pathReplay`を追加し、一次走行の`tgtParam.search`から分離した。`targetSpeeds.txt`の第19項目として保存し、旧18項目ファイルは既存値を保持したまま既定値を追記して修復する。
 - 2026-09-06: 経路制御バージョン11でLevel 1経路生成を直線回廊方式へ置換した。生成状態、回廊数、全長短縮量をログヘッダへ追加し、安全な回廊がない場合はLevel 0へフォールバックする。
 - 2026-09-06: 経路制御バージョン12で、採用済み直線回廊内のライン位置補正だけを無効化した。元ラインのスラローム形状を自己位置補正から再導入しない一方、ライン検出とロスト時フォールバックは維持する。
+- 2026-09-13: 経路制御バージョン13で、実測95 mmを基準にした10個の受光中心の横・前方座標を用い、連続線分上のライン対応点との残差から`x`、`y`、`heading`を5 ms周期で補正する勾配降下方式を追加した。ヨー角補正は既定OFFとし、Level 1直線回廊内では全補正を禁止する。`shortcut.txt`を7項目、`logSchemaVersion`を4へ更新した。
 
 ## 15. 機体・回路変更時にコードへ反映する項目
 

@@ -18,6 +18,7 @@
 #define PATH_DEFAULT_KLATERAL_X100            3000U
 #define PATH_DEFAULT_KHEADING_X100            600U
 #define PATH_DEFAULT_LINE_ALPHA_X1000         10U
+#define PATH_DEFAULT_LINE_THETA_GAIN_X1E9      0U
 
 #define PATH_LEVEL_MAX                        1U // 初期実機検証はLevel 1だけを許可する
 #define PATH_LOOKAHEAD_BASE_MIN_MM            40U
@@ -26,6 +27,7 @@
 #define PATH_KLATERAL_MAX_X100                10000U
 #define PATH_KHEADING_MAX_X100                3000U
 #define PATH_LINE_ALPHA_MAX_X1000             100U
+#define PATH_LINE_THETA_GAIN_MAX_X1E9         1000U
 
 #define PATH_CSV_LINE_SIZE                    4096U
 #define PATH_CORRIDOR_MIN_SPAN_POINTS         15U   // 600mm
@@ -67,6 +69,11 @@
 #define PATH_SENSOR_MIN_SUM                   1200U
 #define PATH_SENSOR_MAX_CLUSTER_WIDTH         3U
 #define PATH_SENSOR_FOV_MM                    35.0f  // ライン位置補正を許可する予測横偏差範囲
+#define PATH_LINE_MATCH_BACK_POINTS           2U
+#define PATH_LINE_MATCH_FORWARD_POINTS        4U
+#define PATH_LINE_MATCH_RESIDUAL_MAX_MM        30.0f
+#define PATH_LINE_POSITION_CORRECTION_MAX_MM    1.0f
+#define PATH_LINE_HEADING_CORRECTION_MAX_DEG    0.1f
 
 #define PATH_FLAG_CORRIDOR_RESERVED           0x01U
 #define PATH_FLAG_CORRIDOR_APPLIED            0x02U
@@ -85,6 +92,19 @@ typedef struct
 	float heading_deg;
 } PathPose;
 
+typedef struct
+{
+	float lateral_mm;
+	float forward_mm;
+} PathLineObservation;
+
+typedef struct
+{
+	float x_mm;
+	float y_mm;
+	float residual_mm;
+} PathLineMatch;
+
 static RoutePoint lineRoute[PATH_ROUTE_MAX_POINTS];
 static RoutePoint driveRoute[PATH_ROUTE_MAX_POINTS];
 static uint16_t driveRouteArcMm[PATH_ROUTE_MAX_POINTS];
@@ -98,9 +118,9 @@ static uint8_t routeShortcutBuildStatus = PATH_SHORTCUT_BUILD_NOT_REQUESTED;
 static uint8_t routeShortcutCorridorCount = 0U;
 static float routeShortcutReductionMm = 0.0f;
 static uint32_t routeGeometryCrc32 = 0U;
-static ShortcutSettings routeGenerationSettings = {0U, 0U, 0U, 0U, 0U, 0U};
-static ShortcutSettings runStartSettings = {0U, 0U, 0U, 0U, 0U, 0U};
-static ShortcutSettings runGenerationSettings = {0U, 0U, 0U, 0U, 0U, 0U};
+static ShortcutSettings routeGenerationSettings = {0U, 0U, 0U, 0U, 0U, 0U, 0U};
+static ShortcutSettings runStartSettings = {0U, 0U, 0U, 0U, 0U, 0U, 0U};
+static ShortcutSettings runGenerationSettings = {0U, 0U, 0U, 0U, 0U, 0U, 0U};
 static int16_t runRouteSourceLog = 0;
 static uint8_t runRouteRequestedLevel = 0U;
 static uint8_t runRouteShortcutLevel = 0U;
@@ -177,9 +197,16 @@ static const float pathSensorLateralMm[NUM_SENSORS] = {
 	9.50f, 18.68f, 27.29f, 35.05f, 41.70f
 };
 
+// 中央受光中心の実測前方距離95mmとKiCad相対座標から求めた受光中心前方座標[mm]。
+static const float pathSensorForwardMm[NUM_SENSORS] = {
+	76.07f, 82.88f, 88.42f, 92.50f, 95.00f,
+	95.00f, 92.50f, 88.42f, 82.88f, 76.07f
+};
+
 ShortcutSettings shortcutSettings = {0U, PATH_DEFAULT_LOOKAHEAD_BASE_MM,
 	PATH_DEFAULT_LOOKAHEAD_PER_MPS_MM, PATH_DEFAULT_KLATERAL_X100,
-	PATH_DEFAULT_KHEADING_X100, PATH_DEFAULT_LINE_ALPHA_X1000};
+	PATH_DEFAULT_KHEADING_X100, PATH_DEFAULT_LINE_ALPHA_X1000,
+	PATH_DEFAULT_LINE_THETA_GAIN_X1E9};
 float pathLogLinePointX_mm = 0.0f;
 float pathLogLinePointY_mm = 0.0f;
 uint8_t pathLogLineValid = 0U;
@@ -187,6 +214,9 @@ float pathLogErrorY_mm = 0.0f;
 int16_t pathLogErrorHeading_cdeg = 0;
 uint8_t pathLogState = PATH_STATE_INACTIVE;
 float pathLogLegalMargin_mm = 0.0f;
+float pathLogLineMatchResidual_mm = 0.0f;
+uint16_t pathLogPoseCorrection_um = 0U;
+int16_t pathLogPoseCorrectionHeading_cdeg = 0;
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathWrapDeg
@@ -297,6 +327,29 @@ static bool pathParseHeader(const char *line, RouteCsvColumns *columns)
 	else if (pathHeaderFieldEquals(start, p, "y")) columns->y = column;
 	else if (pathHeaderFieldEquals(start, p, "courseMarker")) columns->marker = column;
 	return columns->x >= 0 && columns->y >= 0 && columns->marker >= 0;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathReadColumnHeader
+// 処理概要     旧混在形式または新2行形式から経路ログ列名を読み込む
+// 引数         file:読込ファイル, columns:列番号の格納先
+// 戻り値       true:必要列あり false:読込失敗または必要列なし
+/////////////////////////////////////////////////////////////////////
+static bool pathReadColumnHeader(FIL *file, RouteCsvColumns *columns)
+{
+	if (f_gets(routeCsvLine, sizeof(routeCsvLine), file) == NULL ||
+		(strchr(routeCsvLine, '\n') == NULL && strchr(routeCsvLine, '\r') == NULL))
+	{
+		return false;
+	}
+	if (pathParseHeader(routeCsvLine, columns)) return true;
+	if (strchr(routeCsvLine, '=') == NULL) return false;
+	if (f_gets(routeCsvLine, sizeof(routeCsvLine), file) == NULL ||
+		(strchr(routeCsvLine, '\n') == NULL && strchr(routeCsvLine, '\r') == NULL))
+	{
+		return false;
+	}
+	return pathParseHeader(routeCsvLine, columns);
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -799,9 +852,7 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 		sd_fatfs_unlock();
 		return -5;
 	}
-	if (f_gets(routeCsvLine, sizeof(routeCsvLine), &file) == NULL ||
-		(strchr(routeCsvLine, '\n') == NULL && strchr(routeCsvLine, '\r') == NULL) ||
-		!pathParseHeader(routeCsvLine, &columns))
+	if (!pathReadColumnHeader(&file, &columns))
 	{
 		f_close(&file);
 		sd_fatfs_unlock();
@@ -849,9 +900,7 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 		sd_fatfs_unlock();
 		return -13;
 	}
-	if (f_gets(routeCsvLine, sizeof(routeCsvLine), &file) == NULL ||
-		(strchr(routeCsvLine, '\n') == NULL && strchr(routeCsvLine, '\r') == NULL) ||
-		!pathParseHeader(routeCsvLine, &columns))
+	if (!pathReadColumnHeader(&file, &columns))
 	{
 		f_close(&file);
 		sd_fatfs_unlock();
@@ -967,33 +1016,92 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathSenseLine
-// 処理概要     単一ラインを検出し横偏差を推定する
-// 引数         predictedErrorMm: 予測横偏差[mm], measuredErrorMm: 計測偏差の格納先[mm]
+// 処理概要     単一ラインを検出し機体座標系の受光位置を推定する
+// 引数         predictedErrorMm: 予測横偏差[mm], observation: 受光位置の格納先[mm]
 // 戻り値       true: 有効な単一ライン false: 無効
 /////////////////////////////////////////////////////////////////////
-static bool pathSenseLine(float predictedErrorMm, float *measuredErrorMm)
+static bool pathSenseLine(float predictedErrorMm, PathLineObservation *observation)
 {
 	if (!isLineSensorCalibrationValid() || stateCrossLine || fabsf(predictedErrorMm) > PATH_SENSOR_FOV_MM) return false;
 	uint32_t sum = 0U;
-	float weighted = 0.0f;
+	float weightedLateral = 0.0f;
+	float weightedForward = 0.0f;
 	uint8_t first = NUM_SENSORS;
 	uint8_t last = 0U;
 	uint8_t active = 0U;
+	uint8_t clusters = 0U;
+	bool previousActive = false;
 	for (uint8_t i = 0U; i < NUM_SENSORS; i++)
 	{
 		uint16_t value = lSensorCari[i];
-		if (value >= PATH_SENSOR_ACTIVE_TH)
+		bool sensorActive = value >= PATH_SENSOR_ACTIVE_TH;
+		if (sensorActive)
 		{
+			if (!previousActive) clusters++;
 			if (first == NUM_SENSORS) first = i;
 			last = i;
 			active++;
 		}
+		previousActive = sensorActive;
 		sum += value;
-		weighted += (float)value * pathSensorLateralMm[i];
+		weightedLateral += (float)value * pathSensorLateralMm[i];
+		weightedForward += (float)value * pathSensorForwardMm[i];
 	}
-	if (sum < PATH_SENSOR_MIN_SUM || active == 0U || (uint8_t)(last - first + 1U) > PATH_SENSOR_MAX_CLUSTER_WIDTH) return false;
-	float linePositionMm = weighted / (float)sum;
-	*measuredErrorMm = -linePositionMm;
+	if (sum < PATH_SENSOR_MIN_SUM || active == 0U || clusters != 1U ||
+		(uint8_t)(last - first + 1U) > PATH_SENSOR_MAX_CLUSTER_WIDTH) return false;
+	observation->lateral_mm = weightedLateral / (float)sum;
+	observation->forward_mm = weightedForward / (float)sum;
+	return true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathFindLineMatch
+// 処理概要     検出ライン点に最も近い一次経路上の連続点を探索する
+// 引数         sensorX_mm,sensorY_mm: 検出点世界座標[mm], nearest: 機体最近傍index,
+//              maximumArcMm: 対応を許可する最大進捗[mm], match: 対応点の格納先
+// 戻り値       true: 対応点あり false: 対応点なし
+/////////////////////////////////////////////////////////////////////
+static bool pathFindLineMatch(float sensorX_mm, float sensorY_mm, uint16_t nearest,
+	float maximumArcMm, PathLineMatch *match)
+{
+	if (routeCount < 2U) return false;
+	uint16_t begin = (nearest > PATH_LINE_MATCH_BACK_POINTS) ?
+		(uint16_t)(nearest - PATH_LINE_MATCH_BACK_POINTS) : 0U;
+	uint16_t lastPoint = (nearest + PATH_LINE_MATCH_FORWARD_POINTS < routeCount) ?
+		(uint16_t)(nearest + PATH_LINE_MATCH_FORWARD_POINTS) : (uint16_t)(routeCount - 1U);
+	bool found = false;
+	float bestDistanceSquared = 0.0f;
+	for (uint16_t i = begin; i < lastPoint; i++)
+	{
+		if ((float)driveRouteArcMm[i] > maximumArcMm) continue;
+		float segmentHeadingError = pathWrapDeg(
+			((float)lineRoute[i].heading_cdeg * 0.01f) - pathPose.heading_deg);
+		if (fabsf(segmentHeadingError) > PATH_ASSOCIATION_HEADING_MAX_DEG) continue;
+		float x0 = (float)lineRoute[i].x_mm;
+		float y0 = (float)lineRoute[i].y_mm;
+		float segmentX = (float)lineRoute[i + 1U].x_mm - x0;
+		float segmentY = (float)lineRoute[i + 1U].y_mm - y0;
+		float segmentLengthSquared = (segmentX * segmentX) + (segmentY * segmentY);
+		if (segmentLengthSquared <= 1.0f) continue;
+		float projection = (((sensorX_mm - x0) * segmentX) + ((sensorY_mm - y0) * segmentY)) /
+			segmentLengthSquared;
+		if (projection < 0.0f) projection = 0.0f;
+		if (projection > 1.0f) projection = 1.0f;
+		float candidateX = x0 + (segmentX * projection);
+		float candidateY = y0 + (segmentY * projection);
+		float residualX = sensorX_mm - candidateX;
+		float residualY = sensorY_mm - candidateY;
+		float distanceSquared = (residualX * residualX) + (residualY * residualY);
+		if (!found || distanceSquared < bestDistanceSquared)
+		{
+			found = true;
+			bestDistanceSquared = distanceSquared;
+			match->x_mm = candidateX;
+			match->y_mm = candidateY;
+		}
+	}
+	if (!found) return false;
+	match->residual_mm = sqrtf(bestDistanceSquared);
 	return true;
 }
 
@@ -1021,6 +1129,9 @@ void pathFollowerReset(void)
 	pathLogErrorHeading_cdeg = 0;
 	pathLogState = (uint8_t)followerState;
 	pathLogLegalMargin_mm = PATH_LINE_HALF_WIDTH_MM + PATH_OCCUPIED_HALF_WIDTH_MM;
+	pathLogLineMatchResidual_mm = 0.0f;
+	pathLogPoseCorrection_um = 0U;
+	pathLogPoseCorrectionHeading_cdeg = 0;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -1080,26 +1191,64 @@ void pathFollowerUpdateTarget5ms(void)
 	routeIndex = nearest;
 	optimalIndex = routeIndex;
 
-	float lineHeadingDeg = (float)lineRoute[nearest].heading_cdeg * 0.01f;
-	float lineHeadingRad = lineHeadingDeg * DEG2RAD;
+	float lineHeadingRad = (float)lineRoute[nearest].heading_cdeg * 0.01f * DEG2RAD;
 	float lineDx = pathPose.x_mm - (float)lineRoute[nearest].x_mm;
 	float lineDy = pathPose.y_mm - (float)lineRoute[nearest].y_mm;
 	float lineError = (lineDx * cosf(lineHeadingRad)) - (lineDy * sinf(lineHeadingRad));
-	float measuredError = 0.0f;
-	currentLineValid = pathSenseLine(lineError, &measuredError);
+	PathLineObservation observation = {0.0f, 0.0f};
+	currentLineValid = pathSenseLine(lineError, &observation);
 	bool corridorLineCorrectionBlocked = routeShortcutLevel > 0U &&
 		((routeFlags[nearest] & PATH_FLAG_CORRIDOR_APPLIED) != 0U);
-	if (currentLineValid && !corridorLineCorrectionBlocked)
+	PathLineMatch lineMatch = {(float)lineRoute[nearest].x_mm,
+		(float)lineRoute[nearest].y_mm, 0.0f};
+	bool lineMatchValid = false;
+	pathLogPoseCorrection_um = 0U;
+	pathLogPoseCorrectionHeading_cdeg = 0;
+	if (currentLineValid && associationValid)
 	{
-		float alpha = (float)activeSettings->lineAlpha_x1000 * 0.001f;
-		float correction = alpha * (measuredError - lineError);
-		pathPose.x_mm += correction * cosf(lineHeadingRad);
-		pathPose.y_mm -= correction * sinf(lineHeadingRad);
-		lineError += correction;
+		float poseHeadingRad = pathPose.heading_deg * DEG2RAD;
+		float headingSin = sinf(poseHeadingRad);
+		float headingCos = cosf(poseHeadingRad);
+		float sensorX = pathPose.x_mm + (observation.lateral_mm * headingCos) +
+			(observation.forward_mm * headingSin);
+		float sensorY = pathPose.y_mm - (observation.lateral_mm * headingSin) +
+			(observation.forward_mm * headingCos);
+		lineMatchValid = pathFindLineMatch(sensorX, sensorY, nearest, maximumArcMm, &lineMatch);
+		if (lineMatchValid && lineMatch.residual_mm <= PATH_LINE_MATCH_RESIDUAL_MAX_MM &&
+			!corridorLineCorrectionBlocked)
+		{
+			float residualX = sensorX - lineMatch.x_mm;
+			float residualY = sensorY - lineMatch.y_mm;
+			float alpha = (float)activeSettings->lineAlpha_x1000 * 0.001f;
+			float correctionX = -alpha * residualX;
+			float correctionY = -alpha * residualY;
+			float correctionDistance = sqrtf((correctionX * correctionX) +
+				(correctionY * correctionY));
+			float sensorDerivativeX = (-observation.lateral_mm * headingSin) +
+				(observation.forward_mm * headingCos);
+			float sensorDerivativeY = (-observation.lateral_mm * headingCos) -
+				(observation.forward_mm * headingSin);
+			float thetaGradient = (residualX * sensorDerivativeX) +
+				(residualY * sensorDerivativeY);
+			float thetaGain = (float)activeSettings->lineThetaGain_x1e9 * 1.0e-9f;
+			float headingCorrectionDeg = (-thetaGain * thetaGradient) * RAD2DEG;
+			if (correctionDistance <= PATH_LINE_POSITION_CORRECTION_MAX_MM &&
+				fabsf(headingCorrectionDeg) <= PATH_LINE_HEADING_CORRECTION_MAX_DEG)
+			{
+				pathPose.x_mm += correctionX;
+				pathPose.y_mm += correctionY;
+				pathPose.heading_deg = pathWrapDeg(pathPose.heading_deg + headingCorrectionDeg);
+				pathLogPoseCorrection_um = (uint16_t)lroundf(correctionDistance * 1000.0f);
+				pathLogPoseCorrectionHeading_cdeg = pathFloatToInt16(headingCorrectionDeg * 100.0f);
+			}
+		}
 	}
 	pathLogLineValid = currentLineValid ? 1U : 0U;
-	pathLogLinePointX_mm = lineRoute[nearest].x_mm;
-	pathLogLinePointY_mm = lineRoute[nearest].y_mm;
+	pathLogLinePointX_mm = lineMatch.x_mm;
+	pathLogLinePointY_mm = lineMatch.y_mm;
+	pathLogLineMatchResidual_mm = lineMatchValid ? lineMatch.residual_mm : 0.0f;
+	nearestDistance = pathPointDistance(pathPose.x_mm, pathPose.y_mm,
+		driveRoute[nearest].x_mm, driveRoute[nearest].y_mm);
 
 	float lookaheadMm = (float)activeSettings->lookaheadBaseMm +
 		((float)activeSettings->lookaheadPerMpsMm * targetSpeedMps);
@@ -1310,7 +1459,7 @@ void pathFollowerCaptureRunStartSettings(void)
 	runRouteShortcutReductionMm = 0.0f;
 	runRouteCount = 0U;
 	runRouteGeometryCrc32 = 0U;
-	runGenerationSettings = (ShortcutSettings){0U, 0U, 0U, 0U, 0U, 0U};
+	runGenerationSettings = (ShortcutSettings){0U, 0U, 0U, 0U, 0U, 0U, 0U};
 	if (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT)
 	{
 		runRouteSourceLog = routeSourceLog;
@@ -1435,10 +1584,11 @@ void writeShortcutSettings(void)
 	FIL file;
 	if (f_open(&file, PATH_SETTING_FILE, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
 	{
-		f_printf(&file, "%u,%03u,%03u,%04u,%04u,%03u",
+		f_printf(&file, "%u,%03u,%03u,%04u,%04u,%03u,%04u",
 			shortcutSettings.maxLevel, shortcutSettings.lookaheadBaseMm,
 			shortcutSettings.lookaheadPerMpsMm, shortcutSettings.kLateral_x100,
-			shortcutSettings.kHeading_x100, shortcutSettings.lineAlpha_x1000);
+			shortcutSettings.kHeading_x100, shortcutSettings.lineAlpha_x1000,
+			shortcutSettings.lineThetaGain_x1e9);
 		f_close(&file);
 	}
 }
@@ -1453,12 +1603,14 @@ void readShortcutSettings(void)
 {
 	FIL file;
 	char text[64] = {0};
-	int values[6] = {PATH_DEFAULT_MAX_LEVEL, PATH_DEFAULT_LOOKAHEAD_BASE_MM,
+	int values[7] = {PATH_DEFAULT_MAX_LEVEL, PATH_DEFAULT_LOOKAHEAD_BASE_MM,
 		PATH_DEFAULT_LOOKAHEAD_PER_MPS_MM, PATH_DEFAULT_KLATERAL_X100,
-		PATH_DEFAULT_KHEADING_X100, PATH_DEFAULT_LINE_ALPHA_X1000};
+		PATH_DEFAULT_KHEADING_X100, PATH_DEFAULT_LINE_ALPHA_X1000,
+		PATH_DEFAULT_LINE_THETA_GAIN_X1E9};
 	ShortcutSettings defaults = {PATH_DEFAULT_MAX_LEVEL, PATH_DEFAULT_LOOKAHEAD_BASE_MM,
 		PATH_DEFAULT_LOOKAHEAD_PER_MPS_MM, PATH_DEFAULT_KLATERAL_X100,
-		PATH_DEFAULT_KHEADING_X100, PATH_DEFAULT_LINE_ALPHA_X1000};
+		PATH_DEFAULT_KHEADING_X100, PATH_DEFAULT_LINE_ALPHA_X1000,
+		PATH_DEFAULT_LINE_THETA_GAIN_X1E9};
 	shortcutSettings = defaults;
 	bool repair = false;
 	int parsed = 0;
@@ -1466,8 +1618,8 @@ void readShortcutSettings(void)
 	{
 		if (f_gets(text, sizeof(text), &file) != NULL)
 		{
-			parsed = sscanf(text, "%d,%d,%d,%d,%d,%d", &values[0], &values[1], &values[2],
-				&values[3], &values[4], &values[5]);
+			parsed = sscanf(text, "%d,%d,%d,%d,%d,%d,%d", &values[0], &values[1], &values[2],
+				&values[3], &values[4], &values[5], &values[6]);
 		}
 		else repair = true;
 		f_close(&file);
@@ -1480,5 +1632,6 @@ void readShortcutSettings(void)
 	if (parsed >= 4 && pathSettingInRange(values[3], 0, PATH_KLATERAL_MAX_X100)) shortcutSettings.kLateral_x100 = (uint16_t)values[3]; else repair = true;
 	if (parsed >= 5 && pathSettingInRange(values[4], 0, PATH_KHEADING_MAX_X100)) shortcutSettings.kHeading_x100 = (uint16_t)values[4]; else repair = true;
 	if (parsed >= 6 && pathSettingInRange(values[5], 0, PATH_LINE_ALPHA_MAX_X1000)) shortcutSettings.lineAlpha_x1000 = (uint16_t)values[5]; else repair = true;
+	if (parsed >= 7 && pathSettingInRange(values[6], 0, PATH_LINE_THETA_GAIN_MAX_X1E9)) shortcutSettings.lineThetaGain_x1e9 = (uint16_t)values[6]; else repair = true;
 	if (repair) writeShortcutSettings();
 }

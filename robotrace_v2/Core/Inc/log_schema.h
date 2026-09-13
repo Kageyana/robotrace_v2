@@ -21,7 +21,7 @@
 #endif
 
 // 軽量ログを38バイトにし、IMU温度生コードを含めつつ通常不要な診断列を保存しない形式。
-#define LOG_SCHEMA_VERSION 3U
+#define LOG_SCHEMA_VERSION 4U
 
 #define LOG_FIELD_LIST_CORE(STORED, DERIVED) \
 	STORED(U16, cntlog, "%d", (uint16_t)cntRun) \
@@ -45,7 +45,7 @@
 	DERIVED(F32, x, "%f", log_x) \
 	DERIVED(F32, y, "%f", log_y)
 
-// 軽量ログから外した12バイト。詳細デバッグ時だけ末尾へ追加する。
+// 軽量ログから外した20バイト。詳細デバッグ時だけ末尾へ追加する。
 #define LOG_FIELD_LIST_DIAGNOSTIC(STORED, DERIVED) \
 	STORED(U8, slipFlag, "%d", (uint8_t)getSlipFlag()) \
 	STORED(U8, slipFlagLat, "%d", (uint8_t)getSlipFlagLat()) \
@@ -53,7 +53,10 @@
 	STORED(S16, motorVoltageCmdL_mV, "%d", (int16_t)(motorVoltageCmdL_V * 1000.0f)) \
 	STORED(S16, motorVoltageCmdR_mV, "%d", (int16_t)(motorVoltageCmdR_V * 1000.0f)) \
 	STORED(S16, motorpwmL, "%d", (int16_t)motorpwmL) \
-	STORED(S16, motorpwmR, "%d", (int16_t)motorpwmR)
+	STORED(S16, motorpwmR, "%d", (int16_t)motorpwmR) \
+	STORED(F32, lineMatchResidual_mm, "%f", pathLogLineMatchResidual_mm) \
+	STORED(U16, poseCorrection_um, "%d", pathLogPoseCorrection_um) \
+	STORED(S16, poseCorrectionHeading_cdeg, "%d", pathLogPoseCorrectionHeading_cdeg)
 
 #define LOG_FIELD_LIST_DEBUG(STORED, DERIVED) \
 	STORED(F32, acceleVal_X, "%f", imuVal.accele.x) \

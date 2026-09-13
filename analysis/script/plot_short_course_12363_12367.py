@@ -2,6 +2,7 @@ import csv,json,sys,os,tempfile
 from pathlib import Path
 sys.path.insert(0,str(Path('analysis/script').resolve()))
 from analyze_path_following import percentile
+from path_log_recovery import read_csv_log
 os.environ.setdefault('MPLCONFIGDIR', str(Path(tempfile.gettempdir()) / 'robotrace-matplotlib'))
 import matplotlib
 matplotlib.use('Agg')
@@ -12,9 +13,9 @@ fig,axs=plt.subplots(5,1,figsize=(11,15),constrained_layout=True)
 xy,axxy=plt.subplots(figsize=(7,7),layout='constrained')
 result=[]
 for n in range(12363,12368):
- with (Path('F:/Dropbox/Document/robotrace/Log/v2')/f'{n}.csv').open(encoding='utf-8-sig',newline='') as f:
-  rd=csv.reader(f); h=next(rd); cols=[(i,s) for i,s in enumerate(h) if s and '=' not in s]; raw=[r for r in rd if r]
- rows=[{s:float(r[i]) for i,s in cols} for r in raw]
+ log=read_csv_log(Path('F:/Dropbox/Document/robotrace/Log/v2')/f'{n}.csv')
+ rows=[{name:float(value) for name,value in row.items()} for row in log.rows]
+ raw=log.rows; cols=list(enumerate(log.fields))
  t=[r['cntlog']/1000 for r in rows]; dt=[b['cntlog']-a['cntlog'] for a,b in zip(rows,rows[1:])]
  result.append(dict(log=n,rows=len(rows),malformed_rows=sum(len(r)<len(cols) for r in raw),time_s=t[-1],distance_mm=rows[-1]['encTotalOptimal']/54.324,dt_min=min(dt),dt_max=max(dt),speed_error_p95_mps=percentile([abs(r['encCurrentN']-r['targetSpeed'])/53.424 for r in rows],.95),slip_long_samples=sum(r['slipFlag']!=0 for r in rows),slip_lat_samples=sum(r['slipFlagLat']!=0 for r in rows),index_last=rows[-1]['optimalIndex'],battery_min_V=min(r['batteryVoltage_mV'] for r in rows)/1000))
  axxy.plot([r['x'] for r in rows],[r['y'] for r in rows],label=str(n))

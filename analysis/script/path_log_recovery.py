@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""新ログからVersion 12のPATH参照列をメモリ上で復元する共通処理。"""
+"""新ログからVersion 12/13のPATH参照列をメモリ上で復元する共通処理。"""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from typing import Any
 
 
 PATH_MODES = {3, 4}
-PATH_ROUTE_CONTROLLER_VERSION = 12
+PATH_ROUTE_CONTROLLER_VERSIONS = {12, 13}
 PATH_ROUTE_SPACING_MM = 40.0
 PATH_ROUTE_MAX_POINTS = 1514
 PATH_GOAL_EXTENSION_MM = 500.0
@@ -178,22 +178,44 @@ def read_csv_log(path: Path) -> CsvLog:
     with path.open("r", encoding="utf-8-sig", newline="") as source:
         reader = csv.reader(source)
         try:
-            header = next(reader)
+            first_header = next(reader)
         except StopIteration as exc:
             raise ValueError(f"{path}: empty CSV") from exc
 
         fields: list[str] = []
         parameters: dict[str, str] = {}
-        for cell in header:
-            if "=" in cell:
-                name, value = cell.split("=", 1)
-                if name.strip():
-                    parameters[name.strip()] = value.strip()
-            else:
-                fields.append(cell.strip())
+
+        def parse_header(cells: list[str]) -> tuple[list[str], dict[str, str]]:
+            parsed_fields: list[str] = []
+            parsed_parameters: dict[str, str] = {}
+            for cell in cells:
+                cell = cell.strip()
+                if not cell:
+                    continue
+                if "=" in cell:
+                    name, value = cell.split("=", 1)
+                    if name.strip():
+                        parsed_parameters[name.strip()] = value.strip()
+                else:
+                    parsed_fields.append(cell)
+            return parsed_fields, parsed_parameters
+
+        fields, parameters = parse_header(first_header)
+        data_start_line = 2
+        if not fields and parameters:
+            try:
+                second_header = next(reader)
+            except StopIteration as exc:
+                raise ValueError(f"{path}: missing column header") from exc
+            fields, unexpected_parameters = parse_header(second_header)
+            if unexpected_parameters or not fields:
+                raise ValueError(f"{path}: invalid column header")
+            data_start_line = 3
+        elif not fields:
+            raise ValueError(f"{path}: invalid CSV header")
 
         rows: list[dict[str, str]] = []
-        for line_number, raw in enumerate(reader, start=2):
+        for line_number, raw in enumerate(reader, start=data_start_line):
             if len(raw) < len(fields):
                 continue
             rows.append({name: raw[index].strip() for index, name in enumerate(fields)})
@@ -568,7 +590,7 @@ def _route_header_mismatch(log: CsvLog, route: RouteBuild) -> str | None:
     if expected_crc != route.geometry_crc32:
         return f"routeGeometryCrc32不一致: header={expected_crc}, regenerated={route.geometry_crc32}"
     expected_version = parameter_int(log.parameters, "routeControllerVersion")
-    if expected_version != PATH_ROUTE_CONTROLLER_VERSION:
+    if expected_version not in PATH_ROUTE_CONTROLLER_VERSIONS:
         return f"未対応のrouteControllerVersion={expected_version}"
     expected_level = parameter_int(log.parameters, "shortcutLevel")
     if expected_level is None or expected_level != route.applied_level:
@@ -602,7 +624,7 @@ def recover_path_columns(
                         _missing_values(len(log.rows), "非PATH走行", 0), 0)
 
     version = parameter_int(log.parameters, "logSchemaVersion")
-    if version not in (2, 3):
+    if version not in (2, 3, 4):
         return _missing_recovery(log, f"未対応または不明なlogSchemaVersion={version}")
     source_number = parameter_int(log.parameters, "analysisSourceLog", 0) or 0
     if source_number <= 0:
@@ -635,6 +657,7 @@ def recover_path_columns(
     mismatch = _route_header_mismatch(log, route)
     if mismatch is not None:
         return _missing_recovery(log, mismatch, source_number, source_path, route)
+    route_version = parameter_int(log.parameters, "routeControllerVersion")
 
     values: list[dict[str, Any]] = []
     for row in log.rows:
@@ -651,10 +674,10 @@ def recover_path_columns(
             "linePointY_mm": float(line.y),
             "pathLegalMargin_mm": float(margin),
             "recovery_status": "restored",
-            "recovery_reason": "Version 12経路を元ログから再生成",
+            "recovery_reason": f"Version {route_version}経路を元ログから再生成",
             "recovery_source_log": source_number,
         })
-    reason = "指定設定による復元（過去実機設定の証明ではない）" if assumed else "Version 12経路を元ログから再生成"
+    reason = "指定設定による復元（過去実機設定の証明ではない）" if assumed else f"Version {route_version}経路を元ログから再生成"
     for value in values:
         if value["recovery_status"] == "restored":
             value["recovery_reason"] = reason
