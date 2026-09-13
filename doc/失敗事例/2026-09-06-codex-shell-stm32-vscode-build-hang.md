@@ -49,13 +49,20 @@ Codexの非対話シェルから起動したNinja固有の停止であること�
 
 ## 今後の予防策
 
-- このPCでは通常の最終ビルドをVS Code拡張のCMakeタスクから実行する。
+- CodexのCMake/Ninjaビルドは構成生成から最初からサンドボックス外で実行する。通常の最終ビルドをVS Code拡張のCMakeタスクから実行する場合も、Codexシェルでサンドボックス内のNinjaを先に試さない。
 - Codexシェルで確認する場合は、先に`robotrace_v2/.vscode/settings.json`とbundleの実体を確認し、CubeCLT環境と混同しない。
-- Ninjaが30秒以上無出力かつCPU 0のときは中断し、ARM GCCの直接実行でソース由来か環境由来かを切り分ける。
-- 通常サンドボックス内だけで停止し、ARM GCC単体が応答する場合は、同じCMake presetをサンドボックス外で再実行する。preset、作業ディレクトリ、生成先は変更しない。
+- サンドボックス内でNinjaが30秒以上無出力かつCPU 0、またはコンパイラ子プロセスを起動しない場合は中断する。ARM GCCの直接実行でソース由来か環境由来かを切り分ける。
+- サンドボックス内だけで停止し、ARM GCC単体が応答する場合は、同じCMake presetを構成生成からサンドボックス外で再実行する。preset、作業ディレクトリ、生成先は変更しない。
 - Release構成が`Detecting C compiler ABI info`で停止し、同じコンパイラのDebug全ビルドが成功済みの場合に限り、コンパイラ動作確認済みフラグを明示してABI試行を省略する。生成後は全コンパイル・リンクコマンドを実行して実体を検証する。
 - VS Code拡張からDebugMarkerとReleaseが成功した後に、本記録を`resolved`へ変更する。
 
 ## 確認方法
 
 VS CodeでDebugMarkerとReleaseのclean rebuildを実行し、両方のELF更新時刻、終了コード、新規warning、RAM/FLASH使用量を確認する。
+
+## 2026-09-12再発確認
+
+- `cmake --preset Release` はサンドボックス内で成功した。
+- 同じ `cmake --build --preset Release -- -j1` はサンドボックス内で2分以上無出力・CPU使用率0のまま停止したため、中断した。
+- 同じ作業ディレクトリ、同じRelease preset、同じ `-j1` をサンドボックス外で実行すると、既存warningは出たが終了コード0で全32工程とリンクまで完了した。
+- 今回もソース由来のビルド失敗ではなく、Codexサンドボックス内のNinja停止として再現防止策が有効だった。VS Code拡張からのclean rebuild確認は未実施のため、ステータスは `open` のままとする。

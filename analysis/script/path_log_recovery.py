@@ -602,7 +602,7 @@ def recover_path_columns(
                         _missing_values(len(log.rows), "非PATH走行", 0), 0)
 
     version = parameter_int(log.parameters, "logSchemaVersion")
-    if version != 2:
+    if version not in (2, 3):
         return _missing_recovery(log, f"未対応または不明なlogSchemaVersion={version}")
     source_number = parameter_int(log.parameters, "analysisSourceLog", 0) or 0
     if source_number <= 0:

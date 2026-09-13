@@ -178,7 +178,7 @@ Codex は主にファームウェア開発に使用します。必要に応じ�
 
 主な開発環境は VS Code、STM32CubeIDE for Visual Studio Code 拡張機能、STM32CubeCLT、STM32CubeMX です。`.vscode/` には CMake、Flash、ST-Link デバッグ用の設定があります。
 
-このPCの通常ビルドはVS Code拡張「STM32CubeIDE for Visual Studio Code」から実行し、`robotrace_v2/.vscode/settings.json`の`cube-cmake`とSTM32Cube bundle環境を正とします。
+このPCの通常ビルドはVS Code拡張「STM32CubeIDE for Visual Studio Code」から実行し、`robotrace_v2/.vscode/settings.json`の`cube-cmake`とSTM32Cube bundle環境を正とします。CodexのCMake/Ninjaビルドは、構成生成を含めて最初からサンドボックス外で実行します。サンドボックス内でNinjaを先に試してから切り替える運用はしません。
 
 想定ツールは CMake 3.22 以上、Ninja、ARM GCC、STM32CubeCLT、`STM32_Programmer_CLI` です。
 
@@ -191,6 +191,8 @@ Codex は主にファームウェア開発に使用します。必要に応じ�
 - 詳細手順は `.agents/skills/robotrace-flash-debug/SKILL.md` を使う。
 
 Codex が CLI でビルド確認する場合は、`robotrace_v2/` から以下を実行します。Codex のシェルでは `cube-cmake` が PATH に無い場合があるため、通常の `cmake` コマンドを使います。
+
+CodexのCLIビルドは、CMake/Ninjaの停止事例を避けるため、`cmake --preset` と `cmake --build` の両方を最初からサンドボックス外で実行します。サンドボックス内で30秒以上無出力かつCPU使用率0、またはコンパイラ子プロセスが起動しない場合は停止事象とみなし、安全に中断して同じ作業ディレクトリ・preset・生成先のままサンドボックス外で再実行します。`build/` の削除、`git reset`、preset変更で回避しません。
 
 ```powershell
 cmake --preset Debug
@@ -467,9 +469,9 @@ cmake --build --preset Release
 
 - ログファイルは CSV 形式、ヘッダ有り、文字コード UTF-8、区切り文字はカンマ。
 - ログファイル名は通し番号を使う。
-- ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。`logSchemaVersion=2` は `linePointX_mm`, `linePointY_mm`, `pathLegalMargin_mm` を保存しない形式で、通常バイナリレコードは旧形式より12バイト短い。旧CSVは3列が存在する場合に保存値を優先して扱う。
+- ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。`logSchemaVersion=3` の通常軽量ログは1レコード38バイト固定とし、BMI088温度の生11ビットコードを`imuTempRaw`として保存し、`ROC`の直後に符号付き16ビットの`encCurrentL`, `encCurrentR`を保存する。`imuTempRaw=0x400`は無効値とする。Version 2で省略した`linePointX_mm`, `linePointY_mm`, `pathLegalMargin_mm`に加えて、通常ログでは`motorpwmL`, `motorpwmR`, `slipFlag`, `slipFlagLat`, `lineTraceCtrl`, `motorVoltageCmdL_mV`, `motorVoltageCmdR_mV`を保存しない。旧CSVはヘッダ名で列を解決し、復元対象3列が存在する場合に保存値を優先して扱う。スキーマ2の通常CSVにある`motorpwmL`, `motorpwmR`は読み取り可能で、`encCurrentL`, `encCurrentR`, `imuTempRaw`は未記録として扱う。
 - ログヘッダにはログデータ名とパラメータが含まれる。パラメータは `パラメータ名=value` 形式で記載される。
-- `courseAnalysis.c` の2次ログ再解析は、`courseMarker`, `encTotalOptimal`, `ROC`, `targetSpeed`, `optimalIndex`, `slipFlag`, `slipFlagLat` をCSVヘッダ名から解決する。ログ列追加時に固定列番号へ依存しない。
+- `courseAnalysis.c` の通常経路生成は、`courseMarker`, `encTotalOptimal`, `ROC`をCSVヘッダ名から解決する。追加スリップ解析を行う場合だけ、旧形式または詳細デバッグログの`targetSpeed`, `optimalIndex`, `slipFlag`, `slipFlagLat`も必要とする。ログ列追加時に固定列番号へ依存しない。
 - 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_MARKER`, `BOOST_DISTANCE`, `BOOST_SHORTCUT`, `BOOST_PATH_REPLAY` を正とする。
 - 新しい走行モードを追加する場合は、`robotrace_v2/Core/Inc/courseAnalysis.h` に定義を追加する。
 - `emcStop` が 0 以外の場合は緊急停止しており、ゴールしていない走行として扱う。
@@ -478,14 +480,15 @@ cmake --build --preset Release
 - 全走行ログのヘッダには`logSchemaVersion`、`analysisSourceLog`、`slipSourceLog`を残す。一次走行、解析元不明、解析失敗時の番号は0とし、PATH系では`analysisSourceLog`と`routeSourceLog`を一致させる。走行開始時に固定した値を停止後のヘッダへ出力し、保存前の解析番号やUI変更で置き換えない。
 - PATH系ログの復元情報として、`routePointCount`、`routeGeometryCrc32`、`shortcutRequestedLevel`、実採用値の`shortcutLevel`、`shortcutSettings.*`（走行開始時）と`routeShortcutSettings.*`（経路生成時）を記録する。`routeGeometryCrc32`はVersion 12の整数XY経路を固定リトルエンディアンでCRC32化した値とする。
 - 新しい緊急停止条件を追加する場合は、`robotrace_v2/Core/Inc/emergencyStop.h` に定義を追加する。
-- ログ解析では、ラップタイム、速度追従、角速度、スリップを重視する。
+- 通常ログ解析では、ラップタイム、速度追従、角速度、経路追従状態を重視する。スリップは該当列を含む旧形式または詳細デバッグログでのみ評価する。
 - バッテリー状態はログ内パラメータ `batteryVoltage_V` を参照する。単位は `[V]`。
-- `batteryVoltage_mV` は走行中にLPF更新したバッテリー電圧 `[mV]`、`motorVoltageCmdL_mV`, `motorVoltageCmdR_mV` はバッテリー電圧で割る前の左右モーター指令電圧 `[mV]` とする。
-- `motorpwmL`, `motorpwmR` は電圧補償後に実際にタイマへ出力した飽和後DUTYとする。
+- `batteryVoltage_mV` は走行中にLPF更新したバッテリー電圧 `[mV]` とする。詳細デバッグログの`motorVoltageCmdL_mV`, `motorVoltageCmdR_mV`はバッテリー電圧で割る前の左右モーター指令電圧 `[mV]` とする。
+- `encCurrentL`, `encCurrentR` は左右エンコーダの符号付き1 msパルス数とする。`encCurrentN`、`encCurrentCorr_p`、XY座標算出方法は変更しない。
+- 詳細デバッグログの`motorpwmL`, `motorpwmR`は電圧補償後に実際にタイマへ出力した飽和後DUTYとする。通常ログでは左右エンコーダ列を優先して置き換える。
 - `LOG_SCHEMA_PROFILE_LIGHT=0` のデバッグログでは `markerSensor`（LED差分から得たマーカー状態）、`sgMarkerCount`（スタート・ゴールマーカー累積数）、`encRightMarker_p`（右マーカーからの補正後エンコーダパルス）、`patternTrace`（走行状態）を追加出力する。ログヘッダには終了時の `sgMarkerAtLogEnd` と `encRightMarkerAtLogEnd_p` も出力する。
 - 経路追従ログの `lineValid` は限定補正可能状態、`pathErrorY_mm` は経路横偏差 [mm]、`pathErrorHeading_cdeg` は経路制御バージョン4以降では最近傍経路点との方位偏差 [0.01 deg]、`pathState` は追従状態とする。バージョン3以前の`pathErrorHeading_cdeg`は先読み方位との偏差であり、バージョン4以降とp95を直接比較しない。`linePointX_mm`, `linePointY_mm`, `pathLegalMargin_mm`は新形式ではPC上で元一次ログ・設定・`optimalIndex`から復元する。
 - ログヘッダの`tgtParam.pathReplay`はLevel 0 PATH REPLAY速度上限[m/s]とする。
-- 通常ログは `LOG_SCHEMA_PROFILE_LIGHT=1` を既定とし、ラップタイム、速度追従、角速度、マーカー、スリップフラグ、電圧指令、実DUTY、XY確認に必要な列だけを残す。
+- 通常ログは `LOG_SCHEMA_PROFILE_LIGHT=1` を既定とし、1レコード38バイト固定でラップタイム、速度追従、角速度、BMI088温度生コード、マーカー、左右エンコーダ、経路追従、XY確認に必要な列だけを残す。実DUTYが必要な場合は詳細デバッグプロファイルを使用する。
 - 加速度、電流、スリップ内部量などの詳細デバッグ列が必要な場合は、ビルド定義で `LOG_SCHEMA_PROFILE_LIGHT=0` にして一時的に出力する。
 - ログ同士を比較する場合は、`batteryVoltage_V` の差を考慮する。電圧差によるモーター出力、速度追従、加速性能、スリップ傾向の変化を無視しない。
 - ログ形式を安易に変更しない。形式変更が必要な場合は、スキーマまたはドキュメントも合わせて更新する。
@@ -544,6 +547,7 @@ cmake --build --preset Release
 - 2026-08-23: 機体投影半幅65 mm、外接半径100 mm、走行可能領域端まで200 mmを入力した。許容オフセット49.5 mm、境界残余50.5 mmを確認し、経路制御バージョン2でLevel 1のショートカット形状生成を有効化した。
 - 2026-09-06: 経路制御バージョン3で、実走行経路の累積弧長と推定機体方位による対応点候補制限を追加した。ヘアピン出口や近接並走区間へのindexジャンプを防ぎ、候補がない場合はindexを保持して既存の100 msロスト判定へ渡す。
 - 2026-09-06: 経路制御バージョン4で、方位FBと再合流判定を先読み方位差から最近傍経路点の接線方位差へ変更した。先読み方位は曲率FF専用とし、小R手前の早期旋回を抑える。
+- 2026-09-12: `logSchemaVersion=3`の通常軽量ログへBMI088温度生コード`imuTempRaw`を追加し、38バイト固定へ更新した。`ROC`直後へ左右エンコーダ列を追加し、通常ログから左右モーターPWM、スリップフラグ、ライン制御出力、左右モーター電圧指令を外した。モーターPWM等は詳細デバッグプロファイルで引き続き取得でき、スキーマ2の既存CSVは互換維持する。
 - 2026-09-06: 経路制御バージョン5で、`BOOST_PATH_REPLAY` / `BOOST_SHORTCUT`の停止判定を右マーカー回数から分離した。Level 0、Level 1それぞれの実走行経路終端をスタート位置への帰着点とみなし、その500 mm手前へ到達したときに停止を開始する。
 - 2026-09-06: 経路制御バージョン6で、PATH系の帰着点を経路終端ではなく、経路進捗80%以降で座標原点 `(0, 0)` に最も近い経路上の点へ変更した。その帰着点から累積弧長で500 mm手前を停止開始位置とする。
 - 2026-09-06: 経路制御バージョン7で、PATH系の実走行経路を一次走行終端から座標原点 `(0, 0)` へ向かう直線方向に500 mm延長し、その延長終端を停止開始位置とした。原点近傍を通る途中区間は停止判定に使わない。

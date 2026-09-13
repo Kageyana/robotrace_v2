@@ -15,10 +15,10 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - Logs are CSV, UTF-8, comma-separated, with a header.
 - The schema source is `robotrace_v2/Core/Inc/log_schema.h`.
 - The log header contains data names and `parameter=value` entries.
-- `logSchemaVersion=2` omits `linePointX_mm`, `linePointY_mm`, and `pathLegalMargin_mm` from CSV and binary records. Old CSVs containing all three columns use the saved values first.
+- `logSchemaVersion=2` omits `linePointX_mm`, `linePointY_mm`, and `pathLegalMargin_mm` from CSV and binary records. `logSchemaVersion=3` adds the unsigned 16-bit BMI088 `imuTempRaw` code, replaces normal-light `motorpwmL`/`motorpwmR` with signed `encCurrentL`/`encCurrentR` after `ROC`, and also omits `slipFlag`, `slipFlagLat`, `lineTraceCtrl`, `motorVoltageCmdL_mV`, and `motorVoltageCmdR_mV` from the normal light profile, making one binary record 38 bytes. Existing schema 2 CSVs remain readable by header name; their motor PWM columns are retained and encoder-side/temperature columns are reported as not recorded. Old CSVs containing the three reconstructable columns use the saved values first.
 - For new PATH logs, recover the three omitted values in memory from `analysisSourceLog` (or `routeSourceLog` only for old logs), the source CSV, the Version 12 generator settings, and `optimalIndex`. Search beside the secondary log by default; use `--source-log-dir` for another folder.
 - Do not substitute a cntlog-repaired source CSV automatically. Require route point-count, `routeGeometryCrc32`, controller version, and generated-result header checks before recovery. Missing source, unsupported version, CRC mismatch, or out-of-range index produces missing values, not zero or a normal value.
-- Firmware-side secondary-log parsing resolves required fields by header name, not fixed column number. Required fields are `courseMarker`, `encTotalOptimal`, `ROC`, `targetSpeed`, `optimalIndex`, `slipFlag`, and `slipFlagLat`.
+- Firmware-side route parsing resolves required fields by header name, not fixed column number. Normal route generation requires `courseMarker`, `encTotalOptimal`, and `ROC`. The optional additional slip analysis requires a legacy or debug log containing `targetSpeed`, `optimalIndex`, `slipFlag`, and `slipFlagLat`.
 - Distinguish run mode by `optimalTrace`.
 - Exclude failed runs when `emcStop != 0`.
 - Invalidate logs with `cntlog` gaps or processing drops; identify and report the cause.
@@ -37,7 +37,7 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
    - XY trajectory
    - speed tracking
    - angular velocity
-   - slip
+   - slip when the columns are present; otherwise report it as not recorded
    - lap time comparison table
 5. Save generated graphs and tables under `analysis/`.
 6. Report comparison target logs, changed condition, adoption decision, and remaining issues.
@@ -46,17 +46,20 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 
 - `cntlog`: time after run start, based on `cntRun`, `[ms]`.
 - `encCurrentN`: average left/right encoder pulse count per 1 ms.
+- `encCurrentL`, `encCurrentR`: signed left/right encoder pulse counts per 1 ms; schema version 3 normal-light logs store them immediately after `ROC`.
 - `gyroVal_Z`: IMU Z angular velocity, `[deg/s]`.
+- `imuTempRaw`: BMI088 temperature register raw 11-bit code stored in a `uint16_t`; `0x400` is the invalid code. Convert with `temperature_C = signed_code * 0.125 + 23` after 11-bit two's-complement decoding.
 - `courseMarker`: confirmed marker state while running.
 - `encTotalOptimal`: corrected distance count for secondary runs.
 - `ROC`: curvature radius, `[mm]`.
 - `targetSpeed`: target speed in encoder converted units, `[pulse/ms]`.
 - `optimalIndex`: index into `PPAD[]` or `shortCutxycie[]`.
-- `slipFlag`: longitudinal slip flag.
-- `slipFlagLat`: lateral slip flag.
-- `lineTraceCtrl`: current log column name; value is `lineTraceOmegaFBCtrl.pwm`.
+- `slipFlag`: longitudinal slip flag; schema version 3 light logs omit it.
+- `slipFlagLat`: lateral slip flag; schema version 3 light logs omit it.
+- `lineTraceCtrl`: value is `lineTraceOmegaFBCtrl.pwm`; schema version 3 light logs omit it.
 - `targetAngularvelo`: log target angular velocity, `[deg/s]`.
-- `motorpwmL`, `motorpwmR`: left/right motor PWM.
+- `motorpwmL`, `motorpwmR`: left/right motor PWM; schema version 3 normal-light logs omit them, while detailed debug logs retain them. Schema version 2 normal-light CSVs contain them in their original positions.
+- `motorVoltageCmdL_mV`, `motorVoltageCmdR_mV`: motor voltage commands before duty conversion; schema version 3 light logs omit them.
 - `x`, `y`: estimated position from the start marker origin, `[mm]`.
 - `linePointX_mm`, `linePointY_mm`: corresponding first-run line point, `[mm]`; stored in old CSVs and reconstructed in memory for schema version 2.
 - `pathErrorY_mm`: signed lateral path error, `[mm]`.

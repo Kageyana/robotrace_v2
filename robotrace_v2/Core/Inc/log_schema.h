@@ -20,27 +20,23 @@
 #define LOG_SCHEMA_PROFILE_LIGHT 1
 #endif
 
-// linePointX/YとpathLegalMarginを保存しないログ形式。
-#define LOG_SCHEMA_VERSION 2U
+// 軽量ログを38バイトにし、IMU温度生コードを含めつつ通常不要な診断列を保存しない形式。
+#define LOG_SCHEMA_VERSION 3U
 
 #define LOG_FIELD_LIST_CORE(STORED, DERIVED) \
 	STORED(U16, cntlog, "%d", (uint16_t)cntRun) \
 	STORED(U16, encCurrentN, "%d", (uint16_t)encCurrentN) \
 	STORED(F32, gyroVal_Z, "%f", imuVal.gyro.z) \
+	STORED(U16, imuTempRaw, "%d", (uint16_t)imuVal.tempRaw) \
 	STORED(U8, courseMarker, "%d", courseMarkerLog) \
 	STORED(U32, encTotalOptimal, "%d", (uint32_t)encTotalOptimal) \
 	DERIVED(F32, ROC, "%f", log_roc) \
+	STORED(S16, encCurrentL, "%d", (int16_t)encCurrentL) \
+	STORED(S16, encCurrentR, "%d", (int16_t)encCurrentR) \
 	STORED(U8, targetSpeed, "%d", targetSpeed) \
 	STORED(U16, optimalIndex, "%d", (uint16_t)optimalIndex) \
-	STORED(U8, slipFlag, "%d", (uint8_t)getSlipFlag()) \
-	STORED(U8, slipFlagLat, "%d", (uint8_t)getSlipFlagLat()) \
-	STORED(S16, lineTraceCtrl, "%d", (int16_t)lineTraceOmegaFBCtrl.pwm) \
 	STORED(S16, targetAngularvelo, "%d", (int16_t)log_targetAngularVelocity) \
-	STORED(S16, motorpwmL, "%d", (int16_t)motorpwmL) \
-	STORED(S16, motorpwmR, "%d", (int16_t)motorpwmR) \
 	STORED(U16, batteryVoltage_mV, "%d", (uint16_t)(batteryVoltage_V * 1000.0f)) \
-	STORED(S16, motorVoltageCmdL_mV, "%d", (int16_t)(motorVoltageCmdL_V * 1000.0f)) \
-	STORED(S16, motorVoltageCmdR_mV, "%d", (int16_t)(motorVoltageCmdR_V * 1000.0f)) \
 	STORED(U32, encCurrentCorr_p, "%d", (uint32_t)Control_GetEncCurrentCorr_p()) \
 	STORED(U8, lineValid, "%d", pathLogLineValid) \
 	STORED(F32, pathErrorY_mm, "%f", pathLogErrorY_mm) \
@@ -48,6 +44,16 @@
 	STORED(U8, pathState, "%d", pathLogState) \
 	DERIVED(F32, x, "%f", log_x) \
 	DERIVED(F32, y, "%f", log_y)
+
+// 軽量ログから外した12バイト。詳細デバッグ時だけ末尾へ追加する。
+#define LOG_FIELD_LIST_DIAGNOSTIC(STORED, DERIVED) \
+	STORED(U8, slipFlag, "%d", (uint8_t)getSlipFlag()) \
+	STORED(U8, slipFlagLat, "%d", (uint8_t)getSlipFlagLat()) \
+	STORED(S16, lineTraceCtrl, "%d", (int16_t)lineTraceOmegaFBCtrl.pwm) \
+	STORED(S16, motorVoltageCmdL_mV, "%d", (int16_t)(motorVoltageCmdL_V * 1000.0f)) \
+	STORED(S16, motorVoltageCmdR_mV, "%d", (int16_t)(motorVoltageCmdR_V * 1000.0f)) \
+	STORED(S16, motorpwmL, "%d", (int16_t)motorpwmL) \
+	STORED(S16, motorpwmR, "%d", (int16_t)motorpwmR)
 
 #define LOG_FIELD_LIST_DEBUG(STORED, DERIVED) \
 	STORED(F32, acceleVal_X, "%f", imuVal.accele.x) \
@@ -75,6 +81,7 @@
 #else
 #define LOG_FIELD_LIST(STORED, DERIVED) \
 	LOG_FIELD_LIST_CORE(STORED, DERIVED) \
+	LOG_FIELD_LIST_DIAGNOSTIC(STORED, DERIVED) \
 	LOG_FIELD_LIST_DEBUG(STORED, DERIVED)
 #endif
 // 詳細デバッグ列の追加候補:
@@ -99,5 +106,7 @@
 #define LOG_RECORD_SIZE_SKIP(type, name, fmt, expr)
 // 1レコード分のバイトサイズ。
 enum { LOG_RECORD_SIZE_BYTES = 0 LOG_FIELD_LIST(LOG_RECORD_SIZE_ADD, LOG_RECORD_SIZE_SKIP) };
+_Static_assert(!LOG_SCHEMA_PROFILE_LIGHT || LOG_RECORD_SIZE_BYTES == 38U,
+	"Light log record must remain 38 bytes");
 
 #endif // LOG_SCHEMA_H_

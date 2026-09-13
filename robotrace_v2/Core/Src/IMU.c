@@ -86,6 +86,8 @@ static void applyOffsetIMU(void)
 	imuVal.Gid = BMI088val.Gid;
 	imuVal.Initialized = BMI088val.Initialized;
 	imuVal.temp = BMI088val.temp;
+	imuVal.tempRaw = BMI088val.tempRaw;
+	imuVal.tempValid = BMI088val.tempValid;
 
 	// ジャイロ補正（物理量オフセット除去後に方向係数を適用）
 	imuVal.gyro.x = (BMI088val.gyro.x - angleOffset[0]) * COEFF_DPD;
