@@ -112,9 +112,9 @@ File: `boost_%05d.csv`
 - Row format: `index,boost_speed`, with `boost_speed` as `%.3f`.
 - Slip-analysis SD read errors can append diagnostic rows to the same file.
 
-### Log provenance and schema version 4
+### Log provenance and schema version 5
 
-- Firmware logs set `logSchemaVersion=4`. The normal light profile remains 38 bytes. The detailed profile appends `lineMatchResidual_mm`, `poseCorrection_um`, and `poseCorrectionHeading_cdeg`; older schema 2 and 3 logs remain readable.
+- Firmware logs set `logSchemaVersion=5`. The normal light profile is 36 bytes; `encCurrentCorr_p` is a signed 16-bit Kalman-fused 1 ms pulse difference. The detailed profile appends `lineMatchResidual_mm`, `poseCorrection_um`, and `poseCorrectionHeading_cdeg`; older schema 2～4 logs remain readable.
 - Every run records `analysisSourceLog` and `slipSourceLog`. Primary runs, unknown sources, failed analysis, and unused slip analysis use `0`; a successful PATH analysis also keeps `routeSourceLog` for compatibility and the two values must match.
 - PATH headers record `routePointCount`, `routeGeometryCrc32`, `shortcutRequestedLevel`, applied `shortcutLevel`, `shortcutBuildStatus`, `shortcutCorridorCount`, `shortcutReduction_mm`, and both the run-start `shortcutSettings.*` and generation-time `routeShortcutSettings.*` values. The seven setting fields are `maxLevel`, `lookaheadBaseMm`, `lookaheadPerMpsMm`, `kLateral_x100`, `kHeading_x100`, `lineAlpha_x1000`, and `lineThetaGain_x1e9`.
 - PC analysis searches the secondary log directory for `analysisSourceLog` and regenerates the Version 12 or 13 route in memory. It must verify point count, CRC, generator result headers, and `optimalIndex` before restoring the three fields. It never overwrites the original CSV or silently replaces the source with a cntlog-repaired copy.

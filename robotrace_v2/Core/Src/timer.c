@@ -26,6 +26,7 @@ static volatile bool logWriteReq = false;
 /////////////////////////////////////////////////////////////////////
 void Interrupt1ms(void)
 {
+	static bool calibrationWasActive = false;
 
 	// Interrupt 1ms
 	cntRun++;
@@ -65,6 +66,15 @@ void Interrupt1ms(void)
 		{
 			calibrationIMU();
 		}
+		if (calibrationWasActive && !calibratIMU)
+		{
+			Control_ResetDistanceFusion();
+		}
+		calibrationWasActive = calibratIMU;
+	}
+	else
+	{
+		calibrationWasActive = false;
 	}
 
 	// 経路モードは平均速度PIDとヨーレートPIDを使用する。

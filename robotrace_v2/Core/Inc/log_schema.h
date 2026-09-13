@@ -20,8 +20,8 @@
 #define LOG_SCHEMA_PROFILE_LIGHT 1
 #endif
 
-// 軽量ログを38バイトにし、IMU温度生コードを含めつつ通常不要な診断列を保存しない形式。
-#define LOG_SCHEMA_VERSION 4U
+// 軽量ログを36バイトにし、IMU温度生コードを含めつつ通常不要な診断列を保存しない形式。
+#define LOG_SCHEMA_VERSION 5U
 
 #define LOG_FIELD_LIST_CORE(STORED, DERIVED) \
 	STORED(U16, cntlog, "%d", (uint16_t)cntRun) \
@@ -37,7 +37,7 @@
 	STORED(U16, optimalIndex, "%d", (uint16_t)optimalIndex) \
 	STORED(S16, targetAngularvelo, "%d", (int16_t)log_targetAngularVelocity) \
 	STORED(U16, batteryVoltage_mV, "%d", (uint16_t)(batteryVoltage_V * 1000.0f)) \
-	STORED(U32, encCurrentCorr_p, "%d", (uint32_t)Control_GetEncCurrentCorr_p()) \
+	STORED(S16, encCurrentCorr_p, "%d", (int16_t)Control_GetEncCurrentCorr_p()) \
 	STORED(U8, lineValid, "%d", pathLogLineValid) \
 	STORED(F32, pathErrorY_mm, "%f", pathLogErrorY_mm) \
 	STORED(S16, pathErrorHeading_cdeg, "%d", pathLogErrorHeading_cdeg) \
@@ -88,7 +88,6 @@
 	LOG_FIELD_LIST_DEBUG(STORED, DERIVED)
 #endif
 // 詳細デバッグ列の追加候補:
-// STORED(F32, slipDistScaleF, "%f", Control_GetSlipDistScale())
 // STORED(U32, distEncRaw_p, "%d", (uint32_t)Control_GetDistEncRaw_p())
 // STORED(U32, distCorr_p, "%d", (uint32_t)Control_GetDistCorr_p())
 // STORED(U32, distSlipLoss_p, "%d", (uint32_t)Control_GetDistSlipLoss_p())
@@ -109,7 +108,7 @@
 #define LOG_RECORD_SIZE_SKIP(type, name, fmt, expr)
 // 1レコード分のバイトサイズ。
 enum { LOG_RECORD_SIZE_BYTES = 0 LOG_FIELD_LIST(LOG_RECORD_SIZE_ADD, LOG_RECORD_SIZE_SKIP) };
-_Static_assert(!LOG_SCHEMA_PROFILE_LIGHT || LOG_RECORD_SIZE_BYTES == 38U,
-	"Light log record must remain 38 bytes");
+_Static_assert(!LOG_SCHEMA_PROFILE_LIGHT || LOG_RECORD_SIZE_BYTES == 36U,
+	"Light log record must remain 36 bytes");
 
 #endif // LOG_SCHEMA_H_

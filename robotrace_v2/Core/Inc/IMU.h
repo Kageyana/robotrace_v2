@@ -39,5 +39,6 @@ void calcDegrees(void);
 void calcVelocity(void);
 void clearIMUval(void);
 void calibrationIMU(void);
+float IMU_GetForwardAccelerationMps2(void);
 
 #endif // IMU_H_

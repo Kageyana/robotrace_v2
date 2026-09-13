@@ -11,16 +11,19 @@ from pathlib import Path
 
 from normalize_log_headers import inspect_log, normalized_bytes, replace_atomically
 from path_log_recovery import read_csv_log
+from repair_cntlog_wrap import decode_distance_pulse
 
 
 FIELDS = "cntlog,encCurrentN,gyroVal_Z,courseMarker,encTotalOptimal,ROC,x,y,"
-METADATA = "fwVersion=v2-dev,optimalTrace=0.00,emcStop=0.00,"
+METADATA = "fwVersion=v2-dev,logSchemaVersion=5,optimalTrace=0.00,emcStop=0.00,"
 DATA = "10,54,1.5,0,540,3000.0,0.0,10.0,\n20,55,1.0,0,1090,3000.0,0.1,20.0,\n"
 
 
 class LogHeaderFormatTests(unittest.TestCase):
     def temporary_directory(self) -> tempfile.TemporaryDirectory[str]:
-        return tempfile.TemporaryDirectory(dir=Path.cwd())
+        # Dropbox 配下では Windows の一時ディレクトリ作成が拒否される
+        # 環境があるため、テスト用ディレクトリは OS の既定領域を使う。
+        return tempfile.TemporaryDirectory()
 
     def write_log(self, directory: Path, text: str, name: str = "1.csv") -> Path:
         path = directory / name
@@ -78,6 +81,21 @@ class LogHeaderFormatTests(unittest.TestCase):
             replace_atomically(inspect_log(path))
             self.assertEqual(inspect_log(path).state, "normalized")
             self.assertEqual(path.stat().st_mtime_ns, expected_mtime_ns)
+
+    def test_schema_versions_2_to_5_are_read_by_header_name(self) -> None:
+        with self.temporary_directory() as temp_dir:
+            directory = Path(temp_dir)
+            for version in (2, 3, 4, 5):
+                metadata = f"logSchemaVersion={version},optimalTrace=0,emcStop=0,"
+                path = self.write_log(directory, metadata + "\n" + FIELDS + "\n" + DATA,
+                                      f"{version}.csv")
+                log = read_csv_log(path)
+                self.assertEqual(log.parameters["logSchemaVersion"], str(version))
+                self.assertEqual(log.rows[0]["encTotalOptimal"], "540")
+
+    def test_distance_pulse_decode_keeps_old_u32_compatibility(self) -> None:
+        self.assertEqual(decode_distance_pulse("4294967295", 4), -1)
+        self.assertEqual(decode_distance_pulse("-1", 5), -1)
 
 
 if __name__ == "__main__":

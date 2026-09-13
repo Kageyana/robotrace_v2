@@ -78,13 +78,6 @@
 #define SLIP_CUR_MAX_SCALE         1.25f   // 閾値スケール上限
 #define SLIP_CUR_MIN_A             0.10f   // ほぼ惰性/停止時は補正を無効化
 
-// スリップ距離補正パラメータ
-#define SLIP_DIST_CORRECTION_ENABLE	0		// encTotalOptimal補正の有効/無効
-#define SLIP_DIST_MIN_SCALE			0.8f	// 要調整
-#define SLIP_DIST_MIN_SCALE_LAT		0.9f	// 要調整
-#define SLIP_DIST_LPF_COEF_DOWN		0.15f	// 悪化追従
-#define SLIP_DIST_LPF_COEF_UP		0.06f	// 回復追従
-
 // ゴール
 #define COUNT_GOAL 2 // ゴールマーカーを読む回数
 
@@ -173,6 +166,7 @@ void writeTgtspeeds(void);
 void readTgtspeeds(void);
 void checkCrossLine(void);
 void updateSlipDetection(void);
+void Control_ResetDistanceFusion(void);
 void Control_ApplyMarkerCorrection_p(int32_t diff_p);
 float getSlipIndicatorRaw(void);
 float getSlipIndicatorFiltered(void);
@@ -190,7 +184,5 @@ int32_t Control_GetEncCurrentCorr_p(void);
 int32_t Control_GetDistEncRaw_p(void);
 int32_t Control_GetDistCorr_p(void);
 int32_t Control_GetDistSlipLoss_p(void);
-float Control_GetSlipDistScale(void);
-float Control_GetSlipDistScaleRaw(void);
 
 #endif // CONTROL_H_

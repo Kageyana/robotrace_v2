@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "control.h"
+#include "distanceEstimator.h"
 #include "pathFollower.h"
 #include "BMI088.h"
 #include "PIDcontrol.h"
@@ -78,15 +79,12 @@ static bool slipFlag = false;							// 縦スリップ判定フラグ
 static bool slipFlagLat = false;						// 横スリップ判定フラグ
 static bool slipLatEnabledLog = false;					// 横滑り判定の有効条件
 static bool slipLatOnCountEnabledLog = false;			// 横滑りONカウント許可条件
-// スリップ距離補正用の状態
-static float slipDistScaleRaw = 1.0f;					// 距離補正スケール（生）
-static float slipDistScaleF = 1.0f;						// 距離補正スケール（LPF後）
-// スリップ距離補正（パルス版）
+// 距離融合のパルス変換状態
 static int32_t distEncRaw_p = 0;						// 生パルス積算
-static int32_t distCorr_p = 0;							// 補正後パルス積算
-static int32_t distSlipLoss_p = 0;						// 生 - 補正 の積算
-static float distCorrFrac_p = 0.0f;						// 補正後パルスの小数残差
-static int32_t encCurrentCorr_p = 0;					// 補正後の現在速度[pulse/1ms]
+static int32_t distCorr_p = 0;							// 融合後パルス積算
+static int32_t distSlipLoss_p = 0;						// 生 - 融合後の積算
+static float distCorrFrac_p = 0.0f;						// 融合後パルスの小数残差
+static int32_t encCurrentCorr_p = 0;					// 融合後の現在速度[pulse/1ms]
 // スリップ検出用の内部状態（RAM節約のためSLIP_CUR_ENABLEでメンバ切り替え）
 typedef struct {
 	bool prevRunning;
@@ -105,10 +103,7 @@ typedef struct {
 #endif
 } SlipDetState;
 static SlipDetState slipDetState = {0};
-// スリップ距離補正（パルス版）
 static void slipResetAll(SlipDetState *st);
-static void slipDistReset(void);
-static int32_t slipDistUpdateAndApply_p(float rawScale, int32_t dEncRaw_p);
 static const char *getRunStartBlockReason(void);
 static bool isRunStartAllowed(void);
 static void showRunStartBlocked(const char *reason);
@@ -426,6 +421,7 @@ void initSystem(void)
 	enableCycleCounter(); // カウント開始
 
 	updateBatteryVoltage(); // バッテリ電圧を計算
+	DistanceEstimator_Initialize(0.0F);
 
 	encClick = 0; // ホイールクリッククリア
 
@@ -719,9 +715,7 @@ void loopSystem(void)
 		if (SGmarker > 0)
 		{
 			// 変数初期化
-			// スリップ距離補正（パルス版）
 			// スタート地点基準で状態を初期化
-			// スリップ距離補正（パルス版）
 			encTotalN = 0;
 			encTotalOptimal = 0;
 			encLog = 0;
@@ -733,10 +727,10 @@ void loopSystem(void)
 			cntRun = 0;
 			cntLog = 0;
 			slipResetAll(&slipDetState);
-			slipDistReset();
 			DistanceOptimal = 0;
 			optimalIndex = 0;
 			clearIMUval(); // IMU値初期化
+			Control_ResetDistanceFusion();
 			optimalIndex = 0;
 			yawCtrl.Int = 0.0;
 			distCtrl.Int = 0.0;
@@ -1348,48 +1342,6 @@ static void slipResetAll(SlipDetState *st)
 	slipBufIndex = 0;
 }
 ///////////////////////////////////////////////////////////////////////////
-// モジュール名 slipDistReset
-// 処理概要     距離補正の内部状態をリセット
-// 引数         なし
-// 戻り値       なし
-///////////////////////////////////////////////////////////////////////////
-static void slipDistReset(void)
-{
-	// 距離補正スケールと積算距離を初期化
-	slipDistScaleRaw = 1.0f;
-	slipDistScaleF = 1.0f;
-	// スリップ距離補正（パルス版）
-	distEncRaw_p = 0;
-	distCorr_p = 0;
-	distSlipLoss_p = 0;
-	distCorrFrac_p = 0.0f;
-}
-///////////////////////////////////////////////////////////////////////////
-// モジュール名 slipDistUpdateAndApply_p
-// 処理概要     距離補正スケールのLPF更新とパルス補正
-// 引数         rawScale: 距離補正スケール（生）
-//              dEncRaw_p: 生パルス[1ms]
-// 戻り値       補正後パルス[1ms]
-///////////////////////////////////////////////////////////////////////////
-static int32_t slipDistUpdateAndApply_p(float rawScale, int32_t dEncRaw_p)
-{
-	// 距離補正スケールをLPFで平滑化（悪化は速く/回復は遅く）
-	float coef = (rawScale < slipDistScaleF) ? SLIP_DIST_LPF_COEF_DOWN : SLIP_DIST_LPF_COEF_UP;
-	slipDistScaleF = lpf1(slipDistScaleF, rawScale, coef);
-
-	// スリップ距離補正（パルス版）
-	distEncRaw_p += dEncRaw_p;
-	float tmp_p = ((float)dEncRaw_p * slipDistScaleF) + distCorrFrac_p;
-	int32_t dCorr_i = (int32_t)tmp_p;
-	distCorrFrac_p = tmp_p - (float)dCorr_i;
-	distCorr_p += dCorr_i;
-	int32_t dLoss_p = dEncRaw_p - dCorr_i;
-	distSlipLoss_p += dLoss_p;
-
-	encCurrentCorr_p = dCorr_i;
-	return dCorr_i;
-}
-///////////////////////////////////////////////////////////////////////////
 // モジュール名 slipPrimeSpeedHist
 // 処理概要     リングバッファと各種LPFを初期化
 // 引数         st: スリップ検出状態, encSpeed: 現在速度
@@ -1464,8 +1416,6 @@ void updateSlipDetection(void)
 		if (st->prevRunning) {
 			// 走行終了時の全リセット
 			slipResetAll(st);
-			// 距離補正の状態もリセット
-			slipDistReset();
 		}
 		st->prevRunning = false;
 		st->prevMoving  = false;
@@ -1506,8 +1456,6 @@ void updateSlipDetection(void)
 		slipIndicatorRaw = lpf1(slipIndicatorRaw, 0.0f, SLIP_LPF_COEF);
 		// Latは専用LPFで0へ収束させる
 		slipIndicatorFiltered = lpf1(slipIndicatorFiltered, 0.0f, SLIP_LPF_COEF_LAT);
-		// 低速スキップ領域では距離補正スケールを1.0へ寄せる
-		slipDistScaleRaw = 1.0f;
 		slipLatEnabledLog = false;
 		slipLatOnCountEnabledLog = false;
 		return;
@@ -1518,8 +1466,6 @@ void updateSlipDetection(void)
 	if (!st->slipPrimed) {
 		// 開始直後のバッファ初期化
 		slipPrimeSpeedHist(st, encSpeed);
-		// 初回は距離補正スケールを1.0で積算
-		slipDistScaleRaw = 1.0f;
 		slipLatEnabledLog = false;
 		slipLatOnCountEnabledLog = false;
 		return; // 初回は判定しない
@@ -1620,13 +1566,11 @@ void updateSlipDetection(void)
 	bool latEnabled = st->turningState && (fabsf(st->encAyF) > SLIP_LAT_ENCAY_MIN);
 	// 横判定のカウントを許可する条件（PWMが小さい区間は止める）
 	// デフォルトはPWM/電流ゲートなしの条件
-	bool latCountEnabled = latEnabled;
 	// LatのON判定は瞬時電流ゲートも満たした時だけ進める
 	bool latOnCountEnabled = latEnabled;
 	bool latCoastHardClear = false;
 #if SLIP_CUR_ENABLE
 	// SLIP_CUR_ENABLE=1ではPWM/電流ゲートを適用
-	latCountEnabled = latEnabled && (st->pwmSumF > SLIP_PWM_LAT_COUNT_MIN);
 	// 惰性/低トルク時は横判定を強制クリアする
 	latCoastHardClear = (!calibrateMotorCurrent)
 			&& (st->pwmSumF < SLIP_PWM_COAST_MAX)
@@ -1745,28 +1689,6 @@ void updateSlipDetection(void)
 		}
 	}
 
-	//==========================================================
-	// 距離補正スケール算出（既存指標と閾値のみ使用）
-	//==========================================================
-	float scaleLong = 1.0f;
-	float scaleLat = 1.0f;
-
-	if (slipThresholdHigh > slipThresholdLow) {
-		float sevLong = (slipIndicatorRaw - slipThresholdLow) / (slipThresholdHigh - slipThresholdLow);
-		sevLong = fminf(fmaxf(sevLong, 0.0f), 1.0f);
-		scaleLong = 1.0f - sevLong * (1.0f - SLIP_DIST_MIN_SCALE);
-	}
-
-	if (latOnCountEnabled && (slipLatHigh > slipLatLow)) {
-		float sevLat = (slipIndicatorFiltered - slipLatLow) / (slipLatHigh - slipLatLow);
-		sevLat = fminf(fmaxf(sevLat, 0.0f), 1.0f);
-		scaleLat = 1.0f - sevLat * (1.0f - SLIP_DIST_MIN_SCALE_LAT);
-	}
-
-	// 縦/横のうち厳しい方を採用し、[MIN, 1]にクランプ
-	slipDistScaleRaw = fminf(scaleLong, scaleLat);
-	float minScale = fminf(SLIP_DIST_MIN_SCALE, SLIP_DIST_MIN_SCALE_LAT);
-	slipDistScaleRaw = fminf(fmaxf(slipDistScaleRaw, minScale), 1.0f);
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名	getSlipIndicatorRaw
@@ -1828,16 +1750,33 @@ float getSlipImuAyF(void)
 	return slipDetState.imuAyF;
 }
 /////////////////////////////////////////////////////////////////////
+// モジュール名 Control_ResetDistanceFusion
+// 処理概要     距離融合状態、共分散、パルス端数を初期化する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void Control_ResetDistanceFusion(void)
+{
+	float encoderSpeedMps = (float)encCurrentN / PULSE_MILLIMETER;
+	DistanceEstimator_Reset(encoderSpeedMps);
+	distEncRaw_p = 0;
+	distCorr_p = 0;
+	distSlipLoss_p = 0;
+	distCorrFrac_p = 0.0F;
+	encCurrentCorr_p = 0;
+}
+/////////////////////////////////////////////////////////////////////
 // モジュール名 Control_ApplyMarkerCorrection_p
-// 処理概要     マーカー補正値をスリップ補正後パルスへ反映する
+// 処理概要     マーカー補正値を融合後パルスと距離推定器へ反映する
 // 引数         diff_p: 補正量[パルス]
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void Control_ApplyMarkerCorrection_p(int32_t diff_p)
 {
 	encTotalOptimal -= diff_p;	// 走行距離の補正反映
-	distCorr_p -= diff_p;		// 補正後パルスを同期
-	distCorrFrac_p = 0.0f;		// 端数を破棄して一致性を安定化
+	distCorr_p -= diff_p;		// 融合後パルスを同期
+	DistanceEstimator_ApplyDistanceCorrectionM(-(float)diff_p / PULSE_METER);
+	distCorrFrac_p = 0.0F;		// 端数を破棄して一致性を安定化
 }
 int32_t Control_GetEncCurrentCorr_p(void)
 {
@@ -1856,15 +1795,6 @@ int32_t Control_GetDistSlipLoss_p(void)
 {
 	return distSlipLoss_p;
 }
-float Control_GetSlipDistScale(void)
-{
-	return slipDistScaleF;
-}
-float Control_GetSlipDistScaleRaw(void)
-{
-	return slipDistScaleRaw;
-}
-
 #define TARGET_SPEED_PARAM_COUNT ((int16_t)(sizeof(speedParam) / sizeof(float)))
 
 ///////////////////////////////////////////////////////////////////////////
@@ -1935,30 +1865,60 @@ void setEncoderVal(void)
 	int32_t dEncRaw_p = (int32_t)encCurrentN;
 	bool running = (patternTrace >= 11 && patternTrace < 100);
 	int32_t dEncCorr_p = dEncRaw_p;
-	int32_t dEncUse_p = dEncRaw_p;
+	float accelerationMps2 = IMU_GetForwardAccelerationMps2();
+	bool imuValid = initIMU && (imuVal.Initialized != 0U) && !calibratIMU &&
+		isfinite(accelerationMps2);
 
-	if (running) {
-		dEncCorr_p = slipDistUpdateAndApply_p(slipDistScaleRaw, dEncRaw_p);
-	} else {
-		if (prevRunning) {
-			slipDistReset();
+	if (running)
+	{
+		DistanceEstimator_Update((float)encCurrentN / PULSE_MILLIMETER,
+			accelerationMps2, imuValid);
+		float fusedDeltaM = DistanceEstimator_GetFusedDeltaM();
+		float fusedPulseWithRemainder = fusedDeltaM * (float)PULSE_METER + distCorrFrac_p;
+		if (isfinite(fusedPulseWithRemainder))
+		{
+			dEncCorr_p = (int32_t)fusedPulseWithRemainder;
+			distCorrFrac_p = fusedPulseWithRemainder - (float)dEncCorr_p;
 		}
-		encCurrentCorr_p = dEncRaw_p;
+		else
+		{
+			dEncCorr_p = dEncRaw_p;
+			distCorrFrac_p = 0.0F;
+		}
+		if (dEncCorr_p > 32767)
+		{
+			dEncCorr_p = 32767;
+			distCorrFrac_p = 0.0F;
+		}
+		else if (dEncCorr_p < -32768)
+		{
+			dEncCorr_p = -32768;
+			distCorrFrac_p = 0.0F;
+		}
+		distEncRaw_p += dEncRaw_p;
+		distCorr_p += dEncCorr_p;
+		distSlipLoss_p += dEncRaw_p - dEncCorr_p;
+		encCurrentCorr_p = dEncCorr_p;
+	}
+	else
+	{
+		if (prevRunning)
+		{
+			Control_ResetDistanceFusion();
+		}
+		encCurrentCorr_p = (dEncRaw_p > 32767) ? 32767 :
+			((dEncRaw_p < -32768) ? -32768 : dEncRaw_p);
 	}
 	prevRunning = running;
 
-#if SLIP_DIST_CORRECTION_ENABLE
-	dEncUse_p = dEncCorr_p;
-#endif
-
 	// 外部変数
-	enc1 += dEncUse_p;				// 通常トレース用
-	encRightMarker += dEncUse_p;	// ゴールマーカ判定用
-	encCurve += dEncUse_p;			// カーブ処理用
-	encChangeGain += dEncUse_p;		// ゲイン変更用
-	encTotalOptimal += dEncUse_p; 	// 2次走行用
-	encLog += dEncUse_p;			// 一定距離ごとにログを保存する用
-	encPID += dEncUse_p;			// 距離制御用
+	enc1 += dEncCorr_p;				// 通常トレース用
+	encRightMarker += dEncCorr_p;	// ゴールマーカ判定用
+	encCurve += dEncCorr_p;			// カーブ処理用
+	encChangeGain += dEncCorr_p;		// ゲイン変更用
+	encTotalOptimal += dEncCorr_p;	 // 2次走行用
+	encLog += dEncCorr_p;			// 一定距離ごとにログを保存する用
+	encPID += dEncCorr_p;			// 距離制御用
 	encClick += encCurrentL;		// ホイールクリック用
 }
 ///////////////////////////////////////////////////////////////////////////

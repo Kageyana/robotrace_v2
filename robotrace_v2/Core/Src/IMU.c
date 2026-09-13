@@ -11,6 +11,7 @@ volatile IMUval imuVal = {0};	// IMUの実行時変数（加速度、角速度�
 float angleOffset[3] = {0.0F, 0.0F, 0.0F};	// ジャイロオフセット[deg/s]（calibrationIMU()で算出される）
 #ifdef USE_ACCELE
 float acceleOffset[3] = {0.0F, 0.0F, 0.0F};	// 加速度オフセット[g]（calibrationIMU()で算出される）
+static float gravityReference[3] = {0.0F, 0.0F, 0.0F};	// 静止時の重力基準ベクトル[g]
 #ifdef USE_IMU_ROT_CENTER_CORRECTION
 static float prevGyroZRad = 0.0F;		// 角加速度算出用の前回ジャイロz値[rad/s]
 static float alphaZFiltered = 0.0F;		// 角加速度のLPF後値[rad/s^2]
@@ -160,6 +161,20 @@ void calcVelocity(void)
 #endif
 }
 /////////////////////////////////////////////////////////////////////
+// モジュール名 IMU_GetForwardAccelerationMps2
+// 処理概要     静止時重力基準を除去した機体前後加速度を取得する
+// 引数         なし
+// 戻り値       前後加速度[m/s^2]
+/////////////////////////////////////////////////////////////////////
+float IMU_GetForwardAccelerationMps2(void)
+{
+#ifdef USE_ACCELE
+	return (imuVal.accele.y - gravityReference[1]) * GRAVITY_MPS2;
+#else
+	return 0.0F;
+#endif
+}
+/////////////////////////////////////////////////////////////////////
 // モジュール名 clearIMUval
 // 処理概要     IMUの実行時変数を初期化する
 // 引数         なし
@@ -243,7 +258,7 @@ void calibrationIMU(void)
 	angleInt[1] = 0;
 	angleInt[2] = 0;
 #ifdef USE_ACCELE
-	// 平均加速度から重力成分を差し引いてオフセットを算出
+	// 平均加速度から静止時の重力基準ベクトルを保存する。
 	float acceleAvgX = acceleInt[0] / sampleCount;
 	float acceleAvgY = acceleInt[1] / sampleCount;
 	float acceleAvgZ = acceleInt[2] / sampleCount;
@@ -259,7 +274,11 @@ void calibrationIMU(void)
 		gravityCompY = acceleAvgY * normCoef;
 		gravityCompZ = acceleAvgZ * normCoef;
 	}
+	gravityReference[0] = gravityCompX;
+	gravityReference[1] = gravityCompY;
+	gravityReference[2] = gravityCompZ;
 
+	// センサー固有のオフセットを除去し、既存の姿勢推定用には1gの重力を残す。
 	acceleOffset[0] = acceleAvgX - gravityCompX;
 	acceleOffset[1] = acceleAvgY - gravityCompY;
 	acceleOffset[2] = acceleAvgZ - gravityCompZ;

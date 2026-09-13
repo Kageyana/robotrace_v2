@@ -21,6 +21,15 @@ def signed_int16(value: str) -> int:
     return raw - 0x10000 if raw >= 0x8000 else raw
 
 
+def decode_distance_pulse(value: str, schema_version: int | None) -> int:
+    """Version 5はS16、Version 2～4は旧U32として復号する。"""
+    if schema_version is not None and schema_version >= 5:
+        return signed_int16(value)
+    # 旧ファームウェアはU32へキャストして保存していたが、1msのパルス値は
+    # int16_tの値域内である。従来解析と同じく下位16ビットを符号付きで読む。
+    return signed_int16(value)
+
+
 def repair_log(source_path: Path, destination_path: Path) -> dict[str, float | int]:
     with source_path.open("r", encoding="utf-8-sig", newline="") as source:
         rows = list(csv.reader(source))
@@ -32,6 +41,15 @@ def repair_log(source_path: Path, destination_path: Path) -> dict[str, float | i
     if header_index >= len(rows):
         raise ValueError(f"{source_path}: 列名行がありません")
     header = rows[header_index]
+    metadata = {}
+    if header_index == 1:
+        for field in first_nonempty:
+            name, value = field.split("=", 1)
+            metadata[name.strip()] = value.strip()
+    try:
+        schema_version = int(float(metadata["logSchemaVersion"])) if "logSchemaVersion" in metadata else None
+    except ValueError as exc:
+        raise ValueError(f"{source_path}: logSchemaVersionが不正です") from exc
     data_start = header_index + 1
     if len(rows) <= data_start:
         raise ValueError(f"{source_path}: データ行がありません")
@@ -76,7 +94,7 @@ def repair_log(source_path: Path, destination_path: Path) -> dict[str, float | i
 
         dt = delta_ms / 1000.0
         heading_deg += float(row[gyro_index]) * dt
-        distance_mm = signed_int16(row[enc_index]) / PULSE_MILLIMETER * delta_ms
+        distance_mm = decode_distance_pulse(row[enc_index], schema_version) / PULSE_MILLIMETER * delta_ms
         heading_rad = math.radians(heading_deg)
         dx_mm = distance_mm * math.sin(heading_rad)
         dy_mm = distance_mm * math.cos(heading_rad)

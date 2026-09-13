@@ -470,7 +470,7 @@ cmake --build --preset Release
 
 - ログファイルは CSV 形式、ヘッダ有り、文字コード UTF-8、区切り文字はカンマ。1行目は`パラメータ名=value`形式のメタデータ、2行目はログデータ名、3行目以降はデータとする。旧ログの「ログデータ名とメタデータが同じ1行目に混在する形式」とメタデータなし形式も、列名で解決して読み取り可能とする。
 - ログファイル名は通し番号を使う。
-- ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。`logSchemaVersion=4` の通常軽量ログは1レコード38バイト固定とし、BMI088温度の生11ビットコードを`imuTempRaw`として保存し、`ROC`の直後に符号付き16ビットの`encCurrentL`, `encCurrentR`を保存する。`imuTempRaw=0x400`は無効値とする。詳細ログには`lineMatchResidual_mm`、`poseCorrection_um`、`poseCorrectionHeading_cdeg`を末尾へ追加する。Version 2で省略した`linePointX_mm`, `linePointY_mm`, `pathLegalMargin_mm`に加えて、通常ログでは`motorpwmL`, `motorpwmR`, `slipFlag`, `slipFlagLat`, `lineTraceCtrl`, `motorVoltageCmdL_mV`, `motorVoltageCmdR_mV`と新規補正診断列を保存しない。旧CSVはヘッダ名で列を解決し、復元対象3列が存在する場合に保存値を優先して扱う。スキーマ2、3は引き続き読み取り可能とする。
+- ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。`logSchemaVersion=5` の通常軽量ログは1レコード36バイト固定とし、BMI088温度の生11ビットコードを`imuTempRaw`として保存し、`ROC`の直後に符号付き16ビットの`encCurrentL`, `encCurrentR`を保存する。`encCurrentCorr_p`はカルマン融合後の符号付き1ms差分パルスを保存する。`imuTempRaw=0x400`は無効値とする。詳細ログには`lineMatchResidual_mm`、`poseCorrection_um`、`poseCorrectionHeading_cdeg`を末尾へ追加する。Version 2で省略した`linePointX_mm`, `linePointY_mm`, `pathLegalMargin_mm`に加えて、通常ログでは`motorpwmL`, `motorpwmR`, `slipFlag`, `slipFlagLat`, `lineTraceCtrl`, `motorVoltageCmdL_mV`, `motorVoltageCmdR_mV`と新規補正診断列を保存しない。旧CSVはヘッダ名で列を解決し、復元対象3列が存在する場合に保存値を優先して扱う。スキーマ2～4は引き続き読み取り可能とする。距離推定器のノイズ定数、イノベーション棄却回数、フォールバック回数はレコード外のログヘッダへ保存する。
 - ログヘッダの1行目にはパラメータを `パラメータ名=value` 形式で記載し、2行目にはログデータ名だけを記載する。
 - `courseAnalysis.c` の通常経路生成は、`courseMarker`, `encTotalOptimal`, `ROC`をCSVヘッダ名から解決する。追加スリップ解析を行う場合だけ、旧形式または詳細デバッグログの`targetSpeed`, `optimalIndex`, `slipFlag`, `slipFlagLat`も必要とする。ログ列追加時に固定列番号へ依存しない。
 - 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_MARKER`, `BOOST_DISTANCE`, `BOOST_SHORTCUT`, `BOOST_PATH_REPLAY` を正とする。
@@ -484,12 +484,12 @@ cmake --build --preset Release
 - 通常ログ解析では、ラップタイム、速度追従、角速度、経路追従状態を重視する。スリップは該当列を含む旧形式または詳細デバッグログでのみ評価する。
 - バッテリー状態はログ内パラメータ `batteryVoltage_V` を参照する。単位は `[V]`。
 - `batteryVoltage_mV` は走行中にLPF更新したバッテリー電圧 `[mV]` とする。詳細デバッグログの`motorVoltageCmdL_mV`, `motorVoltageCmdR_mV`はバッテリー電圧で割る前の左右モーター指令電圧 `[mV]` とする。
-- `encCurrentL`, `encCurrentR` は左右エンコーダの符号付き1 msパルス数とする。`encCurrentN`、`encCurrentCorr_p`、XY座標算出方法は変更しない。
+- `encCurrentL`, `encCurrentR` は左右エンコーダの符号付き1 msパルス数とする。`encCurrentN`は速度PID用の生平均値、`encCurrentCorr_p`は距離融合後の符号付き1 ms差分パルスとする。XY座標は融合後パルスから算出する。
 - 詳細デバッグログの`motorpwmL`, `motorpwmR`は電圧補償後に実際にタイマへ出力した飽和後DUTYとする。通常ログでは左右エンコーダ列を優先して置き換える。
 - `LOG_SCHEMA_PROFILE_LIGHT=0` のデバッグログでは `markerSensor`（LED差分から得たマーカー状態）、`sgMarkerCount`（スタート・ゴールマーカー累積数）、`encRightMarker_p`（右マーカーからの補正後エンコーダパルス）、`patternTrace`（走行状態）を追加出力する。ログヘッダには終了時の `sgMarkerAtLogEnd` と `encRightMarkerAtLogEnd_p` も出力する。
 - 経路追従ログの `lineValid` は限定補正可能状態、`pathErrorY_mm` は経路横偏差 [mm]、`pathErrorHeading_cdeg` は経路制御バージョン4以降では最近傍経路点との方位偏差 [0.01 deg]、`pathState` は追従状態とする。バージョン3以前の`pathErrorHeading_cdeg`は先読み方位との偏差であり、バージョン4以降とp95を直接比較しない。`linePointX_mm`, `linePointY_mm`, `pathLegalMargin_mm`は新形式ではPC上で元一次ログ・設定・`optimalIndex`から復元する。
 - ログヘッダの`tgtParam.pathReplay`はLevel 0 PATH REPLAY速度上限[m/s]とする。
-- 通常ログは `LOG_SCHEMA_PROFILE_LIGHT=1` を既定とし、1レコード38バイト固定でラップタイム、速度追従、角速度、BMI088温度生コード、マーカー、左右エンコーダ、経路追従、XY確認に必要な列だけを残す。実DUTYが必要な場合は詳細デバッグプロファイルを使用する。
+- 通常ログは `LOG_SCHEMA_PROFILE_LIGHT=1` を既定とし、1レコード36バイト固定でラップタイム、速度追従、角速度、BMI088温度生コード、マーカー、左右エンコーダ、経路追従、XY確認に必要な列だけを残す。実DUTYが必要な場合は詳細デバッグプロファイルを使用する。
 - 加速度、電流、スリップ内部量などの詳細デバッグ列が必要な場合は、ビルド定義で `LOG_SCHEMA_PROFILE_LIGHT=0` にして一時的に出力する。
 - ログ同士を比較する場合は、`batteryVoltage_V` の差を考慮する。電圧差によるモーター出力、速度追従、加速性能、スリップ傾向の変化を無視しない。
 - ログ形式を安易に変更しない。形式変更が必要な場合は、スキーマまたはドキュメントも合わせて更新する。
@@ -558,6 +558,7 @@ cmake --build --preset Release
 - 2026-09-06: 経路制御バージョン11でLevel 1経路生成を直線回廊方式へ置換した。生成状態、回廊数、全長短縮量をログヘッダへ追加し、安全な回廊がない場合はLevel 0へフォールバックする。
 - 2026-09-06: 経路制御バージョン12で、採用済み直線回廊内のライン位置補正だけを無効化した。元ラインのスラローム形状を自己位置補正から再導入しない一方、ライン検出とロスト時フォールバックは維持する。
 - 2026-09-13: 経路制御バージョン13で、実測95 mmを基準にした10個の受光中心の横・前方座標を用い、連続線分上のライン対応点との残差から`x`、`y`、`heading`を5 ms周期で補正する勾配降下方式を追加した。ヨー角補正は既定OFFとし、Level 1直線回廊内では全補正を禁止する。`shortcut.txt`を7項目、`logSchemaVersion`を4へ更新した。
+- 2026-09-13: 距離推定器を追加し、静止時3軸重力基準を除去した前後加速度と平均エンコーダ速度を1msカルマン融合した。距離積算、PATH姿勢、距離系カウンタへ融合差分を適用し、速度PID・過速度・停止判定は生エンコーダを維持した。通常ログを`logSchemaVersion=5`の36バイトへ更新し、`encCurrentCorr_p`を符号付き16ビット化、推定器定数と棄却・フォールバック回数をヘッダへ追加した。
 
 ## 15. 機体・回路変更時にコードへ反映する項目
 

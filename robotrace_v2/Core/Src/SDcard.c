@@ -3,6 +3,7 @@
 //====================================//
 #include "SDcard.h"
 #include "courseAnalysis.h"
+#include "distanceEstimator.h"
 #include "firmware_version.h"
 #include "sd_functions.h"
 #include "stdio.h"
@@ -444,6 +445,13 @@ void createLog(void)
 	setLogHeaderStrS("buildTime", BUILD_TIME);
 	setLogHeaderStrS("branch", GIT_BRANCH);
 	setLogHeaderStr("logSchemaVersion", LOG_SCHEMA_VERSION);
+	setLogHeaderStrF("distanceKalman.sigmaAccel_mps2", DISTANCE_ESTIMATOR_SIGMA_ACCEL_MPS2);
+	setLogHeaderStrF("distanceKalman.sigmaEncoder_mps", DISTANCE_ESTIMATOR_SIGMA_ENCODER_MPS);
+	setLogHeaderStrF("distanceKalman.biasRandomWalk_mps2_sqrt_s", DISTANCE_ESTIMATOR_BIAS_RANDOM_WALK_MPS2_SQRT_S);
+	setLogHeaderStrF("distanceKalman.initialBiasSigma_mps2", DISTANCE_ESTIMATOR_INITIAL_BIAS_SIGMA_MPS2);
+	setLogHeaderStr("distanceKalman.innovationRejectCount",
+		(int32_t)DistanceEstimator_GetInnovationRejectCount());
+	setLogHeaderStr("distanceKalman.fallbackCount", (int32_t)DistanceEstimator_GetFallbackCount());
 	// 制御パラメータ
 	setLogHeaderStrF("batteryVoltage_V", batteryVoltage_V);
 	setLogHeaderStrF("optimalTrace", optimalTrace);
