@@ -3,6 +3,7 @@
 //====================================//
 #include "SDcard.h"
 #include "courseAnalysis.h"
+#include "IMU.h"
 #include "firmware_version.h"
 #include "sd_functions.h"
 #include "stdio.h"
@@ -436,6 +437,7 @@ void createLog(void)
 	logHeaderOverflow = false;
 
 	updateBatteryVoltage(); // ログヘッダへ停止時点の電圧を残す
+	updateImuTempEndTemperature();
 
 	// ログヘッダー
 	logBuildColumns();
@@ -445,6 +447,10 @@ void createLog(void)
 	setLogHeaderStrS("buildTime", BUILD_TIME);
 	setLogHeaderStrS("branch", GIT_BRANCH);
 	setLogHeaderStr("logSchemaVersion", LOG_SCHEMA_VERSION);
+	setLogHeaderStr("imuTempCompEnabled", imuTempCorrectionEnabled ? 1 : 0);
+	setLogHeaderStrF("imuTempCoeff_dpsPerC", imuTempCoeff_dpsPerC);
+	setLogHeaderStrF("imuTempCalibration_C", imuTempCalibration_C);
+	setLogHeaderStrF("imuTempEnd_C", imuTempEnd_C);
 	// 制御パラメータ
 	setLogHeaderStrF("batteryVoltage_V", batteryVoltage_V);
 	setLogHeaderStrF("optimalTrace", optimalTrace);

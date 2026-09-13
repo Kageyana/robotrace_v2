@@ -4,6 +4,7 @@
 #include "control.h"
 #include "pathFollower.h"
 #include "BMI088.h"
+#include "IMU.h"
 #include "PIDcontrol.h"
 #include "encoder.h"
 #include "motor.h"
@@ -297,6 +298,7 @@ void initSystem(void)
 			readLinesenval(); // ラインセンサの最大値と最小値を取得
 			readTgtspeeds();  // 目標速度を取得
 			readShortcutSettings(); // 経路追従・ショートカット設定を取得
+			readImuTempCompensation(); // BMI088温度係数を取得
 
 			if (modeDSP)
 			{

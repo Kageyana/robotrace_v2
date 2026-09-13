@@ -2,13 +2,21 @@
 // インクルード
 //====================================//
 #include "IMU.h"
+#include "SDcard.h"
+#include "fatfs.h"
 #include <math.h>
+#include <stdlib.h>
+#include <string.h>
 //====================================//
 // グローバル変数の定義
 //====================================//
 bool calibratIMU = false;		// IMUキャリブレーション中フラグ
 volatile IMUval imuVal = {0};	// IMUの実行時変数（加速度、角速度、角度などを保持）
 float angleOffset[3] = {0.0F, 0.0F, 0.0F};	// ジャイロオフセット[deg/s]（calibrationIMU()で算出される）
+float imuTempCoeff_dpsPerC = 0.0F;	// ジャイロZ温度係数[deg/s/°C]
+float imuTempCalibration_C = BMI088_TEMP_INVALID_C;	// 走行前校正温度[°C]
+float imuTempEnd_C = BMI088_TEMP_INVALID_C;	// ログ終了時温度[°C]
+bool imuTempCorrectionEnabled = false;	// 走行中の温度補正有効状態
 #ifdef USE_ACCELE
 float acceleOffset[3] = {0.0F, 0.0F, 0.0F};	// 加速度オフセット[g]（calibrationIMU()で算出される）
 #ifdef USE_IMU_ROT_CENTER_CORRECTION
@@ -86,11 +94,26 @@ static void applyOffsetIMU(void)
 	imuVal.Gid = BMI088val.Gid;
 	imuVal.Initialized = BMI088val.Initialized;
 	imuVal.temp = BMI088val.temp;
+	imuVal.tempRaw = BMI088val.tempRaw;
+	imuVal.tempValid = BMI088val.tempValid;
 
 	// ジャイロ補正（物理量オフセット除去後に方向係数を適用）
 	imuVal.gyro.x = (BMI088val.gyro.x - angleOffset[0]) * COEFF_DPD;
 	imuVal.gyro.y = (BMI088val.gyro.y - angleOffset[1]) * COEFF_DPD;
-	imuVal.gyro.z = (BMI088val.gyro.z - angleOffset[2]) * COEFF_DPD;
+	float gyroZ = BMI088val.gyro.z;
+	if (imuTempCorrectionEnabled)
+	{
+		if (!BMI088val.tempValid)
+		{
+			// 走行中に温度が無効になった場合は、その走行中は従来処理へ戻す。
+			imuTempCorrectionEnabled = false;
+		}
+		else
+		{
+			gyroZ -= imuTempCoeff_dpsPerC * (BMI088val.temp - imuTempCalibration_C);
+		}
+	}
+	imuVal.gyro.z = (gyroZ - angleOffset[2]) * COEFF_DPD;
 
 #ifdef USE_ACCELE
 	// 加速度補正（物理量オフセットをそのまま除去）
@@ -226,6 +249,8 @@ void calibrationIMU(void)
 	}
 	else
 	{
+		// 校正完了時点の温度を基準温度として固定する。
+		BMI088getTemp();
 		angleOffset[0] = angleInt[0] / i;
 		angleOffset[1] = angleInt[1] / i;
 		angleOffset[2] = angleInt[2] / i;
@@ -259,5 +284,90 @@ void calibrationIMU(void)
 #endif
 		i = 0;
 		calibratIMU = false;
+		captureImuTempCalibration();
 	}
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 readImuTempCompensation
+// 処理概要     SDカードからBMI088温度係数を読み出し、異常時は0へ修復する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void readImuTempCompensation(void)
+{
+	const char *fileName = PATH_SETTING "imu_temp.txt";
+	int32_t coefficientX1000000 = 0;
+	bool valid = false;
+	FIL file;
+	FRESULT result;
+
+	imuTempCoeff_dpsPerC = 0.0F;
+	if (!initMSD)
+	{
+		return;
+	}
+
+	result = f_open(&file, fileName, FA_OPEN_EXISTING | FA_READ);
+	if (result == FR_OK)
+	{
+		char buffer[32] = {0};
+		UINT bytesRead = 0;
+		result = f_read(&file, buffer, sizeof(buffer) - 1U, &bytesRead);
+		f_close(&file);
+		if (result == FR_OK && bytesRead < sizeof(buffer) - 1U)
+		{
+			char *end = NULL;
+			long parsed = strtol(buffer, &end, 10);
+			while (end != NULL && (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n'))
+			{
+				end++;
+			}
+			if (end != buffer && end != NULL && *end == '\0' &&
+				parsed >= IMU_TEMP_COEFF_MIN_X1000000 && parsed <= IMU_TEMP_COEFF_MAX_X1000000)
+			{
+				coefficientX1000000 = (int32_t)parsed;
+				valid = true;
+			}
+		}
+	}
+
+	if (!valid)
+	{
+		// 欠落・破損・範囲外は、既定値を保存して次回の再発を防ぐ。
+		result = f_open(&file, fileName, FA_CREATE_ALWAYS | FA_WRITE);
+		if (result == FR_OK)
+		{
+			f_printf(&file, "%ld", (long)coefficientX1000000);
+			f_sync(&file);
+			f_close(&file);
+		}
+	}
+
+	imuTempCoeff_dpsPerC = (float)coefficientX1000000 / (float)IMU_TEMP_COEFF_SCALE;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 captureImuTempCalibration
+// 処理概要     走行前IMU校正完了時の温度を補正基準として保存する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void captureImuTempCalibration(void)
+{
+	imuTempCalibration_C = BMI088val.temp;
+	imuTempCorrectionEnabled = BMI088val.tempValid && imuTempCoeff_dpsPerC != 0.0F;
+	if (!imuTempCorrectionEnabled)
+	{
+		imuTempCalibration_C = BMI088_TEMP_INVALID_C;
+	}
+	imuTempEnd_C = BMI088_TEMP_INVALID_C;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 updateImuTempEndTemperature
+// 処理概要     ログ終了時のBMI088温度を保存する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void updateImuTempEndTemperature(void)
+{
+	imuTempEnd_C = BMI088val.tempValid ? BMI088val.temp : BMI088_TEMP_INVALID_C;
 }

@@ -366,6 +366,7 @@ cmake --build --preset Release
 - 設定ファイルの読み書き処理を変更する場合は、ファイル欠落時にデフォルト値でファイルが作成されることを確認する。
 - `targetSpeeds.txt` は既存18項目の末尾へLevel 0専用速度`pathReplay`を追加した19項目とする。`pathReplay`は実値の100倍を第19項目へ保存し、既定値は`0100`（1.00 m/s）とする。旧18項目ファイルは既存値を保持し、`pathReplay`の既定値を末尾へ追加して修復する。
 - `shortcut.txt` は `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000` の順で保存し、改行は付けない。既定値は `1,080,040,3000,0600,010` とする。ライン位置補正の初期実機検証はLevel 0固定の `0,080,040,1500,1600,010` とする。
+- `imu_temp.txt` はBMI088ジャイロZ温度係数 `zSlope_x1000000` の符号付き整数1項目、改行なしで保存する。許容範囲は `-100000..100000`、既定値は `0` とし、欠落・破損・範囲外は0へ修復して温度補正なしで走行可能とする。
 
 設定ファイルの保存先は `./setting/` です。詳細なファイル形式、読み書き関数、破損時の扱いは `.agents/skills/robotrace-sd-settings/SKILL.md` を使います。
 
@@ -469,6 +470,7 @@ cmake --build --preset Release
 - ログファイル名は通し番号を使う。
 - ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。`logSchemaVersion=2` は `linePointX_mm`, `linePointY_mm`, `pathLegalMargin_mm` を保存しない形式で、通常バイナリレコードは旧形式より12バイト短い。旧CSVは3列が存在する場合に保存値を優先して扱う。
 - ログヘッダにはログデータ名とパラメータが含まれる。パラメータは `パラメータ名=value` 形式で記載される。
+- ログヘッダには `imuTempCompEnabled`、`imuTempCoeff_dpsPerC`、`imuTempCalibration_C`、`imuTempEnd_C` を含める。温度補正はジャイロZだけに適用し、温度または基準温度が無効な走行では従来処理へ戻る。
 - `courseAnalysis.c` の2次ログ再解析は、`courseMarker`, `encTotalOptimal`, `ROC`, `targetSpeed`, `optimalIndex`, `slipFlag`, `slipFlagLat` をCSVヘッダ名から解決する。ログ列追加時に固定列番号へ依存しない。
 - 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_MARKER`, `BOOST_DISTANCE`, `BOOST_SHORTCUT`, `BOOST_PATH_REPLAY` を正とする。
 - 新しい走行モードを追加する場合は、`robotrace_v2/Core/Inc/courseAnalysis.h` に定義を追加する。
@@ -544,6 +546,7 @@ cmake --build --preset Release
 - 2026-08-23: 機体投影半幅65 mm、外接半径100 mm、走行可能領域端まで200 mmを入力した。許容オフセット49.5 mm、境界残余50.5 mmを確認し、経路制御バージョン2でLevel 1のショートカット形状生成を有効化した。
 - 2026-09-06: 経路制御バージョン3で、実走行経路の累積弧長と推定機体方位による対応点候補制限を追加した。ヘアピン出口や近接並走区間へのindexジャンプを防ぎ、候補がない場合はindexを保持して既存の100 msロスト判定へ渡す。
 - 2026-09-06: 経路制御バージョン4で、方位FBと再合流判定を先読み方位差から最近傍経路点の接線方位差へ変更した。先読み方位は曲率FF専用とし、小R手前の早期旋回を抑える。
+- 2026-09-13: `imu_temp.txt`からBMI088ジャイロZ温度係数を読み込み、走行前校正温度を基準として走行中の温度ドリフト補正を行う機能を追加した。校正時温度、終了時温度、係数、補正有効状態を通常ログヘッダへ保存する。
 - 2026-09-06: 経路制御バージョン5で、`BOOST_PATH_REPLAY` / `BOOST_SHORTCUT`の停止判定を右マーカー回数から分離した。Level 0、Level 1それぞれの実走行経路終端をスタート位置への帰着点とみなし、その500 mm手前へ到達したときに停止を開始する。
 - 2026-09-06: 経路制御バージョン6で、PATH系の帰着点を経路終端ではなく、経路進捗80%以降で座標原点 `(0, 0)` に最も近い経路上の点へ変更した。その帰着点から累積弧長で500 mm手前を停止開始位置とする。
 - 2026-09-06: 経路制御バージョン7で、PATH系の実走行経路を一次走行終端から座標原点 `(0, 0)` へ向かう直線方向に500 mm延長し、その延長終端を停止開始位置とした。原点近傍を通る途中区間は停止判定に使わない。

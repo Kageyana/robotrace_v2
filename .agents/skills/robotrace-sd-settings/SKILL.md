@@ -42,6 +42,17 @@ File: `speed_ff.txt`
 - No newline.
 - Value is `speedFeedForwardGain`, with Crr multiplied by 1000.
 
+### BMI088 Temperature Compensation
+
+File: `imu_temp.txt`
+
+- Implementation: `IMU.c`, `readImuTempCompensation()`
+- Format: one signed integer `zSlope_x1000000`.
+- No newline.
+- Valid range: `-100000..100000`.
+- Missing, corrupt, or out-of-range values are repaired to `0`; the robot remains runnable with temperature compensation effectively disabled.
+- The runtime coefficient in `[deg/s/°C]` is the stored integer divided by `1000000`.
+
 ### Speed and Acceleration Parameters
 
 File: `targetSpeeds.txt`

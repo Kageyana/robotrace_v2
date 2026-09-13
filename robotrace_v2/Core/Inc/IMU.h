@@ -21,12 +21,19 @@
 #define RAD2DEG (180.0F / M_PI)			// rad→deg
 #define DPS2RADS(dps) ((dps) * DEG2RAD)	// deg/s → rad/s
 #define IMU_ALPHA_LPF_COEF 0.8F			// 角加速度のLPF係数（大きいほどノイズが減るが遅れる。0.8で約20ms程度の時定数）	
+#define IMU_TEMP_COEFF_SCALE 1000000L
+#define IMU_TEMP_COEFF_MIN_X1000000 (-100000L)
+#define IMU_TEMP_COEFF_MAX_X1000000 100000L
 //====================================//
 // グローバル変数の宣言
 //====================================//
 extern bool calibratIMU;		// IMUキャリブレーション中フラグ
 extern volatile IMUval imuVal;	// IMUの実行時変数
 extern float angleOffset[3];	// ジャイロオフセット[deg/s]
+extern float imuTempCoeff_dpsPerC;	// ジャイロZ温度係数[deg/s/°C]
+extern float imuTempCalibration_C;	// 走行前校正温度[°C]
+extern float imuTempEnd_C;		// ログ終了時温度[°C]
+extern bool imuTempCorrectionEnabled;	// 走行中の温度補正有効状態
 #ifdef USE_ACCELE
 extern float acceleOffset[3];	// 加速度オフセット[g]
 #endif
@@ -37,5 +44,8 @@ void calcDegrees(void);
 void calcVelocity(void);
 void clearIMUval(void);
 void calibrationIMU(void);
+void readImuTempCompensation(void);
+void captureImuTempCalibration(void);
+void updateImuTempEndTemperature(void);
 
 #endif // IMU_H_
