@@ -13,7 +13,11 @@
 #define DISTANCE_ESTIMATOR_MAX_ACCEL_MPS2               20.0F
 #define DISTANCE_ESTIMATOR_MAX_SPEED_MPS                10.0F
 #define DISTANCE_ESTIMATOR_INNOVATION_GATE_SIGMA       4.0F
-#define DISTANCE_ESTIMATOR_MAX_MEASUREMENT_VARIANCE_SCALE 100.0F
+#define DISTANCE_ESTIMATOR_MAX_FUSED_DELTA_M \
+	(DISTANCE_ESTIMATOR_MAX_SPEED_MPS * DISTANCE_ESTIMATOR_DT_S + \
+	0.5F * DISTANCE_ESTIMATOR_MAX_ACCEL_MPS2 * \
+	DISTANCE_ESTIMATOR_DT_S * DISTANCE_ESTIMATOR_DT_S)
+#define DISTANCE_ESTIMATOR_MAX_FUSED_DELTA_P 535
 
 typedef struct
 {
@@ -22,8 +26,10 @@ typedef struct
 	float accelerationBias_mps2;
 	float innovation_mps;
 	float innovationSigma_mps;
-	uint32_t innovationRejectCount;
+	uint32_t innovationRejectCount; // 4σ超過または物理上限超過による観測更新スキップ回数
 	uint32_t fallbackCount;
+	uint32_t invalidUpdateCount; // 有限性、共分散、距離差分の検証失敗回数
+	float maxAbsFusedDeltaM; // 融合後1ms距離差分の最大絶対値[m]
 	bool fallbackActive;
 } DistanceEstimatorDiagnostics;
 
@@ -42,6 +48,15 @@ void DistanceEstimator_Initialize(float initialSpeedMps);
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void DistanceEstimator_Reset(float encoderSpeedMps);
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 DistanceEstimator_ResetState
+// 処理概要     状態と共分散を初期化し、必要に応じて走行診断値を保持する
+// 引数         encoderSpeedMps: エンコーダ速度[m/s]
+//              preserveDiagnostics: trueなら棄却・異常・最大差分を保持
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void DistanceEstimator_ResetState(float encoderSpeedMps, bool preserveDiagnostics);
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 DistanceEstimator_Update

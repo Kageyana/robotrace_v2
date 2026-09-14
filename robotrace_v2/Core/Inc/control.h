@@ -166,6 +166,8 @@ void writeTgtspeeds(void);
 void readTgtspeeds(void);
 void checkCrossLine(void);
 void updateSlipDetection(void);
+void Control_RequestDistanceFusionReset(void);
+void Control_ProcessDistanceFusionReset(void);
 void Control_ResetDistanceFusion(void);
 void Control_ApplyMarkerCorrection_p(int32_t diff_p);
 float getSlipIndicatorRaw(void);
@@ -179,6 +181,7 @@ float getSlipPwmSumF(void);
 float getSlipISumF(void);
 float getSlipEncAyF(void);
 float getSlipImuAyF(void);
+uint32_t Control_GetDistanceFusionOutputGuardCount(void);
 // スリップ距離補正（パルス版）
 int32_t Control_GetEncCurrentCorr_p(void);
 int32_t Control_GetDistEncRaw_p(void);

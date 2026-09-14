@@ -85,6 +85,8 @@ static int32_t distCorr_p = 0;							// 融合後パルス積算
 static int32_t distSlipLoss_p = 0;						// 生 - 融合後の積算
 static float distCorrFrac_p = 0.0f;						// 融合後パルスの小数残差
 static int32_t encCurrentCorr_p = 0;					// 融合後の現在速度[pulse/1ms]
+static uint32_t distanceFusionOutputGuardCount = 0U;		// 融合出力ガード作動回数
+static volatile bool distanceFusionResetRequested = false;
 // スリップ検出用の内部状態（RAM節約のためSLIP_CUR_ENABLEでメンバ切り替え）
 typedef struct {
 	bool prevRunning;
@@ -108,6 +110,25 @@ static const char *getRunStartBlockReason(void);
 static bool isRunStartAllowed(void);
 static void showRunStartBlocked(const char *reason);
 static bool blockRunStartIfNeeded(void);
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 clampDistanceFusionOutputPulse
+// 処理概要     生エンコーダパルスを融合出力の物理上限へ制限する
+// 引数         pulse: 制限対象の1msパルス数
+// 戻り値       制限後の1msパルス数
+/////////////////////////////////////////////////////////////////////
+static int32_t clampDistanceFusionOutputPulse(int32_t pulse)
+{
+	if (pulse > DISTANCE_ESTIMATOR_MAX_FUSED_DELTA_P)
+	{
+		return DISTANCE_ESTIMATOR_MAX_FUSED_DELTA_P;
+	}
+	if (pulse < -DISTANCE_ESTIMATOR_MAX_FUSED_DELTA_P)
+	{
+		return -DISTANCE_ESTIMATOR_MAX_FUSED_DELTA_P;
+	}
+	return pulse;
+}
 /////////////////////////////////////////////////////////////////////
 // モジュール名 updateDisplayDmaAndWait
 // 処理概要     初期化表示をDMA更新し、完了しない場合はタイムアウトで抜ける
@@ -730,7 +751,7 @@ void loopSystem(void)
 			DistanceOptimal = 0;
 			optimalIndex = 0;
 			clearIMUval(); // IMU値初期化
-			Control_ResetDistanceFusion();
+			Control_RequestDistanceFusionReset();
 			optimalIndex = 0;
 			yawCtrl.Int = 0.0;
 			distCtrl.Int = 0.0;
@@ -1750,20 +1771,67 @@ float getSlipImuAyF(void)
 	return slipDetState.imuAyF;
 }
 /////////////////////////////////////////////////////////////////////
-// モジュール名 Control_ResetDistanceFusion
+// モジュール名 resetDistanceFusionState
 // 処理概要     距離融合状態、共分散、パルス端数を初期化する
-// 引数         なし
+// 引数         preserveDiagnostics: 終了ログ用診断値を保持するか
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void Control_ResetDistanceFusion(void)
+static void resetDistanceFusionState(bool preserveDiagnostics)
 {
 	float encoderSpeedMps = (float)encCurrentN / PULSE_MILLIMETER;
-	DistanceEstimator_Reset(encoderSpeedMps);
+	uint32_t outputGuardCount = preserveDiagnostics ?
+		distanceFusionOutputGuardCount : 0U;
+	DistanceEstimator_ResetState(encoderSpeedMps, preserveDiagnostics);
 	distEncRaw_p = 0;
 	distCorr_p = 0;
 	distSlipLoss_p = 0;
 	distCorrFrac_p = 0.0F;
 	encCurrentCorr_p = 0;
+	distanceFusionOutputGuardCount = outputGuardCount;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 Control_RequestDistanceFusionReset
+// 処理概要     1ms処理で距離融合を初期化する要求だけを設定する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void Control_RequestDistanceFusionReset(void)
+{
+	distanceFusionResetRequested = true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 Control_ProcessDistanceFusionReset
+// 処理概要     TIM6の1ms処理で距離融合初期化要求を実行する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void Control_ProcessDistanceFusionReset(void)
+{
+	bool requested;
+	uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	requested = distanceFusionResetRequested;
+	distanceFusionResetRequested = false;
+	__set_PRIMASK(primask);
+
+	if (requested)
+	{
+		// 走行終了時だけ最終診断値を次のログ生成まで保持する。
+		resetDistanceFusionState(patternTrace >= 100U);
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 Control_ResetDistanceFusion
+// 処理概要     距離融合状態、共分散、パルス端数を即時初期化する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void Control_ResetDistanceFusion(void)
+{
+	resetDistanceFusionState(false);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 Control_ApplyMarkerCorrection_p
@@ -1781,6 +1849,17 @@ void Control_ApplyMarkerCorrection_p(int32_t diff_p)
 int32_t Control_GetEncCurrentCorr_p(void)
 {
 	return encCurrentCorr_p;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 Control_GetDistanceFusionOutputGuardCount
+// 処理概要     走行中の融合出力ガード作動回数を取得する
+// 引数         なし
+// 戻り値       融合出力ガード作動回数
+/////////////////////////////////////////////////////////////////////
+uint32_t Control_GetDistanceFusionOutputGuardCount(void)
+{
+	return distanceFusionOutputGuardCount;
 }
 // スリップ距離補正（パルス版）
 int32_t Control_GetDistEncRaw_p(void)
@@ -1875,24 +1954,22 @@ void setEncoderVal(void)
 			accelerationMps2, imuValid);
 		float fusedDeltaM = DistanceEstimator_GetFusedDeltaM();
 		float fusedPulseWithRemainder = fusedDeltaM * (float)PULSE_METER + distCorrFrac_p;
-		if (isfinite(fusedPulseWithRemainder))
+		if (isfinite(fusedPulseWithRemainder) &&
+			fusedPulseWithRemainder >= -(float)DISTANCE_ESTIMATOR_MAX_FUSED_DELTA_P &&
+			fusedPulseWithRemainder <= (float)DISTANCE_ESTIMATOR_MAX_FUSED_DELTA_P)
 		{
+			// 整数変換前にfloat値を検証するため、範囲外値の変換による
+			// 未定義動作やINT32_MAX相当の飽和を防止する。
 			dEncCorr_p = (int32_t)fusedPulseWithRemainder;
 			distCorrFrac_p = fusedPulseWithRemainder - (float)dEncCorr_p;
 		}
 		else
 		{
-			dEncCorr_p = dEncRaw_p;
-			distCorrFrac_p = 0.0F;
-		}
-		if (dEncCorr_p > 32767)
-		{
-			dEncCorr_p = 32767;
-			distCorrFrac_p = 0.0F;
-		}
-		else if (dEncCorr_p < -32768)
-		{
-			dEncCorr_p = -32768;
+			if (distanceFusionOutputGuardCount < UINT32_MAX)
+			{
+				distanceFusionOutputGuardCount++;
+			}
+			dEncCorr_p = clampDistanceFusionOutputPulse(dEncRaw_p);
 			distCorrFrac_p = 0.0F;
 		}
 		distEncRaw_p += dEncRaw_p;
@@ -1904,20 +1981,19 @@ void setEncoderVal(void)
 	{
 		if (prevRunning)
 		{
-			Control_ResetDistanceFusion();
+			Control_RequestDistanceFusionReset();
 		}
-		encCurrentCorr_p = (dEncRaw_p > 32767) ? 32767 :
-			((dEncRaw_p < -32768) ? -32768 : dEncRaw_p);
+		encCurrentCorr_p = clampDistanceFusionOutputPulse(dEncRaw_p);
 	}
 	prevRunning = running;
 
 	// 外部変数
-	enc1 += dEncCorr_p;				// 通常トレース用
-	encRightMarker += dEncCorr_p;	// ゴールマーカ判定用
+	enc1 += dEncCorr_p;				// 通常トレース用（検証済み融合値）
+	encRightMarker += dEncRaw_p;	// ゴールマーカ判定用（生エンコーダ）
 	encCurve += dEncCorr_p;			// カーブ処理用
 	encChangeGain += dEncCorr_p;		// ゲイン変更用
 	encTotalOptimal += dEncCorr_p;	 // 2次走行用
-	encLog += dEncCorr_p;			// 一定距離ごとにログを保存する用
+	encLog += dEncRaw_p;			// 一定距離ごとにログを保存する用（生エンコーダ）
 	encPID += dEncCorr_p;			// 距離制御用
 	encClick += encCurrentL;		// ホイールクリック用
 }

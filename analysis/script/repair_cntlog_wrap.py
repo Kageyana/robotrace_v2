@@ -9,10 +9,10 @@ import math
 from pathlib import Path
 
 from path_log_recovery import read_csv_log, recover_path_columns
+from robotrace_units import PULSE_MILLIMETER
 
 
 CNTLOG_MODULUS = 1 << 16
-PULSE_MILLIMETER = 54.324
 REQUIRED_COLUMNS = {"cntlog", "encCurrentCorr_p", "gyroVal_Z", "x", "y"}
 
 
@@ -22,7 +22,7 @@ def signed_int16(value: str) -> int:
 
 
 def decode_distance_pulse(value: str, schema_version: int | None) -> int:
-    """Version 5はS16、Version 2～4は旧U32として復号する。"""
+    """Version 5/6はS16、Version 2～4は旧U32として復号する。"""
     if schema_version is not None and schema_version >= 5:
         return signed_int16(value)
     # 旧ファームウェアはU32へキャストして保存していたが、1msのパルス値は

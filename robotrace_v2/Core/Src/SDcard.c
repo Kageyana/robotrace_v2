@@ -2,10 +2,13 @@
 // インクルード
 //====================================//
 #include "SDcard.h"
+#include "control.h"
 #include "courseAnalysis.h"
 #include "distanceEstimator.h"
+#include "encoder.h"
 #include "firmware_version.h"
 #include "sd_functions.h"
+#include <math.h>
 #include "stdio.h"
 #include <stdint.h>
 //====================================//
@@ -445,13 +448,29 @@ void createLog(void)
 	setLogHeaderStrS("buildTime", BUILD_TIME);
 	setLogHeaderStrS("branch", GIT_BRANCH);
 	setLogHeaderStr("logSchemaVersion", LOG_SCHEMA_VERSION);
+	DistanceEstimatorDiagnostics distanceDiagnostics = DistanceEstimator_GetDiagnostics();
+	uint32_t maxAbsFusedDeltaP = 0U;
+	if (isfinite(distanceDiagnostics.maxAbsFusedDeltaM) &&
+		distanceDiagnostics.maxAbsFusedDeltaM > 0.0F)
+	{
+		maxAbsFusedDeltaP = (uint32_t)(distanceDiagnostics.maxAbsFusedDeltaM *
+			(float)PULSE_METER + 0.5F);
+	}
+	setLogHeaderStrU("logRecordSizeBytes", (uint32_t)LOG_RECORD_SIZE_BYTES);
+	setLogHeaderStrU("dbgOverflowFinal", dbg_overflow);
+	setLogHeaderStrU("logOverflowFinal", logOverflow ? 1U : 0U);
 	setLogHeaderStrF("distanceKalman.sigmaAccel_mps2", DISTANCE_ESTIMATOR_SIGMA_ACCEL_MPS2);
 	setLogHeaderStrF("distanceKalman.sigmaEncoder_mps", DISTANCE_ESTIMATOR_SIGMA_ENCODER_MPS);
 	setLogHeaderStrF("distanceKalman.biasRandomWalk_mps2_sqrt_s", DISTANCE_ESTIMATOR_BIAS_RANDOM_WALK_MPS2_SQRT_S);
 	setLogHeaderStrF("distanceKalman.initialBiasSigma_mps2", DISTANCE_ESTIMATOR_INITIAL_BIAS_SIGMA_MPS2);
-	setLogHeaderStr("distanceKalman.innovationRejectCount",
-		(int32_t)DistanceEstimator_GetInnovationRejectCount());
-	setLogHeaderStr("distanceKalman.fallbackCount", (int32_t)DistanceEstimator_GetFallbackCount());
+	setLogHeaderStrU("distanceKalman.innovationRejectCount",
+		distanceDiagnostics.innovationRejectCount);
+	setLogHeaderStrU("distanceKalman.fallbackCount", distanceDiagnostics.fallbackCount);
+	setLogHeaderStrU("distanceKalman.invalidUpdateCount",
+		distanceDiagnostics.invalidUpdateCount);
+	setLogHeaderStrU("distanceKalman.maxAbsFusedDelta_p", maxAbsFusedDeltaP);
+	setLogHeaderStrU("distanceKalman.outputGuardCount",
+		Control_GetDistanceFusionOutputGuardCount());
 	// 制御パラメータ
 	setLogHeaderStrF("batteryVoltage_V", batteryVoltage_V);
 	setLogHeaderStrF("optimalTrace", optimalTrace);

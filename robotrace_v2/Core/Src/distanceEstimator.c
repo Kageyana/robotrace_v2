@@ -12,6 +12,8 @@ typedef struct
 	float innovationSigmaMps;
 	uint32_t innovationRejectCount;
 	uint32_t fallbackCount;
+	uint32_t invalidUpdateCount;
+	float maxAbsFusedDeltaM;
 	bool fallbackActive;
 	bool initialized;
 } DistanceEstimatorState;
@@ -40,87 +42,145 @@ static float clampFloat(float value, float minimum, float maximum)
 /////////////////////////////////////////////////////////////////////
 // モジュール名 estimatorStateIsFinite
 // 処理概要     距離推定器の状態、共分散、診断値の有限性を確認する
-// 引数         なし
+// 引数         state: 検証対象の距離推定状態
 // 戻り値       全値が有限ならtrue
 /////////////////////////////////////////////////////////////////////
-static bool estimatorStateIsFinite(void)
+static bool estimatorStateIsFinite(const DistanceEstimatorState *state)
 {
 	for (uint8_t i = 0U; i < 3U; i++)
 	{
-		if (!isfinite(estimator.state[i]))
+		if (!isfinite(state->state[i]))
 		{
 			return false;
 		}
 		for (uint8_t j = 0U; j < 3U; j++)
 		{
-			if (!isfinite(estimator.covariance[i][j]))
+			if (!isfinite(state->covariance[i][j]))
 			{
 				return false;
 			}
 		}
 	}
-	return isfinite(estimator.fusedDeltaM) &&
-		isfinite(estimator.innovationMps) &&
-		isfinite(estimator.innovationSigmaMps);
+	return isfinite(state->fusedDeltaM) &&
+		isfinite(state->innovationMps) &&
+		isfinite(state->innovationSigmaMps) &&
+		isfinite(state->maxAbsFusedDeltaM);
 }
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 resetCovariance
 // 処理概要     距離推定器の共分散を初期値へ戻す
-// 引数         なし
+// 引数         state: 初期化対象の距離推定状態
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-static void resetCovariance(void)
+static void resetCovariance(DistanceEstimatorState *state)
 {
 	for (uint8_t i = 0U; i < 3U; i++)
 	{
 		for (uint8_t j = 0U; j < 3U; j++)
 		{
-			estimator.covariance[i][j] = 0.0F;
+			state->covariance[i][j] = 0.0F;
 		}
 	}
-	estimator.covariance[1][1] =
+	state->covariance[1][1] =
 		DISTANCE_ESTIMATOR_SIGMA_ENCODER_MPS * DISTANCE_ESTIMATOR_SIGMA_ENCODER_MPS;
-	estimator.covariance[2][2] =
+	state->covariance[2][2] =
 		DISTANCE_ESTIMATOR_INITIAL_BIAS_SIGMA_MPS2 * DISTANCE_ESTIMATOR_INITIAL_BIAS_SIGMA_MPS2;
 }
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 resetVelocityCovariance
 // 処理概要     速度状態の共分散と相関を再初期化する
-// 引数         なし
+// 引数         state: 初期化対象の距離推定状態
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-static void resetVelocityCovariance(void)
+static void resetVelocityCovariance(DistanceEstimatorState *state)
 {
 	for (uint8_t i = 0U; i < 3U; i++)
 	{
-		estimator.covariance[1][i] = 0.0F;
-		estimator.covariance[i][1] = 0.0F;
+		state->covariance[1][i] = 0.0F;
+		state->covariance[i][1] = 0.0F;
 	}
-	estimator.covariance[1][1] =
+	state->covariance[1][1] =
 		DISTANCE_ESTIMATOR_SIGMA_ENCODER_MPS * DISTANCE_ESTIMATOR_SIGMA_ENCODER_MPS;
 }
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 symmetrizeCovariance
-// 処理概要     共分散行列の対称性と対角要素の非負性を補正する
-// 引数         なし
+// 処理概要     共分散行列の対称性だけを補正する
+// 引数         state: 補正対象の距離推定状態
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-static void symmetrizeCovariance(void)
+static void symmetrizeCovariance(DistanceEstimatorState *state)
 {
 	for (uint8_t i = 0U; i < 3U; i++)
 	{
-		if (estimator.covariance[i][i] < 0.0F || !isfinite(estimator.covariance[i][i]))
-		{
-			estimator.covariance[i][i] = 0.0F;
-		}
 		for (uint8_t j = (uint8_t)(i + 1U); j < 3U; j++)
 		{
-			float average = 0.5F * (estimator.covariance[i][j] + estimator.covariance[j][i]);
-			estimator.covariance[i][j] = average;
-			estimator.covariance[j][i] = average;
+			float average = 0.5F * (state->covariance[i][j] + state->covariance[j][i]);
+			state->covariance[i][j] = average;
+			state->covariance[j][i] = average;
+		}
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 covarianceDiagonalIsValid
+// 処理概要     共分散対角要素が有限かつ非負であることを確認する
+// 引数         state: 検証対象の距離推定状態
+// 戻り値       全対角要素が有効ならtrue
+/////////////////////////////////////////////////////////////////////
+static bool covarianceDiagonalIsValid(const DistanceEstimatorState *state)
+{
+	for (uint8_t i = 0U; i < 3U; i++)
+	{
+		if (!isfinite(state->covariance[i][i]) || state->covariance[i][i] < 0.0F)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 covarianceMatrixIsFinite
+// 処理概要     共分散行列の全要素が有限であることを確認する
+// 引数         matrix: 検証対象の3x3行列
+// 戻り値       全要素が有限ならtrue
+/////////////////////////////////////////////////////////////////////
+static bool covarianceMatrixIsFinite(const float matrix[3][3])
+{
+	for (uint8_t i = 0U; i < 3U; i++)
+	{
+		for (uint8_t j = 0U; j < 3U; j++)
+		{
+			if (!isfinite(matrix[i][j]))
+			{
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 recordFusedDelta
+// 処理概要     融合後距離差分の最大絶対値を診断値へ記録する
+// 引数         state: 記録対象の距離推定状態
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void recordFusedDelta(DistanceEstimatorState *state)
+{
+	if (!isfinite(state->maxAbsFusedDeltaM) || state->maxAbsFusedDeltaM < 0.0F)
+	{
+		state->maxAbsFusedDeltaM = 0.0F;
+	}
+	if (isfinite(state->fusedDeltaM))
+	{
+		float absoluteDelta = fabsf(state->fusedDeltaM);
+		if (absoluteDelta > state->maxAbsFusedDeltaM)
+		{
+			state->maxAbsFusedDeltaM = absoluteDelta;
 		}
 	}
 }
@@ -149,7 +209,36 @@ static void updateFallback(float encoderSpeedMps)
 	estimator.fusedDeltaM = estimator.state[0] - previousDistance;
 	estimator.innovationMps = 0.0F;
 	estimator.innovationSigmaMps = DISTANCE_ESTIMATOR_SIGMA_ENCODER_MPS;
-	resetCovariance();
+	resetCovariance(&estimator);
+	recordFusedDelta(&estimator);
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 updateInvalid
+// 処理概要     更新異常時に距離を戻し、生エンコーダ速度へ同期する
+// 引数         encoderSpeedMps: 平均エンコーダ速度[m/s]
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void updateInvalid(float encoderSpeedMps)
+{
+	float safeSpeed = isfinite(encoderSpeedMps) ?
+		clampFloat(encoderSpeedMps, -DISTANCE_ESTIMATOR_MAX_SPEED_MPS,
+			DISTANCE_ESTIMATOR_MAX_SPEED_MPS) : 0.0F;
+	float previousDistance = isfinite(estimator.state[0]) ? estimator.state[0] : 0.0F;
+
+	if (estimator.invalidUpdateCount < UINT32_MAX)
+	{
+		estimator.invalidUpdateCount++;
+	}
+	estimator.state[0] = previousDistance + safeSpeed * DISTANCE_ESTIMATOR_DT_S;
+	estimator.state[1] = safeSpeed;
+	estimator.state[2] = 0.0F;
+	estimator.fusedDeltaM = estimator.state[0] - previousDistance;
+	estimator.innovationMps = 0.0F;
+	estimator.innovationSigmaMps = DISTANCE_ESTIMATOR_SIGMA_ENCODER_MPS;
+	estimator.fallbackActive = false;
+	resetCovariance(&estimator);
+	recordFusedDelta(&estimator);
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -158,13 +247,13 @@ static void updateFallback(float encoderSpeedMps)
 // 引数         accelerationMps2: 前後加速度[m/s^2]
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-static void predict(float accelerationMps2)
+static void predict(DistanceEstimatorState *state, float accelerationMps2)
 {
 	const float dt = DISTANCE_ESTIMATOR_DT_S;
 	const float dt2 = dt * dt;
 	const float acceleration = clampFloat(accelerationMps2,
 		-DISTANCE_ESTIMATOR_MAX_ACCEL_MPS2, DISTANCE_ESTIMATOR_MAX_ACCEL_MPS2);
-	const float effectiveAcceleration = acceleration - estimator.state[2];
+	const float effectiveAcceleration = acceleration - state->state[2];
 	const float transition[3][3] = {
 		{1.0F, dt, -0.5F * dt2},
 		{0.0F, 1.0F, -dt},
@@ -174,10 +263,10 @@ static void predict(float accelerationMps2)
 	float firstProduct[3][3];
 	float predictedCovariance[3][3];
 
-	predictedState[0] = estimator.state[0] + estimator.state[1] * dt +
+	predictedState[0] = state->state[0] + state->state[1] * dt +
 		0.5F * effectiveAcceleration * dt2;
-	predictedState[1] = estimator.state[1] + effectiveAcceleration * dt;
-	predictedState[2] = estimator.state[2];
+	predictedState[1] = state->state[1] + effectiveAcceleration * dt;
+	predictedState[2] = state->state[2];
 
 	for (uint8_t i = 0U; i < 3U; i++)
 	{
@@ -186,7 +275,7 @@ static void predict(float accelerationMps2)
 			firstProduct[i][j] = 0.0F;
 			for (uint8_t k = 0U; k < 3U; k++)
 			{
-				firstProduct[i][j] += transition[i][k] * estimator.covariance[k][j];
+				firstProduct[i][j] += transition[i][k] * state->covariance[k][j];
 			}
 		}
 	}
@@ -220,17 +309,17 @@ static void predict(float accelerationMps2)
 
 	for (uint8_t i = 0U; i < 3U; i++)
 	{
-		estimator.state[i] = predictedState[i];
+		state->state[i] = predictedState[i];
 		for (uint8_t j = 0U; j < 3U; j++)
 		{
-			estimator.covariance[i][j] = predictedCovariance[i][j];
+			state->covariance[i][j] = predictedCovariance[i][j];
 		}
 	}
-	symmetrizeCovariance();
-	if (estimator.state[1] > DISTANCE_ESTIMATOR_MAX_SPEED_MPS ||
-		estimator.state[1] < -DISTANCE_ESTIMATOR_MAX_SPEED_MPS)
+	symmetrizeCovariance(state);
+	if (state->state[1] > DISTANCE_ESTIMATOR_MAX_SPEED_MPS ||
+		state->state[1] < -DISTANCE_ESTIMATOR_MAX_SPEED_MPS)
 	{
-		estimator.state[1] = clampFloat(estimator.state[1],
+		state->state[1] = clampFloat(state->state[1],
 			-DISTANCE_ESTIMATOR_MAX_SPEED_MPS, DISTANCE_ESTIMATOR_MAX_SPEED_MPS);
 	}
 }
@@ -254,6 +343,25 @@ void DistanceEstimator_Initialize(float initialSpeedMps)
 /////////////////////////////////////////////////////////////////////
 void DistanceEstimator_Reset(float encoderSpeedMps)
 {
+	DistanceEstimator_ResetState(encoderSpeedMps, false);
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 DistanceEstimator_ResetState
+// 処理概要     状態と共分散を初期化し、必要に応じて走行診断値を保持する
+// 引数         encoderSpeedMps: エンコーダ速度[m/s]
+//              preserveDiagnostics: trueなら棄却・異常・最大差分を保持
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void DistanceEstimator_ResetState(float encoderSpeedMps, bool preserveDiagnostics)
+{
+	uint32_t innovationRejectCount = preserveDiagnostics ? estimator.innovationRejectCount : 0U;
+	uint32_t fallbackCount = preserveDiagnostics ? estimator.fallbackCount : 0U;
+	uint32_t invalidUpdateCount = preserveDiagnostics ? estimator.invalidUpdateCount : 0U;
+	float maxAbsFusedDeltaM = preserveDiagnostics &&
+		isfinite(estimator.maxAbsFusedDeltaM) && estimator.maxAbsFusedDeltaM >= 0.0F ?
+		estimator.maxAbsFusedDeltaM : 0.0F;
+
 	estimator.state[0] = 0.0F;
 	estimator.state[1] = isfinite(encoderSpeedMps) ?
 		clampFloat(encoderSpeedMps, -DISTANCE_ESTIMATOR_MAX_SPEED_MPS,
@@ -262,11 +370,13 @@ void DistanceEstimator_Reset(float encoderSpeedMps)
 	estimator.fusedDeltaM = 0.0F;
 	estimator.innovationMps = 0.0F;
 	estimator.innovationSigmaMps = DISTANCE_ESTIMATOR_SIGMA_ENCODER_MPS;
-	estimator.innovationRejectCount = 0U;
-	estimator.fallbackCount = 0U;
+	estimator.innovationRejectCount = innovationRejectCount;
+	estimator.fallbackCount = fallbackCount;
+	estimator.invalidUpdateCount = invalidUpdateCount;
+	estimator.maxAbsFusedDeltaM = maxAbsFusedDeltaM;
 	estimator.fallbackActive = false;
 	estimator.initialized = true;
-	resetCovariance();
+	resetCovariance(&estimator);
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -284,91 +394,189 @@ void DistanceEstimator_Update(float encoderSpeedMps, float accelerationMps2, boo
 		DistanceEstimator_Initialize(encoderSpeedMps);
 	}
 
-	if (!imuValid || !isfinite(encoderSpeedMps) || !isfinite(accelerationMps2))
+	if (!imuValid)
 	{
 		updateFallback(encoderSpeedMps);
 		return;
 	}
 
-	float previousDistance = estimator.state[0];
-	if (estimator.fallbackActive)
+	if (!isfinite(encoderSpeedMps) || !isfinite(accelerationMps2))
+	{
+		updateInvalid(encoderSpeedMps);
+		return;
+	}
+
+	DistanceEstimatorState candidate = estimator;
+	float previousDistance = candidate.state[0];
+	if (!isfinite(previousDistance))
+	{
+		updateInvalid(encoderSpeedMps);
+		return;
+	}
+	// 更新前の状態・共分散が壊れている場合も予測を実行せず、距離ジャンプを防ぐ。
+	if (!estimatorStateIsFinite(&candidate) || !covarianceDiagonalIsValid(&candidate))
+	{
+		updateInvalid(encoderSpeedMps);
+		return;
+	}
+	if (candidate.fallbackActive)
 	{
 		// フォールバック中に生エンコーダへ追従していた速度状態を再同期する。
-		estimator.state[1] = clampFloat(encoderSpeedMps,
+		candidate.state[1] = clampFloat(encoderSpeedMps,
 			-DISTANCE_ESTIMATOR_MAX_SPEED_MPS, DISTANCE_ESTIMATOR_MAX_SPEED_MPS);
-		resetVelocityCovariance();
-		estimator.fallbackActive = false;
+		resetVelocityCovariance(&candidate);
+		candidate.fallbackActive = false;
 	}
 
-	predict(accelerationMps2);
-	if (!estimatorStateIsFinite())
+	predict(&candidate, accelerationMps2);
+	if (!estimatorStateIsFinite(&candidate) || !covarianceDiagonalIsValid(&candidate))
 	{
-		updateFallback(encoderSpeedMps);
+		updateInvalid(encoderSpeedMps);
 		return;
 	}
 
-	float innovation = encoderSpeedMps - estimator.state[1];
-	float innovationVariance = estimator.covariance[1][1] +
-		(DISTANCE_ESTIMATOR_SIGMA_ENCODER_MPS * DISTANCE_ESTIMATOR_SIGMA_ENCODER_MPS);
-	if (!isfinite(innovation) || !isfinite(innovationVariance) || innovationVariance <= 0.0F)
-	{
-		updateFallback(encoderSpeedMps);
-		return;
-	}
-
-	float varianceScale = 1.0F;
-	float normalizedInnovationSquared = (innovation * innovation) / innovationVariance;
-	if (normalizedInnovationSquared >
-		(DISTANCE_ESTIMATOR_INNOVATION_GATE_SIGMA * DISTANCE_ESTIMATOR_INNOVATION_GATE_SIGMA))
-	{
-		varianceScale = normalizedInnovationSquared /
-			(DISTANCE_ESTIMATOR_INNOVATION_GATE_SIGMA * DISTANCE_ESTIMATOR_INNOVATION_GATE_SIGMA);
-		if (varianceScale > DISTANCE_ESTIMATOR_MAX_MEASUREMENT_VARIANCE_SCALE)
-		{
-			varianceScale = DISTANCE_ESTIMATOR_MAX_MEASUREMENT_VARIANCE_SCALE;
-		}
-		if (estimator.innovationRejectCount < UINT32_MAX)
-		{
-			estimator.innovationRejectCount++;
-		}
-	}
-	innovationVariance = estimator.covariance[1][1] +
-		(DISTANCE_ESTIMATOR_SIGMA_ENCODER_MPS * DISTANCE_ESTIMATOR_SIGMA_ENCODER_MPS) * varianceScale;
+	float encoderVariance =
+		DISTANCE_ESTIMATOR_SIGMA_ENCODER_MPS * DISTANCE_ESTIMATOR_SIGMA_ENCODER_MPS;
+	float innovationVariance = candidate.covariance[1][1] + encoderVariance;
 	if (!isfinite(innovationVariance) || innovationVariance <= 0.0F)
 	{
-		updateFallback(encoderSpeedMps);
+		updateInvalid(encoderSpeedMps);
 		return;
 	}
 
-	float gain[3];
-	for (uint8_t i = 0U; i < 3U; i++)
+	float innovation = encoderSpeedMps - candidate.state[1];
+	if (!isfinite(innovation))
 	{
-		gain[i] = estimator.covariance[i][1] / innovationVariance;
+		updateInvalid(encoderSpeedMps);
+		return;
 	}
-	for (uint8_t i = 0U; i < 3U; i++)
+
+	const float initialSpeedVariance = encoderVariance;
+	const float maximumGateVariance = initialSpeedVariance + encoderVariance;
+	float gateVariance = innovationVariance;
+	if (gateVariance > maximumGateVariance)
 	{
-		estimator.state[i] += gain[i] * innovation;
+		gateVariance = maximumGateVariance;
 	}
+	if (!isfinite(gateVariance) || gateVariance <= 0.0F)
+	{
+		updateInvalid(encoderSpeedMps);
+		return;
+	}
+	float gateSigma = sqrtf(gateVariance);
+	if (!isfinite(gateSigma))
+	{
+		updateInvalid(encoderSpeedMps);
+		return;
+	}
+
+	candidate.innovationMps = innovation;
+	candidate.innovationSigmaMps = gateSigma;
+	// 物理上限を超える観測、または固定された4σを超える観測は、
+	// 予測状態だけを採用し、共分散を初期化してゲートを拡大させない。
+	if (encoderSpeedMps > DISTANCE_ESTIMATOR_MAX_SPEED_MPS ||
+		encoderSpeedMps < -DISTANCE_ESTIMATOR_MAX_SPEED_MPS ||
+		fabsf(innovation) > DISTANCE_ESTIMATOR_INNOVATION_GATE_SIGMA * gateSigma)
+	{
+		if (candidate.innovationRejectCount < UINT32_MAX)
+		{
+			candidate.innovationRejectCount++;
+		}
+		candidate.fusedDeltaM = candidate.state[0] - previousDistance;
+		if (!isfinite(candidate.fusedDeltaM) ||
+			fabsf(candidate.fusedDeltaM) > DISTANCE_ESTIMATOR_MAX_FUSED_DELTA_M)
+		{
+			updateInvalid(encoderSpeedMps);
+			return;
+		}
+		resetCovariance(&candidate);
+		recordFusedDelta(&candidate);
+		estimator = candidate;
+		return;
+	}
+
+	// 更新前共分散を完全に退避し、Joseph形式で別行列へ共分散を算出する。
+	// 速度観測の観測行列はH=[0, 1, 0]とする。
 	float priorCovariance[3][3];
 	for (uint8_t i = 0U; i < 3U; i++)
 	{
 		for (uint8_t j = 0U; j < 3U; j++)
 		{
-			priorCovariance[i][j] = estimator.covariance[i][j];
-			estimator.covariance[i][j] -= gain[i] * priorCovariance[1][j];
+			priorCovariance[i][j] = candidate.covariance[i][j];
 		}
 	}
-	symmetrizeCovariance();
-	estimator.state[1] = clampFloat(estimator.state[1],
-		-DISTANCE_ESTIMATOR_MAX_SPEED_MPS, DISTANCE_ESTIMATOR_MAX_SPEED_MPS);
-	estimator.innovationMps = innovation;
-	estimator.innovationSigmaMps = sqrtf(innovationVariance);
-	estimator.fusedDeltaM = estimator.state[0] - previousDistance;
-
-	if (!estimatorStateIsFinite())
+	float gain[3];
+	for (uint8_t i = 0U; i < 3U; i++)
 	{
-		updateFallback(encoderSpeedMps);
+		gain[i] = priorCovariance[i][1] / innovationVariance;
 	}
+	for (uint8_t i = 0U; i < 3U; i++)
+	{
+		candidate.state[i] += gain[i] * innovation;
+	}
+
+	const float observationMatrix[3] = {0.0F, 1.0F, 0.0F};
+	float identityMinusKH[3][3];
+	float firstJosephProduct[3][3];
+	float josephCovariance[3][3];
+	for (uint8_t i = 0U; i < 3U; i++)
+	{
+		for (uint8_t j = 0U; j < 3U; j++)
+		{
+			identityMinusKH[i][j] = (i == j ? 1.0F : 0.0F) -
+				gain[i] * observationMatrix[j];
+		}
+	}
+	for (uint8_t i = 0U; i < 3U; i++)
+	{
+		for (uint8_t j = 0U; j < 3U; j++)
+		{
+			firstJosephProduct[i][j] = 0.0F;
+			for (uint8_t k = 0U; k < 3U; k++)
+			{
+				firstJosephProduct[i][j] += identityMinusKH[i][k] *
+					priorCovariance[k][j];
+			}
+		}
+	}
+	for (uint8_t i = 0U; i < 3U; i++)
+	{
+		for (uint8_t j = 0U; j < 3U; j++)
+		{
+			josephCovariance[i][j] = gain[i] * encoderVariance * gain[j];
+			for (uint8_t k = 0U; k < 3U; k++)
+			{
+				josephCovariance[i][j] += firstJosephProduct[i][k] *
+					identityMinusKH[j][k];
+			}
+		}
+	}
+	if (!covarianceMatrixIsFinite(josephCovariance))
+	{
+		updateInvalid(encoderSpeedMps);
+		return;
+	}
+	for (uint8_t i = 0U; i < 3U; i++)
+	{
+		for (uint8_t j = 0U; j < 3U; j++)
+		{
+			candidate.covariance[i][j] = josephCovariance[i][j];
+		}
+	}
+	symmetrizeCovariance(&candidate);
+	candidate.state[1] = clampFloat(candidate.state[1],
+		-DISTANCE_ESTIMATOR_MAX_SPEED_MPS, DISTANCE_ESTIMATOR_MAX_SPEED_MPS);
+	candidate.fusedDeltaM = candidate.state[0] - previousDistance;
+
+	if (!estimatorStateIsFinite(&candidate) || !covarianceDiagonalIsValid(&candidate) ||
+		!isfinite(candidate.fusedDeltaM) ||
+		fabsf(candidate.fusedDeltaM) > DISTANCE_ESTIMATOR_MAX_FUSED_DELTA_M)
+	{
+		updateInvalid(encoderSpeedMps);
+		return;
+	}
+	recordFusedDelta(&candidate);
+	estimator = candidate;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -414,7 +622,11 @@ void DistanceEstimator_ApplyDistanceCorrectionM(float correctionM)
 {
 	if (isfinite(correctionM) && isfinite(estimator.state[0]))
 	{
-		estimator.state[0] += correctionM;
+		float correctedDistance = estimator.state[0] + correctionM;
+		if (isfinite(correctedDistance))
+		{
+			estimator.state[0] = correctedDistance;
+		}
 	}
 }
 
@@ -434,15 +646,17 @@ DistanceEstimatorDiagnostics DistanceEstimator_GetDiagnostics(void)
 		.innovationSigma_mps = estimator.innovationSigmaMps,
 		.innovationRejectCount = estimator.innovationRejectCount,
 		.fallbackCount = estimator.fallbackCount,
+		.invalidUpdateCount = estimator.invalidUpdateCount,
+		.maxAbsFusedDeltaM = estimator.maxAbsFusedDeltaM,
 		.fallbackActive = estimator.fallbackActive};
 	return diagnostics;
 }
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 DistanceEstimator_GetInnovationRejectCount
-// 処理概要     イノベーション棄却相当の観測回数を取得する
+// 処理概要     4σ超過または物理上限超過で観測更新を完全スキップした回数を取得する
 // 引数         なし
-// 戻り値       観測分散を増加させた回数
+// 戻り値       観測更新を完全スキップした回数
 /////////////////////////////////////////////////////////////////////
 uint32_t DistanceEstimator_GetInnovationRejectCount(void)
 {

@@ -10,9 +10,10 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
+from robotrace_units import PULSE_MILLIMETER
+
 
 LOG_NUMBERS = (12384, 12386, 12387, 12388, 12389, 12394)
-PULSE_MILLIMETER = 54.324
 TREAD_MM = 11.0
 FIXED_STRAIGHTS_MM = (
     ("S1_start_up", 300.0, 1700.0),

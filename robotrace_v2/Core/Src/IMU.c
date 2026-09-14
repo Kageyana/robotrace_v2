@@ -161,18 +161,56 @@ void calcVelocity(void)
 #endif
 }
 /////////////////////////////////////////////////////////////////////
-// モジュール名 IMU_GetForwardAccelerationMps2
-// 処理概要     静止時重力基準を除去した機体前後加速度を取得する
+// モジュール名 IMU_GetLinearAccelerationXMps2
+// 処理概要     静止時重力基準を除去した機体X軸線形加速度を取得する
 // 引数         なし
-// 戻り値       前後加速度[m/s^2]
+// 戻り値       X軸線形加速度[m/s^2]
 /////////////////////////////////////////////////////////////////////
-float IMU_GetForwardAccelerationMps2(void)
+float IMU_GetLinearAccelerationXMps2(void)
+{
+#ifdef USE_ACCELE
+	return (imuVal.accele.x - gravityReference[0]) * GRAVITY_MPS2;
+#else
+	return 0.0F;
+#endif
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 IMU_GetLinearAccelerationYMps2
+// 処理概要     静止時重力基準を除去した機体Y軸線形加速度を取得する
+// 引数         なし
+// 戻り値       Y軸線形加速度[m/s^2]
+/////////////////////////////////////////////////////////////////////
+float IMU_GetLinearAccelerationYMps2(void)
 {
 #ifdef USE_ACCELE
 	return (imuVal.accele.y - gravityReference[1]) * GRAVITY_MPS2;
 #else
 	return 0.0F;
 #endif
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 IMU_GetLinearAccelerationZMps2
+// 処理概要     静止時重力基準を除去した機体Z軸線形加速度を取得する
+// 引数         なし
+// 戻り値       Z軸線形加速度[m/s^2]
+/////////////////////////////////////////////////////////////////////
+float IMU_GetLinearAccelerationZMps2(void)
+{
+#ifdef USE_ACCELE
+	return (imuVal.accele.z - gravityReference[2]) * GRAVITY_MPS2;
+#else
+	return 0.0F;
+#endif
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 IMU_GetForwardAccelerationMps2
+// 処理概要     Y軸線形加速度を前後加速度として取得する互換ラッパー
+// 引数         なし
+// 戻り値       前後加速度[m/s^2]
+/////////////////////////////////////////////////////////////////////
+float IMU_GetForwardAccelerationMps2(void)
+{
+	return IMU_GetLinearAccelerationYMps2();
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 clearIMUval

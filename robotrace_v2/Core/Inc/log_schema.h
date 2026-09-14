@@ -20,13 +20,16 @@
 #define LOG_SCHEMA_PROFILE_LIGHT 1
 #endif
 
-// 軽量ログを36バイトにし、IMU温度生コードを含めつつ通常不要な診断列を保存しない形式。
-#define LOG_SCHEMA_VERSION 5U
+// 軽量ログへ3軸線形加速度を追加した48バイト形式。
+#define LOG_SCHEMA_VERSION 6U
 
 #define LOG_FIELD_LIST_CORE(STORED, DERIVED) \
 	STORED(U16, cntlog, "%d", (uint16_t)cntRun) \
 	STORED(U16, encCurrentN, "%d", (uint16_t)encCurrentN) \
 	STORED(F32, gyroVal_Z, "%f", imuVal.gyro.z) \
+	STORED(F32, imuLinearAccelX_mps2, "%f", IMU_GetLinearAccelerationXMps2()) \
+	STORED(F32, imuLinearAccelY_mps2, "%f", IMU_GetLinearAccelerationYMps2()) \
+	STORED(F32, imuLinearAccelZ_mps2, "%f", IMU_GetLinearAccelerationZMps2()) \
 	STORED(U16, imuTempRaw, "%d", (uint16_t)imuVal.tempRaw) \
 	STORED(U8, courseMarker, "%d", courseMarkerLog) \
 	STORED(U32, encTotalOptimal, "%d", (uint32_t)encTotalOptimal) \
@@ -108,7 +111,7 @@
 #define LOG_RECORD_SIZE_SKIP(type, name, fmt, expr)
 // 1レコード分のバイトサイズ。
 enum { LOG_RECORD_SIZE_BYTES = 0 LOG_FIELD_LIST(LOG_RECORD_SIZE_ADD, LOG_RECORD_SIZE_SKIP) };
-_Static_assert(!LOG_SCHEMA_PROFILE_LIGHT || LOG_RECORD_SIZE_BYTES == 36U,
-	"Light log record must remain 36 bytes");
+_Static_assert(!LOG_SCHEMA_PROFILE_LIGHT || LOG_RECORD_SIZE_BYTES == 48U,
+	"Light log record must remain 48 bytes");
 
 #endif // LOG_SCHEMA_H_

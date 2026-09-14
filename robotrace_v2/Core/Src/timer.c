@@ -42,33 +42,38 @@ void Interrupt1ms(void)
 
 	// Encoder
 	getEncoder();
-	setEncoderVal();
-	encPulse5ms += encCurrentN; // 5ms間のエンコーダパルスを累積
 
 	// IMU処理
 	if (initIMU)
 	{
+		bool imuUpdateReady = false;
 		if (!calibratIMU)
 		{
 			BMI088getGyro();	// 角速度取得
 			BMI088getAccele();	// 加速度取得
 			calcDegrees();		// コンプリメンタリフィルタで角度算出
 			calcVelocity();		// 加速度から速度算出
-			// スリップ距離補正（パルス版）
-			if (patternTrace >= 12 && patternTrace < 100)
-			{
-				updateSlipDetection(); // スリップ検出（Δv比率とフラグ更新を1msで実行）
-			}
+			imuUpdateReady = true;
 			// motorControlYawRate();	// 角速度制御
 			// motorControlYaw();		// 角度制御
 		}
 		else
 		{
 			calibrationIMU();
+			if (calibrationWasActive && !calibratIMU)
+			{
+				Control_RequestDistanceFusionReset();
+				// 校正完了直後も新しい補正済みIMU値を距離更新へ渡す。
+				BMI088getGyro();
+				BMI088getAccele();
+				calcDegrees();
+				calcVelocity();
+				imuUpdateReady = true;
+			}
 		}
-		if (calibrationWasActive && !calibratIMU)
+		if (imuUpdateReady && patternTrace >= 12 && patternTrace < 100)
 		{
-			Control_ResetDistanceFusion();
+			updateSlipDetection(); // スリップ検出（Δv比率とフラグ更新を1msで実行）
 		}
 		calibrationWasActive = calibratIMU;
 	}
@@ -76,6 +81,15 @@ void Interrupt1ms(void)
 	{
 		calibrationWasActive = false;
 	}
+
+	// 校正完了・走行開始の要求は、IMU補正後かつカルマン更新前に実行する。
+	Control_ProcessDistanceFusionReset();
+
+	// IMUの読出し・補正後にカルマン距離と距離系カウンタを更新する。
+	setEncoderVal();
+	// 走行終了要求は、最後の距離系カウンタを反映した同じ1ms処理で実行する。
+	Control_ProcessDistanceFusionReset();
+	encPulse5ms += encCurrentN; // 5ms間のエンコーダパルスを累積
 
 	// 経路モードは平均速度PIDとヨーレートPIDを使用する。
 	bool pathModeActive = (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT);

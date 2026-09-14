@@ -8,6 +8,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 from analyze_path_gains_12205_12224 import LOG_DIR, load_log
+from robotrace_units import PULSE_MILLIMETER
 
 
 OUT_DIR = Path(__file__).resolve().parents[1] / "path_gains_12205_12224"
@@ -48,7 +49,7 @@ def plot_errors() -> None:
                                      constrained_layout=True)
     for number, color, label in [(12218, "tab:blue", "before"), (12223, "tab:red", "after")]:
         data = rows(number)
-        distance = [num(r, "encTotalOptimal") / 54.324 for r in data]
+        distance = [num(r, "encTotalOptimal") / PULSE_MILLIMETER for r in data]
         ax_y.plot(distance, [abs(num(r, "pathErrorY_mm")) for r in data],
                   color=color, label=f"{number} ({label})")
         ax_h.plot(distance, [abs(num(r, "pathErrorHeading_cdeg")) / 100.0 for r in data],
