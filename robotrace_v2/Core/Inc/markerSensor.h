@@ -23,11 +23,16 @@
 // グローバル変数の宣言
 //====================================//
 extern uint8_t  markerSensor;
-extern uint8_t  SGmarker;
+extern uint8_t  SGmarker; // スタート検出で1、以後は右マーカー通過ごとに加算
+extern volatile uint8_t startMarkerOnsetValid;
+extern volatile uint8_t goalMarkerOnsetValid;
+extern volatile int32_t goalMarkerOnset_p;
+void markerStartReferenceReset(void);
 //====================================//
 // プロトタイプ宣言
 //====================================//
-void getMarkerSensor (void);
+void getMarkerSensor(uint8_t phase);
+void discardMarkerSensorPendingSamples(void);
 void initMarkerSensor(void);
 uint8_t checkMarker(void);
 void checkStartGoalMarker(void);

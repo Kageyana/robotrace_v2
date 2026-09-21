@@ -125,7 +125,7 @@ float asignVelocity(int16_t ROC);
 int cmpfloat(const void *n1, const void *n2);
 int16_t readLogTest(int logNumber);
 int16_t calcXYcies(int logNumber);
-void calcXYcie(int16_t encpulse, float angVelo, float dt);
+void calcXYcie(int32_t deltaPulse, float angVelo, float dt);
 void clearXYcie(void);
 void processMarkerEvent(void);
 void clearMarkerProcessState(void);

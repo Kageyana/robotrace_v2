@@ -3,8 +3,10 @@
 //====================================//
 #include "lineSensor.h"
 #include "fatfs.h"
+#include "timer.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 //====================================//
 // グローバル変数の宣言
 //====================================//
@@ -13,7 +15,7 @@
 uint32_t lSensorInt[NUM_SENSORS] = {0};	 // ラインセンサの立ち上がりエッジAD値積算用
 uint16_t lSensor[NUM_SENSORS] = {0};	 // ラインセンサの平均AD値
 uint16_t lSensorCari[NUM_SENSORS] = {0}; // 正規化したラインセンサのAD値
-bool lineSensorState = false;			 // true:ラインセンサ点灯 false:ラインセンサ消灯
+volatile bool lineSensorState = false; // true:ラインセンサ点灯 false:ラインセンサ消灯
 bool lineSensorPower = false;			 // ラインセンサ電源状態
 // 仮想センサステア関連
 uint16_t lineIndex = 0;
@@ -24,6 +26,24 @@ uint16_t lSensorMin[NUM_SENSORS] = {[0 ... NUM_SENSORS - 1] = UINT16_MAX};	// �
 uint8_t modeCalLinesensors = 0;
 static bool lineSensorCalibrationValid = false;
 bool lineSensorSettingCorrupt = false;
+static uint32_t lineAccum[2][NUM_SENSORS];
+static uint32_t lineAverage[2][NUM_SENSORS];
+static uint16_t lineSampleCount[2];
+static uint8_t lineReadyMask;
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 discardLineSensorPendingSamples
+// 処理概要     位相不一致時に未完成の点灯・消灯組を破棄する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void discardLineSensorPendingSamples(void)
+{
+	memset(lineAccum, 0, sizeof(lineAccum));
+	lineSampleCount[0] = 0U;
+	lineSampleCount[1] = 0U;
+	lineReadyMask = 0U;
+}
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 isLineSensorStoredValueInRange
@@ -162,19 +182,13 @@ void delayLineSensorConversionStart(uint32_t us)
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getLineSensor
 // 処理概要  	ラインセンサのAD値を取得し、平均値を計算する
-// 引数     	なし
+// 引数     	phase: ADC開始時に固定したLED位相(0:消灯、1:点灯)
 // 戻り値    	なし
 /////////////////////////////////////////////////////////////////////
-void getLineSensor(void)
+void getLineSensor(uint8_t phase)
 {
-	// LED点灯／消灯それぞれの平均を取るためのワークバッファ
-	static uint32_t accum[2][NUM_SENSORS] = {{0}};
-	static uint32_t average[2][NUM_SENSORS] = {{0}};
-	static uint16_t sampleCount[2] = {0};
-	static uint8_t readyMask = 0;
-	const uint8_t phase = lineSensorState ? 1U : 0U; // 1: LED on, 0: LED off
 	const uint8_t div = LS_AVERAGE_SAMPLES / 2;
-	uint32_t *acc = accum[phase];
+	uint32_t *acc = lineAccum[phase];
 	const uint16_t *sample = (phase == 1U) ? analogValLSon : analogValLSoff;
 
 	// 取得したADC値を位相ごとに積算
@@ -184,27 +198,28 @@ void getLineSensor(void)
 	}
 
 	// 所定回数サンプリングしたら平均値に反映
-	if (++sampleCount[phase] >= LS_AVERAGE_SAMPLES)
+	if (++lineSampleCount[phase] >= LS_AVERAGE_SAMPLES)
 	{
 		for (uint8_t i = 0; i < NUM_SENSORS; i++)
 		{
-			average[phase][i] = acc[i] >> div;
+			lineAverage[phase][i] = acc[i] >> div;
 			acc[i] = 0;
 		}
-		sampleCount[phase] = 0;
-		readyMask |= (1U << phase);
+		lineSampleCount[phase] = 0;
+		lineReadyMask |= (1U << phase);
 	}
 
 	// LED点灯／消灯の両方が揃ったら差分を計算
-	if (readyMask == 0x03U)
+	if (lineReadyMask == 0x03U)
 	{
 		for (uint8_t i = 0; i < NUM_SENSORS; i++)
 		{
-			int32_t diff = (int32_t)average[0][i] - (int32_t)average[1][i];
+			int32_t diff = (int32_t)lineAverage[0][i] - (int32_t)lineAverage[1][i];
 			lSensor[i] = (diff > 0) ? (int16_t)diff : 0;
 		}
-		readyMask = 0;
+		lineReadyMask = 0;
 		calibrationLinesensor(); // 最新のライン値でキャリブレーション／正規化を更新
+		Timer_NotifyLineUpdate();
 	}
 }
 /////////////////////////////////////////////////////////////////////

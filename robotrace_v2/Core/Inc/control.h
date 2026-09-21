@@ -79,7 +79,8 @@
 #define SLIP_CUR_MIN_A             0.10f   // ほぼ惰性/停止時は補正を無効化
 
 // ゴール
-#define COUNT_GOAL 2 // ゴールマーカーを読む回数
+#define COUNT_LAPS 6U // スタート後に通過するゴールマーカーの回数（周回数）
+#define COUNT_GOAL (COUNT_LAPS + 1U) // SGmarkerはスタート検出で1になる
 
 // スタートモード
 #define START_SERACH 3

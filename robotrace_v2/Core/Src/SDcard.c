@@ -6,11 +6,19 @@
 #include "courseAnalysis.h"
 #include "distanceEstimator.h"
 #include "encoder.h"
+#include "markerSensor.h"
+#include "lineSensor.h"
+#include "headingEstimator.h"
+#include "runGuard.h"
+#include "timer.h"
 #include "firmware_version.h"
 #include "sd_functions.h"
 #include <math.h>
 #include "stdio.h"
 #include <stdint.h>
+#ifndef ROBOTRACE_ENABLE_SLIP_UPDATE
+#define ROBOTRACE_ENABLE_SLIP_UPDATE 0
+#endif
 //====================================//
 // グローバル変数の宣
 //====================================//
@@ -20,11 +28,204 @@ FIL fil_R;
 
 // ログヘッダー
 // 詳細デバッグ列を含むCSVのフォーマットと1行分を格納できるサイズにする。
-#define LOG_COLUMN_TITLE_BUFFER_SIZE 4096U
+#define LOG_COLUMN_TITLE_BUFFER_SIZE 6144U
 #define LOG_FORMAT_BUFFER_SIZE       512U
 #define LOG_CSV_LINE_BUFFER_SIZE    1024U
 char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE] = "", formatLog[LOG_FORMAT_BUFFER_SIZE] = "";
 static bool logHeaderOverflow = false;
+static float gyroIntervalSum = 0.0f;
+static uint16_t gyroIntervalSamples = 0U;
+static int32_t encoderIntervalL = 0;
+static int32_t encoderIntervalR = 0;
+static int16_t logEncoderIntervalL = 0;
+static int16_t logEncoderIntervalR = 0;
+static float logGyroIntervalAverage = 0.0f;
+static bool gyroSampleFault = false;
+static bool encoderIntervalFault = false;
+static HeadingCalibration headingCalibration = {0U, 58092U, 57945U, 10602U};
+static HeadingCalibration runHeadingCalibration = {0U, 58092U, 57945U, 10602U};
+static HeadingBiasEstimator headingEstimator;
+static bool runImuCalibrationValid = false;
+static uint16_t runImuCalibrationSamples = 0U;
+static uint16_t runImuCalibrationReadErrors = 0U;
+typedef struct
+{
+	float goalX_mm;
+	float goalY_mm;
+	float goalXGyro_mm;
+	float goalYGyro_mm;
+	float goalXFusedDiagnostic_mm;
+	float goalYFusedDiagnostic_mm;
+	float goalS_mm;
+	int32_t goalPulse_p;
+	uint8_t valid;
+	uint8_t reason; // Schema 10: 0有効、1非一次、2マーカー、3ログ、5区間外、6エンコーダ、8 X超過、9 IMU校正、10 距離未検証
+} LogClosure;
+static LogClosure logClosure;
+static bool lastRunSaved = false;
+static float runStartOmegaKp;
+static float runStartOmegaKi;
+static float runStartOmegaKd;
+static uint32_t runStartLineCalibrationHash;
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logCaptureRunStartSettings
+// 処理概要     動的ゲイン変更前の設定とライン校正値の照合値を保存する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void logCaptureRunStartSettings(void)
+{
+	runStartOmegaKp = lineTraceOmegaFBCtrl.kp;
+	runStartOmegaKi = lineTraceOmegaFBCtrl.ki;
+	runStartOmegaKd = lineTraceOmegaFBCtrl.kd;
+	uint32_t hash = 2166136261UL;
+	for (uint8_t i = 0U; i < NUM_SENSORS; i++)
+	{
+		uint16_t values[2] = {lSensorMin[i], lSensorMax[i]};
+		for (uint8_t j = 0U; j < 2U; j++)
+		{
+			hash = (hash ^ (uint8_t)values[j]) * 16777619UL;
+			hash = (hash ^ (uint8_t)(values[j] >> 8)) * 16777619UL;
+		}
+	}
+	runStartLineCalibrationHash = hash;
+	runHeadingCalibration = headingCalibration;
+	runImuCalibrationValid = IMU_CalibrationReady();
+	runImuCalibrationSamples = IMU_CalibrationSamples();
+	runImuCalibrationReadErrors = IMU_CalibrationReadErrors();
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 writeHeadingCalibrationSettings
+// 処理概要     一次経路の左右車輪校正値をSDへ保存する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void writeHeadingCalibrationSettings(void)
+{
+	FIL file;
+	if (f_open(&file, PATH_SETTING "heading_cal.txt", FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
+	{
+		f_printf(&file, "%u,%lu,%lu,%u", headingCalibration.enabled,
+			(unsigned long)headingCalibration.pulsePerMeterL,
+			(unsigned long)headingCalibration.pulsePerMeterR,
+			headingCalibration.effectiveTreadCentiMm);
+		f_close(&file);
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 readHeadingCalibrationSettings
+// 処理概要     SD校正値を部分反映し、破損時は無効化して修復する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void readHeadingCalibrationSettings(void)
+{
+	FIL file;
+	char valueText[64] = {0};
+	int values[4] = {0, 58092, 57945, 10602};
+	char trailing = '\0';
+	int parsed = 0;
+	bool repair = false;
+	headingCalibration = (HeadingCalibration){0U, 58092U, 57945U, 10602U};
+	if (f_open(&file, PATH_SETTING "heading_cal.txt", FA_OPEN_EXISTING | FA_READ) == FR_OK)
+	{
+		if (f_gets(valueText, sizeof(valueText), &file) != NULL)
+		{
+			parsed = sscanf(valueText, "%d,%d,%d,%d%c", &values[0], &values[1],
+				&values[2], &values[3], &trailing);
+		}
+		else repair = true;
+		f_close(&file);
+	}
+	else repair = true;
+	if (parsed >= 1 && (values[0] == 0 || values[0] == 1))
+		headingCalibration.enabled = (uint8_t)values[0];
+	else repair = true;
+	if (parsed >= 2 && values[1] >= 50000 && values[1] <= 65000)
+		headingCalibration.pulsePerMeterL = (uint32_t)values[1];
+	else repair = true;
+	if (parsed >= 3 && values[2] >= 50000 && values[2] <= 65000)
+		headingCalibration.pulsePerMeterR = (uint32_t)values[2];
+	else repair = true;
+	if (parsed >= 4 && values[3] >= 9000 && values[3] <= 14000)
+		headingCalibration.effectiveTreadCentiMm = (uint16_t)values[3];
+	else repair = true;
+	if (parsed != 4) repair = true;
+	if (repair)
+	{
+		headingCalibration.enabled = 0U;
+		writeHeadingCalibrationSettings();
+	}
+	// 左右実測値が走行距離用の共通換算値から2%を超える場合は経路生成に使わない。
+	if (headingCalibration.pulsePerMeterL < (uint32_t)(PULSE_METER * 0.98f) ||
+		headingCalibration.pulsePerMeterL > (uint32_t)(PULSE_METER * 1.02f) ||
+		headingCalibration.pulsePerMeterR < (uint32_t)(PULSE_METER * 0.98f) ||
+		headingCalibration.pulsePerMeterR > (uint32_t)(PULSE_METER * 1.02f))
+	{
+		// 正常な既存ファイルは保存値を維持し、この走行では診断専用にする。
+		headingCalibration.enabled = 0U;
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logLastRunWasSaved
+// 処理概要     直前のCSVが最後まで正常保存されたか取得する
+// 引数         なし
+// 戻り値       true:保存完了 false:未検証
+/////////////////////////////////////////////////////////////////////
+bool logLastRunWasSaved(void) { return lastRunSaved; }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logLastClosureValid
+// 処理概要     直前の一次走行ログの経路採用可否を取得する
+// 引数         なし
+// 戻り値       true:経路採用可 false:経路不採用
+/////////////////////////////////////////////////////////////////////
+bool logLastClosureValid(void) { return lastRunSaved && logClosure.valid != 0U; }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logLastClosureReason
+// 処理概要     直前の一次走行ログの経路採否理由を取得する
+// 引数         なし
+// 戻り値       理由コード
+/////////////////////////////////////////////////////////////////////
+uint8_t logLastClosureReason(void) { return logClosure.reason; }
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logResetMotionInterval
+// 処理概要     走行開始時にログ区間の角速度・左右パルス積算を初期化する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void logResetMotionInterval(void)
+{
+	gyroIntervalSum = 0.0f;
+	gyroIntervalSamples = 0U;
+	encoderIntervalL = 0;
+	encoderIntervalR = 0;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logAccumulateMotion1ms
+// 処理概要     同じ1ms区間の角速度と左右エンコーダを積算する
+// 引数         gyroDegPerSec: 角速度[deg/s], encoderL/R: 左右パルス[pulse]
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void logAccumulateMotion1ms(float gyroDegPerSec, int16_t encoderL, int16_t encoderR)
+{
+	if (isfinite(gyroDegPerSec) && gyroIntervalSamples < UINT16_MAX)
+	{
+		gyroIntervalSum += gyroDegPerSec;
+		gyroIntervalSamples++;
+		encoderIntervalL += encoderL;
+		encoderIntervalR += encoderR;
+	}
+	else
+	{
+		gyroSampleFault = true;
+	}
+}
 
 // ログバッファ
 // Log buffers
@@ -448,6 +649,16 @@ void createLog(void)
 	setLogHeaderStrS("buildTime", BUILD_TIME);
 	setLogHeaderStrS("branch", GIT_BRANCH);
 	setLogHeaderStr("logSchemaVersion", LOG_SCHEMA_VERSION);
+	setLogHeaderStrU("encoderPulsePerMeter", PULSE_METER);
+	setLogHeaderStr("distanceScaleVerified", PRIMARY_DISTANCE_SCALE_VERIFIED);
+	setLogHeaderStr("imuCalibrationValid", runImuCalibrationValid ? 1 : 0);
+	setLogHeaderStrU("imuCalibrationSamples", runImuCalibrationSamples);
+	setLogHeaderStrU("imuCalibrationReadErrors", runImuCalibrationReadErrors);
+	setLogHeaderStr("headingCalibration.enabled", runHeadingCalibration.enabled);
+	setLogHeaderStrU("headingCalibration.pulsePerMeterL", runHeadingCalibration.pulsePerMeterL);
+	setLogHeaderStrU("headingCalibration.pulsePerMeterR", runHeadingCalibration.pulsePerMeterR);
+	setLogHeaderStrF("headingCalibration.effectiveTread_mm",
+		(float)runHeadingCalibration.effectiveTreadCentiMm * 0.01f);
 	DistanceEstimatorDiagnostics distanceDiagnostics = DistanceEstimator_GetDiagnostics();
 	uint32_t maxAbsFusedDeltaP = 0U;
 	if (isfinite(distanceDiagnostics.maxAbsFusedDeltaM) &&
@@ -457,8 +668,31 @@ void createLog(void)
 			(float)PULSE_METER + 0.5F);
 	}
 	setLogHeaderStrU("logRecordSizeBytes", (uint32_t)LOG_RECORD_SIZE_BYTES);
+	setLogHeaderStrU("logExpectedRows", cntSend);
+	RunTimingDiagnostics timing = Timer_GetRunDiagnostics();
+	setLogHeaderStrU("timing.isrMax_us", (uint32_t)(((uint64_t)timing.maxIsrCycles * 1000000ULL) / SystemCoreClock));
+	setLogHeaderStrU("timing.imuReadMax_us", (uint32_t)(((uint64_t)timing.maxImuReadCycles * 1000000ULL) / SystemCoreClock));
+	setLogHeaderStrU("timing.isrOverrunCount", timing.isrOverrunCount);
+	setLogHeaderStrU("timing.imuReadErrorCount", timing.imuReadErrorCount);
+	setLogHeaderStrU("timing.lineUpdateMaxInterval_ms", timing.maxLineUpdateIntervalMs);
+	setLogHeaderStrU("timing.lineStaleCycleCount", timing.lineStaleCycleCount);
+	setLogHeaderStrU("timing.adcPhaseMismatchCount", timing.adcPhaseMismatchCount);
+	setLogHeaderStrU("timing.startResetMeasured", timing.startResetMeasured);
+	setLogHeaderStrU("timing.startResetDelay_ms", timing.startResetDelayMs);
+	setLogHeaderStr("timing.startResetPulseDelta_p", timing.startResetPulseDelta);
+	setLogHeaderStr("slipUpdateEnabled", ROBOTRACE_ENABLE_SLIP_UPDATE);
+	setLogHeaderStrF("runStartOmega.kp", runStartOmegaKp);
+	setLogHeaderStrF("runStartOmega.ki", runStartOmegaKi);
+	setLogHeaderStrF("runStartOmega.kd", runStartOmegaKd);
+	setLogHeaderStrU("runStartLineCalibrationFNV1a32", runStartLineCalibrationHash);
 	setLogHeaderStrU("dbgOverflowFinal", dbg_overflow);
 	setLogHeaderStrU("logOverflowFinal", logOverflow ? 1U : 0U);
+	setLogHeaderStr("gyroSampleFault", gyroSampleFault ? 1 : 0);
+	setLogHeaderStr("encoderIntervalFault", encoderIntervalFault ? 1 : 0);
+	setLogHeaderStrF("headingKalman.bias_dps", headingEstimator.biasDps);
+	setLogHeaderStrU("headingKalman.accepted", headingEstimator.accepted);
+	setLogHeaderStrU("headingKalman.rejected", headingEstimator.rejected);
+	setLogHeaderStr("headingKalman.invalid", headingEstimator.invalid ? 1 : 0);
 	setLogHeaderStrF("distanceKalman.sigmaAccel_mps2", DISTANCE_ESTIMATOR_SIGMA_ACCEL_MPS2);
 	setLogHeaderStrF("distanceKalman.sigmaEncoder_mps", DISTANCE_ESTIMATOR_SIGMA_ENCODER_MPS);
 	setLogHeaderStrF("distanceKalman.biasRandomWalk_mps2_sqrt_s", DISTANCE_ESTIMATOR_BIAS_RANDOM_WALK_MPS2_SQRT_S);
@@ -480,6 +714,18 @@ void createLog(void)
 	setLogHeaderStr("slipSourceLog", analysisRunSlipSourceLog());
 	// ゴール誤検出調査用。行ログが終了直前で途切れても累積値を確認できる。
 	setLogHeaderStr("sgMarkerAtLogEnd", (int32_t)SGmarker);
+	setLogHeaderStr("startMarkerOnsetValid", (int32_t)startMarkerOnsetValid);
+	setLogHeaderStr("goalMarkerOnsetValid", (int32_t)goalMarkerOnsetValid);
+	setLogHeaderStr("goalMarkerOnset_p", logClosure.goalPulse_p);
+	setLogHeaderStr("closureValid", (int32_t)logClosure.valid);
+	setLogHeaderStr("closureReason", (int32_t)logClosure.reason);
+	setLogHeaderStrF("goalMarkerXRaw_mm", logClosure.goalX_mm);
+	setLogHeaderStrF("goalMarkerYRaw_mm", logClosure.goalY_mm);
+	setLogHeaderStrF("goalMarkerXGyro_mm", logClosure.goalXGyro_mm);
+	setLogHeaderStrF("goalMarkerYGyro_mm", logClosure.goalYGyro_mm);
+	setLogHeaderStrF("goalMarkerXFusedDiagnostic_mm", logClosure.goalXFusedDiagnostic_mm);
+	setLogHeaderStrF("goalMarkerYFusedDiagnostic_mm", logClosure.goalYFusedDiagnostic_mm);
+	setLogHeaderStrF("goalMarkerS_mm", logClosure.goalS_mm);
 	setLogHeaderStr("encRightMarkerAtLogEnd_p", encRightMarker);
 	setLogHeaderStr("routeControllerVersion", PATH_ROUTE_CONTROLLER_VERSION);
 	setLogHeaderStr("routeSourceLog", pathRunRouteSourceLog());
@@ -611,6 +857,10 @@ void createLog(void)
 void initLog(void)
 {
 	FRESULT fresult;		// f_write status
+	lastRunSaved = false;
+	gyroSampleFault = false;
+	encoderIntervalFault = false;
+	HeadingBiasEstimator_Reset(&headingEstimator);
 	// CSV変換ループの実行回数を走行ごとに正しく制御するため送信カウンタをリセット
 	cntSend = 0;
 	fresult = f_open(&fil_W, "temp", FA_CREATE_ALWAYS | FA_WRITE); // create/overwrite file
@@ -714,6 +964,21 @@ void writeLogBufferPuts(void)
 		}
 
 		// スキーマ順でバイナリ書き込みを展開。
+		logGyroIntervalAverage = (gyroIntervalSamples > 0U) ?
+			(gyroIntervalSum / (float)gyroIntervalSamples) : imuVal.gyro.z;
+		if (gyroIntervalSamples == 0U || gyroIntervalSamples != cntLog) gyroSampleFault = true;
+		if (encoderIntervalL < INT16_MIN || encoderIntervalL > INT16_MAX ||
+			encoderIntervalR < INT16_MIN || encoderIntervalR > INT16_MAX)
+		{
+			encoderIntervalFault = true;
+			logEncoderIntervalL = 0;
+			logEncoderIntervalR = 0;
+		}
+		else
+		{
+			logEncoderIntervalL = (int16_t)encoderIntervalL;
+			logEncoderIntervalR = (int16_t)encoderIntervalR;
+		}
 #define LOG_SEND_U8(value) send8bit((uint8_t)(value))
 #define LOG_SEND_U16(value) send16bit((uint16_t)(value))
 #define LOG_SEND_S16(value) send16bit((uint16_t)(int16_t)(value))
@@ -722,6 +987,7 @@ void writeLogBufferPuts(void)
 #define LOG_SEND_FIELD(type, name, fmt, expr) LOG_SEND_##type(expr);
 #define LOG_SEND_SKIP(type, name, fmt, expr)
 		LOG_FIELD_LIST(LOG_SEND_FIELD, LOG_SEND_SKIP)
+		logResetMotionInterval();
 #undef LOG_SEND_FIELD
 #undef LOG_SEND_SKIP
 #undef LOG_SEND_U8
@@ -816,6 +1082,7 @@ void endTempFile(void)
 /////////////////////////////////////////////////////////////////////
 void endLog(void)
 {
+	lastRunSaved = false;
 	modeLOG = false; // stop logging
 	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY);
 	FRESULT fresult;		// f_write status
@@ -827,7 +1094,12 @@ void endLog(void)
 	uint16_t time, beforeTime = 0;
 	int16_t speed, beforeSpeed = 0;
 	float dt, zg;
-	float log_roc, log_x, log_y;
+	float log_roc, log_x, log_y, log_x_fused, log_y_fused;
+	HeadingPose fusedPose = {0.0f, 0.0f, 0.0f};
+	float travelled_mm = 0.0f;
+	int32_t previousPulse_p = 0;
+	bool logIntervalValid = true;
+	bool goalBracketFound = false;
 	LogRecord rec;
 
 	float cross_start_mm[CROSSSEG_MAX];
@@ -849,27 +1121,54 @@ void endLog(void)
 	}
 	f_close(&fil_W);
 
-	createLog();
-	if (!create_log_ready)
-	{
-		printf("endLog: createLog failed\r\n");
-		return;
-	}
-
 	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ);
 	if (fresult != FR_OK)
 	{
 		printf("f_open error in endLog\r\n");
-		f_close(&fil_W);
+		return;
+	}
+	// 停止後の第1パス: 左右差によるバイアス推定は診断専用。経路には適用しない。
+	HeadingBiasEstimator_Reset(&headingEstimator);
+	if (optimalTrace == BOOST_NONE && runHeadingCalibration.enabled != 0U)
+	{
+		uint16_t previousTime = 0U;
+		for (j = 0; j < cntSend; j++)
+		{
+			fresult = f_read(&fil, log, sizeof(log), &readByte);
+			if (fresult != FR_OK || readByte != LOG_SIZE)
+			{
+				headingEstimator.invalid = true;
+				break;
+			}
+			logaddress = log;
+			logReadRecord(&rec);
+			uint16_t intervalMs = (uint16_t)(rec.cntlog - previousTime);
+			if (!HeadingBiasEstimator_Update(&headingEstimator, &runHeadingCalibration,
+				rec.gyroVal_Z, rec.encIntervalL_p, rec.encIntervalR_p,
+				(float)intervalMs * 0.001f)) break;
+			previousTime = rec.cntlog;
+		}
+	}
+	f_close(&fil);
+	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ);
+	if (fresult != FR_OK)
+	{
+		printf("f_open error after heading estimate\r\n");
 		return;
 	}
 
-	// クロスライン前後100mm直線化のため、2パスで補正する
-	// pass1: 距離基準でクロスライン区間を抽出
+	// 第2パス: クロスライン区間と経路用ジャイロXY・診断用融合XYを抽出する。
 	beforeTime = 0;
 	beforeSpeed = 0;
 	dist_mm = 0.0f;
+	travelled_mm = 0.0f;
+	previousPulse_p = 0;
 	in_cross = false;
+	clearXYcie();
+	fusedPose = (HeadingPose){0.0f, 0.0f, 0.0f};
+	memset(&logClosure, 0, sizeof(logClosure));
+	logClosure.goalPulse_p = goalMarkerOnset_p;
+	logClosure.reason = (optimalTrace == BOOST_NONE) ? 2U : 1U;
 	for (j = 0; j < cntSend; j++)
 	{
 		fresult = f_read(&fil, log, sizeof(log), &readByte);
@@ -880,7 +1179,6 @@ void endLog(void)
 		if (fresult != FR_OK)
 		{
 			printf("f_read error in endLog\r\n");
-			f_close(&fil_W);
 			f_close(&fil);
 			return;
 		}
@@ -894,7 +1192,43 @@ void endLog(void)
 			speed = beforeSpeed;
 		}
 		beforeSpeed = speed;
-		dt = (float)(time - beforeTime) / 1000.0f;
+		dt = (float)(uint16_t)(time - beforeTime) / 1000.0f;
+		if (optimalTrace == BOOST_NONE)
+		{
+			int32_t pulse_p = (int32_t)rec.encTotalOptimal;
+			int32_t delta_p = pulse_p - previousPulse_p;
+			float previousX = xycie.x;
+			float previousY = xycie.y;
+			float previousFusedX = fusedPose.x_mm;
+			float previousFusedY = fusedPose.y_mm;
+			float previousS = travelled_mm;
+			uint16_t intervalMs = (uint16_t)(time - beforeTime);
+			if (intervalMs == 0U || intervalMs > 100U || delta_p < 0 ||
+				!isfinite(rec.gyroVal_Z)) logIntervalValid = false;
+			if (logIntervalValid)
+			{
+				calcXYcie(delta_p, rec.gyroVal_Z, (float)intervalMs / 1000.0f);
+				HeadingPose_Advance(&fusedPose, (float)delta_p / PULSE_MILLIMETER,
+					rec.gyroVal_Z - headingEstimator.biasDps,
+					(float)intervalMs / 1000.0f);
+				travelled_mm += (float)delta_p / PULSE_MILLIMETER;
+				if (!goalBracketFound && logClosure.goalPulse_p > 0 &&
+					previousPulse_p <= logClosure.goalPulse_p &&
+					logClosure.goalPulse_p <= pulse_p && delta_p > 0)
+				{
+					float ratio = (float)(logClosure.goalPulse_p - previousPulse_p) / (float)delta_p;
+					logClosure.goalXGyro_mm = previousX + ratio * (xycie.x - previousX);
+					logClosure.goalYGyro_mm = previousY + ratio * (xycie.y - previousY);
+					logClosure.goalX_mm = logClosure.goalXGyro_mm;
+					logClosure.goalY_mm = logClosure.goalYGyro_mm;
+					logClosure.goalXFusedDiagnostic_mm = previousFusedX + ratio * (fusedPose.x_mm - previousFusedX);
+					logClosure.goalYFusedDiagnostic_mm = previousFusedY + ratio * (fusedPose.y_mm - previousFusedY);
+					logClosure.goalS_mm = previousS + ratio * (travelled_mm - previousS);
+					goalBracketFound = true;
+				}
+			}
+			previousPulse_p = pulse_p;
+		}
 		dist_mm += calcDlMm(speed, dt);
 		beforeTime = time;
 
@@ -917,6 +1251,33 @@ void endLog(void)
 			in_cross = false;
 		}
 	}
+	if (optimalTrace == BOOST_NONE)
+	{
+		DistanceEstimatorDiagnostics diagnostics = DistanceEstimator_GetDiagnostics();
+		if (!startMarkerOnsetValid || !goalMarkerOnsetValid || SGmarker < COUNT_GOAL)
+			logClosure.reason = 2U;
+		else if (!logIntervalValid || gyroSampleFault || j != cntSend || emcStop != 0 || logOverflow ||
+			dbg_overflow != 0U || diagnostics.invalidUpdateCount != 0U ||
+			Control_GetDistanceFusionOutputGuardCount() != 0U)
+			logClosure.reason = 3U;
+		else if (encoderIntervalFault)
+			logClosure.reason = 6U;
+		else if (!RunGuard_PrimaryImuCalibrated(runImuCalibrationValid,
+			runImuCalibrationSamples, runImuCalibrationReadErrors,
+			IMU_CALIBRATION_SAMPLE_COUNT))
+			logClosure.reason = 9U;
+		else if (!goalBracketFound || logClosure.goalS_mm <= 0.0f)
+			logClosure.reason = 5U;
+		else if (!isfinite(logClosure.goalX_mm) || fabsf(logClosure.goalX_mm) > 20.0f)
+			logClosure.reason = 8U;
+		else if (PRIMARY_DISTANCE_SCALE_VERIFIED == 0U)
+			logClosure.reason = 10U;
+		else
+		{
+			logClosure.reason = 0U;
+			logClosure.valid = 1U;
+		}
+	}
 	if (in_cross && cross_count < CROSSSEG_MAX)
 	{
 		cross_end_mm[cross_count] = dist_mm;
@@ -924,6 +1285,12 @@ void endLog(void)
 	}
 
 	f_close(&fil);
+	createLog();
+	if (!create_log_ready)
+	{
+		printf("endLog: createLog failed\r\n");
+		return;
+	}
 	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ);
 	if (fresult != FR_OK)
 	{
@@ -932,9 +1299,12 @@ void endLog(void)
 		return;
 	}
 	clearXYcie();
+	fusedPose = (HeadingPose){0.0f, 0.0f, 0.0f};
 	beforeTime = 0;
 	beforeSpeed = 0;
 	dist_mm = 0.0f;
+	travelled_mm = 0.0f;
+	previousPulse_p = 0;
 
 	// pass2: 抽出した区間の前後100mmを直線ROCに補正してCSV出力
 	for (j = 0; j < cntSend; j++)
@@ -965,12 +1335,28 @@ void endLog(void)
 		}
 		beforeSpeed = speed;
 
-		dt = (float)(time - beforeTime) / 1000.0f;
+		dt = (float)(uint16_t)(time - beforeTime) / 1000.0f;
 		log_roc = calcROC(speed, zg, dt);
 
-		calcXYcie((int16_t)rec.encCurrentCorr_p, zg, dt);
+		int32_t deltaPulse_p;
+		if (optimalTrace == BOOST_NONE)
+		{
+			int32_t currentPulse_p = (int32_t)rec.encTotalOptimal;
+			deltaPulse_p = currentPulse_p - previousPulse_p;
+			previousPulse_p = currentPulse_p;
+			travelled_mm += (float)deltaPulse_p / PULSE_MILLIMETER;
+		}
+		else
+		{
+			deltaPulse_p = (int32_t)rec.encCurrentCorr_p * (int32_t)(uint16_t)(time - beforeTime);
+		}
+		calcXYcie(deltaPulse_p, zg, dt);
+		HeadingPose_Advance(&fusedPose, (float)deltaPulse_p / PULSE_MILLIMETER,
+			zg - ((optimalTrace == BOOST_NONE) ? headingEstimator.biasDps : 0.0f), dt);
 		log_x = xycie.x;
 		log_y = xycie.y;
+		log_x_fused = fusedPose.x_mm;
+		log_y_fused = fusedPose.y_mm;
 		dist_mm += calcDlMm(speed, dt);
 		beforeTime = time;
 
@@ -1028,14 +1414,19 @@ void endLog(void)
 		}
 	}
 
-	f_sync(&fil_W);
-	f_sync(&fil);
-	f_close(&fil_W);
+	bool csvComplete = (j == cntSend && f_sync(&fil_W) == FR_OK);
+	FRESULT csvCloseResult = f_close(&fil_W);
 	f_close(&fil);
+	if (!csvComplete || csvCloseResult != FR_OK)
+	{
+		printf("endLog: CSV incomplete\r\n");
+		return;
+	}
 
 	f_unlink("temp");
 
 	cntSend = 0;
+	lastRunSaved = true;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getFileNumbers

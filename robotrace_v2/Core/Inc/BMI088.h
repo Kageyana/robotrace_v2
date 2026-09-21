@@ -80,9 +80,9 @@ extern volatile IMUval BMI088val;
 // プロトタイプ宣言
 //====================================//
 bool initBMI088(void);
-void BMI088getGyro(void);
-void BMI088getAccele(void);
-void BMI088getTemp(void);
+bool BMI088getGyro(void);
+bool BMI088getAccele(void);
+bool BMI088getTemp(void);
 bool BMI088DecodeTemperature(uint8_t tempMsb, uint8_t tempLsb, float *temperatureC);
 
 #endif // BMI088_H_

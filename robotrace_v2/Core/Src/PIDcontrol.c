@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "PIDcontrol.h"
+#include "timer.h"
 #include "BMI088.h"
 #include "control.h"
 #include "courseAnalysis.h"
@@ -276,6 +277,11 @@ void motorControlTraceOmegaFB(void)
 {
 	int32_t iP, iI, iD, iRet, target, Dev, Dif, senL, senR, sensorDiff;
 	static int32_t traceBefore;
+	// ADCの新しい点灯・消灯組が来ない間は、古いライン値から新たな操舵目標を作らない。
+	if (patternTrace >= 12 && patternTrace < 100 && !Timer_IsLineObservationFresh())
+	{
+		return;
+	}
 
 	// サーボモータ用PWM値計算
 	if (!isLineSensorCalibrationValid())

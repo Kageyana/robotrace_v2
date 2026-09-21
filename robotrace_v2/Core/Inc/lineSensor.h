@@ -25,7 +25,7 @@
 //====================================//
 extern uint16_t lSensor[NUM_SENSORS];
 extern float angleSensor;
-extern bool lineSensorState;
+extern volatile bool lineSensorState;
 extern bool lineSensorPower;
 
 extern uint16_t lSensorCari[NUM_SENSORS];
@@ -39,7 +39,8 @@ extern bool lineSensorSettingCorrupt;
 //====================================//
 void powerLineSensors(uint8_t onoff);
 void delayLineSensorConversionStart(uint32_t us);
-void getLineSensor(void);
+void getLineSensor(uint8_t phase);
+void discardLineSensorPendingSamples(void);
 void getAngleSensor(void);
 void calibrationLinesensor(void);
 void writeLinesenval(void);

@@ -32,6 +32,8 @@ analysis/*
 !analysis/script/
 analysis/script/*
 !analysis/script/*.py
+!analysis/script/test_primary_run_guards.c
+!analysis/script/test_heading_estimator.c
 !analysis/script/test_encoder_average.c
 # obsidian
 docs/.obsidian/**

@@ -257,11 +257,11 @@ static void test_imu_deg(void)
 
 	if (!calibratIMU)
 	{
-		ssd1306_SetCursor(64, 30);
+		ssd1306_SetCursor(54, 30);
 		ssd1306_printf(Font_7x10, "xd:%6.1f", imuVal.angle.x);
-		ssd1306_SetCursor(64, 42);
+		ssd1306_SetCursor(54, 42);
 		ssd1306_printf(Font_7x10, "yd:%6.1f", imuVal.angle.y);
-		ssd1306_SetCursor(64, 54);
+		ssd1306_SetCursor(54, 54);
 		ssd1306_printf(Font_7x10, "zd:%6.1f", imuVal.angle.z);
 	}
 
@@ -281,7 +281,7 @@ static void test_imu_deg(void)
 		ssd1306_printf(Font_7x10, "Now");
 		ssd1306_UpdateScreen();
 
-		calibratIMU = true;
+		IMU_StartCalibration();
 		calibrateMotorCurrent =true;
 		HAL_Delay(2000);
 	}

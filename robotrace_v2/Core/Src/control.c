@@ -11,6 +11,8 @@
 #include "fatfs.h"
 #include "battery.h"
 #include "firmware_version.h"
+#include "timer.h"
+#include "runGuard.h"
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -313,6 +315,7 @@ void initSystem(void)
 			readLinesenval(); // ラインセンサの最大値と最小値を取得
 			readTgtspeeds();  // 目標速度を取得
 			readShortcutSettings(); // 経路追従・ショートカット設定を取得
+			readHeadingCalibrationSettings(); // 一次経路の方位校正値を取得
 
 			if (modeDSP)
 			{
@@ -523,6 +526,24 @@ static bool blockRunStartIfNeeded(void)
 	showRunStartBlocked(getRunStartBlockReason());
 	return true;
 }
+/////////////////////////////////////////////////////////////////////
+// モジュール名 showRunLogValidation
+// 処理概要     一次走行ログが経路として使えない理由を停止後に表示する
+// 引数         saved: CSV保存完了の有無
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void showRunLogValidation(bool saved)
+{
+	if (!modeDSP) return;
+	ssd1306_FillRectangle(0, 15, 127, 63, Black);
+	ssd1306_SetCursor(0, 25);
+	ssd1306_printf(Font_6x8, saved ? "Route invalid" : "Run unverified");
+	if (saved)
+	{
+		ssd1306_SetCursor(0, 45);
+		ssd1306_printf(Font_6x8, "closure reason %u", logLastClosureReason());
+	}
+}
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 systemLoop
 // 処理概要     メインループ
@@ -534,7 +555,7 @@ void loopSystem(void)
 	int16_t ret = 0;
 
     // 緊急停止処理
-	if (patternTrace > 10 && patternTrace < 100 && emcStop > 0)
+	if (patternTrace > 10 && patternTrace <= 101 && emcStop > 0)
 	{
 		goalTime = cntRun;
 		patternTrace = 255;
@@ -692,10 +713,12 @@ void loopSystem(void)
 			// SDカードの使用可否に依存せず、走行ごとの解析元と設定を固定する。
 			analysisCaptureRunStart(optimalTrace);
 			pathFollowerCaptureRunStartSettings();
+			logCaptureRunStartSettings();
 			if (initMSD)
 			{
 				initLog(); // ログ一時ファイル作成
 			}
+			Timer_ResetRunDiagnostics();
 
 			// 変数初期化
 			encRightMarker = 0;
@@ -737,8 +760,10 @@ void loopSystem(void)
 		{
 			// 変数初期化
 			// スタート地点基準で状態を初期化
+			Timer_NotifyStartReferenceReset(encTotalN);
 			encTotalN = 0;
 			encTotalOptimal = 0;
+			markerStartReferenceReset();
 			encLog = 0;
 			encPID = 0;
 			enc1 = 0;
@@ -764,6 +789,7 @@ void loopSystem(void)
 
 			if (initMSD)
 			{
+				logResetMotionInterval();
 				modeLOG = true; // log start
 			}
 			
@@ -835,7 +861,7 @@ void loopSystem(void)
 			motorCommandOutSynth(0, veloCtrl.pwm, steeringPwm, 0);
 		}
 
-		// 通常走行はゴールマーカー、PATH系は一次走行終端から原点方向へ500mm進んだ点をゴールとする。
+		// 通常走行はゴールマーカー、PATH系は一次走行終端と原点の中間点をゴールとする。
 		bool pathGoalMode = (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT);
 		if ((!pathGoalMode && SGmarker >= COUNT_GOAL) ||
 			(pathGoalMode && pathFollowerGoalReached()))
@@ -871,9 +897,11 @@ void loopSystem(void)
 	case 102:
 		setTargetSpeed(0);
 		motorCommandOutSynth(0, 0, 0, 0);
+		Timer_StopRunDiagnostics();
 
 		int16_t savedLogNo = 0;	// 追加: 保存実績ログ番号
 		int16_t endIdxBefore = endFileIndex;	// 追加: endLog前のログ末尾を保持
+		bool hadLog = modeLOG;
 		// 追加: 表示用の予測ログ番号はSD空でも落ちないようガード
 		int16_t predictedLogNo = getNextLogNumber();
 		if (modeLOG)
@@ -889,22 +917,23 @@ void loopSystem(void)
 			ssd1306_SetCursor(0, 45);
 			ssd1306_printf(Font_11x18, "Written");
 		}
+		bool runLogSaved = hadLog && logLastRunWasSaved() && endFileIndex > endIdxBefore;
+		bool runVerified = RunGuard_CanAdvanceAutoRun(runLogSaved,
+			optimalTrace == BOOST_NONE, logLastClosureValid());
 
 		if (autoStart > 0)
 		{
-			// 追加: 保存成功時のみ解析対象を更新し、失敗時は自動走行を停止
-			if (endFileIndex > endIdxBefore)
+			if (!runVerified)
 			{
-				savedLogNo = fileNumbers[endFileIndex];	// 追加: 実際に保存されたログ番号を採用
-				autoStartAnalyze = savedLogNo;
-				// 自動走行モードのときは再度走行準備へ
-				autoStart++;
-			}
-			else
-			{
+				showRunLogValidation(runLogSaved);
 				autoStart = 0;
 				autoStartAnalyze = 0;
+				patternTrace = 103;
+				break;
 			}
+			savedLogNo = fileNumbers[endFileIndex]; // 実際に保存されたログ番号を採用
+			autoStartAnalyze = savedLogNo;
+			autoStart++;
 
 			if (autoStart > 5)
 			{
@@ -939,7 +968,11 @@ void loopSystem(void)
 		else
 		{
 			// 手動走行のときは停止
-			if (modeDSP)
+			if (!runVerified)
+			{
+				showRunLogValidation(runLogSaved);
+			}
+			else if (modeDSP)
 			{
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				if (logOverflow || markerOverflow)
@@ -1008,9 +1041,18 @@ void loopSystem(void)
 ///////////////////////////////////////////////////////////////////////////
 void emergencyStop(void)
 {
+	Timer_StopRunDiagnostics();
 	// 機体停止処理
 	setTargetSpeed(0);
-	while (encCurrentN > 5)
+	if (emcStop == STOP_IMU_READ)
+	{
+		motorCommandOut(0, 0); // IMUが使えないときはフィードバック減速をしない
+		while (encCurrentN > 5)
+		{
+			motorCommandOut(0, 0); // 惰性停止までログ終了を待つ
+		}
+	}
+	else while (encCurrentN > 5)
 	{
 		motorCommandOutSynth(0, veloCtrl.pwm, 0, 0);
 	}
@@ -1089,7 +1131,7 @@ void countDown(void)
 		countdown--;
 		if (countdown == 2000)
 		{
-			calibratIMU = true; // 残り2秒からIMUキャリブレーションを開始
+			IMU_StartCalibration(); // 残り2秒からIMUキャリブレーションを開始
 		}
 	}
 }

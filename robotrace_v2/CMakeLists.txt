@@ -37,6 +37,7 @@ add_executable(${CMAKE_PROJECT_NAME})
 # ログスキーマのプロファイル。1:通常の軽量ログ、0:詳細デバッグ列を含むログ。
 # マーカー誤検出の調査時は -DROBOTRACE_LOG_SCHEMA_PROFILE_LIGHT=0 を指定する。
 set(ROBOTRACE_LOG_SCHEMA_PROFILE_LIGHT "1" CACHE STRING "1=light log schema, 0=debug log schema")
+option(ROBOTRACE_ENABLE_SLIP_UPDATE "Enable 1 ms slip diagnostics for baseline comparison" OFF)
 
 execute_process(
     COMMAND git rev-parse --short HEAD
@@ -76,6 +77,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 	${CMAKE_SOURCE_DIR}/Core/Src/IMU.c
 	${CMAKE_SOURCE_DIR}/Core/Src/control.c
 	${CMAKE_SOURCE_DIR}/Core/Src/distanceEstimator.c
+	${CMAKE_SOURCE_DIR}/Core/Src/headingEstimator.c
 	${CMAKE_SOURCE_DIR}/Core/Src/courseAnalysis.c
 	${CMAKE_SOURCE_DIR}/Core/Src/pathFollower.c
 	${CMAKE_SOURCE_DIR}/Core/Src/DWT.c
@@ -111,6 +113,7 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     GIT_COMMIT="${GIT_COMMIT_SHORT}"
     GIT_BRANCH="${GIT_BRANCH_NAME}"
     LOG_SCHEMA_PROFILE_LIGHT=${ROBOTRACE_LOG_SCHEMA_PROFILE_LIGHT}
+    ROBOTRACE_ENABLE_SLIP_UPDATE=$<BOOL:${ROBOTRACE_ENABLE_SLIP_UPDATE}>
 )
 
 # Remove wrong libob.a library dependency when using cpp files

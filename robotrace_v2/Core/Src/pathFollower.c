@@ -1,4 +1,5 @@
 #include "pathFollower.h"
+#include "runGuard.h"
 #include "PIDcontrol.h"
 #include "SDcard.h"
 #include "control.h"
@@ -29,7 +30,7 @@
 #define PATH_LINE_ALPHA_MAX_X1000             100U
 #define PATH_LINE_THETA_GAIN_MAX_X1E9         1000U
 
-#define PATH_CSV_LINE_SIZE                    4096U
+#define PATH_CSV_LINE_SIZE                    6144U
 #define PATH_CORRIDOR_MIN_SPAN_POINTS         15U   // 600mm
 #define PATH_CORRIDOR_MAX_SPAN_POINTS         40U   // 1600mm
 #define PATH_CORRIDOR_TRANSITION_POINTS       3U    // 120mm
@@ -62,8 +63,7 @@
 #define PATH_LINE_LOST_COUNT_5MS              20U
 #define PATH_ASSOCIATION_PROGRESS_MARGIN_MM   120.0f
 #define PATH_ASSOCIATION_HEADING_MAX_DEG      60.0f
-#define PATH_GOAL_EXTENSION_MM                500.0f
-#define PATH_GOAL_EXTENSION_POINTS            13U
+#define PATH_GOAL_RESERVED_POINTS             13U  // 終端から原点まで1040mm以下なら延長点を確保
 #define PATH_REJOIN_BLEND_STEP                50U
 #define PATH_SENSOR_ACTIVE_TH                 800U
 #define PATH_SENSOR_MIN_SUM                   1200U
@@ -82,7 +82,9 @@ typedef struct
 {
 	int16_t x;
 	int16_t y;
-	int16_t marker;
+	int16_t pulse;
+	uint32_t expectedRows;
+	bool closureValid;
 } RouteCsvColumns;
 
 typedef struct
@@ -309,7 +311,7 @@ static bool pathParseHeader(const char *line, RouteCsvColumns *columns)
 	int16_t column = 0;
 	columns->x = -1;
 	columns->y = -1;
-	columns->marker = -1;
+	columns->pulse = -1;
 
 	while (*p != '\0' && *p != '\r' && *p != '\n')
 	{
@@ -317,7 +319,7 @@ static bool pathParseHeader(const char *line, RouteCsvColumns *columns)
 		{
 			if (pathHeaderFieldEquals(start, p, "x")) columns->x = column;
 			else if (pathHeaderFieldEquals(start, p, "y")) columns->y = column;
-			else if (pathHeaderFieldEquals(start, p, "courseMarker")) columns->marker = column;
+			else if (pathHeaderFieldEquals(start, p, "encTotalOptimal")) columns->pulse = column;
 			column++;
 			start = p + 1;
 		}
@@ -325,8 +327,8 @@ static bool pathParseHeader(const char *line, RouteCsvColumns *columns)
 	}
 	if (pathHeaderFieldEquals(start, p, "x")) columns->x = column;
 	else if (pathHeaderFieldEquals(start, p, "y")) columns->y = column;
-	else if (pathHeaderFieldEquals(start, p, "courseMarker")) columns->marker = column;
-	return columns->x >= 0 && columns->y >= 0 && columns->marker >= 0;
+	else if (pathHeaderFieldEquals(start, p, "encTotalOptimal")) columns->pulse = column;
+	return columns->x >= 0 && columns->y >= 0 && columns->pulse >= 0;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -342,8 +344,28 @@ static bool pathReadColumnHeader(FIL *file, RouteCsvColumns *columns)
 	{
 		return false;
 	}
-	if (pathParseHeader(routeCsvLine, columns)) return true;
-	if (strchr(routeCsvLine, '=') == NULL) return false;
+	const bool supportedVersion = strstr(routeCsvLine, "logSchemaVersion=10,") != NULL;
+	const char *valid = strstr(routeCsvLine, "closureValid=1,");
+	const char *reason = strstr(routeCsvLine, "closureReason=0,");
+	const char *mode = strstr(routeCsvLine, "optimalTrace=0.00,");
+	const char *stop = strstr(routeCsvLine, "emcStop=0.00,");
+	const char *scale = strstr(routeCsvLine, "encoderPulsePerMeter=");
+	char *scaleEnd = NULL;
+	const unsigned long sourcePulsePerMeter = (scale != NULL) ?
+		strtoul(scale + strlen("encoderPulsePerMeter="), &scaleEnd, 10) : 0UL;
+	const char *calibrated = strstr(routeCsvLine, "imuCalibrationValid=1,");
+	const char *calibrationSamples = strstr(routeCsvLine, "imuCalibrationSamples=100,");
+	const char *calibrationErrors = strstr(routeCsvLine, "imuCalibrationReadErrors=0,");
+	const char *distanceVerified = strstr(routeCsvLine, "distanceScaleVerified=1,");
+	const char *expectedRows = strstr(routeCsvLine, "logExpectedRows=");
+	columns->closureValid = (supportedVersion && valid != NULL && reason != NULL &&
+		mode != NULL && stop != NULL && scaleEnd != NULL && *scaleEnd == ',' &&
+		sourcePulsePerMeter == PULSE_METER && calibrated != NULL &&
+		calibrationSamples != NULL && calibrationErrors != NULL && distanceVerified != NULL);
+	if (!columns->closureValid) return false;
+	columns->expectedRows = (expectedRows != NULL) ?
+		(uint32_t)strtoul(expectedRows + strlen("logExpectedRows="), NULL, 10) : 0U;
+	if (expectedRows == NULL || columns->expectedRows == 0U) return false;
 	if (f_gets(routeCsvLine, sizeof(routeCsvLine), file) == NULL ||
 		(strchr(routeCsvLine, '\n') == NULL && strchr(routeCsvLine, '\r') == NULL))
 	{
@@ -372,28 +394,58 @@ static bool pathCsvFloatAt(const char *line, int16_t targetColumn, float *value)
 	char *end = NULL;
 	float parsed = strtof(start, &end);
 	if (end == start) return false;
+	if (*end != ',' && *end != '\r' && *end != '\n' && *end != '\0') return false;
 	*value = parsed;
 	return true;
 }
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathReadCsvPoint
-// 処理概要     CSV行から座標とマーカー値を読む
-// 引数         line: CSV行, columns: 列情報, xMm,yMm: 座標[mm], marker: マーカー値
+// 処理概要     CSV行からジャイロ経路座標と累積距離を読む
+// 引数         line: CSV行, columns: 列情報, xMm/yMm: 座標[mm], pulse: 累積パルス
 // 戻り値       true: 読取成功 false: 読取失敗
 /////////////////////////////////////////////////////////////////////
 static bool pathReadCsvPoint(const char *line, const RouteCsvColumns *columns,
-	float *xMm, float *yMm, uint8_t *marker)
+	float *xMm, float *yMm, float *pulse)
 {
-	float markerValue = 0.0f;
 	if (!pathCsvFloatAt(line, columns->x, xMm) ||
 		!pathCsvFloatAt(line, columns->y, yMm) ||
-		!pathCsvFloatAt(line, columns->marker, &markerValue))
+		!pathCsvFloatAt(line, columns->pulse, pulse))
 	{
 		return false;
 	}
-	if (!isfinite(*xMm) || !isfinite(*yMm)) return false;
-	*marker = (uint8_t)markerValue;
+	if (!isfinite(*xMm) || !isfinite(*yMm) || !isfinite(*pulse)) return false;
+	return true;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathAppendRouteSample
+// 処理概要     経路を40mm間隔で再標本化する
+// 引数         xMm/yMm: 終点[mm], previousX/Y: 前点,
+//              accumulated: 残距離[mm]
+// 戻り値       true:追加成功 false:点数上限
+/////////////////////////////////////////////////////////////////////
+static bool pathAppendRouteSample(float xMm, float yMm,
+	float *previousX, float *previousY, float *accumulated)
+{
+	float startX = *previousX;
+	float startY = *previousY;
+	float remaining = pathPointDistance(startX, startY, xMm, yMm);
+	while (remaining > 0.0f && *accumulated + remaining >= PATH_ROUTE_SPACING_MM)
+	{
+		if (routeCount >= PATH_ROUTE_MAX_POINTS - PATH_GOAL_RESERVED_POINTS) return false;
+		float needed = PATH_ROUTE_SPACING_MM - *accumulated;
+		float ratio = needed / remaining;
+		startX += (xMm - startX) * ratio;
+		startY += (yMm - startY) * ratio;
+		lineRoute[routeCount].x_mm = pathFloatToInt16(startX);
+		lineRoute[routeCount].y_mm = pathFloatToInt16(startY);
+		routeCount++;
+		remaining -= needed;
+		*accumulated = 0.0f;
+	}
+	*accumulated += remaining;
+	*previousX = xMm;
+	*previousY = yMm;
 	return true;
 }
 
@@ -468,7 +520,7 @@ static void pathBuildSpeedProfile(RoutePoint *route, uint16_t count, uint8_t sho
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathExtendDriveRouteTowardOrigin
-// 処理概要     一次走行終端から座標原点方向へ実走行経路を500mm延長する
+// 処理概要     一次走行終端と座標原点の中間点まで実走行経路を延長する
 // 引数         shortcutLevel: 実走行経路へ適用済みの短縮レベル
 // 戻り値       true:延長成功 false:延長不可
 /////////////////////////////////////////////////////////////////////
@@ -478,8 +530,10 @@ static bool pathExtendDriveRouteTowardOrigin(uint8_t shortcutLevel)
 	float endX = (float)driveRoute[routeCount - 1U].x_mm;
 	float endY = (float)driveRoute[routeCount - 1U].y_mm;
 	float distanceToOriginMm = sqrtf((endX * endX) + (endY * endY));
-	if (distanceToOriginMm < 1.0f) return false;
-	uint16_t appendCount = PATH_GOAL_EXTENSION_POINTS;
+	float goalExtensionMm = distanceToOriginMm * 0.5f;
+	if (!isfinite(goalExtensionMm) || goalExtensionMm < 1.0f) return false;
+	if (goalExtensionMm > (float)(PATH_ROUTE_MAX_POINTS - routeCount) * PATH_ROUTE_SPACING_MM) return false;
+	uint16_t appendCount = (uint16_t)ceilf(goalExtensionMm / PATH_ROUTE_SPACING_MM);
 	if ((uint32_t)routeCount + appendCount > PATH_ROUTE_MAX_POINTS) return false;
 
 	float unitX = -endX / distanceToOriginMm;
@@ -487,7 +541,7 @@ static bool pathExtendDriveRouteTowardOrigin(uint8_t shortcutLevel)
 	float advancedMm = 0.0f;
 	for (uint16_t i = 0U; i < appendCount; i++)
 	{
-		float nextAdvancedMm = fminf(PATH_GOAL_EXTENSION_MM,
+		float nextAdvancedMm = fminf(goalExtensionMm,
 			advancedMm + PATH_ROUTE_SPACING_MM);
 		int16_t extensionX = pathFloatToInt16(endX + (unitX * nextAdvancedMm));
 		int16_t extensionY = pathFloatToInt16(endY + (unitY * nextAdvancedMm));
@@ -838,10 +892,12 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	ShortcutSettings generationSettings = shortcutSettings;
 	uint8_t requestedShortcutLevel = shortcutLevel;
 	char fileName[16];
-	float firstX = 0.0f, firstY = 0.0f, lastX = 0.0f, lastY = 0.0f;
+	float lastX = 0.0f, lastY = 0.0f;
 	float previousX = 0.0f, previousY = 0.0f, totalLength = 0.0f;
 	bool havePoint = false;
-	uint8_t marker = 0U;
+	bool parseError = false;
+	uint32_t parsedRows = 0U;
+	float pulse = 0.0f;
 	bool lockAcquired = sd_fatfs_lock(500U);
 	if (!lockAcquired) return -9;
 
@@ -861,32 +917,30 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	while (f_gets(routeCsvLine, sizeof(routeCsvLine), &file) != NULL)
 	{
 		float x, y;
-		if (!pathReadCsvPoint(routeCsvLine, &columns, &x, &y, &marker)) continue;
+		if (!RunGuard_CompleteCsvRow(routeCsvLine) ||
+			!pathReadCsvPoint(routeCsvLine, &columns, &x, &y, &pulse))
+		{
+			parseError = true;
+			break;
+		}
+		parsedRows++;
 		if (!havePoint)
 		{
-			firstX = previousX = x;
-			firstY = previousY = y;
 			havePoint = true;
 		}
-		else
-		{
-			totalLength += pathPointDistance(previousX, previousY, x, y);
-			previousX = x;
-			previousY = y;
-		}
+		totalLength += pathPointDistance(previousX, previousY, x, y);
+		previousX = x;
+		previousY = y;
 		lastX = x;
 		lastY = y;
 	}
-	if (!havePoint || totalLength < PATH_ROUTE_SPACING_MM)
+	if (parseError || !havePoint || totalLength < PATH_ROUTE_SPACING_MM ||
+		!RunGuard_CsvRowsMatch(columns.expectedRows, parsedRows))
 	{
 		f_close(&file);
 		sd_fatfs_unlock();
 		return -11;
 	}
-	/* 一次走行の終点を固定ゴールへ補正せず、ログの経路形状を保持する。 */
-	const float closureX = 0.0f;
-	const float closureY = 0.0f;
-
 	/*
 	 * 1パス目でEOFまで読み込んだFILをf_lseek()だけで巻き戻すと、
 	 * SPI接続のSDカードやFatFsの状態によって2パス目が空読みに
@@ -913,67 +967,47 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	lineRoute[0].x_mm = 0;
 	lineRoute[0].y_mm = 0;
 	routeFlags[0] = 0U;
-	float rawTraversed = 0.0f;
 	float accumulated = 0.0f;
-	float previousRawX = 0.0f;
-	float previousRawY = 0.0f;
-	float previousCorrectedX = 0.0f;
-	float previousCorrectedY = 0.0f;
-	bool firstCorrected = true;
+	float previousFusedX = 0.0f;
+	float previousFusedY = 0.0f;
 	bool routeOverflow = false;
+	float previousPulse = 0.0f;
+	uint32_t secondPassRows = 0U;
 	while (f_gets(routeCsvLine, sizeof(routeCsvLine), &file) != NULL)
 	{
 		float rawX, rawY;
-		if (!pathReadCsvPoint(routeCsvLine, &columns, &rawX, &rawY, &marker)) continue;
-		if (!firstCorrected)
+		if (!RunGuard_CompleteCsvRow(routeCsvLine) ||
+			!pathReadCsvPoint(routeCsvLine, &columns, &rawX, &rawY, &pulse))
 		{
-			rawTraversed += pathPointDistance(previousRawX, previousRawY, rawX, rawY);
+			routeOverflow = true;
+			break;
 		}
-		previousRawX = rawX;
-		previousRawY = rawY;
-		float progress = fminf(1.0f, rawTraversed / totalLength);
-		float blend = progress * progress * (3.0f - (2.0f * progress));
-		float correctedX = (rawX - firstX) + (closureX * blend);
-		float correctedY = (rawY - firstY) + (closureY * blend);
-		if (firstCorrected)
+		secondPassRows++;
+		if (pulse < previousPulse)
 		{
-			previousCorrectedX = correctedX;
-			previousCorrectedY = correctedY;
-			firstCorrected = false;
-			continue;
+			routeOverflow = true;
+			break;
 		}
-
-		float segmentStartX = previousCorrectedX;
-		float segmentStartY = previousCorrectedY;
-		float remainingSegment = pathPointDistance(segmentStartX, segmentStartY, correctedX, correctedY);
-		while (accumulated + remainingSegment >= PATH_ROUTE_SPACING_MM)
+		if (!pathAppendRouteSample(rawX, rawY,
+			&previousFusedX, &previousFusedY, &accumulated))
 		{
-			if (routeCount >= (PATH_ROUTE_MAX_POINTS - PATH_GOAL_EXTENSION_POINTS))
-			{
-				routeOverflow = true;
-				break;
-			}
-			float needed = PATH_ROUTE_SPACING_MM - accumulated;
-			float ratio = needed / remainingSegment;
-			segmentStartX += (correctedX - segmentStartX) * ratio;
-			segmentStartY += (correctedY - segmentStartY) * ratio;
-			lineRoute[routeCount].x_mm = pathFloatToInt16(segmentStartX);
-			lineRoute[routeCount].y_mm = pathFloatToInt16(segmentStartY);
-			routeCount++;
-			remainingSegment -= needed;
-			accumulated = 0.0f;
+			routeOverflow = true;
+			break;
 		}
-		accumulated += remainingSegment;
-		previousCorrectedX = correctedX;
-		previousCorrectedY = correctedY;
-		if (routeOverflow) break;
+		previousPulse = pulse;
 	}
 	f_close(&file);
 	sd_fatfs_unlock();
-	if (routeOverflow) return -7;
+	if (routeOverflow || secondPassRows != parsedRows) return -7;
+	if (pathPointDistance((float)lineRoute[routeCount - 1U].x_mm,
+		(float)lineRoute[routeCount - 1U].y_mm, lastX, lastY) >= 0.5f)
+	{
+		if (routeCount >= PATH_ROUTE_MAX_POINTS - PATH_GOAL_RESERVED_POINTS) return -7;
+		lineRoute[routeCount].x_mm = pathFloatToInt16(lastX);
+		lineRoute[routeCount].y_mm = pathFloatToInt16(lastY);
+		routeCount++;
+	}
 	if (routeCount < 2U) return -11;
-	lineRoute[routeCount - 1U].x_mm = pathFloatToInt16(lastX - firstX);
-	lineRoute[routeCount - 1U].y_mm = pathFloatToInt16(lastY - firstY);
 	pathComputeHeadings(lineRoute, routeCount);
 	pathBuildSpeedProfile(lineRoute, routeCount, 0U);
 	memcpy(driveRoute, lineRoute, sizeof(RoutePoint) * routeCount);
@@ -1393,7 +1427,7 @@ bool pathFollowerLineIsValid(void) { return currentLineValid; }
 uint16_t pathRouteCount(void) { return routeCount; }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathFollowerGoalReached
-// 処理概要     一次走行終端から原点方向へ500mm延長した停止点への到達を判定する
+// 処理概要     一次走行終端と原点の中間点への到達を判定する
 // 引数         なし
 // 戻り値       true:停止開始位置へ到達 false:走行途中
 /////////////////////////////////////////////////////////////////////

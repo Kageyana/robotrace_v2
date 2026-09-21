@@ -4,48 +4,66 @@
 #include "markerSensor.h"
 #include "control.h"
 #include "encoder.h"
+#include "timer.h"
 #include <stdint.h>
 //====================================//
 // グローバル変数の宣言
 //====================================//
 uint8_t markerSensor = 0;
 uint8_t SGmarker = 0;
+volatile uint8_t startMarkerOnsetValid = 0U;
+volatile uint8_t goalMarkerOnsetValid = 0U;
+volatile int32_t goalMarkerOnset_p = 0;
+static int32_t rightMarkerCandidate_p = 0;
+static int32_t rightMarkerQualified_p = 0;
+static uint8_t rightMarkerQualified = 0U;
+static uint8_t startMarkerCandidate = 0U;
 static int32_t encMarkerL = PULSE_METER/10, encMarkerR = (PULSE_METER/10) + 1;
+static uint8_t markerRon = 1U, markerRoff = 1U, markerLon = 1U, markerLoff = 1U;
+static uint8_t markerReadyMask;
+/////////////////////////////////////////////////////////////////////
+// モジュール名 discardMarkerSensorPendingSamples
+// 処理概要     位相不一致時に未完成のマーカー点灯・消灯組を破棄する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void discardMarkerSensorPendingSamples(void)
+{
+	markerReadyMask = 0U;
+	markerSensor = 0U;
+}
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getMarksensor
 // 処理概要     マーカーセンサの値を取得
-// 引数         なし
+// 引数         phase: ADC開始時に固定したLED位相(0:消灯、1:点灯)
 // 戻り値       0x1:右センサ反応 0x2:左センサ反応
 /////////////////////////////////////////////////////////////////////
-void getMarkerSensor(void)
+void getMarkerSensor(uint8_t phase)
 {
 	uint8_t ret = 0;
-	static uint8_t ron = 1, roff = 1, lon = 1, loff = 1;
-	static uint8_t readyMask = 0;
-	const uint8_t phase = lineSensorState ? 1U : 0U; // 1: LED on, 0: LED off
 
 	// マーカーセンサ値取得(白:0 黒:1)
 	if(phase){
-		lon = HAL_GPIO_ReadPin(SidesensorL_GPIO_Port, SidesensorL_Pin);
-		ron = HAL_GPIO_ReadPin(SidesensorR_GPIO_Port, SidesensorR_Pin);
+		markerLon = HAL_GPIO_ReadPin(SidesensorL_GPIO_Port, SidesensorL_Pin);
+		markerRon = HAL_GPIO_ReadPin(SidesensorR_GPIO_Port, SidesensorR_Pin);
 	}
 	else
 	{
-		loff = HAL_GPIO_ReadPin(SidesensorL_GPIO_Port, SidesensorL_Pin);
-		roff = HAL_GPIO_ReadPin(SidesensorR_GPIO_Port, SidesensorR_Pin);
+		markerLoff = HAL_GPIO_ReadPin(SidesensorL_GPIO_Port, SidesensorL_Pin);
+		markerRoff = HAL_GPIO_ReadPin(SidesensorR_GPIO_Port, SidesensorR_Pin);
 	}
-	readyMask |= (1U << phase);
+	markerReadyMask |= (1U << phase);
 
-	if (readyMask == 0x03U)
+	if (markerReadyMask == 0x03U)
 	{
 		uint8_t diffR=0, diffL=0;
-		diffR = (roff > ron) ? (roff - ron) : 0U;
-		diffL = (loff > lon) ? (loff - lon) : 0U;
+		diffR = (markerRoff > markerRon) ? (markerRoff - markerRon) : 0U;
+		diffL = (markerLoff > markerLon) ? (markerLoff - markerLon) : 0U;
 		if (diffR == 1)
 			ret += RIGHTMARKER;
 		if (diffL == 1)
 			ret += LEFTMARKER;
-		readyMask = 0;
+		markerReadyMask = 0;
 		markerSensor = ret;
 	}
 }
@@ -57,10 +75,34 @@ void getMarkerSensor(void)
 ///////////////////////////////////////////////////////////////////////////
 void initMarkerSensor(void)
 {
+    discardMarkerSensorPendingSamples();
     markerSensor = 0;
     SGmarker = 0;
     encMarkerL = PULSE_METER/10;
     encMarkerR = (PULSE_METER/10) + 1;
+    startMarkerOnsetValid = 0U;
+    goalMarkerOnsetValid = 0U;
+    goalMarkerOnset_p = 0;
+    rightMarkerQualified = 0U;
+    rightMarkerCandidate_p = 0;
+    rightMarkerQualified_p = 0;
+    startMarkerCandidate = 0U;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 markerStartReferenceReset
+// 処理概要     スタート検出後の距離原点にマーカー幅検証を同期する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void markerStartReferenceReset(void)
+{
+    startMarkerCandidate = 1U;
+    startMarkerOnsetValid = 0U;
+    goalMarkerOnsetValid = 0U;
+    goalMarkerOnset_p = 0;
+    rightMarkerQualified = 0U;
+    rightMarkerCandidate_p = 0;
+    rightMarkerQualified_p = 0;
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 checkMarker
@@ -84,6 +126,10 @@ uint8_t checkMarker(void)
 		existMarker = nowMarker;   // 最初に検知したマーカーを記録
 		checkStart = 1;			   // マーカー幅計測開始
 		encMarkerN = nowEncTotalN; // 距離計測開始
+		if (nowMarker == RIGHTMARKER && SGmarker > 0U)
+		{
+			rightMarkerCandidate_p = encTotalOptimal;
+		}
 	}
 	if (checkStart == 1)
 	{
@@ -108,6 +154,8 @@ uint8_t checkMarker(void)
 			if (existMarker == 0x1)
 			{
 				encMarkerR = nowEncTotalN;
+				rightMarkerQualified_p = rightMarkerCandidate_p;
+				rightMarkerQualified = 1U;
 			}
 			else if (existMarker == 0x2)
 			{
@@ -155,8 +203,26 @@ void checkStartGoalMarker(void)
 {
 	if(SGmarker > 0) // スタートマーカー通過後
 	{
+		if (startMarkerCandidate != 0U)
+		{
+			if ((markerSensor == 0U && encTotalN <= encMM(10)) ||
+				markerSensor == CROSSLINE)
+			{
+				startMarkerCandidate = 0U;
+			}
+			else if (encTotalN > encMM(20))
+			{
+				startMarkerOnsetValid = 1U;
+				startMarkerCandidate = 0U;
+			}
+		}
 		if (courseMarker == RIGHTMARKER && encRightMarker > encMM(1000))
 		{ // 1000mm以上離れたらゴールマーカー検出可能
+			if (rightMarkerQualified != 0U)
+			{
+				goalMarkerOnset_p = rightMarkerQualified_p;
+				goalMarkerOnsetValid = 1U;
+			}
 			SGmarker++;
 			encRightMarker = 0;
 		}
@@ -165,6 +231,7 @@ void checkStartGoalMarker(void)
 	{
 		if(markerSensor == RIGHTMARKER)
 		{
+			Timer_NotifyStartMarkerDetected(encTotalN);
 			SGmarker++;
 			encRightMarker = 0;
 		}

@@ -3,10 +3,15 @@
 //====================================//
 #include "IMU.h"
 #include <math.h>
+#include <string.h>
 //====================================//
 // グローバル変数の定義
 //====================================//
 bool calibratIMU = false;		// IMUキャリブレーション中フラグ
+static volatile bool imuCalibrationResetRequested = false;
+static volatile bool imuCalibrationReady = false;
+static volatile uint16_t imuCalibrationSamples = 0U;
+static volatile uint16_t imuCalibrationReadErrors = 0U;
 volatile IMUval imuVal = {0};	// IMUの実行時変数（加速度、角速度、角度などを保持）
 float angleOffset[3] = {0.0F, 0.0F, 0.0F};	// ジャイロオフセット[deg/s]（calibrationIMU()で算出される）
 #ifdef USE_ACCELE
@@ -258,9 +263,20 @@ void calibrationIMU(void)
 #ifdef USE_ACCELE
 	static float acceleInt[3];
 #endif
+	if (imuCalibrationResetRequested)
+	{
+		sampleCount = 0U;
+		sampleIntervalMs = 0U;
+		memset(angleInt, 0, sizeof(angleInt));
+#ifdef USE_ACCELE
+		memset(acceleInt, 0, sizeof(acceleInt));
+#endif
+		imuCalibrationResetRequested = false;
+	}
 
 	if(!BMI088val.Initialized)
 	{
+		if (imuCalibrationReadErrors < UINT16_MAX) imuCalibrationReadErrors++;
 		return;
 	}
 
@@ -272,18 +288,29 @@ void calibrationIMU(void)
 	sampleIntervalMs = 0;
 
 	// 20msごとにジャイロの物理量を積算する
-	BMI088getGyro();
-	angleInt[0] += BMI088val.gyro.x;
-	angleInt[1] += BMI088val.gyro.y;
-	angleInt[2] += BMI088val.gyro.z;
+	if (!BMI088getGyro() || !isfinite(BMI088val.gyro.x) ||
+		!isfinite(BMI088val.gyro.y) || !isfinite(BMI088val.gyro.z))
+	{
+		if (imuCalibrationReadErrors < UINT16_MAX) imuCalibrationReadErrors++;
+		return;
+	}
 #ifdef USE_ACCELE
 	// 加速度の物理量を積算する
-	BMI088getAccele();
+	if (!BMI088getAccele() || !isfinite(BMI088val.accele.x) ||
+		!isfinite(BMI088val.accele.y) || !isfinite(BMI088val.accele.z))
+	{
+		if (imuCalibrationReadErrors < UINT16_MAX) imuCalibrationReadErrors++;
+		return;
+	}
 	acceleInt[0] += BMI088val.accele.x;
 	acceleInt[1] += BMI088val.accele.y;
 	acceleInt[2] += BMI088val.accele.z;
 #endif
+	angleInt[0] += BMI088val.gyro.x;
+	angleInt[1] += BMI088val.gyro.y;
+	angleInt[2] += BMI088val.gyro.z;
 	sampleCount++;
+	imuCalibrationSamples = sampleCount;
 	if (sampleCount < IMU_CALIBRATION_SAMPLE_COUNT)
 	{
 		return;
@@ -326,5 +353,47 @@ void calibrationIMU(void)
 #endif
 	sampleCount = 0;
 	sampleIntervalMs = 0;
+	imuCalibrationReady = imuCalibrationReadErrors == 0U &&
+		imuCalibrationSamples == IMU_CALIBRATION_SAMPLE_COUNT &&
+		isfinite(angleOffset[0]) && isfinite(angleOffset[1]) && isfinite(angleOffset[2]);
 	calibratIMU = false;
 }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 IMU_StartCalibration
+// 処理概要     IMU校正の診断値と積算状態をリセットして開始する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void IMU_StartCalibration(void)
+{
+	imuCalibrationReady = false;
+	imuCalibrationSamples = 0U;
+	imuCalibrationReadErrors = 0U;
+	imuCalibrationResetRequested = true;
+	calibratIMU = true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 IMU_CalibrationReady
+// 処理概要     直近のIMU校正が読出し異常なしで完了したか返す
+// 引数         なし
+// 戻り値       true:有効 false:未完了または異常
+/////////////////////////////////////////////////////////////////////
+bool IMU_CalibrationReady(void) { return imuCalibrationReady; }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 IMU_CalibrationSamples
+// 処理概要     直近のIMU校正で採用したサンプル数を返す
+// 引数         なし
+// 戻り値       採用サンプル数
+/////////////////////////////////////////////////////////////////////
+uint16_t IMU_CalibrationSamples(void) { return imuCalibrationSamples; }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 IMU_CalibrationReadErrors
+// 処理概要     直近のIMU校正で検出した読出し異常回数を返す
+// 引数         なし
+// 戻り値       読出し異常回数
+/////////////////////////////////////////////////////////////////////
+uint16_t IMU_CalibrationReadErrors(void) { return imuCalibrationReadErrors; }

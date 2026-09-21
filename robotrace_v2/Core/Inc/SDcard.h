@@ -43,10 +43,17 @@ bool initMicroSD(void);
 void createLog(void);
 void endTempFile(void);
 void endLog(void);
+void logCaptureRunStartSettings(void);
+void readHeadingCalibrationSettings(void);
+bool logLastRunWasSaved(void);
+bool logLastClosureValid(void);
+uint8_t logLastClosureReason(void);
 void writeMarkerPos(uint32_t distance, uint8_t marker);
 void initLog(void);
 // スキーマ順で1レコードを書き込む。
 void writeLogBufferPuts(void);
+void logResetMotionInterval(void);
+void logAccumulateMotion1ms(float gyroDegPerSec, int16_t encoderL, int16_t encoderR);
 void writeLogPuts(void);
 void send8bit(uint8_t data);
 void send16bit(uint16_t data);

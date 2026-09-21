@@ -1594,20 +1594,18 @@ int16_t calcXYcies(int logNumber)
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 calcXYcie
-// 処理概要     エンコーダと角速度からログ用XY座標を積分する
-// 引数         encpulse: 移動パルス, angVelo: 角速度[deg/s], dt: 経過時間[s]
+// 処理概要     区間移動量と平均角速度を中点方位でログ用XYへ積分する
+// 引数         deltaPulse: 区間移動量[パルス], angVelo: 区間平均角速度[deg/s], dt: 経過時間[s]
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void calcXYcie(int16_t encpulse, float angVelo, float dt)
+void calcXYcie(int32_t deltaPulse, float angVelo, float dt)
 {
-	static float velocity, degzR;
-
-	xydegz = xydegz + (angVelo * dt);		// 積算角度[deg]
-	degzR = xydegz * (M_PI / 180.0F);		// radへ変換
-	velocity = (float)encpulse / PULSE_MILLIMETER * 1000; // 移動速度[mm/s]
-
-	xycie.x = xycie.x + (velocity * sin(degzR) * dt);
-	xycie.y = xycie.y + (velocity * cos(degzR) * dt);
+	float deltaHeading = angVelo * dt;
+	float middleHeadingRad = (xydegz + 0.5f * deltaHeading) * (M_PI / 180.0F);
+	float deltaMm = (float)deltaPulse / PULSE_MILLIMETER;
+	xycie.x += deltaMm * sinf(middleHeadingRad);
+	xycie.y += deltaMm * cosf(middleHeadingRad);
+	xydegz += deltaHeading;
 }
 // モジュール名 clearXYcie
 // 処理概要     ログ用XY座標と積算角度を初期化する

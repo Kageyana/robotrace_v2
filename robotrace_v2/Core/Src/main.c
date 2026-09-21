@@ -22,6 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "runGuard.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -64,6 +65,8 @@ TIM_HandleTypeDef htim13;
 DMA_HandleTypeDef hdma_tim1_ch3;
 
 /* USER CODE BEGIN PV */
+static volatile uint8_t adcLinePhase;
+static volatile bool adcLineConversionActive;
 
 /* USER CODE END PV */
 
@@ -1067,8 +1070,19 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *AdcHandle)
 {
 	if (AdcHandle->Instance == ADC1)
 	{
-		getMarkerSensor();
-		getLineSensor();
+		if (!RunGuard_AdcSampleUsable(adcLineConversionActive, adcLinePhase,
+			(uint8_t)lineSensorState))
+		{
+			Timer_NotifyAdcPhaseMismatch();
+			discardLineSensorPendingSamples();
+			discardMarkerSensorPendingSamples();
+		}
+		else
+		{
+			getMarkerSensor(adcLinePhase);
+			getLineSensor(adcLinePhase);
+		}
+		adcLineConversionActive = false;
 	}
 	if (AdcHandle->Instance == ADC2)
 	{
@@ -1125,16 +1139,20 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
     if(htim->Instance==TIM3 && htim->Channel==HAL_TIM_ACTIVE_CHANNEL_1){
 		__HAL_TIM_DISABLE_IT(&htim3, TIM_IT_CC1);  // ワンショット完了
 		// ラインセンサのADC変換開始
-		if(lineSensorState){
+		adcLinePhase = lineSensorState ? 1U : 0U;
+		adcLineConversionActive = true;
+		if(adcLinePhase){
 			// LED ON時：反射光の取得
 			if (HAL_ADC_Start_DMA(&hadc1, (uint32_t*)analogValLSon, NUM_SENSORS+1) != HAL_OK)
 			{
+				adcLineConversionActive = false;
 				Error_Handler();
 			}
 		}else{
 			// LED OFF時：環境光の取得
 			if (HAL_ADC_Start_DMA(&hadc1, (uint32_t*)analogValLSoff, NUM_SENSORS+1) != HAL_OK)
 			{
+				adcLineConversionActive = false;
 				Error_Handler();
 			}
 		}
