@@ -2,7 +2,7 @@
 type: codex-failure
 date: 2026-09-13
 task: "距離カルマン融合後の一次走行ログ確認"
-status: open
+status: resolved
 severity: high
 tags:
   - codex/failure
@@ -33,4 +33,12 @@ tags:
 
 ## ステータス
 
-コード修正と合成テストは完了したが、修正後の実機ログ未取得のため`open`とする。
+2026-09-14に修正後の一次走行ログ12439、12441、12444を確認した。3本とも
+`emcStop=0`、`cntlog`欠落なし、`logSchemaVersion=6`、`logRecordSizeBytes=48`、
+`distanceKalman.invalidUpdateCount=0`、`distanceKalman.outputGuardCount=0`、
+`dbgOverflowFinal=0`、`logOverflowFinal=0`だった。合成回帰テスト15件とDebugビルドも
+成功したため、Joseph形式更新の再発防止策は検証済みとして`resolved`とする。
+
+ログヘッダの`gitCommit=f34d347`は修正をコミットする前のビルド情報だが、修正後に追加した
+Version 6列と診断値が記録されている。今後は実機ログとソースを一意に対応させるため、
+走行用ビルドを作る前に対象変更をコミットし、dirty状態もヘッダへ記録する。

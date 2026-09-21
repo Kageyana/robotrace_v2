@@ -70,6 +70,15 @@ File: `shortcut.txt`
 - The default is `1,080,040,3000,0600,010,0000`; `lineThetaGain_x1e9` stores the heading correction gain as `b x 10^9 [rad/mm^2]` and is OFF by default.
 - Partial reads apply valid fields; invalid or missing fields use defaults and the file is repaired. Existing six-field files preserve their valid values and append `0000`.
 
+### Primary Heading Calibration
+
+File: `heading_cal.txt`
+
+- Implementation: `SDcard.c`, `readHeadingCalibrationSettings()`.
+- Format: `enabled,pulsePerMeterL,pulsePerMeterR,effectiveTreadCentiMm`, no newline.
+- Missing/invalid default: `0,58092,57945,10602` from the latest hand-rolled 1m and turn measurements. Existing valid files are not overwritten. Valid parsed fields are retained during repair, but the calibration is disabled. Values outside `50000..65000` pulse/m or `9000..14000` centi-mm are invalid. If either wheel differs more than 2% from the common distance scale `58019` pulse/m, disable it in memory without rewriting a valid file.
+- The run-start snapshot and wheel-derived Kalman result are saved in the final CSV header for diagnosis only. Schema 10 uses the independently calibrated IMU gyro for route XY; a disabled wheel calibration does not prohibit a route, but the distance-verification and IMU-calibration gates do.
+
 ### Line Sensor Calibration
 
 File: `lsval.txt`

@@ -138,12 +138,16 @@ Codex は主にファームウェア開発に使用します。必要に応じ�
 - 進行方向の角度定義: CW を `+`、CCW を `-` とする。
 - 左右モーターの正方向: 前進を `+`、後退を `-` とする。
 - `gyroVal_Z` の正方向: 機体のフットプリントに対して CW を `+` とする。
+- BMI088の物理Y軸は`-`方向が機体前進方向と一致する。`BMI088getAccele()`で生Y値を`-1`倍し、ソフトウェア上の`imuVal.accele.y`および`imuLinearAccelY_mps2`は前進を`+`とする。
 - 左右エンコーダの符号: 前進を `+`、後退を `-` とする。
 
 ### 機体寸法パラメータの正
 
-- タイヤ径: `23.5 mm`
-- トレッド幅: `11 mm`
+- タイヤ径: `23 mm`
+- 実測パルスから逆算した有効転がり径（速度フィードフォワード用）: 約`22.47 mm`。物理的なタイヤ径とは区別し、Duty 100の動力直線走行で共通距離換算を確認済み。高速域は別途評価する。
+- タイヤ幅: `11 mm`
+- 左右駆動輪の中心間距離: `109 mm`。手押し旋回から得た診断用の暫定有効トレッド幅は約`106.02 mm`で、経路方位の補正にはまだ使用しない。
+- モーター軸エンコーダからタイヤへの減速比: `1:2`。
 - エンコーダ分解能: `512 カウント/回転`、4 逓倍。
 - 機体寸法パラメータは、コード内の値を正とする。
 - コード、STEP、実測値が一致しない場合はコードを基準に判断し、必要に応じてコードと `AGENTS.md` を更新する。
@@ -369,6 +373,7 @@ cmake --build --preset Release
 - 設定ファイルの読み書き処理を変更する場合は、ファイル欠落時にデフォルト値でファイルが作成されることを確認する。
 - `targetSpeeds.txt` は既存18項目の末尾へLevel 0専用速度`pathReplay`を追加した19項目とする。`pathReplay`は実値の100倍を第19項目へ保存し、既定値は`0100`（1.00 m/s）とする。旧18項目ファイルは既存値を保持し、`pathReplay`の既定値を末尾へ追加して修復する。
 - `shortcut.txt` は `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000,lineThetaGain_x1e9` の順で保存し、改行は付けない。既定値は `1,080,040,3000,0600,010,0000` とする。`lineThetaGain_x1e9`はヨー角補正ゲインを`b × 10^9 [rad/mm^2]`で保持し、既定では無効とする。ライン位置・ヨー角補正の初期実機検証はLevel 0固定の `0,080,040,1500,1600,010,0100` とする。旧6項目ファイルは既存の有効値を保持し、末尾へ`0000`を追加して修復する。
+- `heading_cal.txt`は`有効フラグ,左pulse/m,右pulse/m,有効トレッド幅×100[mm]`の4項目、改行なしとする。新規作成・破損時の既定値は暫定実測値`0,58092,57945,10602`。正常な既存ファイルは自動上書きしない。欠落・破損時は無効化して修復し、有効値でも左右pulse/mが共通距離換算58,019 pulse/mから2%を超えて異なる場合はメモリ上で無効化する。走行開始時に値を固定し、終了ヘッダへ出力する。スキーマ10では左右差による推定は診断専用で、経路方位には適用しない。
 
 設定ファイルの保存先は `./setting/` です。詳細なファイル形式、読み書き関数、破損時の扱いは `.agents/skills/robotrace-sd-settings/SKILL.md` を使います。
 
@@ -402,7 +407,7 @@ cmake --build --preset Release
 
 - 走行開始条件は、UI 上でスタート開始動作を行ったときとする。
 - `autoStart` は、UI 上でオートスタート開始動作を行ったときに実行する。
-- 通常走行のゴール判定条件は、ゴールマーカーを規定回数通過したときとする。`BOOST_PATH_REPLAY` / `BOOST_SHORTCUT`は右マーカー回数を停止条件に使わず、一次走行終端から座標原点 `(0, 0)` へ向かう直線方向に500 mm進んだ位置へ到達したときに停止を開始する。
+- 通常走行では`SGmarker`をスタート検出時に1、以後は右マーカー通過ごとに1増やす。`COUNT_LAPS=6`、`COUNT_GOAL=7`として、6周目の右マーカーで停止を開始する。`BOOST_PATH_REPLAY` / `BOOST_SHORTCUT`は右マーカー回数を停止条件に使わず、一次走行終端と座標原点 `(0, 0)` の中間点へ到達したときに停止を開始する。
 - 正常終了時、緊急停止時ともに、ログ保存タイミングは機体停止時とする。緊急停止ログでは `emcStop` に停止要因を記録する。
 - 走行開始、ゴール判定、ログ終了処理を変更する場合は、正常終了と緊急停止のログ保存タイミングが変わらないか確認する。
 
@@ -433,8 +438,8 @@ cmake --build --preset Release
 - `BOOST_MARKER`: マーカー位置によって区間速度を決定するモード。現在は使用していない。
 - `BOOST_DISTANCE`: 1次走行の走行距離と比較し、現在の走行位置と曲率半径から速度を決定して走行する。
 - `BOOST_SHORTCUT`: `BOOST_PATH_REPLAY` の経路から交互旋回するスラローム区間を抽出して直線回廊へ置換し、合法余裕を検証したLevel 1経路をヨーレート制御で走行する。Level 0の一次経路再現には形状変更を適用しない。
-- `BOOST_PATH_REPLAY`: 1次走行ログの `x`, `y`, `courseMarker` をヘッダ名で読み、40 mm間隔に再標本化した経路をラインセンサー非依存で再走行する。ラインセンサーは限定的な位置補正とロスト時フォールバックにだけ使う。
-- `BOOST_PATH_REPLAY` / `BOOST_SHORTCUT` のゴール判定は、通常右マーカーの誤カウントによる早期終了を防ぐためマーカー回数に依存させない。Level 0、Level 1それぞれの実走行経路を、一次走行終端から座標原点 `(0, 0)` へ向かう直線方向に500 mm延長し、その延長終端へ到達したときに停止を開始する。途中で座標原点近傍を通る別区間は停止点探索の対象にしない。
+- `BOOST_PATH_REPLAY`: スキーマ10一次走行ログの`x`, `y`, `encTotalOptimal`をヘッダ名で読み、40 mm間隔に再標本化した経路をラインセンサー非依存で再走行する。マーカー点を経路に固定しない。走行中の方位積分は従来どおりIMU Z軸角速度を用い、ラインセンサーは限定的な位置補正とロスト時フォールバックにだけ使う。
+- `BOOST_PATH_REPLAY` / `BOOST_SHORTCUT` のゴール判定は、通常右マーカーの誤カウントによる早期終了を防ぐためマーカー回数に依存させない。Level 0、Level 1それぞれの実走行経路を、一次走行終端から座標原点 `(0, 0)` までの直線距離の半分だけ原点方向へ延長し、その延長終端へ到達したときに停止を開始する。途中で座標原点近傍を通る別区間は停止点探索の対象にしない。延長点が配列上限を超える経路は生成しない。
 - 経路制御バージョン3では、`BOOST_PATH_REPLAY` / `BOOST_SHORTCUT` の対応点候補を補正後エンコーダ累積進行距離の120 mm先まで、かつ推定機体方位との差60 deg以内に制限する。候補がない5 ms周期ではindexを保持してロスト回数を加算し、100 ms継続した場合だけ既存のラインフォールバックまたは`STOP_LOCALIZATION`へ移る。累積弧長はLevel 0、Level 1とも実際の`driveRoute`から算出する。
 - 経路制御バージョン4では、方位FB、ロスト判定、再合流判定に最近傍経路点の接線方位差を使用し、先読み方位は曲率FFの算出だけに使用する。小R手前で先読み方位FBによって早期旋回しないようにする。
 - 経路制御バージョン11では、Level 1の制約付きElastic Bandを廃止し、600～1600 mm、曲率符号変化3回以上、端点方位差12 deg以下の区間を最大34 mm移動させる直線回廊方式へ変更した。入口と出口は120 mmで滑らかに接続し、新規自己交差、合法余裕、全長5 mm以上の短縮を検査する。マーカー位置は直線回廊の固定点にしない。
@@ -459,7 +464,7 @@ cmake --build --preset Release
 
 ### スリップ判定とチューニング
 
-- スリップ判定は `1 ms` 周期で、`patternTrace >= 12 && patternTrace < 100` の走行中に実行する。`encSpeed < 0.1 m/s` では判定をスキップする。
+- スリップ判定更新は通常ビルドでは1ms制御経路から外す。計測比較用に`ROBOTRACE_ENABLE_SLIP_UPDATE=ON`でビルドした場合だけ、`patternTrace >= 12 && patternTrace < 100`で1ms更新する。この場合も`encSpeed < 0.1 m/s`では判定をスキップする。
 - `slipFlag` は縦スリップ、`slipFlagLat` は横スリップの判定フラグとする。
 - 性能改善の優先順位は、再現性、完走率、ラップタイム短縮の順とする。
 - 1 回の走行で変更してよいパラメータ数は最大 2 個までとする。
@@ -473,24 +478,32 @@ cmake --build --preset Release
 - ログファイル名は通し番号を使う。
 - ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。`logSchemaVersion=6` の通常軽量ログは1レコード48バイト固定とし、`gyroVal_Z`直後に静止時重力基準と旋回中心補正後の`imuLinearAccelX_mps2`、`imuLinearAccelY_mps2`、`imuLinearAccelZ_mps2`を[m/s²]のfloat32で保存する。BMI088温度の生11ビットコードは`imuTempRaw`として保存し、`ROC`の直後に符号付き16ビットの`encCurrentL`, `encCurrentR`を保存する。`encCurrentCorr_p`はカルマン融合後の符号付き1ms差分パルスを保存する。`imuTempRaw=0x400`は無効値とする。詳細ログには`lineMatchResidual_mm`、`poseCorrection_um`、`poseCorrectionHeading_cdeg`を末尾へ追加する。Version 2で省略した`linePointX_mm`, `linePointY_mm`, `pathLegalMargin_mm`に加えて、通常ログでは`motorpwmL`, `motorpwmR`, `slipFlag`, `slipFlagLat`, `lineTraceCtrl`, `motorVoltageCmdL_mV`, `motorVoltageCmdR_mV`と新規補正診断列を保存しない。旧CSVはヘッダ名で列を解決し、復元対象3列が存在する場合に保存値を優先して扱う。スキーマ2～5は引き続き読み取り可能とする。距離推定器のノイズ定数、4σ超過またはエンコーダ物理上限超過で観測更新を完全スキップした回数、フォールバック回数、`invalidUpdateCount`、`maxAbsFusedDelta_p`、`outputGuardCount`はレコード外のログヘッダへ保存する。終了ヘッダには`logRecordSizeBytes`、`dbgOverflowFinal`、`logOverflowFinal`も保存する。
 - ログヘッダの1行目にはパラメータを `パラメータ名=value` 形式で記載し、2行目にはログデータ名だけを記載する。
+- スキーマ7は軽量48バイト、スキーマ8は軽量36バイトで、左右個別`encCurrentL/R`は記録時点の1msパルスだった。スキーマ9以降も軽量36バイトを維持し、この2欄はジャイロ平均と同一区間の符号付き積算パルス`encIntervalL_p/R_p`とする。スキーマ9では`x/y`がジャイロ単独の診断座標、`x_fused_mm/y_fused_mm`が左右差から推定したバイアスを差し引いた経路座標だった。スキーマ10では`x/y`を経路座標とし、`x_fused_mm/y_fused_mm`は診断専用にする。マーカーは完走とゴールX差の検証のみで、XY補正や経路点の固定に使わない。スキーマ10の`closureReason`は0=有効、1=非一次、2=マーカー不正、3=ログ異常、5=ゴールがログ区間外、6=エンコーダ区間異常、8=ゴールX差20mm超過、9=IMU校正無効、10=距離換算未検証とする。新しい経路元は正常終了かつ`closureValid=1`のスキーマ10一次ログのみとする。
+- 経路制御バージョン14～16は履歴解析用とする。バージョン17ではスキーマ10のジャイロ単独XYを経路元とし、マーカー点を挿入せず、実際の終端点と終端から原点方向への中間停止点を含める。`routeGeometryCrc32`の復元はバージョン別に再生成する。
+- `gyroSampleFault=1`は1ms角速度サンプルの欠落・非有限値を示し、一次経路生成を禁止する。
+- 1ms診断は通常36バイトレコードを増やさず、終了ヘッダの`timing.isrMax_us`、`timing.imuReadMax_us`、`timing.isrOverrunCount`、`timing.imuReadErrorCount`、`timing.lineUpdateMaxInterval_ms`、`timing.lineStaleCycleCount`、`timing.adcPhaseMismatchCount`、`timing.startResetMeasured`、`timing.startResetDelay_ms`、`timing.startResetPulseDelta_p`に記録する。最大実行時間はDWTサイクルをマイクロ秒換算した値で、ライン更新間隔は1ms周期カウンタ基準とする。`runStartOmega.kp/ki/kd`は動的クロスラインゲイン変更前の走行開始値、`runStartLineCalibrationFNV1a32`は10センサーのmin/maxを順にリトルエンディアン2バイトずつFNV-1aで照合した値、`slipUpdateEnabled`はビルド時の1msスリップ更新設定を示す。
+- 新規CSVヘッダの`logExpectedRows`は一時バイナリから変換すべきレコード数を示す。経路生成時はCSVデータ行の改行終端と行数を照合し、途中切断や欠落を経路元にしない。旧スキーマ7/8ログでこのヘッダがない場合は従来どおり読める。
+- ADC完了時は変換開始時にラッチしたLED位相と現位相を照合し、不一致なら未完成の点灯・消灯組を破棄する。ライン値が3制御周期以上更新されない間は、新たなライン偏差による角速度目標を計算せず、直前の操舵出力を保持する。実機で長い更新停止が残る場合は高速走行を禁止して原因を調査する。
+- 一次走行は`COUNT_GOAL=7`（スタート1回＋ゴール右マーカー6回）による走行中の停止条件を使うが、停止後にCSV保存と`closureValid=1`を確認できない場合は経路無効または未検証と表示し、autoStartの次走へ進まない。これは物理的な完走認定とは別である。
 - `courseAnalysis.c` の通常経路生成は、`courseMarker`, `encTotalOptimal`, `ROC`をCSVヘッダ名から解決する。追加スリップ解析を行う場合だけ、旧形式または詳細デバッグログの`targetSpeed`, `optimalIndex`, `slipFlag`, `slipFlagLat`も必要とする。ログ列追加時に固定列番号へ依存しない。
 - 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_MARKER`, `BOOST_DISTANCE`, `BOOST_SHORTCUT`, `BOOST_PATH_REPLAY` を正とする。
 - 新しい走行モードを追加する場合は、`robotrace_v2/Core/Inc/courseAnalysis.h` に定義を追加する。
 - `emcStop` が 0 以外の場合は緊急停止しており、ゴールしていない走行として扱う。
-- 緊急停止条件は `robotrace_v2/Core/Inc/emergencyStop.h` の定義を正とする。経路追従中に自己位置を喪失し、ライン追従へ移行できない場合は `STOP_LOCALIZATION` とする。
+- 緊急停止条件は `robotrace_v2/Core/Inc/emergencyStop.h` の定義を正とする。経路追従中に自己位置を喪失し、ライン追従へ移行できない場合は `STOP_LOCALIZATION`、走行中のBMI088ジャイロ・加速度・温度のSPI読出しが失敗した場合は`STOP_IMU_READ=8`とし、不正なIMU値を制御へ渡さずモーターを止める。
 - Version 11以降のLevel 1生成結果はログヘッダの`shortcutBuildStatus`、`shortcutCorridorCount`、`shortcutReduction_mm`で確認する。生成成功は`shortcutBuildStatus=1`とする。
 - 全走行ログのヘッダには`logSchemaVersion`、`analysisSourceLog`、`slipSourceLog`を残す。一次走行、解析元不明、解析失敗時の番号は0とし、PATH系では`analysisSourceLog`と`routeSourceLog`を一致させる。走行開始時に固定した値を停止後のヘッダへ出力し、保存前の解析番号やUI変更で置き換えない。
-- PATH系ログの復元情報として、`routePointCount`、`routeGeometryCrc32`、`shortcutRequestedLevel`、実採用値の`shortcutLevel`、`shortcutSettings.*`（走行開始時）と`routeShortcutSettings.*`（経路生成時）を記録する。`routeGeometryCrc32`はVersion 12/13で共通の整数XY経路を固定リトルエンディアンでCRC32化した値とする。
+- PATH系ログの復元情報として、`routePointCount`、`routeGeometryCrc32`、`shortcutRequestedLevel`、実採用値の`shortcutLevel`、`shortcutSettings.*`（走行開始時）と`routeShortcutSettings.*`（経路生成時）を記録する。`routeGeometryCrc32`は各バージョンで生成した整数XY経路を固定リトルエンディアンでCRC32化した値とする。
 - 新しい緊急停止条件を追加する場合は、`robotrace_v2/Core/Inc/emergencyStop.h` に定義を追加する。
 - 通常ログ解析では、ラップタイム、速度追従、角速度、経路追従状態を重視する。スリップは該当列を含む旧形式または詳細デバッグログでのみ評価する。
 - バッテリー状態はログ内パラメータ `batteryVoltage_V` を参照する。単位は `[V]`。
 - `batteryVoltage_mV` は走行中にLPF更新したバッテリー電圧 `[mV]` とする。詳細デバッグログの`motorVoltageCmdL_mV`, `motorVoltageCmdR_mV`はバッテリー電圧で割る前の左右モーター指令電圧 `[mV]` とする。
-- `encCurrentL`, `encCurrentR` は左右エンコーダの符号付き1 msパルス数とする。`encCurrentN`は速度PID用の生平均値、`encCurrentCorr_p`は検証済み距離融合後の符号付き1 ms差分パルスとする。`encLog`と`encRightMarker`はログ周期・ゴール判定用の生エンコーダカウンタとし、`enc1`, `encCurve`, `encChangeGain`, `encTotalOptimal`, `encPID`およびXY座標は検証済み融合値から算出する。
+- 内部変数`encCurrentL/R`は左右の符号付き1msパルス数、スキーマ9の記録列`encIntervalL_p/R_p`はログ区間積算値とする。`encCurrentN`は速度PID用の生平均値、`encCurrentCorr_p`は検証済み距離融合後の符号付き1ms差分パルスとする。`encLog`と`encRightMarker`はログ周期・ゴール判定用の生カウンタとし、`enc1`, `encCurve`, `encChangeGain`, `encTotalOptimal`, `encPID`およびXY座標は検証済み融合距離から算出する。
 - 詳細デバッグログの`motorpwmL`, `motorpwmR`は電圧補償後に実際にタイマへ出力した飽和後DUTYとする。通常ログでは左右エンコーダ列を優先して置き換える。
 - `LOG_SCHEMA_PROFILE_LIGHT=0` のデバッグログでは `markerSensor`（LED差分から得たマーカー状態）、`sgMarkerCount`（スタート・ゴールマーカー累積数）、`encRightMarker_p`（右マーカーからの補正後エンコーダパルス）、`patternTrace`（走行状態）を追加出力する。ログヘッダには終了時の `sgMarkerAtLogEnd` と `encRightMarkerAtLogEnd_p` も出力する。
 - 経路追従ログの `lineValid` は限定補正可能状態、`pathErrorY_mm` は経路横偏差 [mm]、`pathErrorHeading_cdeg` は経路制御バージョン4以降では最近傍経路点との方位偏差 [0.01 deg]、`pathState` は追従状態とする。バージョン3以前の`pathErrorHeading_cdeg`は先読み方位との偏差であり、バージョン4以降とp95を直接比較しない。`linePointX_mm`, `linePointY_mm`, `pathLegalMargin_mm`は新形式ではPC上で元一次ログ・設定・`optimalIndex`から復元する。
 - ログヘッダの`tgtParam.pathReplay`はLevel 0 PATH REPLAY速度上限[m/s]とする。
-- 通常ログは `LOG_SCHEMA_PROFILE_LIGHT=1` を既定とし、`logSchemaVersion=6`の1レコード48バイト固定でラップタイム、速度追従、角速度、3軸線形加速度、BMI088温度生コード、マーカー、左右エンコーダ、経路追従、XY確認に必要な列だけを残す。実DUTYが必要な場合は詳細デバッグプロファイルを使用する。
+- 通常ログは`LOG_SCHEMA_PROFILE_LIGHT=1`を既定とし、現行`logSchemaVersion=10`の1レコード36バイト固定で左右区間パルス、区間平均角速度、経路用ジャイロXY、診断専用の無補正融合XYを確認する。詳細デバッグプロファイルは121バイト、走行中の距離カルマンへの加速度入力は軽量プロファイルでも継続する。
+- スキーマ10の経路元は`encoderPulsePerMeter=58019`、`imuCalibrationValid=1`、100サンプル・読出し異常0、`distanceScaleVerified=1`、`closureValid=1`の正常一次ログのみとする。2026-09-21の動力1m×5走で左右平均の距離換算が各走±1%以内と確認できたため、`PRIMARY_DISTANCE_SCALE_VERIFIED=1`とする。旧スキーマ9の56,687／55,116 pulse/mログは閲覧・履歴PATH解析に限る。
 - 加速度、電流、スリップ内部量などの詳細デバッグ列が必要な場合は、ビルド定義で `LOG_SCHEMA_PROFILE_LIGHT=0` にして一時的に出力する。
 - ログ同士を比較する場合は、`batteryVoltage_V` の差を考慮する。電圧差によるモーター出力、速度追従、加速性能、スリップ傾向の変化を無視しない。
 - ログ形式を安易に変更しない。形式変更が必要な場合は、スキーマまたはドキュメントも合わせて更新する。
@@ -563,6 +576,10 @@ cmake --build --preset Release
 - 2026-09-13: 距離融合の換算を`PULSE_METER=53424`から一元導出し、4σ超過またはエンコーダ物理上限超過時は観測更新を完全スキップする方式へ修正した。IMU読出し後にカルマン更新する1ms順序へ変更し、Version 5/36バイトと既存公開インターフェースは維持した。
 - 2026-09-13: 距離融合の予測・観測更新を一時状態で検証してから確定する方式へ変更した。有限性、共分散対角、1ms距離差分の検証失敗時は距離ジャンプを確定せず生エンコーダへ戻し、棄却時は共分散を初期化した。リセット実行をTIM6の1ms処理へ統一し、ログ周期・ゴール判定を生エンコーダへ分離、終了ヘッダへ最終オーバーフローと無効更新診断を追加した。共分散パラメータは実機10走確認まで調整しない。
 - 2026-09-13: 通常ログを`logSchemaVersion=6`の48バイトへ更新し、`gyroVal_Z`直後へ静止時重力基準と旋回中心補正後の3軸線形加速度を[m/s²]のfloat32で追加した。Y軸列は距離カルマンへ渡す前後加速度と同じAPI値を使用し、Version 2～5のCSVヘッダ名解析とPATH復元互換を維持した。
+- 2026-09-20: 経路制御バージョン15で、PATH REPLAY/SHORTCUTの延長終端を一次走行最終点と原点の中間点へ変更した。40 mm刻みの末尾に中間点を追加し、点数上限を超える場合は経路生成を拒否する。Version 14以前のログ復元は固定500 mmのまま維持する。
+- 2026-09-20: 一次走行の停止周回数を6周に変更した。`SGmarker`はスタート時に1を含むため、6回目の右マーカー通過に対応する`COUNT_GOAL=7`で停止を開始する。PATH系の停止条件は変更しない。
+- 2026-09-20: 実測の左55,036・右55,196 pulse/mと既知角旋回で得た有効トレッド幅109 mmを採用した。共通距離換算は平均55,116 pulse/m、速度FFの有効転がり径は23.66 mm。旧スキーマ9ログはヘッダ換算値で区別し、新ファームウェアの経路元には使わない。`heading_cal.txt`の既定フラグは実機低速検証まで0のままにする。
+- 2026-09-20: その後の手押し1m直進3回で左58,092／右57,945 pulse/mを測定し、共通換算58,019 pulse/m、速度FF有効径22.47mmへ暫定更新した。旋回から得た約106.02mmは診断値に留める。スキーマ10／経路Version 17はジャイロ単独XYを採用するが、動力1m検証まで距離ゲートを無効化しない。
 
 ## 15. 機体・回路変更時にコードへ反映する項目
 
