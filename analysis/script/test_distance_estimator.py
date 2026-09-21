@@ -6,7 +6,13 @@ from __future__ import annotations
 import math
 import unittest
 
-from robotrace_units import PULSE_METER, PULSE_MILLIMETER
+try:
+    from .robotrace_units import CURRENT_PULSE_METER
+except ImportError:  # ファイル単体実行との互換
+    from robotrace_units import CURRENT_PULSE_METER
+
+PULSE_METER = CURRENT_PULSE_METER
+PULSE_MILLIMETER = PULSE_METER / 1000.0
 
 
 DT = 0.001
@@ -17,7 +23,7 @@ INITIAL_BIAS_SIGMA = 0.5
 MAX_ACCEL = 20.0
 MAX_SPEED = 10.0
 MAX_FUSED_DELTA_M = MAX_SPEED * DT + 0.5 * MAX_ACCEL * DT * DT
-MAX_FUSED_DELTA_P = 535
+MAX_FUSED_DELTA_P = 552
 INITIAL_SPEED_VARIANCE = SIGMA_ENCODER**2
 
 
@@ -297,12 +303,12 @@ class DistanceEstimatorTests(unittest.TestCase):
             (math.nan, 17, 17, True),
             (math.inf, 17, 17, True),
             (-math.inf, -17, -17, True),
-            (-535.0, 17, -535, False),
-            (535.0, 17, 535, False),
-            (-536.0, -17, -17, True),
-            (536.0, 17, 17, True),
-            (2147483648.0, 700, 535, True),
-            (-2147483648.0, -700, -535, True),
+            (-float(MAX_FUSED_DELTA_P), 17, -MAX_FUSED_DELTA_P, False),
+            (float(MAX_FUSED_DELTA_P), 17, MAX_FUSED_DELTA_P, False),
+            (-float(MAX_FUSED_DELTA_P + 1), -17, -17, True),
+            (float(MAX_FUSED_DELTA_P + 1), 17, 17, True),
+            (2147483648.0, 700, MAX_FUSED_DELTA_P, True),
+            (-2147483648.0, -700, -MAX_FUSED_DELTA_P, True),
         ]
         for fused_pulse, raw_pulse, expected, guarded in cases:
             actual, actual_guarded = guarded_output_pulse(fused_pulse, raw_pulse)

@@ -9,9 +9,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from normalize_log_headers import inspect_log, normalized_bytes, replace_atomically
-from path_log_recovery import build_route, read_csv_log, recover_path_columns
-from repair_cntlog_wrap import decode_distance_pulse
+try:
+    from .normalize_log_headers import inspect_log, normalized_bytes, replace_atomically
+    from .path_log_recovery import build_route, read_csv_log, recover_path_columns
+    from .repair_cntlog_wrap import decode_distance_pulse
+except ImportError:  # ファイル単体実行との互換
+    from normalize_log_headers import inspect_log, normalized_bytes, replace_atomically
+    from path_log_recovery import build_route, read_csv_log, recover_path_columns
+    from repair_cntlog_wrap import decode_distance_pulse
 
 
 FIELDS = "cntlog,encCurrentN,gyroVal_Z,courseMarker,encTotalOptimal,ROC,x,y,"

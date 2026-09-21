@@ -14,7 +14,7 @@ from robotrace_units import PULSE_MILLIMETER
 
 
 LOG_NUMBERS = (12384, 12386, 12387, 12388, 12389, 12394)
-TREAD_MM = 11.0
+TREAD_MM = 109.0
 FIXED_STRAIGHTS_MM = (
     ("S1_start_up", 300.0, 1700.0),
     ("S2_outer_down", 5000.0, 8000.0),
@@ -68,7 +68,7 @@ def read_log(path: Path) -> LogData:
         distance_mm.append(distance_mm[-1] + rows[index]["encCurrentCorr_p"]
                            / PULSE_MILLIMETER * dt_ms)
         heading_deg.append(heading_deg[-1] + rows[index]["gyroVal_Z"] * dt_ms / 1000.0)
-        encoder_rate = ((rows[index]["encCurrentR"] - rows[index]["encCurrentL"])
+        encoder_rate = ((rows[index]["encCurrentL"] - rows[index]["encCurrentR"])
                         / PULSE_MILLIMETER / TREAD_MM * 180.0 / math.pi * 1000.0)
         encoder_heading_deg.append(encoder_heading_deg[-1] + encoder_rate * dt_ms / 1000.0)
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""新ログからVersion 12/13のPATH参照列をメモリ上で復元する共通処理。"""
+"""ログからVersion 12～15のPATH参照列をメモリ上で復元する共通処理。"""
 
 from __future__ import annotations
 
@@ -11,13 +11,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+try:
+    from .robotrace_units import CURRENT_PULSE_METER, SCHEMA9_PULSE_METER, SCHEMA9_MEASURED_PULSE_METER
+except ImportError:  # analysis/scriptを直接importする既存テスト用
+    from robotrace_units import CURRENT_PULSE_METER, SCHEMA9_PULSE_METER, SCHEMA9_MEASURED_PULSE_METER
+
 
 PATH_MODES = {3, 4}
-PATH_ROUTE_CONTROLLER_VERSIONS = {12, 13}
+PATH_ROUTE_CONTROLLER_VERSIONS = {12, 13, 14, 15, 16, 17}
 PATH_ROUTE_SPACING_MM = 40.0
 PATH_ROUTE_MAX_POINTS = 1514
 PATH_GOAL_EXTENSION_MM = 500.0
-PATH_GOAL_EXTENSION_POINTS = 13
+PATH_GOAL_RESERVED_POINTS = 13
 PATH_CORRIDOR_MIN_SPAN_POINTS = 15
 PATH_CORRIDOR_MAX_SPAN_POINTS = 40
 PATH_CORRIDOR_TRANSITION_POINTS = 3
@@ -419,18 +424,26 @@ def generate_shortcut(line: list[RoutePoint], requested_level: int, max_level: i
     return drive, flags, level, 1, reduction, corridor_count
 
 
-def extend_to_origin(line: list[RoutePoint], drive: list[RoutePoint], flags: list[int]) -> None:
+def extend_to_origin(line: list[RoutePoint], drive: list[RoutePoint], flags: list[int],
+                     route_version: int = 14) -> None:
     if len(drive) < 2:
         raise ValueError("終端延長不可:経路点不足")
     end_x, end_y = f32(drive[-1].x), f32(drive[-1].y)
     distance = f32(math.sqrt(f32(f32(end_x * end_x) + f32(end_y * end_y))))
     if distance < 1.0:
         raise ValueError("終端延長不可:終点が原点")
+    goal_extension = f32(distance * 0.5) if route_version >= 15 else PATH_GOAL_EXTENSION_MM
+    if not math.isfinite(goal_extension) or goal_extension < 1.0:
+        raise ValueError("終端延長不可:終点が原点")
+    append_count = (math.ceil(f32(goal_extension / PATH_ROUTE_SPACING_MM))
+                    if route_version >= 15 else PATH_GOAL_RESERVED_POINTS)
+    if len(drive) + append_count > PATH_ROUTE_MAX_POINTS:
+        raise ValueError("終端延長不可:経路点数上限")
     unit_x = f32(-end_x / distance)
     unit_y = f32(-end_y / distance)
     advanced = 0.0
-    for _ in range(PATH_GOAL_EXTENSION_POINTS):
-        next_advanced = min(PATH_GOAL_EXTENSION_MM, f32(advanced + PATH_ROUTE_SPACING_MM))
+    for _ in range(append_count):
+        next_advanced = min(goal_extension, f32(advanced + PATH_ROUTE_SPACING_MM))
         x = int16_round(f32(end_x + f32(unit_x * next_advanced)))
         y = int16_round(f32(end_y + f32(unit_y * next_advanced)))
         drive.append(RoutePoint(x, y))
@@ -452,7 +465,17 @@ def geometry_crc32(route: RouteBuild | tuple[list[RoutePoint], list[RoutePoint]]
     return zlib.crc32(payload) & 0xFFFFFFFF
 
 
-def build_route(source: CsvLog, requested_level: int, max_level: int) -> RouteBuild:
+def build_route(source: CsvLog, requested_level: int, max_level: int,
+                route_version: int | None = None,
+                expected_pulse_meter: int | None = None) -> RouteBuild:
+    if route_version is None:
+        schema = parameter_int(source.parameters, "logSchemaVersion")
+        route_version = 17 if schema == 10 else (16 if schema == 9 else (14 if schema in (7, 8) else 13))
+    if parameter_int(source.parameters, "logSchemaVersion") in (9, 10):
+        return build_route_unwarped(source, requested_level, max_level, route_version,
+                                    expected_pulse_meter)
+    if parameter_int(source.parameters, "logSchemaVersion") in (7, 8):
+        return build_route_v14(source, requested_level, max_level, route_version)
     raw_points = _read_route_points(source)
     if not raw_points:
         raise ValueError("元ログに有効なXY点がありません")
@@ -491,7 +514,7 @@ def build_route(source: CsvLog, requested_level: int, max_level: int) -> RouteBu
         segment_start_x, segment_start_y = previous_corrected_x, previous_corrected_y
         remaining = point_distance(segment_start_x, segment_start_y, corrected_x, corrected_y)
         while f32(accumulated + remaining) >= PATH_ROUTE_SPACING_MM:
-            if len(line) >= PATH_ROUTE_MAX_POINTS - PATH_GOAL_EXTENSION_POINTS:
+            if len(line) >= PATH_ROUTE_MAX_POINTS - PATH_GOAL_RESERVED_POINTS:
                 raise ValueError("元ログ経路が最大点数を超えました")
             needed = f32(PATH_ROUTE_SPACING_MM - accumulated)
             ratio = f32(needed / remaining)
@@ -512,8 +535,186 @@ def build_route(source: CsvLog, requested_level: int, max_level: int) -> RouteBu
         drive = [RoutePoint(point.x, point.y, point.heading_cdeg) for point in line]
         compute_headings(drive)
         applied = 0
-    extend_to_origin(line, drive, flags)
+    extend_to_origin(line, drive, flags, route_version)
     built = RouteBuild(line, drive, flags, requested_level, applied, status, corridor_count, reduction, 0)
+    built.geometry_crc32 = geometry_crc32(built)
+    return built
+
+
+def build_route_v14(source: CsvLog, requested_level: int, max_level: int,
+                    route_version: int = 14) -> RouteBuild:
+    """Schema 7/8の補正済みCSVからVersion 14/15経路を再生成する。"""
+    if parameter_int(source.parameters, "closureValid") != 1:
+        raise ValueError("一次ログのclosureValidが1ではありません")
+    required = {"x_closed_mm", "y_closed_mm", "courseMarker", "encTotalOptimal"}
+    if not required <= set(source.fields):
+        raise ValueError("補正座標または累積パルス列がありません")
+    goal_p = parameter_int(source.parameters, "goalMarkerOnset_p")
+    goal_y = parameter_number(source.parameters, "goalMarkerYRaw_mm")
+    if goal_p is None or goal_p <= 0 or not math.isfinite(goal_y):
+        raise ValueError("ゴールマーカー基準が不正です")
+    points: list[tuple[float, float, float]] = []
+    for row in source.rows:
+        try:
+            x = f32(float(row["x_closed_mm"]))
+            y = f32(float(row["y_closed_mm"]))
+            pulse = f32(float(row["encTotalOptimal"]))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("経路行が不正です") from exc
+        if not all(math.isfinite(value) for value in (x, y, pulse)):
+            raise ValueError("経路行が非有限です")
+        points.append((x, y, pulse))
+    if not points:
+        raise ValueError("経路点がありません")
+    total_length = 0.0
+    prev_x = prev_y = 0.0
+    for x, y, _ in points:
+        total_length = f32(total_length + point_distance(prev_x, prev_y, x, y))
+        prev_x, prev_y = x, y
+    if total_length < PATH_ROUTE_SPACING_MM:
+        raise ValueError("元ログの経路長が短すぎます")
+
+    line = [RoutePoint(0, 0)]
+    accumulated = 0.0
+    prev_x = prev_y = prev_pulse = 0.0
+    anchor_index = None
+
+    def append_point(x: float, y: float, anchor: bool) -> None:
+        nonlocal accumulated, prev_x, prev_y, anchor_index
+        start_x, start_y = prev_x, prev_y
+        remaining = point_distance(start_x, start_y, x, y)
+        while remaining > 0.0 and f32(accumulated + remaining) >= PATH_ROUTE_SPACING_MM:
+            if len(line) >= PATH_ROUTE_MAX_POINTS - PATH_GOAL_RESERVED_POINTS:
+                raise ValueError("経路点数上限")
+            needed = f32(PATH_ROUTE_SPACING_MM - accumulated)
+            ratio = f32(needed / remaining)
+            start_x = f32(start_x + f32(f32(x - start_x) * ratio))
+            start_y = f32(start_y + f32(f32(y - start_y) * ratio))
+            line.append(RoutePoint(int16_round(start_x), int16_round(start_y)))
+            remaining = f32(remaining - needed)
+            accumulated = 0.0
+        accumulated = f32(accumulated + remaining)
+        if anchor:
+            if point_distance(line[-1].x, line[-1].y, x, y) >= 0.5:
+                if len(line) >= PATH_ROUTE_MAX_POINTS - PATH_GOAL_RESERVED_POINTS:
+                    raise ValueError("経路点数上限")
+                line.append(RoutePoint(0, 0))
+            line[-1].x, line[-1].y = int16_round(x), int16_round(y)
+            anchor_index = len(line) - 1
+            accumulated = 0.0
+        prev_x, prev_y = x, y
+
+    for x, y, pulse in points:
+        if pulse < prev_pulse:
+            raise ValueError("累積距離が逆行しています")
+        if anchor_index is None and prev_pulse <= goal_p <= pulse:
+            append_point(0.0, f32(goal_y), True)
+        append_point(x, y, False)
+        prev_pulse = pulse
+    if anchor_index is None:
+        raise ValueError("ゴールマーカーが経路範囲外です")
+    last_x, last_y = points[-1][:2]
+    if point_distance(line[-1].x, line[-1].y, last_x, last_y) >= 0.5:
+        line.append(RoutePoint(int16_round(last_x), int16_round(last_y)))
+    compute_headings(line)
+    drive, flags, applied, status, reduction, corridor_count = generate_shortcut(
+        line, requested_level, max_level)
+    if status == 1 and (drive[anchor_index].x != 0 or
+                        drive[anchor_index].y != line[anchor_index].y):
+        drive = [RoutePoint(point.x, point.y, point.heading_cdeg) for point in line]
+        applied, status = 0, 5
+    extend_to_origin(line, drive, flags, route_version)
+    built = RouteBuild(line, drive, flags, requested_level, applied, status,
+                       corridor_count, reduction, 0)
+    built.geometry_crc32 = geometry_crc32(built)
+    return built
+
+
+def build_route_unwarped(source: CsvLog, requested_level: int, max_level: int,
+                         route_version: int,
+                         expected_pulse_meter: int | None = None) -> RouteBuild:
+    """Schema 9の融合XYまたはSchema 10のジャイロXYから経路を再生成する。"""
+    schema = parameter_int(source.parameters, "logSchemaVersion")
+    if (schema, route_version) not in ((9, 16), (10, 17)):
+        raise ValueError("経路Versionとログスキーマが対応しません")
+    if parameter_int(source.parameters, "closureValid") != 1:
+        raise ValueError("一次ログのclosureValidが1ではありません")
+    if parameter_int(source.parameters, "closureReason") != 0 or \
+            parameter_int(source.parameters, "optimalTrace") != 0 or \
+            parameter_int(source.parameters, "emcStop") != 0:
+        raise ValueError("一次ログの完走・採用条件が不正です")
+    source_pulse_meter = parameter_int(source.parameters, "encoderPulsePerMeter")
+    if expected_pulse_meter is None:
+        expected_pulse_meter = int(CURRENT_PULSE_METER)
+    if source_pulse_meter != expected_pulse_meter:
+        raise ValueError("経路元の距離換算が不正です")
+    if schema == 9:
+        if expected_pulse_meter not in (int(SCHEMA9_PULSE_METER), int(SCHEMA9_MEASURED_PULSE_METER)) or \
+                parameter_int(source.parameters, "headingCalibration.enabled") != 1:
+            raise ValueError("Schema 9の校正または距離換算が不正です")
+        x_field, y_field = "x_fused_mm", "y_fused_mm"
+    else:
+        if expected_pulse_meter != int(CURRENT_PULSE_METER) or \
+                parameter_int(source.parameters, "imuCalibrationValid") != 1 or \
+                parameter_int(source.parameters, "imuCalibrationSamples") != 100 or \
+                parameter_int(source.parameters, "imuCalibrationReadErrors") != 0 or \
+                parameter_int(source.parameters, "distanceScaleVerified") != 1:
+            raise ValueError("Schema 10のIMU校正または距離検証が不正です")
+        x_field, y_field = "x", "y"
+    required = {x_field, y_field, "encTotalOptimal"}
+    if not required <= set(source.fields):
+        raise ValueError("経路座標または累積パルス列がありません")
+    points: list[tuple[float, float, float]] = []
+    for row in source.rows:
+        try:
+            x = f32(float(row[x_field]))
+            y = f32(float(row[y_field]))
+            pulse = f32(float(row["encTotalOptimal"]))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("経路行が不正です") from exc
+        if not all(math.isfinite(value) for value in (x, y, pulse)):
+            raise ValueError("経路行が非有限です")
+        points.append((x, y, pulse))
+    if not points:
+        raise ValueError("経路点がありません")
+    expected_rows = parameter_int(source.parameters, "logExpectedRows")
+    if expected_rows is None or expected_rows != len(points):
+        raise ValueError("一次ログの行数が不正です")
+    line = [RoutePoint(0, 0)]
+    accumulated = 0.0
+    prev_x = prev_y = prev_pulse = 0.0
+    total_length = 0.0
+    for x, y, pulse in points:
+        if pulse < prev_pulse:
+            raise ValueError("累積距離が逆行しています")
+        total_length = f32(total_length + point_distance(prev_x, prev_y, x, y))
+        start_x, start_y = prev_x, prev_y
+        remaining = point_distance(start_x, start_y, x, y)
+        while remaining > 0.0 and f32(accumulated + remaining) >= PATH_ROUTE_SPACING_MM:
+            if len(line) >= PATH_ROUTE_MAX_POINTS - PATH_GOAL_RESERVED_POINTS:
+                raise ValueError("経路点数上限")
+            needed = f32(PATH_ROUTE_SPACING_MM - accumulated)
+            ratio = f32(needed / remaining)
+            start_x = f32(start_x + f32(f32(x - start_x) * ratio))
+            start_y = f32(start_y + f32(f32(y - start_y) * ratio))
+            line.append(RoutePoint(int16_round(start_x), int16_round(start_y)))
+            remaining = f32(remaining - needed)
+            accumulated = 0.0
+        accumulated = f32(accumulated + remaining)
+        prev_x, prev_y, prev_pulse = x, y, pulse
+    if total_length < PATH_ROUTE_SPACING_MM:
+        raise ValueError("元ログの経路長が短すぎます")
+    last_x, last_y = points[-1][:2]
+    if point_distance(line[-1].x, line[-1].y, last_x, last_y) >= 0.5:
+        if len(line) >= PATH_ROUTE_MAX_POINTS - PATH_GOAL_RESERVED_POINTS:
+            raise ValueError("経路点数上限")
+        line.append(RoutePoint(int16_round(last_x), int16_round(last_y)))
+    compute_headings(line)
+    drive, flags, applied, status, reduction, corridor_count = generate_shortcut(
+        line, requested_level, max_level)
+    extend_to_origin(line, drive, flags, route_version)
+    built = RouteBuild(line, drive, flags, requested_level, applied, status,
+                       corridor_count, reduction, 0)
     built.geometry_crc32 = geometry_crc32(built)
     return built
 
@@ -624,7 +825,7 @@ def recover_path_columns(
                         _missing_values(len(log.rows), "非PATH走行", 0), 0)
 
     version = parameter_int(log.parameters, "logSchemaVersion")
-    if version not in (2, 3, 4, 5, 6):
+    if version not in (2, 3, 4, 5, 6, 7, 8, 9, 10):
         return _missing_recovery(log, f"未対応または不明なlogSchemaVersion={version}")
     source_number = parameter_int(log.parameters, "analysisSourceLog", 0) or 0
     if source_number <= 0:
@@ -648,17 +849,24 @@ def recover_path_columns(
     if generation_max is None:
         return _missing_recovery(log, "経路生成時maxLevelがありません", source_number, source_path)
 
+    route_version = parameter_int(log.parameters, "routeControllerVersion")
+    if route_version not in PATH_ROUTE_CONTROLLER_VERSIONS:
+        return _missing_recovery(log, f"未対応のrouteControllerVersion={route_version}", source_number, source_path)
     try:
         source = read_csv_log(source_path)
-        route = build_route(source, requested, generation_max)
+        source_scale = None
+        if version in (9, 10):
+            source_scale = parameter_int(log.parameters, "encoderPulsePerMeter")
+            if source_scale is None:
+                raise ValueError("二次ログのencoderPulsePerMeterがありません")
+        route = build_route(source, requested, generation_max, route_version,
+                            source_scale)
     except (OSError, ValueError, struct.error) as exc:
         reason = f"経路再生成失敗: {exc}"
         return _missing_recovery(log, reason, source_number, source_path)
     mismatch = _route_header_mismatch(log, route)
     if mismatch is not None:
         return _missing_recovery(log, mismatch, source_number, source_path, route)
-    route_version = parameter_int(log.parameters, "routeControllerVersion")
-
     values: list[dict[str, Any]] = []
     for row in log.rows:
         raw_index = row.get("optimalIndex")

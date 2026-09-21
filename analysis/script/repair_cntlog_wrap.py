@@ -8,8 +8,12 @@ import csv
 import math
 from pathlib import Path
 
-from path_log_recovery import read_csv_log, recover_path_columns
-from robotrace_units import PULSE_MILLIMETER
+try:
+    from .path_log_recovery import read_csv_log, recover_path_columns
+    from .robotrace_units import PULSE_MILLIMETER
+except ImportError:  # ファイル単体実行との互換
+    from path_log_recovery import read_csv_log, recover_path_columns
+    from robotrace_units import PULSE_MILLIMETER
 
 
 CNTLOG_MODULUS = 1 << 16
