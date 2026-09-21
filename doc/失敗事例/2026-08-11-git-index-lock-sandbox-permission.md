@@ -43,9 +43,12 @@ fatal: Unable to create 'D:/robotrace/robotrace_v2/.git/index.lock': Permission 
 
 Git の index や履歴を書き換える操作は、権限昇格付きで再実行した。`git add` と `git commit` は承認済み prefix になった。
 
+2026-09-21の解析ファイルのコミットでも再発した。作業開始時に提示されていた権限設定では`.git`は読み取り専用だったが、通常権限で`git add --`を試し、同じ`index.lock`エラーになった。対象を限定した同じコマンドを`require_escalated`付きで再実行するとステージできた。従来の「必要に応じて昇格」だけでは再発を防げなかった。
+
 ## 今後の予防策
 
 - `git add`、`git commit`、`git restore`、`git switch` など `.git` を更新する操作は、必要に応じて最初から昇格付きで実行する。
+- Git更新前に権限設定の`.git`書き込み可否を確認し、読み取り専用なら最初の`git add`から`require_escalated`を指定する。対象パスを限定し、`git diff --cached --name-only`で確認してからコミットする。
 - 失敗した場合は別手段で回避せず、同じコマンドを昇格付きで再実行する。
 - 戻し操作では対象ファイルを明示し、ユーザーの未関連変更を巻き込まない。
 
