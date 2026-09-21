@@ -46,7 +46,7 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 ## Column Meanings
 
 - `cntlog`: time after run start, based on `cntRun`, `[ms]`.
-- `encCurrentN`: average left/right encoder pulse count per 1 ms.
+- `encCurrentN`: average left/right encoder pulse count per 1 ms. Builds after the powered distance validation carry the half-pulse remainder between 1 ms samples to prevent cumulative truncation bias.
 - `encCurrentL`, `encCurrentR`: signed left/right encoder pulse counts per 1 ms; schema version 3/4/5/6 normal-light logs store them immediately after `ROC`.
 - `encCurrentCorr_p`: signed Kalman-fused distance pulse difference per 1 ms; schema version 5/6 stores it as signed 16-bit.
 - `encLog`, `encRightMarker`: raw encoder counters used for log timing and goal-marker distance; they are intentionally independent of fusion validation.

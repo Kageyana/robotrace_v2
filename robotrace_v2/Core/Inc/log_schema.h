@@ -22,6 +22,8 @@
 
 // 軽量ログへ3軸線形加速度を追加した48バイト形式。
 #define LOG_SCHEMA_VERSION 6U
+// 動力走行1m×5走の左右平均距離が各走±1%以内（表示丸め込み）と確認済み。
+#define PRIMARY_DISTANCE_SCALE_VERIFIED 1U
 
 #define LOG_FIELD_LIST_CORE(STORED, DERIVED) \
 	STORED(U16, cntlog, "%d", (uint16_t)cntRun) \

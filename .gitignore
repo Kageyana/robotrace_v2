@@ -32,5 +32,6 @@ analysis/*
 !analysis/script/
 analysis/script/*
 !analysis/script/*.py
+!analysis/script/test_encoder_average.c
 # obsidian
 docs/.obsidian/**
