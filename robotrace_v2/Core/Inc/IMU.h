@@ -12,7 +12,7 @@
 //====================================//
 #define DEFF_TIME 0.001F				// 制御周期[s]（1ms）
 #define COEFF_COMPFILTER 0.96F			// ジャイロと加速度のコンプリメンタリフィルタ係数（ジャイロの方が信頼できる場合は大きくする）
-#define COEFF_DPD -0.996F				// ジャイロの符号と単位変換（DPS→RAD/s）を兼ねる係数（-1に近い値を調整して入れる）
+#define COEFF_DPD -1.0F				// ジャイロの符号と単位変換（DPS→RAD/s）を兼ねる係数（-1に近い値を調整して入れる）
 #define USE_IMU_ROT_CENTER_CORRECTION	// ジャイロzを角加速度に変換して遠心加速度補正に使う（旋回中心からIMUまでの距離がある場合はON推奨）
 #define IMU_OFFSET_X_M 0.0F 			// TODO: 旋回中心から IMU までのオフセット[m]。imuVal の座標系基準
 #define IMU_OFFSET_Y_M 0.0236F 			// TODO: 旋回中心から IMU までのオフセット[m]。imuVal の座標系基準
