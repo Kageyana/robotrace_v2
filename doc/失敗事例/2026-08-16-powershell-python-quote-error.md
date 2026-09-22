@@ -43,6 +43,11 @@ PowerShell側の引用符エスケープとPython f-string内の辞書参照が�
 
 複数行のPython集計は一行python -cにせず、既存解析スクリプトまたは一時スクリプトとして実行する。
 
+## 再発記録
+
+- 2026-09-22: 2行ヘッダーの実ログ読込確認で、PowerShellのダブルクォート内に辞書参照を含むPython f-stringを再び記述し、同じ`unterminated string literal`が発生した。PowerShellのシングルクォートヒアストリングへ複数行Pythonを格納して再実行し、ログ12590を2種類の読込処理で2923行・列数エラー0として確認した。
+- 今後はPythonが複数の引用符、Windowsパス、f-stringまたは辞書参照を含む時点で、一行`python -c`を使わずヒアストリングを使用する。
+
 ## 関連
 
 - 関連ノート:

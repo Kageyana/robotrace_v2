@@ -53,3 +53,7 @@ apply_patch verification failed: Failed to find expected lines
 
 - 関連ノート: なし
 - 参考リンク: `robotrace_v2/Core/Src/courseAnalysis.c`
+
+## 2026-09-22 再発
+
+ログ解析スクリプトへ複数機能を一括追加するとき、既に更新済みのヘッダー判定行を古い内容のままパッチ文脈へ含めて適用に失敗した。対象箇所を`rg`と行範囲表示で再確認し、関数単位の短いパッチへ分割して解消した。今後は同一ターン内でも、変更前に対象行の現状を再確認する。

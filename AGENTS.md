@@ -406,7 +406,7 @@ cmake --build --preset Release
 
 ### UI 操作とパラメータ保存タイミング
 
-- 走行開始時、カウントダウン完了かつ IMU/電流センサーキャリブレーション完了後に、PID、速度フィードフォワード、目標速度を SD カードへ保存する。
+- 走行開始時は3秒カウントダウンを行い、残り2秒でIMU・電流センサーキャリブレーションを開始する。カウントダウン完了かつ両キャリブレーション完了後に、PID、速度フィードフォワード、目標速度を SD カードへ保存する。
 - パラメータ保存は `autoStart <= 1` のときだけ行い、`autoStart >= 2` の連続走行中はスキップする。
 - オートスタートは最大 5 走を前提とする。詳細な保存ファイルの扱いは `.agents/skills/robotrace-sd-settings/SKILL.md` を使う。
 
@@ -468,9 +468,9 @@ cmake --build --preset Release
 
 - ログファイルは CSV 形式、ヘッダ有り、文字コード UTF-8、区切り文字はカンマ。
 - ログファイル名は通し番号を使う。
-- ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。`logSchemaVersion=2` は `linePointX_mm`, `linePointY_mm`, `pathLegalMargin_mm` を保存しない形式で、通常バイナリレコードは旧形式より12バイト短い。旧CSVは3列が存在する場合に保存値を優先して扱う。
+- ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。`logSchemaVersion=2`/`3`/`4` は `linePointX_mm`, `linePointY_mm`, `pathLegalMargin_mm` を保存しない形式である。Version 3はVersion 2を基礎に左右モーター電圧指令列を削除し、その位置へ`imuTemp_cdegC`（BMI088温度×100、`int16_t`、単位`0.01°C`、無効値`INT16_MIN`）を追加する。Version 4はVersion 3を基礎に`motorpwmL`/`motorpwmR`を削除し、同じ4バイト位置へ`imuYawAngle_deg`（`float`、単位`deg`、1 ms周期で積算済みのYaw角）を追加する。通常プロファイルは42バイト、詳細デバッグプロファイルは95バイトである。Version 4 CSVは1行目に走行中に保存しない`name=value`形式のパラメータ、2行目に走行中に保存する列名、3行目以降にデータを保存する。1行目または2行目の欠落、改行なし、形式不正、必須列不足は不正ログとして扱う。
 - ログヘッダにはログデータ名とパラメータが含まれる。パラメータは `パラメータ名=value` 形式で記載される。
-- ログヘッダには `imuTempCompEnabled`、`imuTempCoeff_dpsPerC`、`imuTempCalibration_C`、`imuTempEnd_C` を含める。温度補正はジャイロZだけに適用し、温度または基準温度が無効な走行では従来処理へ戻る。
+- ログヘッダには `imuTempCalibrationValid`、`imuTempCalibrationStart_C`、`imuTempCalibration_C`、`imuTempCalibrationEnd_C`、`imuTempCalibrationSamples`、`imuTempCalibrationReadErrors`、`imuGyroOffsetZ_dps`、`imuTempCompEnabled`、`imuTempCoeff_dpsPerC`、`imuTempEnd_C` を含める。カウントダウンは3秒から開始し、残り2秒でIMU校正を開始して、1 ms周期の2000サンプル、100 ms間隔の温度20回を取得する。温度基準値は有効温度の平均、Valid判定は16回以上、読取エラーは`tempValid == false`の回数とする。温度補正はジャイロZだけに適用し、補正有効条件は`imuTempCalibrationValid && imuTempCoeff_dpsPerC != 0.0F`とする。温度または基準温度が無効な走行では従来処理へ戻る。
 - `courseAnalysis.c` の2次ログ再解析は、`courseMarker`, `encTotalOptimal`, `ROC`, `targetSpeed`, `optimalIndex`, `slipFlag`, `slipFlagLat` をCSVヘッダ名から解決する。ログ列追加時に固定列番号へ依存しない。
 - 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_MARKER`, `BOOST_DISTANCE`, `BOOST_SHORTCUT`, `BOOST_PATH_REPLAY` を正とする。
 - 新しい走行モードを追加する場合は、`robotrace_v2/Core/Inc/courseAnalysis.h` に定義を追加する。
@@ -482,16 +482,16 @@ cmake --build --preset Release
 - 新しい緊急停止条件を追加する場合は、`robotrace_v2/Core/Inc/emergencyStop.h` に定義を追加する。
 - ログ解析では、ラップタイム、速度追従、角速度、スリップを重視する。
 - バッテリー状態はログ内パラメータ `batteryVoltage_V` を参照する。単位は `[V]`。
-- `batteryVoltage_mV` は走行中にLPF更新したバッテリー電圧 `[mV]`、`motorVoltageCmdL_mV`, `motorVoltageCmdR_mV` はバッテリー電圧で割る前の左右モーター指令電圧 `[mV]` とする。
-- `motorpwmL`, `motorpwmR` は電圧補償後に実際にタイマへ出力した飽和後DUTYとする。
+- `batteryVoltage_mV` は走行中にLPF更新したバッテリー電圧 `[mV]` とする。Version 3/4の`imuTemp_cdegC`は走行中に5 ms周期で更新したBMI088温度の常設ログ値とする。Version 4の`imuYawAngle_deg`は、走行開始時の`clearIMUval()`後に1 ms周期で積算されたオフセット・温度補正後の`imuVal.angle.z`を保存する。
+- `gyroVal_Z` は角速度 `[deg/s]` としてROC計算に使用する。Version 4のXY座標は`imuYawAngle_deg`を直接使用し、Version 2/3は`gyroVal_Z`をログ周期で再積算する。解析表・軌跡比較にはYaw取得方法を`stored_1ms_angle`または`integrated_log_gyro`として併記し、異なる方式を無条件に同一比較しない。
 - `LOG_SCHEMA_PROFILE_LIGHT=0` のデバッグログでは `markerSensor`（LED差分から得たマーカー状態）、`sgMarkerCount`（スタート・ゴールマーカー累積数）、`encRightMarker_p`（右マーカーからの補正後エンコーダパルス）、`patternTrace`（走行状態）を追加出力する。ログヘッダには終了時の `sgMarkerAtLogEnd` と `encRightMarkerAtLogEnd_p` も出力する。
 - 経路追従ログの `lineValid` は限定補正可能状態、`pathErrorY_mm` は経路横偏差 [mm]、`pathErrorHeading_cdeg` は経路制御バージョン4以降では最近傍経路点との方位偏差 [0.01 deg]、`pathState` は追従状態とする。バージョン3以前の`pathErrorHeading_cdeg`は先読み方位との偏差であり、バージョン4以降とp95を直接比較しない。`linePointX_mm`, `linePointY_mm`, `pathLegalMargin_mm`は新形式ではPC上で元一次ログ・設定・`optimalIndex`から復元する。
 - ログヘッダの`tgtParam.pathReplay`はLevel 0 PATH REPLAY速度上限[m/s]とする。
-- 通常ログは `LOG_SCHEMA_PROFILE_LIGHT=1` を既定とし、ラップタイム、速度追従、角速度、マーカー、スリップフラグ、電圧指令、実DUTY、XY確認に必要な列だけを残す。
+- 通常ログは `LOG_SCHEMA_PROFILE_LIGHT=1` を既定とし、ラップタイム、速度追従、角速度、積算Yaw角、マーカー、スリップフラグ、走行中温度、XY確認に必要な列だけを残す。モーターPWM変数、モーター電圧指令の内部変数、電圧補償制御は維持し、通常ログからは出力しない。
 - 加速度、電流、スリップ内部量などの詳細デバッグ列が必要な場合は、ビルド定義で `LOG_SCHEMA_PROFILE_LIGHT=0` にして一時的に出力する。
 - ログ同士を比較する場合は、`batteryVoltage_V` の差を考慮する。電圧差によるモーター出力、速度追従、加速性能、スリップ傾向の変化を無視しない。
 - ログ形式を安易に変更しない。形式変更が必要な場合は、スキーマまたはドキュメントも合わせて更新する。
-- 新形式PATHログは二次ログと同じフォルダの元一次ログを探索し、必要なら`--source-log-dir`を指定する。Version 12の経路点数・CRC・生成結果ヘッダが一致するまで3項目を復元せず、元ログ欠落、未対応版、CRC不一致、index範囲外は欠測として扱う。元CSVは上書きせず、cntlog補修済みXYを元ログの代わりに自動使用しない。
+- Version 2/3/4の新形式PATHログは二次ログと同じフォルダの元一次ログを探索し、必要なら`--source-log-dir`を指定する。Version 12の経路点数・CRC・生成結果ヘッダが一致するまで3項目を復元せず、元ログ欠落、未対応版、CRC不一致、index範囲外は欠測として扱う。元CSVは上書きせず、cntlog補修済みXYを元ログの代わりに自動使用しない。
 - 解析結果には3項目を「保存値／復元値／欠測」、理由、参照元ログ番号とともに出力する。非PATH走行では経路追従評価の対象外とし、元経路が欠けても実走行推定XYを描画する。
 - 一次ログと二次ログは自動削除方針を変えず、PCへ一緒に保存してから新形式の復元解析を行う。今回のログ形式確認とLevel 1最低10本の採用検証は別管理とする。
 - 詳細な解析手順は `.agents/skills/robotrace-log-analysis/SKILL.md` を使う。
@@ -547,6 +547,7 @@ cmake --build --preset Release
 - 2026-09-06: 経路制御バージョン3で、実走行経路の累積弧長と推定機体方位による対応点候補制限を追加した。ヘアピン出口や近接並走区間へのindexジャンプを防ぎ、候補がない場合はindexを保持して既存の100 msロスト判定へ渡す。
 - 2026-09-06: 経路制御バージョン4で、方位FBと再合流判定を先読み方位差から最近傍経路点の接線方位差へ変更した。先読み方位は曲率FF専用とし、小R手前の早期旋回を抑える。
 - 2026-09-13: `imu_temp.txt`からBMI088ジャイロZ温度係数を読み込み、走行前校正温度を基準として走行中の温度ドリフト補正を行う機能を追加した。校正時温度、終了時温度、係数、補正有効状態を通常ログヘッダへ保存する。
+- 2026-09-21: カウントダウン残り2秒から2秒間のIMU・温度校正を実装し、温度統計をヘッダへ追加した。ログをVersion 3（温度列、通常42バイト・詳細デバッグ95バイト、モーター電圧指令列なし）へ更新し、PATH復元はVersion 2/3を受け付けるようにした。
 - 2026-09-06: 経路制御バージョン5で、`BOOST_PATH_REPLAY` / `BOOST_SHORTCUT`の停止判定を右マーカー回数から分離した。Level 0、Level 1それぞれの実走行経路終端をスタート位置への帰着点とみなし、その500 mm手前へ到達したときに停止を開始する。
 - 2026-09-06: 経路制御バージョン6で、PATH系の帰着点を経路終端ではなく、経路進捗80%以降で座標原点 `(0, 0)` に最も近い経路上の点へ変更した。その帰着点から累積弧長で500 mm手前を停止開始位置とする。
 - 2026-09-06: 経路制御バージョン7で、PATH系の実走行経路を一次走行終端から座標原点 `(0, 0)` へ向かう直線方向に500 mm延長し、その延長終端を停止開始位置とした。原点近傍を通る途中区間は停止判定に使わない。

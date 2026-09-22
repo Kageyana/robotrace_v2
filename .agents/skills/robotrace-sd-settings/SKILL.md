@@ -123,12 +123,16 @@ File: `boost_%05d.csv`
 - Row format: `index,boost_speed`, with `boost_speed` as `%.3f`.
 - Slip-analysis SD read errors can append diagnostic rows to the same file.
 
-### Log provenance and schema version 2
+### Log provenance and schema versions 2, 3, and 4
 
 - Firmware logs set `logSchemaVersion=2` and omit `linePointX_mm`, `linePointY_mm`, and `pathLegalMargin_mm` from both CSV and binary records. The internal path values remain available to the controller.
+- Firmware logs set `logSchemaVersion=3` for the temperature-compensation measurement format. Version 3 keeps the Version 2 path-column omission, replaces the two motor voltage command fields with `imuTemp_cdegC`, and uses a 42-byte binary record in the normal profile or a 95-byte binary record in the detailed debug profile.
+- Firmware logs set `logSchemaVersion=4` for the 1 ms cumulative IMU yaw-angle measurement format. Version 4 keeps the Version 3 temperature column and replaces `motorpwmL`/`motorpwmR` with `imuYawAngle_deg` at the same 4-byte record position; the normal and detailed record sizes remain 42 and 95 bytes.
+- Version 4 CSV files require non-running parameters on line 1, running-record column names on line 2, and data from line 3. Both header lines must exist and terminate with a newline; missing or malformed headers are invalid.
+- The Version 3 header records the 2-second IMU temperature calibration statistics: `imuTempCalibrationValid`, `imuTempCalibrationStart_C`, `imuTempCalibration_C`, `imuTempCalibrationEnd_C`, `imuTempCalibrationSamples`, `imuTempCalibrationReadErrors`, and `imuGyroOffsetZ_dps`, together with the compensation coefficient and enable state.
 - Every run records `analysisSourceLog` and `slipSourceLog`. Primary runs, unknown sources, failed analysis, and unused slip analysis use `0`; a successful PATH analysis also keeps `routeSourceLog` for compatibility and the two values must match.
 - PATH headers record `routePointCount`, `routeGeometryCrc32`, `shortcutRequestedLevel`, applied `shortcutLevel`, `shortcutBuildStatus`, `shortcutCorridorCount`, `shortcutReduction_mm`, and both the run-start `shortcutSettings.*` and generation-time `routeShortcutSettings.*` values. The six setting fields are `maxLevel`, `lookaheadBaseMm`, `lookaheadPerMpsMm`, `kLateral_x100`, `kHeading_x100`, and `lineAlpha_x1000`.
-- PC analysis searches the secondary log directory for `analysisSourceLog` and regenerates the Version 12 route in memory. It must verify point count, CRC, generator result headers, and `optimalIndex` before restoring the three fields. It never overwrites the original CSV or silently replaces the source with a cntlog-repaired copy.
+- PC analysis searches the secondary log directory for `analysisSourceLog` and regenerates the Version 12 route in memory. It must verify point count, CRC, generator result headers, and `optimalIndex` before restoring the three fields. It never overwrites the original CSV or silently replaces the source with a cntlog-repaired copy. For XY and yaw analysis, Version 4 uses `imuYawAngle_deg` directly; Version 2/3 uses integrated `gyroVal_Z`, and the method must be recorded and not mixed unconditionally.
 - Missing source logs, unsupported schema/controller versions, CRC mismatches, and invalid indices are reported as missing with a reason and source number. Non-PATH runs are outside route-following evaluation. Store primary and secondary logs together for PC recovery; do not change the existing SD log deletion policy.
 
 ## Corruption Handling
