@@ -86,7 +86,8 @@
 #define SLIP_DIST_LPF_COEF_UP		0.06f	// 回復追従
 
 // ゴール
-#define COUNT_GOAL 2 // ゴールマーカーを読む回数
+#define GOAL_LAP_COUNT 6U
+#define COUNT_GOAL (GOAL_LAP_COUNT + 1U) // SGmarkerはスタートマーカーを1として数える
 
 // スタートモード
 #define START_SERACH 3
