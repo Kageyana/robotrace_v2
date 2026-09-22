@@ -42,6 +42,18 @@ File: `speed_ff.txt`
 - No newline.
 - Value is `speedFeedForwardGain`, with Crr multiplied by 1000.
 
+### BMI088 Gyro-Z Temperature Compensation
+
+File: `imu_temp.txt`
+
+- Implementation: `SDcard.c`, `readImuTempCompensation()`; runtime state API: `IMU.c`.
+- Format: one signed integer `zSlope_x1000000`, ASCII, with no newline.
+- Valid range: `-100000..100000`; the runtime coefficient is the stored value divided by `1000000` and has units `[dps/°C]`.
+- Missing, unreadable, malformed, or out-of-range files are repaired with the default `0` and temperature correction remains disabled.
+- At the countdown's remaining 2 seconds, the existing IMU calibration remains 100 samples at 20 ms intervals. BMI088 temperature is sampled every five accepted IMU calibration samples, for 20 attempts at 100 ms intervals.
+- Temperature calibration is valid at 16 or more valid samples. The first valid temperature, valid-temperature mean, last valid temperature, valid count, and invalid-read count are retained. A zero coefficient does not discard these statistics.
+- The run-time correction is enabled only when temperature calibration is valid and the coefficient is non-zero. A run-time invalid temperature disables correction while preserving the existing IMU read-failure stop behavior.
+
 ### Speed and Acceleration Parameters
 
 File: `targetSpeeds.txt`
@@ -122,6 +134,8 @@ File: `boost_%05d.csv`
 - Slip-analysis SD read errors can append diagnostic rows to the same file.
 
 ### Log provenance and schema versions 5 and 6
+
+- The current distance-Kalman firmware keeps `logSchemaVersion=10` and the light/detailed record sizes at 36/121 bytes. Temperature compensation is metadata-only: the header records `imuTempCalibrationValid`, `imuTempCalibrationStart_C`, `imuTempCalibration_C`, `imuTempCalibrationEnd_C`, `imuTempCalibrationSamples`, `imuTempCalibrationReadErrors`, `imuGyroOffsetZ_dps`, `imuTempCompEnabled`, `imuTempCoeff_dpsPerC`, and `imuTempEnd_C`. Temperature and offset values use three decimal places; the coefficient uses six. The motion columns `imuTempRaw` and corrected `gyroVal_Z` remain unchanged.
 
 - Firmware logs set `logSchemaVersion=6`. The normal light profile is 48 bytes and adds float32 `imuLinearAccelX_mps2`, `imuLinearAccelY_mps2`, and `imuLinearAccelZ_mps2` in `[m/s²]` immediately after `gyroVal_Z`; `encCurrentCorr_p` remains a signed 16-bit validated Kalman-fused 1 ms pulse difference. The header's `distanceKalman.innovationRejectCount` counts complete encoder-observation skips caused by an innovation over 4σ or an encoder speed over ±10 m/s, while `invalidUpdateCount` counts finite-state, covariance, or fused-delta validation failures that use raw encoder fallback. `maxAbsFusedDelta_p`, `outputGuardCount`, `logRecordSizeBytes`, `dbgOverflowFinal`, and `logOverflowFinal` record final safety diagnostics. The detailed profile appends `lineMatchResidual_mm`, `poseCorrection_um`, and `poseCorrectionHeading_cdeg`; older schema 2～5 logs remain readable.
 - Every run records `analysisSourceLog` and `slipSourceLog`. Primary runs, unknown sources, failed analysis, and unused slip analysis use `0`; a successful PATH analysis also keeps `routeSourceLog` for compatibility and the two values must match.

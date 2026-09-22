@@ -344,6 +344,7 @@ cmake --build --preset Release
 - 速度・加速度: `robotrace_v2/Core/Inc/control.h`, `robotrace_v2/Core/Src/control.c`, `robotrace_v2/Core/Src/setup.c` の `speedParamTable`, `./setting/targetSpeeds.txt`
 - PID ゲイン、速度フィードフォワード: `robotrace_v2/Core/Inc/PIDcontrol.h`, `robotrace_v2/Core/Src/PIDcontrol.c`, `robotrace_v2/Core/Src/setup.c`, `./setting/line.txt`, `lineomega.txt`, `speed.txt`, `yawRate.txt`, `yaw.txt`, `dist.txt`, `speed_ff.txt`
 - ラインセンサー校正・閾値: `robotrace_v2/Core/Inc/lineSensor.h`, `robotrace_v2/Core/Src/lineSensor.c`, `./setting/lsval.txt`
+- BMI088ジャイロZ温度補正: `robotrace_v2/Core/Inc/IMU.h`, `robotrace_v2/Core/Src/IMU.c`, `./setting/imu_temp.txt`。設定値は温度係数[dps/°C]を1,000,000倍した符号付き整数1項目、許容範囲は`-100000..100000`、既定値と欠落・破損・範囲外の修復値は`0`とする。改行は付けない。
 - スリップ判定、クロスライン検出、走行中ゲイン変更: `robotrace_v2/Core/Inc/control.h`, `robotrace_v2/Core/Src/control.c`
 - 緊急停止条件: `robotrace_v2/Core/Inc/emergencyStop.h`, `robotrace_v2/Core/Src/emergencyStop.c`
 - 走行モード、コース解析、速度計画: `robotrace_v2/Core/Inc/courseAnalysis.h`, `robotrace_v2/Core/Src/courseAnalysis.c`
@@ -413,7 +414,7 @@ cmake --build --preset Release
 
 ### UI 操作とパラメータ保存タイミング
 
-- 走行開始時、カウントダウン完了かつ IMU/電流センサーキャリブレーション完了後に、PID、速度フィードフォワード、目標速度を SD カードへ保存する。
+- 走行開始時は3秒カウントダウンの残り2秒でIMUと電流センサーの校正を同時に開始し、IMUは20 ms間隔100回、BMI088温度は5回ごとに取得して合計20回とする。カウントダウン完了かつ両校正完了後に、PID、速度フィードフォワード、目標速度を SD カードへ保存する。
 - パラメータ保存は `autoStart <= 1` のときだけ行い、`autoStart >= 2` の連続走行中はスキップする。
 - オートスタートは最大 5 走を前提とする。詳細な保存ファイルの扱いは `.agents/skills/robotrace-sd-settings/SKILL.md` を使う。
 
@@ -479,6 +480,7 @@ cmake --build --preset Release
 - ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。`logSchemaVersion=6` の通常軽量ログは1レコード48バイト固定とし、`gyroVal_Z`直後に静止時重力基準と旋回中心補正後の`imuLinearAccelX_mps2`、`imuLinearAccelY_mps2`、`imuLinearAccelZ_mps2`を[m/s²]のfloat32で保存する。BMI088温度の生11ビットコードは`imuTempRaw`として保存し、`ROC`の直後に符号付き16ビットの`encCurrentL`, `encCurrentR`を保存する。`encCurrentCorr_p`はカルマン融合後の符号付き1ms差分パルスを保存する。`imuTempRaw=0x400`は無効値とする。詳細ログには`lineMatchResidual_mm`、`poseCorrection_um`、`poseCorrectionHeading_cdeg`を末尾へ追加する。Version 2で省略した`linePointX_mm`, `linePointY_mm`, `pathLegalMargin_mm`に加えて、通常ログでは`motorpwmL`, `motorpwmR`, `slipFlag`, `slipFlagLat`, `lineTraceCtrl`, `motorVoltageCmdL_mV`, `motorVoltageCmdR_mV`と新規補正診断列を保存しない。旧CSVはヘッダ名で列を解決し、復元対象3列が存在する場合に保存値を優先して扱う。スキーマ2～5は引き続き読み取り可能とする。距離推定器のノイズ定数、4σ超過またはエンコーダ物理上限超過で観測更新を完全スキップした回数、フォールバック回数、`invalidUpdateCount`、`maxAbsFusedDelta_p`、`outputGuardCount`はレコード外のログヘッダへ保存する。終了ヘッダには`logRecordSizeBytes`、`dbgOverflowFinal`、`logOverflowFinal`も保存する。
 - ログヘッダの1行目にはパラメータを `パラメータ名=value` 形式で記載し、2行目にはログデータ名だけを記載する。
 - ログヘッダの`gyroScaleCoeff`は、`IMU.h`で定義された`COEFF_DPD`（ジャイロ変換係数）を小数6桁で記録する。
+- Schema 10のログヘッダには、`imuTempCalibrationValid`、`imuTempCalibrationStart_C`、`imuTempCalibration_C`、`imuTempCalibrationEnd_C`、`imuTempCalibrationSamples`、`imuTempCalibrationReadErrors`、`imuGyroOffsetZ_dps`、`imuTempCompEnabled`、`imuTempCoeff_dpsPerC`、`imuTempEnd_C`を記録する。温度・オフセットは小数3桁、温度係数は小数6桁とし、温度補正は有効温度16回以上かつ係数非ゼロの場合だけ有効とする。係数が0でも温度統計は保持する。
 - スキーマ7は軽量48バイト、スキーマ8は軽量36バイトで、左右個別`encCurrentL/R`は記録時点の1msパルスだった。スキーマ9以降も軽量36バイトを維持し、この2欄はジャイロ平均と同一区間の符号付き積算パルス`encIntervalL_p/R_p`とする。スキーマ9では`x/y`がジャイロ単独の診断座標、`x_fused_mm/y_fused_mm`が左右差から推定したバイアスを差し引いた経路座標だった。スキーマ10では`x/y`を経路座標とし、`x_fused_mm/y_fused_mm`は診断専用にする。マーカーは完走とゴールX差の検証のみで、XY補正や経路点の固定に使わない。スキーマ10の`closureReason`は0=有効、1=非一次、2=マーカー不正、3=ログ異常、5=ゴールがログ区間外、6=エンコーダ区間異常、8=ゴールX差20mm超過、9=IMU校正無効、10=距離換算未検証とする。新しい経路元は正常終了かつ`closureValid=1`のスキーマ10一次ログのみとする。
 - 経路制御バージョン14～16は履歴解析用とする。バージョン17ではスキーマ10のジャイロ単独XYを経路元とし、マーカー点を挿入せず、実際の終端点と終端から原点方向への中間停止点を含める。`routeGeometryCrc32`の復元はバージョン別に再生成する。
 - `gyroSampleFault=1`は1ms角速度サンプルの欠落・非有限値を示し、一次経路生成を禁止する。
