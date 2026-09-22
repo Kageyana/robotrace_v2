@@ -572,7 +572,7 @@ void loopSystem(void)
 			if(ret > 0)
 			{
 				// コース解析成功
-				countdown = 2000;							  // カウントダウンスタート
+				countdown = 3000;							  // 3秒カウントダウンスタート
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56, 28);
 				ssd1306_printf(Font_16x26, "%d", autoStart);	// 追加: 走行回数を表示
@@ -615,10 +615,10 @@ void loopSystem(void)
 				}
 
 				motorCommandOut(0, 0);
-				countdown = 2000;							  // カウントダウンスタート
+				countdown = 3000;							  // 3秒カウントダウンスタート
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56, 28);
-				ssd1306_printf(Font_16x26, "5");
+				ssd1306_printf(Font_16x26, "3");
 
 				patternTrace = 1;
 			}
@@ -627,6 +627,13 @@ void loopSystem(void)
 
 	case 1:
 		// カウントダウンスタート
+		if (countdown > 0 && countdown <= 2000 &&
+			!calibratIMU && !calibrateMotorCurrent)
+		{
+			startCalibrationIMU();
+			calibrateMotorCurrent = true; // 電流センサキャリブレーションを開始
+		}
+
 		if (modeDSP)
 		{
 			if (countdown == 4000)
@@ -649,12 +656,10 @@ void loopSystem(void)
 			{
 				ssd1306_SetCursor(56, 28);
 				ssd1306_printf(Font_16x26, "1");
-				calibratIMU = true;		// IMUキャリブレーションを開始
-				calibrateMotorCurrent = true; // 電流センサキャリブレーションを開始
 			}
 		}
 
-		// IMUのキャリブレーションが終了したら走行開始
+		// 両方のキャリブレーションが終了したら走行開始
 		if (!calibratIMU && !calibrateMotorCurrent && countdown == 0)
 		{
 			updateBatteryVoltage(); // 走行開始直前の電圧を反映

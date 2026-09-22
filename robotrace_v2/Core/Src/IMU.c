@@ -14,11 +14,21 @@ bool calibratIMU = false;		// IMUキャリブレーション中フラグ
 volatile IMUval imuVal = {0};	// IMUの実行時変数（加速度、角速度、角度などを保持）
 float angleOffset[3] = {0.0F, 0.0F, 0.0F};	// ジャイロオフセット[deg/s]（calibrationIMU()で算出される）
 float imuTempCoeff_dpsPerC = 0.0F;	// ジャイロZ温度係数[deg/s/°C]
+bool imuTempCalibrationValid = false;	// 走行前温度校正の有効状態
+float imuTempCalibrationStart_C = BMI088_TEMP_INVALID_C;	// 最初の有効温度[°C]
 float imuTempCalibration_C = BMI088_TEMP_INVALID_C;	// 走行前校正温度[°C]
+float imuTempCalibrationEnd_C = BMI088_TEMP_INVALID_C;	// 最後の有効温度[°C]
+uint16_t imuTempCalibrationSamples = 0U;	// 有効温度サンプル数
+uint16_t imuTempCalibrationReadErrors = 0U;	// 無効温度サンプル数
 float imuTempEnd_C = BMI088_TEMP_INVALID_C;	// ログ終了時温度[°C]
 bool imuTempCorrectionEnabled = false;	// 走行中の温度補正有効状態
+static uint16_t imuCalibrationSampleCount = 0U;
+static float imuAngleInt[3] = {0.0F, 0.0F, 0.0F};
+static float imuTempCalibrationSum_C = 0.0F;
+static bool imuTempCalibrationHasValue = false;
 #ifdef USE_ACCELE
 float acceleOffset[3] = {0.0F, 0.0F, 0.0F};	// 加速度オフセット[g]（calibrationIMU()で算出される）
+static float imuAcceleInt[3] = {0.0F, 0.0F, 0.0F};
 #ifdef USE_IMU_ROT_CENTER_CORRECTION
 static float prevGyroZRad = 0.0F;		// 角加速度算出用の前回ジャイロz値[rad/s]
 static float alphaZFiltered = 0.0F;		// 角加速度のLPF後値[rad/s^2]
@@ -213,55 +223,94 @@ void clearIMUval(void)
 #endif
 }
 /////////////////////////////////////////////////////////////////////
+// モジュール名 startCalibrationIMU
+// 処理概要     IMUの2秒間校正と温度統計を開始する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void startCalibrationIMU(void)
+{
+	if (calibratIMU)
+	{
+		return;
+	}
+
+	imuCalibrationSampleCount = 0U;
+	imuAngleInt[0] = 0.0F;
+	imuAngleInt[1] = 0.0F;
+	imuAngleInt[2] = 0.0F;
+#ifdef USE_ACCELE
+	imuAcceleInt[0] = 0.0F;
+	imuAcceleInt[1] = 0.0F;
+	imuAcceleInt[2] = 0.0F;
+#endif
+	imuTempCalibrationSum_C = 0.0F;
+	imuTempCalibrationHasValue = false;
+	imuTempCalibrationValid = false;
+	imuTempCalibrationStart_C = BMI088_TEMP_INVALID_C;
+	imuTempCalibration_C = BMI088_TEMP_INVALID_C;
+	imuTempCalibrationEnd_C = BMI088_TEMP_INVALID_C;
+	imuTempCalibrationSamples = 0U;
+	imuTempCalibrationReadErrors = 0U;
+	imuTempCorrectionEnabled = false;
+	imuTempEnd_C = BMI088_TEMP_INVALID_C;
+	calibratIMU = true;
+}
+/////////////////////////////////////////////////////////////////////
 // モジュール名 calibrationIMU
-// 処理概要     ジャイロと加速度のオフセットを校正する
+// 処理概要     ジャイロと加速度のオフセットを2秒間校正し、温度統計を取得する
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void calibrationIMU(void)
 {
-	static uint16_t i = 0;
-	static float angleInt[3];
-#ifdef USE_ACCELE
-	static float acceleInt[3];
-#endif
-
 	if(!BMI088val.Initialized)
 	{
 		return;
 	}
 
-	if (i < (uint32_t)(1.0 / DEFF_TIME))
-	{
-		// ジャイロの物理量を積算
-		BMI088getGyro();
-		angleInt[0] += BMI088val.gyro.x;
-		angleInt[1] += BMI088val.gyro.y;
-		angleInt[2] += BMI088val.gyro.z;
+	BMI088getGyro();
+	imuAngleInt[0] += BMI088val.gyro.x;
+	imuAngleInt[1] += BMI088val.gyro.y;
+	imuAngleInt[2] += BMI088val.gyro.z;
 #ifdef USE_ACCELE
-		// 加速度の物理量を積算
-		BMI088getAccele();
-		acceleInt[0] += BMI088val.accele.x;
-		acceleInt[1] += BMI088val.accele.y;
-		acceleInt[2] += BMI088val.accele.z;
+	BMI088getAccele();
+	imuAcceleInt[0] += BMI088val.accele.x;
+	imuAcceleInt[1] += BMI088val.accele.y;
+	imuAcceleInt[2] += BMI088val.accele.z;
 #endif
-		i++;
-	}
-	else
+	imuCalibrationSampleCount++;
+
+	if ((imuCalibrationSampleCount % IMU_TEMP_CALIBRATION_INTERVAL_SAMPLES) == 0U)
 	{
-		// 校正完了時点の温度を基準温度として固定する。
 		BMI088getTemp();
-		angleOffset[0] = angleInt[0] / i;
-		angleOffset[1] = angleInt[1] / i;
-		angleOffset[2] = angleInt[2] / i;
-		angleInt[0] = 0;
-		angleInt[1] = 0;
-		angleInt[2] = 0;
+		if (BMI088val.tempValid)
+		{
+			if (!imuTempCalibrationHasValue)
+			{
+				imuTempCalibrationStart_C = BMI088val.temp;
+				imuTempCalibrationHasValue = true;
+			}
+			imuTempCalibrationEnd_C = BMI088val.temp;
+			imuTempCalibrationSum_C += BMI088val.temp;
+			imuTempCalibrationSamples++;
+		}
+		else
+		{
+			imuTempCalibrationReadErrors++;
+		}
+	}
+
+	if (imuCalibrationSampleCount >= IMU_CALIBRATION_SAMPLE_COUNT)
+	{
+		angleOffset[0] = imuAngleInt[0] / (float)imuCalibrationSampleCount;
+		angleOffset[1] = imuAngleInt[1] / (float)imuCalibrationSampleCount;
+		angleOffset[2] = imuAngleInt[2] / (float)imuCalibrationSampleCount;
 #ifdef USE_ACCELE
 		// 平均加速度から重力成分を差し引いてオフセットを算出
-		float acceleAvgX = acceleInt[0] / i;
-		float acceleAvgY = acceleInt[1] / i;
-		float acceleAvgZ = acceleInt[2] / i;
+		float acceleAvgX = imuAcceleInt[0] / (float)imuCalibrationSampleCount;
+		float acceleAvgY = imuAcceleInt[1] / (float)imuCalibrationSampleCount;
+		float acceleAvgZ = imuAcceleInt[2] / (float)imuCalibrationSampleCount;
 		float gravityScale = sqrtf((acceleAvgX * acceleAvgX) + (acceleAvgY * acceleAvgY) + (acceleAvgZ * acceleAvgZ));
 		float gravityCompX = 0.0f;
 		float gravityCompY = 0.0f;
@@ -278,13 +327,18 @@ void calibrationIMU(void)
 		acceleOffset[0] = acceleAvgX - gravityCompX;
 		acceleOffset[1] = acceleAvgY - gravityCompY;
 		acceleOffset[2] = acceleAvgZ - gravityCompZ;
-		acceleInt[0] = 0;
-		acceleInt[1] = 0;
-		acceleInt[2] = 0;
 #endif
-		i = 0;
-		calibratIMU = false;
 		captureImuTempCalibration();
+		imuCalibrationSampleCount = 0U;
+		imuAngleInt[0] = 0.0F;
+		imuAngleInt[1] = 0.0F;
+		imuAngleInt[2] = 0.0F;
+#ifdef USE_ACCELE
+		imuAcceleInt[0] = 0.0F;
+		imuAcceleInt[1] = 0.0F;
+		imuAcceleInt[2] = 0.0F;
+#endif
+		calibratIMU = false;
 	}
 }
 /////////////////////////////////////////////////////////////////////
@@ -347,18 +401,26 @@ void readImuTempCompensation(void)
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 captureImuTempCalibration
-// 処理概要     走行前IMU校正完了時の温度を補正基準として保存する
+// 処理概要     2秒間の有効温度平均と統計から補正基準を確定する
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void captureImuTempCalibration(void)
 {
-	imuTempCalibration_C = BMI088val.temp;
-	imuTempCorrectionEnabled = BMI088val.tempValid && imuTempCoeff_dpsPerC != 0.0F;
-	if (!imuTempCorrectionEnabled)
+	if (imuTempCalibrationSamples > 0U)
 	{
-		imuTempCalibration_C = BMI088_TEMP_INVALID_C;
+		imuTempCalibration_C = imuTempCalibrationSum_C / (float)imuTempCalibrationSamples;
 	}
+	else
+	{
+		imuTempCalibrationStart_C = BMI088_TEMP_INVALID_C;
+		imuTempCalibration_C = BMI088_TEMP_INVALID_C;
+		imuTempCalibrationEnd_C = BMI088_TEMP_INVALID_C;
+	}
+	imuTempCalibrationValid =
+		imuTempCalibrationSamples >= IMU_TEMP_CALIBRATION_MIN_VALID_SAMPLES;
+	imuTempCorrectionEnabled =
+		imuTempCalibrationValid && imuTempCoeff_dpsPerC != 0.0F;
 	imuTempEnd_C = BMI088_TEMP_INVALID_C;
 }
 /////////////////////////////////////////////////////////////////////

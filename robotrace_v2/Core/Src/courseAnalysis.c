@@ -37,7 +37,6 @@ static int16_t runAnalysisSourceLog = 0;
 static int16_t runSlipSourceLog = 0;
 int32_t encTotalOptimal = 0; // 2谺｡襍ｰ陦檎畑縺ｮ霍晞屬螟画焚(霍晞屬陬懈ｭ｣繧偵☆繧・
 int32_t encPID = 0;			 // 霍晞屬蛻ｶ蠕｡逕ｨ縺ｮ霍晞屬螟画焚
-float xydegz = 0;
 int32_t straightMeter;
 bool straightState;
 bool straightMarkerPending;
@@ -125,6 +124,7 @@ typedef struct
 } SecondLogColumnMap;
 
 static bool csvFieldEquals(const char *start, const char *end, const char *name);
+static bool validateLogParameterLine(const char *line);
 
 typedef struct
 {
@@ -255,6 +255,45 @@ static bool csvFieldEquals(const char *start, const char *end, const char *name)
 
 	size_t nameLength = strlen(name);
 	return (size_t)(end - start) == nameLength && strncmp(start, name, nameLength) == 0;
+}
+
+/////////////////////////////////////////////////////////////////////
+// ローカル関数 validateLogParameterLine
+// 処理概要     CSV 1行目がname=value形式のパラメータ行か検証する
+// 引数         line:パラメータ行
+// 戻り値       true:正常 false:不正
+/////////////////////////////////////////////////////////////////////
+static bool validateLogParameterLine(const char *line)
+{
+	const char *fieldStart = line;
+	const char *p = line;
+	bool foundField = false;
+
+	while (*p != '\0' && *p != '\n' && *p != '\r')
+	{
+		if (*p == ',')
+		{
+			if (p == fieldStart)
+			{
+				return (p[1] == '\n' || p[1] == '\r' || p[1] == '\0') ? foundField : false;
+			}
+			const char *equals = memchr(fieldStart, '=', (size_t)(p - fieldStart));
+			if (equals == NULL || equals == fieldStart)
+			{
+				return false;
+			}
+			foundField = true;
+			fieldStart = p + 1;
+		}
+		p++;
+	}
+
+	if (p == fieldStart)
+	{
+		return foundField;
+	}
+	const char *equals = memchr(fieldStart, '=', (size_t)(p - fieldStart));
+	return foundField && equals != NULL && equals != fieldStart;
 }
 
 static bool secondLogColumnMapIsValid(const SecondLogColumnMap *map)
@@ -639,13 +678,25 @@ int16_t readLogDistance(int logNumber)
 		memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
 
 		PrimaryLogColumnMap primaryColumns;
-		TCHAR *header = f_gets(log, log_len, &fil_Read); // 1行目はヘッダー
-		if (!header || (strchr((const char *)header, '\n') == NULL && strchr((const char *)header, '\r') == NULL) ||
-			!parsePrimaryLogHeader((const char *)header, &primaryColumns))
+		TCHAR *parameterLine = f_gets(log, log_len, &fil_Read); // 1行目はパラメータ
+		if (!parameterLine || (strchr((const char *)parameterLine, '\n') == NULL && strchr((const char *)parameterLine, '\r') == NULL) ||
+			!validateLogParameterLine((const char *)parameterLine))
 		{
 			ret = -10;
 			errorDetected = true;
 			if (f_error(&fil_Read)) logReadSlipIoError(logNumber, 0, &fil_Read, "io_fail");
+		}
+		TCHAR *header = NULL;
+		if (!errorDetected)
+		{
+			header = f_gets(log, log_len, &fil_Read); // 2行目は列名
+			if (!header || (strchr((const char *)header, '\n') == NULL && strchr((const char *)header, '\r') == NULL) ||
+				!parsePrimaryLogHeader((const char *)header, &primaryColumns))
+			{
+				ret = -10;
+				errorDetected = true;
+				if (f_error(&fil_Read)) logReadSlipIoError(logNumber, 0, &fil_Read, "io_fail");
+			}
 		}
 
 		UINT lineNo = 0;
@@ -1086,9 +1137,9 @@ int16_t readLogDistanceSlip(int logNumber)
 	int16_t maxOptimalIndex = -1;
 	SecondLogColumnMap secondLogColumns;
 
-	// 1陦檎岼縺ｯ繝倥ャ繝縺ｪ縺ｮ縺ｧ隱ｭ縺ｿ鬟帙・縺・
-	TCHAR *header = f_gets(log, log_len, &fil_Read);
-	if (!header)
+	// 1行目はパラメータ、2行目は列名として読み込む。
+	TCHAR *parameterLine = f_gets(log, log_len, &fil_Read);
+	if (!parameterLine)
 	{
 		int eof = f_eof(&fil_Read);
 		int err = f_error(&fil_Read);
@@ -1103,7 +1154,15 @@ int16_t readLogDistanceSlip(int logNumber)
 		}
 		goto cleanup;
 	}
-	if ((strchr((const char *)header, '\n') == NULL && strchr((const char *)header, '\r') == NULL) ||
+	if ((strchr((const char *)parameterLine, '\n') == NULL && strchr((const char *)parameterLine, '\r') == NULL) ||
+		!validateLogParameterLine((const char *)parameterLine))
+	{
+		ret = -2;
+		goto cleanup;
+	}
+	TCHAR *header = f_gets(log, log_len, &fil_Read);
+	if (!header ||
+		(strchr((const char *)header, '\n') == NULL && strchr((const char *)header, '\r') == NULL) ||
 		!parseSecondLogHeader((const char *)header, &secondLogColumns))
 	{
 		ret = -2; // 2次ログに必要な列がない
@@ -1482,8 +1541,16 @@ int16_t readLogTest(int logNumber)
 		// 讒矩菴馴・蛻励・蛻晄悄蛹・
 		memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
 
-		TCHAR *header = f_gets(log, log_len, &fil_Read);
-		if (!header || (strchr((const char *)header, '\n') == NULL && strchr((const char *)header, '\r') == NULL) ||
+		TCHAR *parameterLine = f_gets(log, log_len, &fil_Read);
+		TCHAR *header = NULL;
+		if (!parameterLine ||
+			(strchr((const char *)parameterLine, '\n') == NULL && strchr((const char *)parameterLine, '\r') == NULL) ||
+			!validateLogParameterLine((const char *)parameterLine))
+		{
+			ret = -10;
+		}
+		else if ((header = f_gets(log, log_len, &fil_Read)) == NULL ||
+			(strchr((const char *)header, '\n') == NULL && strchr((const char *)header, '\r') == NULL) ||
 			!parsePrimaryLogHeader((const char *)header, &primaryColumns))
 		{
 			ret = -10;
@@ -1547,24 +1614,21 @@ int16_t calcXYcies(int logNumber)
 	return routeBuildFromLog(logNumber, shortcutSettings.maxLevel);
 }
 /////////////////////////////////////////////////////////////////////
-// モジュール名 calcXYcie
-// 処理概要     エンコーダと角速度からログ用XY座標を積分する
-// 引数         encpulse: 移動パルス, angVelo: 角速度[deg/s], dt: 経過時間[s]
+// モジュール名 calcXYcieFromYawAngle
+// 処理概要     1ms周期で積算済みのYaw角からログ用XY座標を積分する
+// 引数         encpulse: 移動パルス, yawAngleDeg: 累積Yaw角[deg], dt: 経過時間[s]
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void calcXYcie(int16_t encpulse, float angVelo, float dt)
+void calcXYcieFromYawAngle(int16_t encpulse, float yawAngleDeg, float dt)
 {
-	static float velocity, degzR;
-
-	xydegz = xydegz + (angVelo * dt);		// 積算角度[deg]
-	degzR = xydegz * (M_PI / 180.0F);		// radへ変換
-	velocity = (float)encpulse / PULSE_MILLIMETER * 1000; // 移動速度[mm/s]
+	float velocity = (float)encpulse / PULSE_MILLIMETER * 1000; // 移動速度[mm/s]
+	float degzR = yawAngleDeg * (M_PI / 180.0F); // 累積Yaw角をradへ変換
 
 	xycie.x = xycie.x + (velocity * sin(degzR) * dt);
 	xycie.y = xycie.y + (velocity * cos(degzR) * dt);
 }
 // モジュール名 clearXYcie
-// 処理概要     ログ用XY座標と積算角度を初期化する
+// 処理概要     ログ用XY座標を初期化する
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
@@ -1572,7 +1636,6 @@ void clearXYcie(void)
 {
 	xycie.x = 0;
 	xycie.y = 0;
-	xydegz = 0;
 }
 /////////////////////////////////////////////////////////////////////
 // ローカル関数 clampMarkerIndex

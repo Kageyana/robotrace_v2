@@ -16,11 +16,13 @@ FIL fil_W;
 FIL fil_R;
 
 // ログヘッダー
-// 詳細デバッグ列を含むCSVのフォーマットと1行分を格納できるサイズにする。
+// パラメータ行・列名行・データ行を含むCSVのフォーマットを格納できるサイズにする。
 #define LOG_COLUMN_TITLE_BUFFER_SIZE 4096U
+#define LOG_PARAMETER_LINE_BUFFER_SIZE 4096U
 #define LOG_FORMAT_BUFFER_SIZE       512U
 #define LOG_CSV_LINE_BUFFER_SIZE    1024U
 char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE] = "", formatLog[LOG_FORMAT_BUFFER_SIZE] = "";
+static char logParameterLine[LOG_PARAMETER_LINE_BUFFER_SIZE] = "";
 static bool logHeaderOverflow = false;
 
 // ログバッファ
@@ -81,6 +83,7 @@ static float logReadF32(void);
 static void logReadRecord(LogRecord *rec);
 static void logBuildColumns(void);
 static bool logAppendText(char *buffer, size_t bufferSize, const char *text);
+static void setLogHeaderStrFPrecision(const char *name, float value, unsigned int precision);
 static uint8_t *logGetFreeBuffer(void);
 static bool readSavedLogNumber(int16_t *outNumber);
 static void writeSavedLogNumber(int16_t fileNumber);
@@ -433,6 +436,7 @@ void createLog(void)
 	}
 
 	columnTitle[0] = 0; // バッファを安全に初期化
+	logParameterLine[0] = 0; // パラメータ行を安全に初期化
 	formatLog[0] = 0;   // バッファを安全に初期化
 	logHeaderOverflow = false;
 
@@ -447,10 +451,16 @@ void createLog(void)
 	setLogHeaderStrS("buildTime", BUILD_TIME);
 	setLogHeaderStrS("branch", GIT_BRANCH);
 	setLogHeaderStr("logSchemaVersion", LOG_SCHEMA_VERSION);
+	setLogHeaderStr("imuTempCalibrationValid", imuTempCalibrationValid ? 1 : 0);
+	setLogHeaderStrFPrecision("imuTempCalibrationStart_C", imuTempCalibrationStart_C, 3U);
+	setLogHeaderStrFPrecision("imuTempCalibration_C", imuTempCalibration_C, 3U);
+	setLogHeaderStrFPrecision("imuTempCalibrationEnd_C", imuTempCalibrationEnd_C, 3U);
+	setLogHeaderStr("imuTempCalibrationSamples", imuTempCalibrationSamples);
+	setLogHeaderStr("imuTempCalibrationReadErrors", imuTempCalibrationReadErrors);
+	setLogHeaderStrFPrecision("imuGyroOffsetZ_dps", angleOffset[2], 3U);
 	setLogHeaderStr("imuTempCompEnabled", imuTempCorrectionEnabled ? 1 : 0);
-	setLogHeaderStrF("imuTempCoeff_dpsPerC", imuTempCoeff_dpsPerC);
-	setLogHeaderStrF("imuTempCalibration_C", imuTempCalibration_C);
-	setLogHeaderStrF("imuTempEnd_C", imuTempEnd_C);
+	setLogHeaderStrFPrecision("imuTempCoeff_dpsPerC", imuTempCoeff_dpsPerC, 6U);
+	setLogHeaderStrFPrecision("imuTempEnd_C", imuTempEnd_C, 3U);
 	// 制御パラメータ
 	setLogHeaderStrF("batteryVoltage_V", batteryVoltage_V);
 	setLogHeaderStrF("optimalTrace", optimalTrace);
@@ -521,7 +531,8 @@ void createLog(void)
 	setLogHeaderStrF("distCtrl.kp", distCtrl.kp);
 	setLogHeaderStrF("distCtrl.ki", distCtrl.ki);
 	setLogHeaderStrF("distCtrl.kd", distCtrl.kd);
-	if (!logAppendText(columnTitle, sizeof(columnTitle), "\n") ||
+	if (!logAppendText(logParameterLine, sizeof(logParameterLine), "\n") ||
+		!logAppendText(columnTitle, sizeof(columnTitle), "\n") ||
 		!logAppendText(formatLog, sizeof(formatLog), "\n"))
 	{
 		logHeaderOverflow = true;
@@ -534,11 +545,19 @@ void createLog(void)
 		create_log_ready = false;
 		return;
 	}
+	total = (UINT)strlen(logParameterLine);
+	fresult = f_write(&fil_W, logParameterLine, total, &written);
+	if (fresult != FR_OK || written != total)
+	{
+		printf("createLog header write error: %d (%lu/%lu)\r\n", fresult, (unsigned long)written, (unsigned long)total);
+		f_close(&fil_W);
+		return;
+	}
 	total = (UINT)strlen(columnTitle);
 	fresult = f_write(&fil_W, columnTitle, total, &written);
 	if (fresult != FR_OK || written != total)
 	{
-		printf("createLog header write error: %d (%lu/%lu)\r\n", fresult, (unsigned long)written, (unsigned long)total);
+		printf("createLog column header write error: %d (%lu/%lu)\r\n", fresult, (unsigned long)written, (unsigned long)total);
 		f_close(&fil_W);
 		return;
 	}
@@ -917,7 +936,7 @@ void endLog(void)
 		dt = (float)(time - beforeTime) / 1000.0f;
 		log_roc = calcROC(speed, zg, dt);
 
-		calcXYcie((int16_t)rec.encCurrentCorr_p, zg, dt);
+		calcXYcieFromYawAngle((int16_t)rec.encCurrentCorr_p, rec.imuYawAngle_deg, dt);
 		log_x = xycie.x;
 		log_y = xycie.y;
 		dist_mm += calcDlMm(speed, dt);
@@ -1129,7 +1148,7 @@ void setLogHeaderStr(char *name, int32_t value)
 	char headerStr[64];
 
 	snprintf((char *)headerStr, sizeof(headerStr), "%s=%ld,", name, (long)value); // バッファサイズを指定して安全に変換
-	if (!logAppendText(columnTitle, sizeof(columnTitle), headerStr)) logHeaderOverflow = true;
+	if (!logAppendText(logParameterLine, sizeof(logParameterLine), headerStr)) logHeaderOverflow = true;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setLogHeaderStrU
@@ -1142,7 +1161,7 @@ void setLogHeaderStrU(char *name, uint32_t value)
 	char headerStr[64];
 
 	snprintf(headerStr, sizeof(headerStr), "%s=%lu,", name, (unsigned long)value);
-	if (!logAppendText(columnTitle, sizeof(columnTitle), headerStr)) logHeaderOverflow = true;
+	if (!logAppendText(logParameterLine, sizeof(logParameterLine), headerStr)) logHeaderOverflow = true;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setLogHeaderStrF
@@ -1152,10 +1171,20 @@ void setLogHeaderStrU(char *name, uint32_t value)
 /////////////////////////////////////////////////////////////////////
 void setLogHeaderStrF(char *name, float value)
 {
-    char headerStr[64];
+	setLogHeaderStrFPrecision(name, value, 2U);
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 setLogHeaderStrFPrecision
+// 処理概要     指定小数桁数でログCSVヘッダーへfloat値を追記する
+// 引数         name:変数名 value:値 precision:小数桁数
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void setLogHeaderStrFPrecision(const char *name, float value, unsigned int precision)
+{
+	char headerStr[64];
 
-    snprintf((char *)headerStr, sizeof(headerStr), "%s=%4.2f,", name, (double)value);
-	if (!logAppendText(columnTitle, sizeof(columnTitle), headerStr)) logHeaderOverflow = true;
+	snprintf(headerStr, sizeof(headerStr), "%s=%.*f,", name, (int)precision, (double)value);
+	if (!logAppendText(logParameterLine, sizeof(logParameterLine), headerStr)) logHeaderOverflow = true;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setLogHeaderStrS
@@ -1168,7 +1197,7 @@ void setLogHeaderStrS(char *name, const char *value)
 	char headerStr[96];
 
 	snprintf(headerStr, sizeof(headerStr), "%s=%s,", name, value);
-	if (!logAppendText(columnTitle, sizeof(columnTitle), headerStr)) logHeaderOverflow = true;
+	if (!logAppendText(logParameterLine, sizeof(logParameterLine), headerStr)) logHeaderOverflow = true;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SDtest

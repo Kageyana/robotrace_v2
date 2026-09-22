@@ -24,6 +24,11 @@
 #define IMU_TEMP_COEFF_SCALE 1000000L
 #define IMU_TEMP_COEFF_MIN_X1000000 (-100000L)
 #define IMU_TEMP_COEFF_MAX_X1000000 100000L
+#define IMU_CALIBRATION_SAMPLE_COUNT 2000U
+#define IMU_TEMP_CALIBRATION_INTERVAL_SAMPLES 100U
+#define IMU_TEMP_CALIBRATION_TOTAL_SAMPLES \
+	(IMU_CALIBRATION_SAMPLE_COUNT / IMU_TEMP_CALIBRATION_INTERVAL_SAMPLES)
+#define IMU_TEMP_CALIBRATION_MIN_VALID_SAMPLES 16U
 //====================================//
 // グローバル変数の宣言
 //====================================//
@@ -31,7 +36,12 @@ extern bool calibratIMU;		// IMUキャリブレーション中フラグ
 extern volatile IMUval imuVal;	// IMUの実行時変数
 extern float angleOffset[3];	// ジャイロオフセット[deg/s]
 extern float imuTempCoeff_dpsPerC;	// ジャイロZ温度係数[deg/s/°C]
+extern bool imuTempCalibrationValid;	// 走行前温度校正の有効状態
+extern float imuTempCalibrationStart_C;	// 最初の有効温度[°C]
 extern float imuTempCalibration_C;	// 走行前校正温度[°C]
+extern float imuTempCalibrationEnd_C;	// 最後の有効温度[°C]
+extern uint16_t imuTempCalibrationSamples;	// 有効温度サンプル数
+extern uint16_t imuTempCalibrationReadErrors;	// 無効温度サンプル数
 extern float imuTempEnd_C;		// ログ終了時温度[°C]
 extern bool imuTempCorrectionEnabled;	// 走行中の温度補正有効状態
 #ifdef USE_ACCELE
@@ -43,6 +53,7 @@ extern float acceleOffset[3];	// 加速度オフセット[g]
 void calcDegrees(void);
 void calcVelocity(void);
 void clearIMUval(void);
+void startCalibrationIMU(void);
 void calibrationIMU(void);
 void readImuTempCompensation(void);
 void captureImuTempCalibration(void);

@@ -267,6 +267,45 @@ static bool pathHeaderFieldEquals(const char *start, const char *end, const char
 }
 
 /////////////////////////////////////////////////////////////////////
+// モジュール名 pathValidateParameterLine
+// 処理概要     CSV 1行目がname=value形式のパラメータ行か検証する
+// 引数         line:パラメータ行
+// 戻り値       true:正常 false:不正
+/////////////////////////////////////////////////////////////////////
+static bool pathValidateParameterLine(const char *line)
+{
+	const char *fieldStart = line;
+	const char *p = line;
+	bool foundField = false;
+
+	while (*p != '\0' && *p != '\n' && *p != '\r')
+	{
+		if (*p == ',')
+		{
+			if (p == fieldStart)
+			{
+				return (p[1] == '\n' || p[1] == '\r' || p[1] == '\0') ? foundField : false;
+			}
+			const char *equals = memchr(fieldStart, '=', (size_t)(p - fieldStart));
+			if (equals == NULL || equals == fieldStart)
+			{
+				return false;
+			}
+			foundField = true;
+			fieldStart = p + 1;
+		}
+		p++;
+	}
+
+	if (p == fieldStart)
+	{
+		return foundField;
+	}
+	const char *equals = memchr(fieldStart, '=', (size_t)(p - fieldStart));
+	return foundField && equals != NULL && equals != fieldStart;
+}
+
+/////////////////////////////////////////////////////////////////////
 // モジュール名 pathParseHeader
 // 処理概要     CSVヘッダから経路生成に必要な列番号を解決する
 // 引数         line:CSVヘッダ, columns:列番号の格納先
@@ -801,6 +840,9 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	}
 	if (f_gets(routeCsvLine, sizeof(routeCsvLine), &file) == NULL ||
 		(strchr(routeCsvLine, '\n') == NULL && strchr(routeCsvLine, '\r') == NULL) ||
+		!pathValidateParameterLine(routeCsvLine) ||
+		f_gets(routeCsvLine, sizeof(routeCsvLine), &file) == NULL ||
+		(strchr(routeCsvLine, '\n') == NULL && strchr(routeCsvLine, '\r') == NULL) ||
 		!pathParseHeader(routeCsvLine, &columns))
 	{
 		f_close(&file);
@@ -850,6 +892,9 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 		return -13;
 	}
 	if (f_gets(routeCsvLine, sizeof(routeCsvLine), &file) == NULL ||
+		(strchr(routeCsvLine, '\n') == NULL && strchr(routeCsvLine, '\r') == NULL) ||
+		!pathValidateParameterLine(routeCsvLine) ||
+		f_gets(routeCsvLine, sizeof(routeCsvLine), &file) == NULL ||
 		(strchr(routeCsvLine, '\n') == NULL && strchr(routeCsvLine, '\r') == NULL) ||
 		!pathParseHeader(routeCsvLine, &columns))
 	{

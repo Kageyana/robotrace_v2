@@ -4,6 +4,7 @@
 // インクルード
 //====================================//
 #include <stdint.h>
+#include <limits.h>
 #include "SDcard.h"
 #include "battery.h"
 #include "motor.h"
@@ -20,8 +21,8 @@
 #define LOG_SCHEMA_PROFILE_LIGHT 1
 #endif
 
-// linePointX/YとpathLegalMarginを保存しないログ形式。
-#define LOG_SCHEMA_VERSION 2U
+// Version 3を基礎にモーターPWM列を1ms積算Yaw角へ置換したログ形式。
+#define LOG_SCHEMA_VERSION 4U
 
 #define LOG_FIELD_LIST_CORE(STORED, DERIVED) \
 	STORED(U16, cntlog, "%d", (uint16_t)cntRun) \
@@ -36,11 +37,9 @@
 	STORED(U8, slipFlagLat, "%d", (uint8_t)getSlipFlagLat()) \
 	STORED(S16, lineTraceCtrl, "%d", (int16_t)lineTraceOmegaFBCtrl.pwm) \
 	STORED(S16, targetAngularvelo, "%d", (int16_t)log_targetAngularVelocity) \
-	STORED(S16, motorpwmL, "%d", (int16_t)motorpwmL) \
-	STORED(S16, motorpwmR, "%d", (int16_t)motorpwmR) \
+	STORED(F32, imuYawAngle_deg, "%f", imuVal.angle.z) \
 	STORED(U16, batteryVoltage_mV, "%d", (uint16_t)(batteryVoltage_V * 1000.0f)) \
-	STORED(S16, motorVoltageCmdL_mV, "%d", (int16_t)(motorVoltageCmdL_V * 1000.0f)) \
-	STORED(S16, motorVoltageCmdR_mV, "%d", (int16_t)(motorVoltageCmdR_V * 1000.0f)) \
+	STORED(S16, imuTemp_cdegC, "%d", (int16_t)(imuVal.tempValid ? (imuVal.temp * 100.0f) : INT16_MIN)) \
 	STORED(U32, encCurrentCorr_p, "%d", (uint32_t)Control_GetEncCurrentCorr_p()) \
 	STORED(U8, lineValid, "%d", pathLogLineValid) \
 	STORED(F32, pathErrorY_mm, "%f", pathLogErrorY_mm) \
@@ -99,5 +98,18 @@
 #define LOG_RECORD_SIZE_SKIP(type, name, fmt, expr)
 // 1レコード分のバイトサイズ。
 enum { LOG_RECORD_SIZE_BYTES = 0 LOG_FIELD_LIST(LOG_RECORD_SIZE_ADD, LOG_RECORD_SIZE_SKIP) };
+
+#define LOG_RECORD_SIZE_LIGHT_BYTES 42U
+#define LOG_RECORD_SIZE_DEBUG_BYTES 95U
+
+#if LOG_SCHEMA_PROFILE_LIGHT
+_Static_assert(
+    LOG_RECORD_SIZE_BYTES == LOG_RECORD_SIZE_LIGHT_BYTES,
+    "Version 4 light log record size must be 42 bytes");
+#else
+_Static_assert(
+    LOG_RECORD_SIZE_BYTES == LOG_RECORD_SIZE_DEBUG_BYTES,
+    "Version 4 debug log record size must be 95 bytes");
+#endif
 
 #endif // LOG_SCHEMA_H_
