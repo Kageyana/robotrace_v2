@@ -13,7 +13,7 @@ from path_log_recovery import read_csv_log, recover_path_columns
 
 CNTLOG_MODULUS = 1 << 16
 PULSE_MILLIMETER = 54.324
-REQUIRED_COLUMNS = {"cntlog", "encCurrentCorr_p", "gyroVal_Z", "x", "y"}
+REQUIRED_COLUMNS = {"cntlog", "encCurrentCorr_p", "x", "y"}
 
 
 def signed_int16(value: str) -> int:
@@ -21,21 +21,68 @@ def signed_int16(value: str) -> int:
     return raw - 0x10000 if raw >= 0x8000 else raw
 
 
-def repair_log(source_path: Path, destination_path: Path) -> dict[str, float | int]:
+def repair_log(source_path: Path, destination_path: Path) -> dict[str, float | int | str]:
     with source_path.open("r", encoding="utf-8-sig", newline="") as source:
-        rows = list(csv.reader(source))
-    if len(rows) < 2:
+        parameter_line = source.readline()
+        column_line = source.readline()
+        data_rows = list(csv.reader(source))
+    if not parameter_line:
+        raise ValueError(f"{source_path}: パラメータ行がありません")
+    if not parameter_line.endswith(("\n", "\r")):
+        raise ValueError(f"{source_path}: パラメータ行に改行がありません")
+    if not column_line:
+        raise ValueError(f"{source_path}: 列名行がありません")
+    if not column_line.endswith(("\n", "\r")):
+        raise ValueError(f"{source_path}: 列名行に改行がありません")
+
+    parameter_items = next(csv.reader([parameter_line]))
+    if parameter_items and parameter_items[-1] == "":
+        parameter_items = parameter_items[:-1]
+    if not parameter_items or any("=" not in item or not item.split("=", 1)[0].strip() for item in parameter_items):
+        raise ValueError(f"{source_path}: パラメータ行が不正です")
+    parameters = {
+        item.split("=", 1)[0].strip(): item.split("=", 1)[1].strip()
+        for item in parameter_items
+    }
+
+    header = next(csv.reader([column_line]))
+    if header and header[-1] == "":
+        header = header[:-1]
+    header = [name.strip() for name in header]
+    if not header or any(not name for name in header):
+        raise ValueError(f"{source_path}: 列名行が不正です")
+    rows = [parameter_items, header]
+    for row_number, row in enumerate(data_rows, start=3):
+        if row and row[-1] == "":
+            row = row[:-1]
+        if len(row) != len(header):
+            raise ValueError(f"{source_path}:{row_number}: 列数が一致しません")
+        rows.append(row)
+    if len(rows) < 3:
         raise ValueError(f"{source_path}: データ行がありません")
 
-    header = rows[0]
-    columns = {name.strip(): index for index, name in enumerate(header)}
-    missing = sorted(REQUIRED_COLUMNS - columns.keys())
+    data_start = 2
+    columns = {
+        name.strip(): index
+        for index, name in enumerate(header)
+        if name.strip()
+    }
+    try:
+        schema_version = int(float(parameters.get("logSchemaVersion", "-1")))
+    except ValueError:
+        schema_version = -1
+    if schema_version == 4:
+        required_yaw_column = "imuYawAngle_deg"
+    else:
+        required_yaw_column = "gyroVal_Z"
+    missing = sorted((REQUIRED_COLUMNS | {required_yaw_column}) - columns.keys())
     if missing:
         raise ValueError(f"{source_path}: 必須列がありません: {', '.join(missing)}")
 
     cnt_index = columns["cntlog"]
     enc_index = columns["encCurrentCorr_p"]
-    gyro_index = columns["gyroVal_Z"]
+    gyro_index = columns.get("gyroVal_Z")
+    yaw_angle_index = columns.get("imuYawAngle_deg") if schema_version == 4 else None
     x_index = columns["x"]
     y_index = columns["y"]
 
@@ -49,7 +96,7 @@ def repair_log(source_path: Path, destination_path: Path) -> dict[str, float | i
     max_step_mm = 0.0
     wrap_row = -1
 
-    for row_number, row in enumerate(rows[1:], start=2):
+    for row_number, row in enumerate(rows[data_start:], start=data_start + 1):
         raw_time = int(float(row[cnt_index]))
         if previous_raw is not None and raw_time < previous_raw:
             if previous_raw - raw_time <= CNTLOG_MODULUS // 2:
@@ -68,7 +115,10 @@ def repair_log(source_path: Path, destination_path: Path) -> dict[str, float | i
             raise ValueError(f"{source_path}:{row_number}: 不正な時間差です ({delta_ms} ms)")
 
         dt = delta_ms / 1000.0
-        heading_deg += float(row[gyro_index]) * dt
+        if yaw_angle_index is not None:
+            heading_deg = float(row[yaw_angle_index])
+        else:
+            heading_deg += float(row[gyro_index]) * dt
         distance_mm = signed_int16(row[enc_index]) / PULSE_MILLIMETER * delta_ms
         heading_rad = math.radians(heading_deg)
         dx_mm = distance_mm * math.sin(heading_rad)
@@ -88,14 +138,15 @@ def repair_log(source_path: Path, destination_path: Path) -> dict[str, float | i
         csv.writer(destination, lineterminator="\n").writerows(rows)
 
     return {
-        "samples": len(rows) - 1,
+        "samples": len(rows) - data_start,
         "wrap_count": wrap_count,
         "wrap_csv_row": wrap_row,
         "last_cntlog_ms": previous_time,
-        "duration_ms": previous_time - int(float(rows[1][cnt_index])),
+        "duration_ms": previous_time - int(float(rows[data_start][cnt_index])),
         "final_x_mm": x_mm,
         "final_y_mm": y_mm,
         "max_step_mm": max_step_mm,
+        "yaw_angle_source": "stored_1ms_angle" if yaw_angle_index is not None else "integrated_log_gyro",
     }
 
 

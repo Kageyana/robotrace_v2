@@ -4,11 +4,12 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import math
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
+
+from path_log_recovery import read_csv_log
 
 
 SPACING_MM = 40.0
@@ -39,12 +40,11 @@ def wrap_rad(angle: float) -> float:
 
 def read_raw(path: Path) -> list[tuple[float, float, int]]:
     points: list[tuple[float, float, int]] = []
-    with path.open("r", encoding="utf-8-sig", newline="") as source:
-        for row in csv.DictReader(source):
-            try:
-                points.append((float(row["x"]), float(row["y"]), int(float(row["courseMarker"]))))
-            except (KeyError, TypeError, ValueError):
-                continue
+    for row in read_csv_log(path).rows:
+        try:
+            points.append((float(row["x"]), float(row["y"]), int(float(row["courseMarker"]))))
+        except (KeyError, TypeError, ValueError):
+            continue
     if len(points) < 2:
         raise ValueError("有効なx, y, courseMarkerが不足しています")
     return points

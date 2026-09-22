@@ -113,6 +113,7 @@ class CsvLog:
     fields: list[str]
     rows: list[dict[str, str]]
     parameters: dict[str, str]
+    row_length_errors: int = 0
 
 
 @dataclass
@@ -176,30 +177,46 @@ def optimal_index_error(value: Any, route_count: int) -> str:
 
 def read_csv_log(path: Path) -> CsvLog:
     with path.open("r", encoding="utf-8-sig", newline="") as source:
-        reader = csv.reader(source)
-        try:
-            header = next(reader)
-        except StopIteration as exc:
-            raise ValueError(f"{path}: empty CSV") from exc
+        parameter_line = source.readline()
+        column_line = source.readline()
+        if not parameter_line:
+            raise ValueError(f"{path}: missing parameter line")
+        if not parameter_line.endswith(("\n", "\r")):
+            raise ValueError(f"{path}: parameter line has no newline")
+        if not column_line:
+            raise ValueError(f"{path}: missing column header")
+        if not column_line.endswith(("\n", "\r")):
+            raise ValueError(f"{path}: column header has no newline")
 
-        fields: list[str] = []
         parameters: dict[str, str] = {}
-        for cell in header:
-            if "=" in cell:
-                name, value = cell.split("=", 1)
-                if name.strip():
-                    parameters[name.strip()] = value.strip()
-            else:
-                fields.append(cell.strip())
+        parameter_record = next(csv.reader([parameter_line]))
+        if parameter_record and parameter_record[-1] == "":
+            parameter_record = parameter_record[:-1]
+        if not parameter_record or any("=" not in cell or not cell.split("=", 1)[0].strip() for cell in parameter_record):
+            raise ValueError(f"{path}: invalid parameter line")
+        for cell in parameter_record:
+            name, value = cell.split("=", 1)
+            parameters[name.strip()] = value.strip()
+
+        fields = next(csv.reader([column_line]))
+        if fields and fields[-1] == "":
+            fields = fields[:-1]
+        fields = [field.strip() for field in fields]
+        if not fields or any(not field for field in fields):
+            raise ValueError(f"{path}: invalid column header")
 
         rows: list[dict[str, str]] = []
-        for line_number, raw in enumerate(reader, start=2):
-            if len(raw) < len(fields):
+        row_length_errors = 0
+        for raw in csv.reader(source):
+            if raw and raw[-1] == "":
+                raw = raw[:-1]
+            if len(raw) != len(fields):
+                row_length_errors += 1
                 continue
             rows.append({name: raw[index].strip() for index, name in enumerate(fields)})
         if not rows:
             raise ValueError(f"{path}: no data rows")
-    return CsvLog(path, fields, rows, parameters)
+    return CsvLog(path, fields, rows, parameters, row_length_errors)
 
 
 def _read_route_points(source: CsvLog) -> list[tuple[float, float, int]]:
@@ -602,7 +619,7 @@ def recover_path_columns(
                         _missing_values(len(log.rows), "非PATH走行", 0), 0)
 
     version = parameter_int(log.parameters, "logSchemaVersion")
-    if version != 2:
+    if version not in {2, 3, 4}:
         return _missing_recovery(log, f"未対応または不明なlogSchemaVersion={version}")
     source_number = parameter_int(log.parameters, "analysisSourceLog", 0) or 0
     if source_number <= 0:
@@ -654,7 +671,8 @@ def recover_path_columns(
             "recovery_reason": "Version 12経路を元ログから再生成",
             "recovery_source_log": source_number,
         })
-    reason = "指定設定による復元（過去実機設定の証明ではない）" if assumed else "Version 12経路を元ログから再生成"
+    schema_reason = f"Version {version}ログのVersion 12経路を元ログから再生成"
+    reason = "指定設定による復元（過去実機設定の証明ではない）" if assumed else schema_reason
     for value in values:
         if value["recovery_status"] == "restored":
             value["recovery_reason"] = reason
