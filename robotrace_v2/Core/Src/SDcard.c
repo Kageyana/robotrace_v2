@@ -68,6 +68,8 @@ static float runStartOmegaKi;
 static float runStartOmegaKd;
 static uint32_t runStartLineCalibrationHash;
 
+static void setLogHeaderStrFPrecision(char *name, float value, uint8_t precision);
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logCaptureRunStartSettings
 // 処理概要     動的ゲイン変更前の設定とライン校正値の照合値を保存する
@@ -649,6 +651,7 @@ void createLog(void)
 	setLogHeaderStrS("buildTime", BUILD_TIME);
 	setLogHeaderStrS("branch", GIT_BRANCH);
 	setLogHeaderStr("logSchemaVersion", LOG_SCHEMA_VERSION);
+	setLogHeaderStrFPrecision("gyroScaleCoeff", COEFF_DPD, 6U);
 	setLogHeaderStrU("encoderPulsePerMeter", PULSE_METER);
 	setLogHeaderStr("distanceScaleVerified", PRIMARY_DISTANCE_SCALE_VERIFIED);
 	setLogHeaderStr("imuCalibrationValid", runImuCalibrationValid ? 1 : 0);
@@ -1597,6 +1600,19 @@ void setLogHeaderStrF(char *name, float value)
     char headerStr[64];
 
     snprintf((char *)headerStr, sizeof(headerStr), "%s=%4.2f,", name, (double)value);
+	if (!logAppendText(columnTitle, sizeof(columnTitle), headerStr)) logHeaderOverflow = true;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 setLogHeaderStrFPrecision
+// 処理概要     ログCSVのヘッダーに指定桁数の浮動小数値を追記する
+// 引数         name:変数名 value:値 precision:小数点以下の桁数
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void setLogHeaderStrFPrecision(char *name, float value, uint8_t precision)
+{
+	char headerStr[64];
+
+	snprintf(headerStr, sizeof(headerStr), "%s=%.*f,", name, (int)precision, (double)value);
 	if (!logAppendText(columnTitle, sizeof(columnTitle), headerStr)) logHeaderOverflow = true;
 }
 /////////////////////////////////////////////////////////////////////
