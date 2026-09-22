@@ -14,6 +14,7 @@
 #include "firmware_version.h"
 #include "sd_functions.h"
 #include <math.h>
+#include <stdlib.h>
 #include "stdio.h"
 #include <stdint.h>
 #ifndef ROBOTRACE_ENABLE_SLIP_UPDATE
@@ -115,6 +116,52 @@ static void writeHeadingCalibrationSettings(void)
 			headingCalibration.effectiveTreadCentiMm);
 		f_close(&file);
 	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 readImuTempCompensation
+// 処理概要     SDカードからBMI088ジャイロZ温度係数を読み込み、不正時は0へ修復する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void readImuTempCompensation(void)
+{
+	const char fileName[] = PATH_SETTING "imu_temp.txt";
+	char buffer[24] = {0};
+	char *end = NULL;
+	FIL file;
+	UINT bytesRead = 0U;
+	uint32_t fileSize = 0U;
+	long coeffX1000000 = 0L;
+	bool valid = false;
+
+	IMU_SetTempCompensationCoefficient(0);
+	if (f_open(&file, fileName, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+	{
+		fileSize = (uint32_t)f_size(&file);
+		if (fileSize > 0U && fileSize < sizeof(buffer) &&
+			f_read(&file, buffer, (UINT)fileSize, &bytesRead) == FR_OK &&
+			bytesRead == (UINT)fileSize)
+		{
+			buffer[bytesRead] = '\0';
+			coeffX1000000 = strtol(buffer, &end, 10);
+			valid = end != buffer && *end == '\0' &&
+				coeffX1000000 >= IMU_TEMP_COEFF_MIN_X1000000 &&
+				coeffX1000000 <= IMU_TEMP_COEFF_MAX_X1000000;
+		}
+		f_close(&file);
+	}
+
+	if (!valid)
+	{
+		coeffX1000000 = 0L;
+		if (f_open(&file, fileName, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
+		{
+			f_printf(&file, "%ld", coeffX1000000);
+			f_close(&file);
+		}
+	}
+	IMU_SetTempCompensationCoefficient((int32_t)coeffX1000000);
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -643,6 +690,7 @@ void createLog(void)
 	logHeaderOverflow = false;
 
 	updateBatteryVoltage(); // ログヘッダへ停止時点の電圧を残す
+	updateImuTempEndTemperature(); // ログヘッダへ終了時点のBMI088温度を残す
 
 	// 1行目: メタデータ
 	setLogHeaderStrS("fwVersion", FW_VERSION);
@@ -652,6 +700,16 @@ void createLog(void)
 	setLogHeaderStrS("branch", GIT_BRANCH);
 	setLogHeaderStr("logSchemaVersion", LOG_SCHEMA_VERSION);
 	setLogHeaderStrFPrecision("gyroScaleCoeff", COEFF_DPD, 6U);
+	setLogHeaderStr("imuTempCalibrationValid", imuTempCalibrationValid ? 1 : 0);
+	setLogHeaderStrFPrecision("imuTempCalibrationStart_C", imuTempCalibrationStart_C, 3U);
+	setLogHeaderStrFPrecision("imuTempCalibration_C", imuTempCalibration_C, 3U);
+	setLogHeaderStrFPrecision("imuTempCalibrationEnd_C", imuTempCalibrationEnd_C, 3U);
+	setLogHeaderStrU("imuTempCalibrationSamples", imuTempCalibrationSamples);
+	setLogHeaderStrU("imuTempCalibrationReadErrors", imuTempCalibrationReadErrors);
+	setLogHeaderStrFPrecision("imuGyroOffsetZ_dps", angleOffset[2], 3U);
+	setLogHeaderStr("imuTempCompEnabled", imuTempCorrectionEnabled ? 1 : 0);
+	setLogHeaderStrFPrecision("imuTempCoeff_dpsPerC", imuTempCoeff_dpsPerC, 6U);
+	setLogHeaderStrFPrecision("imuTempEnd_C", imuTempEnd_C, 3U);
 	setLogHeaderStrU("encoderPulsePerMeter", PULSE_METER);
 	setLogHeaderStr("distanceScaleVerified", PRIMARY_DISTANCE_SCALE_VERIFIED);
 	setLogHeaderStr("imuCalibrationValid", runImuCalibrationValid ? 1 : 0);

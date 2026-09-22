@@ -12,6 +12,17 @@ static volatile bool imuCalibrationResetRequested = false;
 static volatile bool imuCalibrationReady = false;
 static volatile uint16_t imuCalibrationSamples = 0U;
 static volatile uint16_t imuCalibrationReadErrors = 0U;
+float imuTempCoeff_dpsPerC = 0.0F;
+bool imuTempCalibrationValid = false;
+float imuTempCalibrationStart_C = BMI088_TEMP_INVALID_C;
+float imuTempCalibration_C = BMI088_TEMP_INVALID_C;
+float imuTempCalibrationEnd_C = BMI088_TEMP_INVALID_C;
+uint16_t imuTempCalibrationSamples = 0U;
+uint16_t imuTempCalibrationReadErrors = 0U;
+bool imuTempCorrectionEnabled = false;
+float imuTempEnd_C = BMI088_TEMP_INVALID_C;
+static float imuTempCalibrationSum_C = 0.0F;
+static uint16_t imuTempCalibrationAttempts = 0U;
 volatile IMUval imuVal = {0};	// IMUの実行時変数（加速度、角速度、角度などを保持）
 float angleOffset[3] = {0.0F, 0.0F, 0.0F};	// ジャイロオフセット[deg/s]（calibrationIMU()で算出される）
 #ifdef USE_ACCELE
@@ -32,6 +43,8 @@ static bool gyroZInitialized = false;	// ジャイロzの初期化フラグ
 static void applyRotCenterCorrectionIMU(void);
 #endif
 #endif
+static void captureImuTempCalibration(void);
+static void finalizeImuTempCalibration(void);
 /////////////////////////////////////////////////////////////////////
 // モジュール名 applyRotCenterCorrectionIMU
 // 処理概要     旋回中心ずれによる加速度成分を2D(yaw軸まわり)で補正する
@@ -98,7 +111,21 @@ static void applyOffsetIMU(void)
 	// ジャイロ補正（物理量オフセット除去後に方向係数を適用）
 	imuVal.gyro.x = (BMI088val.gyro.x - angleOffset[0]) * COEFF_DPD;
 	imuVal.gyro.y = (BMI088val.gyro.y - angleOffset[1]) * COEFF_DPD;
-	imuVal.gyro.z = (BMI088val.gyro.z - angleOffset[2]) * COEFF_DPD;
+	float gyroZ = BMI088val.gyro.z;
+	if (imuTempCorrectionEnabled)
+	{
+		if (!BMI088val.tempValid || !isfinite(BMI088val.temp))
+		{
+			// 走行中に温度が無効になった場合は、その走行の補正を停止する。
+			imuTempCorrectionEnabled = false;
+		}
+		else
+		{
+			gyroZ -= imuTempCoeff_dpsPerC *
+				(BMI088val.temp - imuTempCalibration_C);
+		}
+	}
+	imuVal.gyro.z = (gyroZ - angleOffset[2]) * COEFF_DPD;
 
 #ifdef USE_ACCELE
 	// 加速度補正（物理量オフセットをそのまま除去）
@@ -249,6 +276,97 @@ void clearIMUval(void)
 #endif
 #endif
 }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 IMU_SetTempCompensationCoefficient
+// 処理概要     SDカードから読み込んだBMI088温度係数を実行時値へ設定する
+// 引数         coeffX1000000: 温度係数を1,000,000倍した値
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void IMU_SetTempCompensationCoefficient(int32_t coeffX1000000)
+{
+	if (coeffX1000000 < IMU_TEMP_COEFF_MIN_X1000000 ||
+		coeffX1000000 > IMU_TEMP_COEFF_MAX_X1000000)
+	{
+		coeffX1000000 = 0;
+	}
+	imuTempCoeff_dpsPerC = (float)coeffX1000000 /
+		(float)IMU_TEMP_COEFF_SCALE;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 updateImuTempEndTemperature
+// 処理概要     ログヘッダー用に終了時点の有効なBMI088温度を保存する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void updateImuTempEndTemperature(void)
+{
+	if (BMI088getTemp() && BMI088val.tempValid && isfinite(BMI088val.temp))
+	{
+		imuTempEnd_C = BMI088val.temp;
+	}
+	else
+	{
+		imuTempEnd_C = BMI088_TEMP_INVALID_C;
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 captureImuTempCalibration
+// 処理概要     IMU校正周期に合わせて温度を取得し、統計値を更新する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void captureImuTempCalibration(void)
+{
+	if (imuTempCalibrationAttempts >= IMU_TEMP_CALIBRATION_TOTAL_SAMPLES)
+	{
+		return;
+	}
+	imuTempCalibrationAttempts++;
+
+	if (BMI088getTemp() && BMI088val.tempValid && isfinite(BMI088val.temp))
+	{
+		if (imuTempCalibrationSamples == 0U)
+		{
+			imuTempCalibrationStart_C = BMI088val.temp;
+		}
+		imuTempCalibrationEnd_C = BMI088val.temp;
+		imuTempCalibrationSum_C += BMI088val.temp;
+		imuTempCalibrationSamples++;
+	}
+	else if (imuTempCalibrationReadErrors < UINT16_MAX)
+	{
+		imuTempCalibrationReadErrors++;
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 finalizeImuTempCalibration
+// 処理概要     2秒間の温度統計を確定し、温度補正の有効状態を更新する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void finalizeImuTempCalibration(void)
+{
+	if (imuTempCalibrationSamples > 0U)
+	{
+		imuTempCalibration_C = imuTempCalibrationSum_C /
+			(float)imuTempCalibrationSamples;
+	}
+	else
+	{
+		imuTempCalibrationStart_C = BMI088_TEMP_INVALID_C;
+		imuTempCalibration_C = BMI088_TEMP_INVALID_C;
+		imuTempCalibrationEnd_C = BMI088_TEMP_INVALID_C;
+	}
+	imuTempCalibrationValid =
+		imuTempCalibrationSamples >= IMU_TEMP_CALIBRATION_MIN_VALID_SAMPLES;
+	imuTempCorrectionEnabled = imuTempCalibrationValid &&
+		imuTempCoeff_dpsPerC != 0.0F;
+}
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 calibrationIMU
 // 処理概要     ジャイロと加速度のオフセットを校正する
@@ -271,6 +389,8 @@ void calibrationIMU(void)
 #ifdef USE_ACCELE
 		memset(acceleInt, 0, sizeof(acceleInt));
 #endif
+		imuTempCalibrationAttempts = 0U;
+		imuTempCalibrationSum_C = 0.0F;
 		imuCalibrationResetRequested = false;
 	}
 
@@ -311,6 +431,10 @@ void calibrationIMU(void)
 	angleInt[2] += BMI088val.gyro.z;
 	sampleCount++;
 	imuCalibrationSamples = sampleCount;
+	if ((sampleCount % IMU_TEMP_CALIBRATION_INTERVAL_SAMPLES) == 0U)
+	{
+		captureImuTempCalibration();
+	}
 	if (sampleCount < IMU_CALIBRATION_SAMPLE_COUNT)
 	{
 		return;
@@ -351,6 +475,7 @@ void calibrationIMU(void)
 	acceleInt[1] = 0;
 	acceleInt[2] = 0;
 #endif
+	finalizeImuTempCalibration();
 	sampleCount = 0;
 	sampleIntervalMs = 0;
 	imuCalibrationReady = imuCalibrationReadErrors == 0U &&
@@ -370,6 +495,16 @@ void IMU_StartCalibration(void)
 	imuCalibrationReady = false;
 	imuCalibrationSamples = 0U;
 	imuCalibrationReadErrors = 0U;
+	imuTempCalibrationValid = false;
+	imuTempCalibrationStart_C = BMI088_TEMP_INVALID_C;
+	imuTempCalibration_C = BMI088_TEMP_INVALID_C;
+	imuTempCalibrationEnd_C = BMI088_TEMP_INVALID_C;
+	imuTempCalibrationSamples = 0U;
+	imuTempCalibrationReadErrors = 0U;
+	imuTempCalibrationSum_C = 0.0F;
+	imuTempCalibrationAttempts = 0U;
+	imuTempCorrectionEnabled = false;
+	imuTempEnd_C = BMI088_TEMP_INVALID_C;
 	imuCalibrationResetRequested = true;
 	calibratIMU = true;
 }

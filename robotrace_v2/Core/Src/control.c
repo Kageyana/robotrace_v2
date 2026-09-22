@@ -316,6 +316,7 @@ void initSystem(void)
 			readTgtspeeds();  // 目標速度を取得
 			readShortcutSettings(); // 経路追従・ショートカット設定を取得
 			readHeadingCalibrationSettings(); // 一次経路の方位校正値を取得
+			readImuTempCompensation(); // BMI088ジャイロZ温度係数を取得
 
 			if (modeDSP)
 			{
@@ -685,7 +686,6 @@ void loopSystem(void)
 			{
 				ssd1306_SetCursor(56, 28);
 				ssd1306_printf(Font_16x26, "1");
-				calibrateMotorCurrent = true; // 電流センサキャリブレーションを開始
 			}
 		}
 
@@ -1132,6 +1132,7 @@ void countDown(void)
 		if (countdown == 2000)
 		{
 			IMU_StartCalibration(); // 残り2秒からIMUキャリブレーションを開始
+			calibrateMotorCurrent = true; // IMUと同時に電流センサキャリブレーションを開始
 		}
 	}
 }

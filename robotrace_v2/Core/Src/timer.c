@@ -9,6 +9,7 @@
 #include "lineSensor.h"
 #include "pathFollower.h"
 #include "runGuard.h"
+#include <math.h>
 #include <stdint.h>
 #include <string.h>
 #define STRAIGHT_STATE_THRESHOLD_MM	70	// 直線判定の距離閾値[mm]
@@ -402,12 +403,18 @@ void Interrupt1ms(void)
 			{
 				if (!BMI088getTemp())
 				{
+					imuTempCorrectionEnabled = false;
 					if (runTimingActive) runTiming.imuReadErrorCount++;
 					if (patternTrace >= 11 && patternTrace <= 101)
 					{
 						emcStop = STOP_IMU_READ;
 						motorCommandOut(0, 0);
 					}
+				}
+				else if (!BMI088val.tempValid || !isfinite(BMI088val.temp))
+				{
+					// 温度コードが無効な場合は走行を継続しつつ温度補正だけ停止する。
+					imuTempCorrectionEnabled = false;
 				}
 				imuVal.temp = BMI088val.temp;
 			}

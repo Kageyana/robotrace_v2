@@ -44,6 +44,7 @@ void createLog(void);
 void endTempFile(void);
 void endLog(void);
 void logCaptureRunStartSettings(void);
+void readImuTempCompensation(void);
 void readHeadingCalibrationSettings(void);
 bool logLastRunWasSaved(void);
 bool logLastClosureValid(void);
