@@ -46,7 +46,7 @@
 #define PATH_CORRIDOR_MAX_PROJECTION          1.02f
 #define PATH_CORRIDOR_MIN_SAVING_MM           5.0f
 
-// 寸法入力値はすべて[mm]。機体座標の原点は左右駆動輪の車軸中心とし、
+// 寸法入力値はすべて[mm]。機体座標原点は前車軸中心と後車軸中心の中点とし、
 // 上面から見て右を+X、左を-X、前方を+Y、後方を-Yとする。
 #define PATH_TRACKING_ERROR_BUDGET_MM         15.0f
 #define PATH_LINE_HALF_WIDTH_MM               9.5f   // コースライン実幅の1/2

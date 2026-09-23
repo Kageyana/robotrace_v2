@@ -23,8 +23,8 @@
 #define COEFF_COMPFILTER 0.96F			// ジャイロと加速度のコンプリメンタリフィルタ係数（ジャイロの方が信頼できる場合は大きくする）
 #define COEFF_DPD -0.9924F				// ジャイロの符号と単位変換（DPS→RAD/s）を兼ねる係数（-1に近い値を調整して入れる）
 #define USE_IMU_ROT_CENTER_CORRECTION	// ジャイロzを角加速度に変換して遠心加速度補正に使う（旋回中心からIMUまでの距離がある場合はON推奨）
-#define IMU_OFFSET_X_M 0.0F 			// TODO: 旋回中心から IMU までのオフセット[m]。imuVal の座標系基準
-#define IMU_OFFSET_Y_M 0.0236F 			// TODO: 旋回中心から IMU までのオフセット[m]。imuVal の座標系基準
+#define IMU_OFFSET_X_M  0.0F			// 機体基準点（前後車軸中心の中点）からBMI088中心までの左右オフセット[m]。右を+X
+#define IMU_OFFSET_Y_M (-0.03168F)		// 機体基準点（前後車軸中心の中点）からBMI088中心までの前後オフセット[m]。前方を+Y
 #define GRAVITY_MPS2 9.80665F			// 重力加速度[m/s^2]
 #define DEG2RAD (M_PI / 180.0F)			// deg→rad
 #define RAD2DEG (180.0F / M_PI)			// rad→deg
