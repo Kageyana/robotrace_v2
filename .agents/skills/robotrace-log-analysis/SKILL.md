@@ -1,112 +1,27 @@
 ---
 name: robotrace-log-analysis
-description: ロボトレース走行ログを解析、比較、可視化するときに使う。CSVログ、XY軌跡、速度追従、角速度、スリップ、ラップタイム比較、autoStart 5走比較、emcStopやcntlog欠落の判定を扱う。
+description: 実機のCSVログを検証・可視化・比較し、一次経路元の妥当性やPATH経路の復元結果を判定するときに使う。
 ---
 
-# Robotrace Log Analysis
+# 走行ログ解析
 
-## Overview
+## 入力と有効性
 
-Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md` as the source for project-wide units, log schema, paths, and safety policy.
+- ログフォルダは環境依存。実在するパスを確認する。解析スクリプトは `analysis/script/`、出力は `analysis/` に置く。対象ログ番号と走行モード `optimalTrace` を記録し、一次・`BOOST_DISTANCE`・`BOOST_PATH_REPLAY`・`BOOST_SHORTCUT` を混ぜて比較しない。
+- 現行列定義は `robotrace_v2/Core/Inc/log_schema.h`（schema 10: 軽量36 B、詳細121 B）。CSVはUTF-8で1行目が `key=value` メタデータ、2行目が列名、3行目以降がデータ。旧式の混在1行ヘッダ・メタデータなし形式も列名で解決する。ファームウェア行末のカンマは無名の空欄としてのみ無視し、名前のある列の不足や行数不一致は無視しない。
+- まず `emcStop==0`、`cntlog` の連続性、必要列、バッテリー電圧を確認する。新形式は `logExpectedRows` とデータ行数/改行終端、`logOverflowFinal` も照合し、ヘッダのない旧ログに新形式の要件を遡及しない。PATH系は1サンプルの `optimalIndex` 前進が5点以上なら無効。Level 1評価は `shortcutBuildStatus=1`、回廊数・短縮量・合法余裕を確認する。失敗走行は原因分析に使ってよいが採用比較から除く。
+- 軽量ログにはスリップ・モーターPWM・線形加速度・位置補正診断列がない。必要なら `robotrace_v2/CMakePresets.json` の `DebugMarker` または `ROBOTRACE_LOG_SCHEMA_PROFILE_LIGHT=0` で詳細ログを取得する。レコード長変更は制御負荷にも影響し得るので、通常ログと詳細ログを同条件とみなさない。
 
-## Inputs
+## スキーマ・経路の解釈
 
-- Logs live under `F:\Dropbox\Document\robotrace\Log\v2` when accessible.
-- Logs are CSV, UTF-8, comma-separated. The current format stores `name=value` metadata on line 1, column names on line 2, and data from line 3 onward. Readers must also accept legacy mixed headers containing column names and metadata on line 1, and old metadata-free column headers.
-- The schema source is `robotrace_v2/Core/Inc/log_schema.h`.
-- Schema 7 uses 48-byte light records; schema 8 uses 36-byte light records by moving the three linear-acceleration fields to the 121-byte detailed profile. Both keep signed instantaneous left/right encoder samples. `gyroVal_Z` is the mean of 1 ms gyro samples over the logged interval (older versions store the instantaneous value). Schema-7/8 first-run raw `x/y` use successive `encTotalOptimal` counts and midpoint heading; their `x_closed_mm/y_closed_mm` apply the historical marker-constrained X correction. Their marker anchor is at `goalMarkerOnset_p`; include `(0,0)` and the corrected goal marker point `(0,goalMarkerYRaw_mm)` in historical plots. Schema 2–8 logs remain analysis-readable but cannot source a new route on schema-9 firmware.
-- Route controller version 14 regenerates schema-7/8 corrected routes, including the exact marker anchor and the actual final sample; `path_log_recovery.py` must verify the regenerated point count and CRC before restoring omitted path columns.
-- Schema 9 keeps the 36-byte light record but replaces the two signed 1 ms encoder samples with signed left/right pulse sums over exactly the same interval as `gyroVal_Z`. Its `encoderPulsePerMeter` header is `56687` for old nominal-scale logs or `55116` for later measured-scale logs. Its `x/y` are gyro-only diagnostics and `x_fused_mm/y_fused_mm` are unwarped Kalman-bias-corrected coordinates. Both scales remain analysis-readable for historical PATH recovery with route controller version 16, but cannot source a new route.
-- Schema 10 preserves the 36-byte record and interval encoder columns. `encoderPulsePerMeter=58019` passed five powered straight runs at Duty 100, with each mean forward-distance error below 1% even after the UI rounding bound. Builds made before this validation have `distanceScaleVerified=0`; newer builds set it to 1. `closureReason=10` applies to unverified builds when the other closure checks pass. `x/y` are the independent pre-run-IMU-calibrated gyro coordinates used by route controller version 17; `x_fused_mm/y_fused_mm` and `headingKalman.*` are diagnostic only. Markers only validate finish and `|goalMarkerXRaw_mm| <= 20 mm`. Schema 10 requires 100 successful IMU calibration samples, zero calibration read errors, a verified distance scale, and valid closure. `goalMarkerXFusedDiagnostic_mm` may differ from the gyro goal X. Route points and stop extension do not use the marker anchor.
-- The log header contains data names and `parameter=value` entries.
-- `logSchemaVersion=2` omits `linePointX_mm`, `linePointY_mm`, and `pathLegalMargin_mm` from CSV and binary records. `logSchemaVersion=3` adds the unsigned 16-bit BMI088 `imuTempRaw` code, replaces normal-light `motorpwmL`/`motorpwmR` with signed `encCurrentL`/`encCurrentR` after `ROC`, and also omits `slipFlag`, `slipFlagLat`, `lineTraceCtrl`, `motorVoltageCmdL_mV`, and `motorVoltageCmdR_mV` from the normal light profile, making one binary record 38 bytes. `logSchemaVersion=4` keeps that 38-byte light record and appends `lineMatchResidual_mm`, `poseCorrection_um`, and `poseCorrectionHeading_cdeg` only to the detailed profile. `logSchemaVersion=5` changes only `encCurrentCorr_p` from unsigned 32-bit to signed 16-bit and makes the normal light record 36 bytes; its column name remains unchanged. `logSchemaVersion=6` adds `imuLinearAccelX_mps2`, `imuLinearAccelY_mps2`, and `imuLinearAccelZ_mps2` as float32 `[m/s²]` columns immediately after `gyroVal_Z`, making the normal light record 48 bytes. Existing schema 2～6 CSVs remain readable by header name. Old CSVs containing the three reconstructable columns use the saved values first. Version 5/6 end-of-run headers also record `logRecordSizeBytes`, `dbgOverflowFinal`, `logOverflowFinal`, `distanceKalman.invalidUpdateCount`, `distanceKalman.maxAbsFusedDelta_p`, and `distanceKalman.outputGuardCount`.
-- For new PATH logs, recover the three omitted values in memory from `analysisSourceLog` (or `routeSourceLog` only for old logs), the source CSV, the Version 12/13 generator settings, and `optimalIndex`. Search beside the secondary log by default; use `--source-log-dir` for another folder.
-- Do not substitute a cntlog-repaired source CSV automatically. Require route point-count, `routeGeometryCrc32`, controller version, and generated-result header checks before recovery. Missing source, unsupported version, CRC mismatch, or out-of-range index produces missing values, not zero or a normal value.
-- Firmware-side route parsing resolves required fields by header name, not fixed column number. Normal route generation requires `courseMarker`, `encTotalOptimal`, and `ROC`. The optional additional slip analysis requires a legacy or debug log containing `targetSpeed`, `optimalIndex`, `slipFlag`, and `slipFlagLat`.
-- Do not treat the metadata line as a data header. Resolve the column-name row first, then map data by header name.
-- Firmware CSV rows end with a comma; `csv.DictReader` exposes the trailing empty field as `""`. Ignore only that unnamed terminal field in completeness checks, and still reject missing named fields, extra values, or row-count mismatches.
-- Distinguish run mode by `optimalTrace`.
-- Exclude failed runs when `emcStop != 0`.
-- Invalidate logs with `cntlog` gaps or processing drops; identify and report the cause.
-- If battery voltage differs significantly, recommend charging and retrying instead of comparing as equal conditions.
+- schema 7/8 の `encCurrentL/R` は瞬間の1 msパルス、schema 9/10 の `encIntervalL_p/R_p` はジャイロ平均と同じログ区間の積算パルス。`encCurrentCorr_p` は融合後の符号付き1 ms差分。旧版と新版の値を同じ物理量として比較しない。
+- schema 9 の `x/y` は診断用ジャイロXY、`x_fused_mm/y_fused_mm` が当時の経路XY。schema 10 は逆に `x/y` が経路用ジャイロXY、`x_fused_mm/y_fused_mm` は診断専用。現行ファームウェアの新規PATH元ログは schema 10 の正常一次走行のみで、`closureValid=1`、`distanceScaleVerified=1`、エンコーダ換算とIMU校正・読出し状態が合致する必要がある。旧ログは閲覧と履歴復元用に扱う。
+- PATH系で軽量ログから省略された `linePointX_mm`、`linePointY_mm`、`pathLegalMargin_mm` は `analysis/script/path_log_recovery.py` で一次ログと設定からメモリ上に復元する。一次ログは二次ログと同じフォルダを探し、必要なら `--source-log-dir` を指定する。元CSVや `cntlog` 補修済みファイルを自動で上書き・代用しない。
+- 復元時は `routeControllerVersion` に対応する経路を再生成し、`routePointCount`、`routeGeometryCrc32`、Level/生成結果のヘッダ値、有限な整数 `optimalIndex` とその範囲を照合する。元ログ欠落・CRC不一致・不正indexは0補完せず欠測とする。保存値優先、復元状態は `saved` / `restored` / `partial` / `missing` / `not_applicable` と理由・元ログ番号・欠測行数を出す。欠測行があれば走行全体の最小合法余裕は判定不能。
+- `pathErrorHeading_cdeg` は経路制御版3以前は先読み方位との差、版4以降は最近傍接線との差。異なる定義のp95は直接比較しない。`imuTempRaw=0x400` は無効で、他の生値は11ビット符号付きとして `signed_code * 0.125 + 23` [°C] に変換する。
 
-## Workflow
+## 比較・出力
 
-1. Inspect available logs and identify target log numbers.
-2. Confirm the run mode from `optimalTrace` and compare only compatible run types.
-3. Check validity:
-   - `emcStop == 0`
-   - `cntlog` is monotonic and plausible for distance-based logging
-   - required columns from `log_schema.h` exist
-   - `batteryVoltage_V` is suitable for comparison
-4. Analyze required plots and tables:
-   - XY trajectory
-   - speed tracking
-   - angular velocity
-   - slip when the columns are present; otherwise report it as not recorded
-   - lap time comparison table
-5. Save generated graphs and tables under `analysis/`.
-6. Report comparison target logs, changed condition, adoption decision, and remaining issues.
-
-## Column Meanings
-
-- `cntlog`: time after run start, based on `cntRun`, `[ms]`.
-- `encCurrentN`: average left/right encoder pulse count per 1 ms. Builds after the powered distance validation carry the half-pulse remainder between 1 ms samples to prevent cumulative truncation bias.
-- `encCurrentL`, `encCurrentR`: signed left/right encoder pulse counts per 1 ms; schema versions 3–8 normal-light logs store them immediately after `ROC`.
-- `encIntervalL_p`, `encIntervalR_p`: schema-9 signed left/right interval pulse sums, aligned with the interval-mean `gyroVal_Z`; do not treat these as instantaneous 1 ms samples.
-- `encCurrentCorr_p`: signed Kalman-fused distance pulse difference per 1 ms; schema versions 5–8 store it as signed 16-bit.
-- `encLog`, `encRightMarker`: raw encoder counters used for log timing and goal-marker distance; they are intentionally independent of fusion validation.
-- `enc1`, `encCurve`, `encChangeGain`, `encTotalOptimal`, `encPID`: internal counters updated with the validated fused distance difference.
-- `distanceKalman.innovationRejectCount`: count of 1 ms updates where the encoder observation was completely skipped because the innovation exceeded 4σ or the encoder speed exceeded ±10 m/s.
-- `distanceKalman.fallbackCount`: count of transitions to raw-encoder fallback while IMU calibration, IMU validity, or finite-value checks were invalid.
-- `distanceKalman.invalidUpdateCount`: count of finite-state, covariance-diagonal, or 1 ms fused-distance validation failures that caused a raw-encoder update and covariance reset.
-- `distanceKalman.maxAbsFusedDelta_p`: maximum absolute validated fused 1 ms distance difference in pulses.
-- `distanceKalman.outputGuardCount`: count of fused-output float values that were non-finite or outside ±535 pulses before integer conversion and therefore used the bounded raw encoder pulse.
-- `logRecordSizeBytes`: binary record size recorded at log finalization; Versions 5/8 normal-light logs are 36 bytes, Versions 6/7 are 48 bytes, and Version 8 detailed logs are 121 bytes.
-- `dbgOverflowFinal`: final debug/log-buffer overflow counter; `logOverflowFinal=1` means the log buffer reached its limit.
-- `gyroVal_Z`: IMU Z angular velocity, `[deg/s]`.
-- `imuLinearAccelX_mps2`, `imuLinearAccelY_mps2`, `imuLinearAccelZ_mps2`: X/Y/Z linear acceleration after static gravity-reference removal and rotation-center correction, `[m/s²]`; the Y value is the same value passed to the distance estimator. Schema 8 saves these columns only in detailed logs, so light logs cannot support sample-level acceleration diagnostics.
-- `imuTempRaw`: BMI088 temperature register raw 11-bit code stored in a `uint16_t`; `0x400` is the invalid code. Convert with `temperature_C = signed_code * 0.125 + 23` after 11-bit two's-complement decoding.
-- Schema 10 temperature-compensation metadata is stored in the first header line: `imuTempCalibrationValid`, `imuTempCalibrationStart_C`, `imuTempCalibration_C`, `imuTempCalibrationEnd_C`, `imuTempCalibrationSamples`, `imuTempCalibrationReadErrors`, `imuGyroOffsetZ_dps`, `imuTempCompEnabled`, `imuTempCoeff_dpsPerC`, and `imuTempEnd_C`. Temperature and offset values use three decimal places; the coefficient uses six. Temperature correction is enabled only for at least 16 valid calibration temperatures and a non-zero coefficient. A zero coefficient keeps the calibration statistics but makes `imuTempCompEnabled=0`.
-- The coefficient source is `setting/imu_temp.txt`, a signed integer divided by `1,000,000` to obtain `[dps/°C]`; valid values are `-100000..100000`, and missing or invalid settings are repaired to `0`. The stored motion columns `imuTempRaw` and corrected `gyroVal_Z` remain unchanged, and schema 10 record sizes remain 36 bytes (light) and 121 bytes (detailed).
-- `courseMarker`: confirmed marker state while running.
-- `encTotalOptimal`: corrected distance count for secondary runs.
-- `ROC`: curvature radius, `[mm]`.
-- `targetSpeed`: target speed in encoder converted units, `[pulse/ms]`.
-- `optimalIndex`: index into `PPAD[]` or `shortCutxycie[]`.
-- `slipFlag`: longitudinal slip flag; schema version 3/4 light logs omit it.
-- `slipFlagLat`: lateral slip flag; schema version 3/4 light logs omit it.
-- `lineTraceCtrl`: value is `lineTraceOmegaFBCtrl.pwm`; schema version 3/4 light logs omit it.
-- `targetAngularvelo`: log target angular velocity, `[deg/s]`.
-- `motorpwmL`, `motorpwmR`: left/right motor PWM; schema version 3/4 normal-light logs omit them, while detailed debug logs retain them. Schema version 2 normal-light CSVs contain them in their original positions.
-- `motorVoltageCmdL_mV`, `motorVoltageCmdR_mV`: motor voltage commands before duty conversion; schema version 3/4 light logs omit them.
-- `lineMatchResidual_mm`: observed line point to matched continuous first-run route segment distance `[mm]`; schema version 4 detailed logs only.
-- `poseCorrection_um`: translation correction magnitude applied in one 5 ms update `[um]`; schema version 4 detailed logs only.
-- `poseCorrectionHeading_cdeg`: heading correction applied in one 5 ms update `[0.01 deg]`; schema version 4 detailed logs only.
-- `x`, `y`: estimated position from the start marker origin, `[mm]`.
-- `linePointX_mm`, `linePointY_mm`: corresponding first-run line point, `[mm]`; stored in old CSVs and reconstructed in memory for schema version 2/3/4/5/6.
-- `pathErrorY_mm`: signed lateral path error, `[mm]`.
-- `pathErrorHeading_cdeg`: heading error, `[0.01 deg]`.
-- `pathState`: 1 tracking, 2 line fallback, 3 rejoin blend, 4 localization lost.
-- `pathLegalMargin_mm`: remaining line-overlap margin after the tracking-error budget, `[mm]`; stored in old CSVs and reconstructed in memory for schema version 2/3/4/5/6.
-
-## Run Mode Checks
-
-- `BOOST_NONE`: verify distance, angular velocity, markers, curvature radius, and XY plot. Pay special attention to angle drift.
-- `BOOST_MARKER`: verify all markers detected in the first run are detected.
-- `BOOST_DISTANCE`: verify current course position matches the estimated position and first-run distance.
-- `BOOST_PATH_REPLAY`: verify path lateral/heading error, fallback count, and line correction validity against the first-run route.
-- `BOOST_SHORTCUT`: verify the robot follows the validated shortcut, `pathLegalMargin_mm` remains non-negative, and no localization fallback occurs.
-- For schema version 2/3/4/5/6/7, report each reconstructed field as `saved`, `restored`, `partial`, or `missing`, including the reason, source log number, and `recovery_missing_samples`. `restored` requires every row to succeed; mixed row results are `partial`, and no successful row is `missing`.
-- Accept `optimalIndex` only when it is finite, integer-valued, non-negative, and within the regenerated route. Blank, fractional, NaN, infinity, negative, and out-of-range values are missing. Compute index differences only between adjacent valid rows; never bridge across a missing row.
-- If any reconstructed row is missing, report the whole-run legal margin as indeterminate rather than taking the minimum of only valid rows. Continue speed, slip, state, and recorded path-error analysis. Plot reference-route segments separately so missing intervals are not connected, and annotate the missing sample count.
-- Compare only logs with the same run mode; distance, path replay, and shortcut modes are not equivalent.
-
-## Output Rules
-
-- Put analysis scripts in `analysis/script/`.
-- Use Python when useful.
-- Save results in `analysis/`.
-- Name outputs so the target log number and analysis type are clear.
-- Examples: `log_00012_summary.csv`, `log_00012_xy.png`.
-- If the input contract is not yet implemented, decide it before adding a script: single log, multi-log comparison, and autoStart 5-run comparison are separate modes.
+1. 対象モードで揃え、バッテリー・速度設定・ファームウェア/経路版・校正状態を照合する。autoStart比較は5走すべて揃った系列を用いる。電圧差が大きければ充電後に取り直す。
+2. XY、ラップタイム、目標/実速度、角速度、PATH時の横・方位誤差とフォールバック、存在する場合だけスリップを図表化する。欠測の経路区間は線でつながず理由を注記する。
+3. `analysis/script/analyze_path_following.py` はPATHモード専用。`--source-log-dir`、`--require-autostart-five`、診断用 `--allow-invalid` を必要に応じて使う。通常の採用比較で `--allow-invalid` を使わない。結果には比較対象・除外理由・変更条件・採否と残課題を残す。

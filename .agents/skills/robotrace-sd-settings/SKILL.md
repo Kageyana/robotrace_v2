@@ -1,152 +1,25 @@
 ---
 name: robotrace-sd-settings
-description: robotrace_v2のSDカード内設定ファイルを読む、書く、修復する、保存形式を変更するときに使う。targetSpeeds.txt、PID設定、lsval.txt、lognum.txt、analysis.txt、boostログの形式を扱う。
+description: 実機SDカードのsetting/*.txtを読み書き・修復するときや設定形式/旧形式互換を変更するときに使う。
 ---
 
-# Robotrace SD Settings
+# SD設定ファイル
 
-## Overview
+- 実機の `./setting/*.txt` をコード既定値より優先する。SD未挿入は警告して走行可能、挿入済みで欠落した設定は既定値で作成する。読めた有効項目は保持し、範囲外は既定値へ戻し、破損ファイルは修復する。`lsval.txt` 破損時は走行禁止。パーサー変更時は欠落・途中切れ・範囲外・既存形式の修復を確認する。
+- 以下の形式は `robotrace_v2/Core/Src/` の実装を正とする。固定幅・末尾カンマ・改行なし等を独断で統一せず、読み手と書き手を同時に変更する。実機上の値を変更する前にファイルの現物を確認する。
 
-Use this skill when editing or reviewing SD-card setting file behavior. Treat `AGENTS.md` as the source for high-level precedence and safety policy.
+## 形式と実装の起点
 
-## General Policy
+| ファイル（`setting/` 下） | 実装 | 保存形式・注意点 |
+| --- | --- | --- |
+| `line.txt`、`lineomega.txt`、`speed.txt`、`yawRate.txt`、`yaw.txt`、`dist.txt` | `PIDcontrol.c` `readPIDparameters` / `writePIDparameters` | `kp,ki,kd`、書式 `%03d,%03d,%03d`、改行なし。 |
+| `speed_ff.txt` | `PIDcontrol.c` `readSpeedFeedForwardGain` / `writeSpeedFeedForwardGain` | 係数整数1項目、`%03d`、改行なし。 |
+| `targetSpeeds.txt` | `control.c` `readTgtspeeds` / `writeTgtspeeds` | 順序は `speedParam` の19項目、各値×100を `%04d,` で保存（末尾カンマあり）。第19項目はLevel 0の `pathReplay`。旧18項目は値を保持して末尾の既定値を補い修復する。 |
+| `shortcut.txt` | `pathFollower.c` `readShortcutSettings` / `writeShortcutSettings` | `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,kLateral_x100,kHeading_x100,lineAlpha_x1000,lineThetaGain_x1e9` の7項目、改行なし。既定 `1,080,040,3000,0600,010,0000`。旧6項目は有効値を保持し末尾 `0000` を追加。ヨー角補正は既定OFF。 |
+| `heading_cal.txt` | `SDcard.c` `readHeadingCalibrationSettings` | `enabled,leftPulsePerM,rightPulsePerM,effectiveTreadCentiMm`、改行なし。欠落・破損時 `0,58092,57945,10602` で無効化して修復。正常な既存値は上書きせず、左右いずれかが `PULSE_METER` と2%超異なる場合はメモリ上で無効化。現行の経路方位には使わず診断用。 |
+| `imu_temp.txt` | `SDcard.c` `readImuTempCompensation` / `IMU.c` | 符号付き整数1項目、改行なし。BMI088ジャイロZ温度係数 `[dps/°C] × 1000000`、範囲 `-100000..100000`。欠落・不正時は0で修復し補正OFF。 |
+| `lsval.txt` | `lineSensor.c` `readLinesenval` / `writeLinesenval` | 10個の `lSensorMax`、続いて10個の `lSensorMin`、各 `%04u,`（末尾カンマあり）、改行なし。全センサー異常や破損時は走行禁止。 |
+| `analysis.txt` / `lognum.txt` | `courseAnalysis.c` `getLogNumber` / `saveLogNumber`、`SDcard.c` `readSavedLogNumber` / `writeSavedLogNumber` | 5桁の番号。`analysis.txt` は解析元番号、`lognum.txt` は保存済み番号。後者の欠落・不正時はSD上の最大ログ番号の次、なければ1。 |
 
-- `./setting/*.txt` on the robot-side SD card is the source for real-machine settings.
-- SD values take precedence over code defaults.
-- Running without an SD card is allowed, but display a warning.
-- If an SD card is inserted and a setting file is missing, create the target file with code defaults.
-- Files are usually headerless ASCII numeric text, comma-separated or a single numeric value.
-- Fixed-width files have read code that assumes the field shape; change readers and writers together.
-
-## Setting File Formats
-
-### PID Gains
-
-Files: `line.txt`, `lineomega.txt`, `speed.txt`, `yawRate.txt`, `yaw.txt`, `dist.txt`
-
-- Implementation: `PIDcontrol.c`, `writePIDparameters()`, `readPIDparameters()`
-- Format: `kp,ki,kd`
-- Write format: `%03d,%03d,%03d`
-- Read format: `%d,%d,%d`
-- No newline.
-- Values are `int16_t` control gains.
-
-### Speed Feedforward
-
-File: `speed_ff.txt`
-
-- Implementation: `PIDcontrol.c`, `writeSpeedFeedForwardGain()`, `readSpeedFeedForwardGain()`
-- Format: `gain`
-- Write format: `%03d`
-- Read format: `%hd`
-- No newline.
-- Value is `speedFeedForwardGain`, with Crr multiplied by 1000.
-
-### BMI088 Gyro-Z Temperature Compensation
-
-File: `imu_temp.txt`
-
-- Implementation: `SDcard.c`, `readImuTempCompensation()`; runtime state API: `IMU.c`.
-- Format: one signed integer `zSlope_x1000000`, ASCII, with no newline.
-- Valid range: `-100000..100000`; the runtime coefficient is the stored value divided by `1000000` and has units `[dps/°C]`.
-- Missing, unreadable, malformed, or out-of-range files are repaired with the default `0` and temperature correction remains disabled.
-- At the countdown's remaining 2 seconds, the existing IMU calibration remains 100 samples at 20 ms intervals. BMI088 temperature is sampled every five accepted IMU calibration samples, for 20 attempts at 100 ms intervals.
-- Temperature calibration is valid at 16 or more valid samples. The first valid temperature, valid-temperature mean, last valid temperature, valid count, and invalid-read count are retained. A zero coefficient does not discard these statistics.
-- The run-time correction is enabled only when temperature calibration is valid and the coefficient is non-zero. A run-time invalid temperature disables correction while preserving the existing IMU read-failure stop behavior.
-
-### Speed and Acceleration Parameters
-
-File: `targetSpeeds.txt`
-
-- Implementation: `control.c`, `writeTgtspeeds()`, `readTgtspeeds()`
-- Format: 19 fixed-width comma-separated fields.
-- Write format: each item `%04d,`
-- Read format: each item `%04hd,`
-- No newline.
-- Stored values are rounded real values multiplied by 100, then divided by 100 on read.
-- Order: `search`, `stop`, `bstStraight`, `bst1500`, `bst1300`, `bst1000`, `bst800`, `bst700`, `bst600`, `bst500`, `bst400`, `bst300`, `bst200`, `bst100`, `acceleF`, `acceleD`, `shortCut`, `decelLeadMm`, `pathReplay`.
-- `search`, `stop`, `bst*`, `shortCut`, `pathReplay` are speeds `[m/s]`.
-- `acceleF`, `acceleD` are accelerations `[m/s^2]`.
-- `decelLeadMm` is distance `[mm]`.
-- `pathReplay` is the Level 0 PATH REPLAY speed cap. Existing 18-field files retain all existing values and are repaired by appending its code default.
-
-### Path Replay and Shortcut
-
-File: `shortcut.txt`
-
-- Implementation: `pathFollower.c`, `writeShortcutSettings()`, `readShortcutSettings()`
-- Format: `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000,lineThetaGain_x1e9`
-- Write format: `%u,%03u,%03u,%04u,%04u,%03u,%04u`
-- No newline.
-- `maxLevel` is `0..3`; SD absent keeps Level 0.
-- The default is `1,080,040,3000,0600,010,0000`; `lineThetaGain_x1e9` stores the heading correction gain as `b x 10^9 [rad/mm^2]` and is OFF by default.
-- Partial reads apply valid fields; invalid or missing fields use defaults and the file is repaired. Existing six-field files preserve their valid values and append `0000`.
-
-### Primary Heading Calibration
-
-File: `heading_cal.txt`
-
-- Implementation: `SDcard.c`, `readHeadingCalibrationSettings()`.
-- Format: `enabled,pulsePerMeterL,pulsePerMeterR,effectiveTreadCentiMm`, no newline.
-- Missing/invalid default: `0,58092,57945,10602` from the latest hand-rolled 1m and turn measurements. Existing valid files are not overwritten. Valid parsed fields are retained during repair, but the calibration is disabled. Values outside `50000..65000` pulse/m or `9000..14000` centi-mm are invalid. If either wheel differs more than 2% from the common distance scale `58019` pulse/m, disable it in memory without rewriting a valid file.
-- The run-start snapshot and wheel-derived Kalman result are saved in the final CSV header for diagnosis only. Schema 10 uses the independently calibrated IMU gyro for route XY; a disabled wheel calibration does not prohibit a route, but the distance-verification and IMU-calibration gates do.
-
-### Line Sensor Calibration
-
-File: `lsval.txt`
-
-- Implementation: `lineSensor.c`, `writeLinesenval()`, `readLinesenval()`
-- Format: `NUM_SENSORS` max values followed by `NUM_SENSORS` min values.
-- Current `NUM_SENSORS` is 10, so there are 20 fields.
-- Write format: each item `%04d,`
-- Read format: each item `%hu,`
-- No newline.
-- Order: `lSensorMax[0]` to `lSensorMax[9]`, then `lSensorMin[0]` to `lSensorMin[9]`.
-- If corrupt, running is prohibited by policy.
-
-### Analysis and Log Numbers
-
-File: `analysis.txt`
-
-- Implementation: `courseAnalysis.c`, `saveLogNumber()`, `getLogNumber()`
-- Format: 5-digit zero-padded log number.
-- Write format: `%05d`
-- Read format: `%5hd`
-- Stores the analyzed log number.
-
-File: `lognum.txt`
-
-- Implementation: `SDcard.c`, `writeSavedLogNumber()`, `readSavedLogNumber()`
-- Format: 5-digit zero-padded log number.
-- Write format: `%05d`
-- Read format: `%d`
-- Used for next saved log number.
-- If missing, unreadable, or `<= 0`, start from SD max log number + 1, or 1.
-
-### Boost Speed Log
-
-File: `boost_%05d.csv`
-
-- Implementation: `courseAnalysis.c`
-- Written when `WRITE_BOOSTSPEED_LOG` is enabled.
-- Header: `index,boost_speed`
-- Row format: `index,boost_speed`, with `boost_speed` as `%.3f`.
-- Slip-analysis SD read errors can append diagnostic rows to the same file.
-
-### Log provenance and schema versions 5 and 6
-
-- The current distance-Kalman firmware keeps `logSchemaVersion=10` and the light/detailed record sizes at 36/121 bytes. Temperature compensation is metadata-only: the header records `imuTempCalibrationValid`, `imuTempCalibrationStart_C`, `imuTempCalibration_C`, `imuTempCalibrationEnd_C`, `imuTempCalibrationSamples`, `imuTempCalibrationReadErrors`, `imuGyroOffsetZ_dps`, `imuTempCompEnabled`, `imuTempCoeff_dpsPerC`, and `imuTempEnd_C`. Temperature and offset values use three decimal places; the coefficient uses six. The motion columns `imuTempRaw` and corrected `gyroVal_Z` remain unchanged.
-
-- Firmware logs set `logSchemaVersion=6`. The normal light profile is 48 bytes and adds float32 `imuLinearAccelX_mps2`, `imuLinearAccelY_mps2`, and `imuLinearAccelZ_mps2` in `[m/s²]` immediately after `gyroVal_Z`; `encCurrentCorr_p` remains a signed 16-bit validated Kalman-fused 1 ms pulse difference. The header's `distanceKalman.innovationRejectCount` counts complete encoder-observation skips caused by an innovation over 4σ or an encoder speed over ±10 m/s, while `invalidUpdateCount` counts finite-state, covariance, or fused-delta validation failures that use raw encoder fallback. `maxAbsFusedDelta_p`, `outputGuardCount`, `logRecordSizeBytes`, `dbgOverflowFinal`, and `logOverflowFinal` record final safety diagnostics. The detailed profile appends `lineMatchResidual_mm`, `poseCorrection_um`, and `poseCorrectionHeading_cdeg`; older schema 2～5 logs remain readable.
-- Every run records `analysisSourceLog` and `slipSourceLog`. Primary runs, unknown sources, failed analysis, and unused slip analysis use `0`; a successful PATH analysis also keeps `routeSourceLog` for compatibility and the two values must match.
-- PATH headers record `routePointCount`, `routeGeometryCrc32`, `shortcutRequestedLevel`, applied `shortcutLevel`, `shortcutBuildStatus`, `shortcutCorridorCount`, `shortcutReduction_mm`, and both the run-start `shortcutSettings.*` and generation-time `routeShortcutSettings.*` values. The seven setting fields are `maxLevel`, `lookaheadBaseMm`, `lookaheadPerMpsMm`, `kLateral_x100`, `kHeading_x100`, `lineAlpha_x1000`, and `lineThetaGain_x1e9`.
-- PC analysis searches the secondary log directory for `analysisSourceLog` and regenerates the Version 12 or 13 route in memory. It must verify point count, CRC, generator result headers, and `optimalIndex` before restoring the three fields. It never overwrites the original CSV or silently replaces the source with a cntlog-repaired copy.
-- Missing source logs, unsupported schema/controller versions, CRC mismatches, and invalid indices are reported as missing with a reason and source number. Non-PATH runs are outside route-following evaluation. Store primary and secondary logs together for PC recovery; do not change the existing SD log deletion policy.
-
-## Corruption Handling
-
-- If a setting file is partially readable, apply only readable values.
-- Use code defaults for out-of-range values.
-- Repair corrupted files by overwriting with defaults or valid values.
-- Prohibit running if `lsval.txt` is corrupt.
-- Parser changes must preserve partial reflection, out-of-range defaulting, repair behavior, and `lsval.txt` run prohibition.
+- `courseAnalysis.h` の `WRITE_BOOSTSPEED_LOG` 有効時は `courseAnalysis.c` が速度計画を `setting/boost_%05d.csv` に書く。無効時にもスリップ解析のSD読出しエラー診断で同名ファイルが作成され得る。常時生成される設定ファイルとして扱わない。
+- 走行ログCSVのスキーマ・`analysisSourceLog` 等の出自・PC側PATH復元手順は `robotrace-log-analysis` を参照する。設定保存タイミングは `control.c` の走行開始処理を確認し、連続走行中の `autoStart>=2` ではパラメータ保存を繰り返さない。
