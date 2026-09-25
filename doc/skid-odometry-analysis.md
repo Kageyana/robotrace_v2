@@ -6,7 +6,7 @@
 
 ## 1. 動力走行による距離換算の確認
 
-室内の直線約1 mを動力走行で3回以上測り、各回の実移動距離と左右エンコーダ値をCSVへ記録する。`powered`は実際に動力走行した場合だけ`1`にする。現在の共通換算値は58,019 pulse/mで、距離校正を変更する前にこの値の妥当性を判定する。
+室内の直線約1 mを動力走行で3回以上測り、各回の実移動距離と左右エンコーダ値をCSVへ記録する。`powered`は実際に動力走行した場合だけ`1`にする。`duty`、`battery_V`、`surface`、`conditions`などの任意列は解析結果へそのまま残る。現在の共通換算値は58,019 pulse/mで、距離校正を変更する前にこの値の妥当性を判定する。
 
 ### 現行画面で測る場合
 
@@ -16,13 +16,15 @@
 4. 同じ条件で3回以上繰り返す。各回の開始・終了値、またはそれらの差を入力する。表示は1 mm単位で丸められるため、判定では表示差に最大±1 mmの不確かさを加える。床の距離測定も1%判定に十分な精度で行う。
 
 ```csv
-run_id,actual_mm,left_start_mm,left_end_mm,right_start_mm,right_end_mm,powered
-1,1000,20,1020,17,1017,1
-2,1000,1020,2020,1017,2017,1
-3,1000,2020,3020,2017,3017,1
+run_id,actual_mm,left_start_mm,left_end_mm,right_start_mm,right_end_mm,powered,duty,conditions
+1,1000,20,1020,17,1017,1,100,室内直線の動力走行
+2,1000,1020,2020,1017,2017,1,100,室内直線の動力走行
+3,1000,2020,3020,2017,3017,1,100,室内直線の動力走行
 ```
 
 上記は**入力形式の例**であり、実測結果ではない。実測した開始・終了表示の差は、`analysis/skid_odometry/powered_1m.csv`の`left_delta_mm,right_delta_mm`に記録した。
+
+1 mm単位の画面表示から開始・終了差を作った場合、各側の距離差には最大±1 mmの表示丸め不確かさがある。結果JSONの`display_quantization_bound_mm`と`side_ppm_display_rounding_bound`がこれを示す。床上の実距離測定誤差はこの丸め幅に含まれないため、実距離の測定方法・路面・Duty・電圧なども任意列へ記録する。入力に条件がない既存データの条件を解析器は推測しない。
 
 エンコーダ生パルスを別手段で取得した場合は、代わりに次の形式を使う。二つの形式を同じCSV内で混在させない。
 
@@ -53,21 +55,81 @@ python analysis/script/analyze_skid_odometry.py distance analysis/skid_odometry/
 
 Debug/Releaseビルドと正転・逆転のホスト試験を通し、Release ELFをSWDで書き込んだ。書き込み後の一次走行7本については第4節で比較する。10本の計画には未達だが、現時点の採否は取得済み7本で判断する。
 
-## 2. 旋回時の診断
+## 2. 左右換算と対称ICRの初期同定
 
-スキーマ9以降の正常な一次走行ログでは、左右の区間パルスと同区間平均ジャイロ角速度から有効トレッドを計算する。速度帯、旋回半径帯、CW/CCW別に中央値と10〜90パーセンタイルを出す。
+まず第1節の動力1 m測定から左右それぞれの`pulse/m`を確かめる。旋回解析には左右値を渡し、測定による左右換算と既存`heading_cal.txt`値を比較する。解析器は設定ファイルを書かず、同定結果で更新もしない。
 
 ```powershell
-python analysis/script/analyze_skid_odometry.py turn F:\Dropbox\Document\robotrace\Log\v2\12554.csv F:\Dropbox\Document\robotrace\Log\v2\12555.csv --output analysis/skid_odometry/turn_diagnostics.json
+$log = "F:\Dropbox\Document\robotrace\Log\v2\125XX.csv" # 正常なschema 10一次ログへ置換
+$leftPpm = [double](Read-Host "動力1 m実測の左pulse/m中央値")
+$rightPpm = [double](Read-Host "動力1 m実測の右pulse/m中央値")
+python analysis/script/analyze_skid_odometry.py turn "$log" --left-ppm $leftPpm --right-ppm $rightPpm --output analysis/skid_odometry/turn_diagnostics.json
 ```
 
-左右別の提供値を診断として適用する場合は、`--left-ppm 58092 --right-ppm 57945`を付ける。出力には`explicit provisional side scale`と記録され、走行ログ内の校正が有効になったことは意味しない。
+引数にはその時点の動力1 m実測から得た左右中央値を指定する。明示値は出力で`explicit provisional side scale`と表示され、走行ログ内の校正が有効になったことを意味しない。
 
-左右個別のpulse/mは、ログ上で校正が有効かつ共通換算との差が各2%以内の場合だけ使う。有効トレッドはタイヤ中心間距離とは別の走行条件依存の診断値であり、一次経路の方位積分を左右車輪差へ切り替えない。
+対象は正常なschema 10の一次ログに限る。`optimalTrace=0`、`closureValid=1`、`closureReason=0`、`emcStop=0`、両overflow=0、`gyroSampleFault=0`、`encoderIntervalFault=0`、IMU校正100サンプル・読出しエラー0、`distanceScaleVerified=1`、`encoderPulsePerMeter=58019`、`logExpectedRows`と実行数の一致を検査する。必要列の欠落、名前付き列の不正行、条件不一致のログは解析を拒否し、その項目をエラーに出す。schema 10の36 B軽量レコード形式と列は変更せず、軽量ログにない`slipFlag`類も必須にしない。
+
+スキーマ10は約10 mmごとの記録で、時間間隔は固定5 msまたは20 msではない。各区間の`dt`を連続行の`cntlog`差からミリ秒で求め、U16折り返しは65536を法として展開する。区間値は次のとおり。
+
+```text
+ΔL[mm] = 1000 × encIntervalL_p / ppmL
+ΔR[mm] = 1000 × encIntervalR_p / ppmR
+Δθ[rad] = gyroVal_Z[deg/s] × dt[s] × π / 180
+Δs[mm] = ΔL − ΔR
+```
+
+同方向の旋回区間をまとめ、CW/CCW・速度帯ごとに原点を通る最小二乗`Δs ≈ T_eff × Δθ`を当てはめる。`tread_fit_mm`がこの未補正の有効トレッド、`tread_median_mm`と`p10/p90`が旋回区間ごとの未補正値とばらつき。`gyro_angle_minus_encoder_angle_*`も各方向の未補正`tread_fit_mm`で比較したジャイロ角と左右差由来角の差を示す。速度帯別に十分な旋回角度がない区間、0.3 m/s未満または10 m/s超、5 deg/s未満、1度未満の旋回、推定トレッド20〜400 mmの範囲外は除外され、件数がJSONに出る。
+
+補助回帰`Δs = T × Δθ + q × Δt`は「時間比例オフセット」の残差診断としてのみ扱う。各速度帯で旋回区間が5本以上あり、CW・CCWの双方を含む場合に`q`[mm/s]、残差RMS[mm]、`R²`、区間数を出力する。左右距離倍率誤差や方向別スリップも時間比例成分になり得るため、`q`や`R²`から物理的なジャイロバイアスを判定せず、主推定のトレッドやICRを補正しない。`icr_candidate_left_mm`と`icr_candidate_right_mm`は未補正主推定の`±T_eff/2`で、左右対称モデルの候補位置にすぎない。記録された旋回条件におけるタイヤ中心間距離109 mmとも別の量である。
+
+旋回診断では共有CSV読込の`strict_rows=True`を使い、列数不足、名前付き列の空値、非空の余剰セル、余剰空セルが2個以上ある行を物理行番号付きで拒否する。現行ログの末尾カンマに相当する空セル1個は許可する。ほかの共有読込呼び出しは従来の寛容な動作を維持する。
+
+結果にはファームウェア版・commit・バッテリー電圧も記録する。`heading_calibration_reference_only`と差分項目には、ログに保存された既存`heading_cal.txt`値を表示する。これは比較用で、解析結果をSDカードやファームウェアへ書き戻さない。
+
+これらの信号だけでは横速度係数`K_lat`や前後方向ICRずれを同定できない。完全なスキッドステア運動モデルには時刻同期した外部XY運動計測が必要である（[Mandowらの実験的運動学](https://doi.org/10.1109/IROS.2007.4399139)）。`pathFollowerUpdatePose1ms()`、横速度、EKF、SD設定はこの段階では変更しない。
 
 保存済みの`12554`〜`12559`では、たとえば1〜2 m/s・半径200 mm未満のCW旋回が約119 mm、同条件のCCW旋回が約114 mmの中央値だった。6本とも`closureValid=0`で、取得時点では距離換算の動力検証も未完了だったため、これは校正値の採用根拠ではない。詳細は`turn_12554_12559.json`に保存した。
 
+これらの過去ログは新しい旋回診断の入力ゲートを満たさない。将来、正常なschema 10一次ログが得られてからCW/CCW・速度帯ごとの再現性を評価する。実測ログがない間はパラメータを採用扱いにせず、制御採用には同条件の実機ログ最低10本を用い、完走率・経路誤差を先に比較する。
+
 同じ6本へ左右別の提供値を適用すると、同条件の各走中央値はCW 118.31〜119.58 mm、CCW 114.27〜114.67 mmだった。共通換算との差はCWで約-0.2〜-0.4 mm、CCWで約+0.4 mmと小さく、左右旋回差は残る。結果は`turn_12554_12559_side_58092_57945.json`に保存した。接地・横滑りの診断値として扱い、経路方位に使わない。
+
+### 2026-09-25時点の既存ログによる初期評価
+
+`F:\Dropbox\Document\robotrace\Log\v2\126*.csv`の78本を確認し、今回の正常schema 10一次走行条件を通った7本（12656〜12658、12662、12663、12668、12673）だけを解析した。7本とも36 B、行数一致、故障・overflowなし、`cntlog`差10〜12 msだった。残りは一次走行でないか、閉路・停止条件を満たさないため除外した。
+
+次表は各走行内の旋回区間を速度帯・方向ごとに当てはめた未補正`T_eff`の中央値と、走行間の範囲である。ログ間の生サンプルは混ぜていない。`±T_eff/2`の対称ICR候補も、同じJSONの`icr_candidate_left_mm` / `icr_candidate_right_mm`に未補正値として保存する。
+
+| commit | ログ数 | `batteryVoltage_V`範囲 | 速度帯[m/s] | CW `T_eff`[mm] | CCW `T_eff`[mm] |
+| --- | ---: | ---: | --- | ---: | ---: |
+| `0c643ed` | 4 | 7.96〜8.28 V | 0.3〜1 | 108.52 (107.52〜108.84) | 107.66 (105.62〜108.27) |
+| `0c643ed` | 4 | 7.96〜8.28 V | 1〜2 | 116.57 (115.28〜116.92) | 116.34 (115.66〜116.90) |
+| `9bbb07c` | 3 | 7.54〜7.57 V | 0.3〜1 | 108.92 (108.90〜108.99) | 107.36 (105.92〜109.71) |
+| `9bbb07c` | 3 | 7.54〜7.57 V | 1〜2 | 118.71 (118.65〜120.30) | 116.05 (115.19〜116.63) |
+
+2〜4 m/s以上の有効な旋回区間はこの7本にない。commitと電圧条件が異なるため、この表から単一の採用値を決めない。JSONの`time_proportional_offset_by_speed_band`には適格速度帯の`q_mmps`、`residual_rms_mm`、`r_squared`、`segments`を記録する。これは残差形状の診断値で、`R²`を含め物理的なジャイロバイアスの識別・補正には使わない。
+
+同じ7本の時間比例オフセット診断の範囲は次のとおり。`segments`は各ログ内の旋回区間数である。
+
+| 速度帯[m/s] | `q_mmps`[mm/s] | 残差RMS[mm] | `R²` | `segments` |
+| --- | ---: | ---: | ---: | ---: |
+| 0.3〜1 | -7.06〜-1.94 | 1.64〜1.93 | 0.99859〜0.99914 | 88〜186 |
+| 1〜2 | -7.89〜11.00 | 1.81〜3.07 | 0.99674〜0.99851 | 116〜165 |
+
+共通58,019 pulse/mでの出力は`analysis/skid_odometry/turn_12656_12673_common.json`、5回の丸め表示距離から出た左右中央値（左58,193、右57,614 pulse/m）を仮適用した感度出力は`analysis/skid_odometry/turn_12656_12673_provisional_side_scales.json`にある。左右測定は`side_scale_verified=false`なので仮適用であり、`T_eff`の差は各binで最大4.42 mmだった。既存ログの`headingCalibration.enabled=0`かつ記録値109.00 mmは参照のままである。
+
+## 検証と採用範囲
+
+合成ログは左右パルス符号、可変区間時間、cntlog折り返し、既知トレッド、ゼロの真のジャイロバイアスでCW/CCW有効トレッドが異なる場合、5区間未満の補助回帰抑止、欠落行・故障メタデータを確認する。共有読込の厳格モードでは末尾カンマあり・なしの正常行を受理し、余分な`999`、列不足、名前付き列の空値、余剰空セル複数を行番号付きで拒否する。旧形式の共有読込テストも実行する。リポジトリルートから次を実行する。
+
+```powershell
+python -m unittest analysis.script.test_skid_odometry analysis.script.test_log_header_formats analysis.script.test_heading_route_schema10 analysis.script.test_heading_route_schema9
+```
+
+現状の7本は初期オフライン評価のみとし、旋回係数を採用しない。実ログでは同一走行条件の正常一次ログを揃え、CW/CCWと速度帯ごとに再現性を比較する。後日のファームウェア採否には実機ログ最低10本を使い、完走率と経路誤差を先に評価する。
+
+この段階は左右距離倍率と対称ICRの候補診断までとする。横速度係数`K_lat`と前後方向ICRずれは、左右エンコーダとジャイロだけでは同定できない。外部XY基準を時刻同期してから横方向モデルを評価し、現行姿勢更新とのオフライン比較を通過した後にファームウェア反映を検討する。
 
 ## 3. 横滑りのオフライン候補
 

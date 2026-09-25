@@ -18,15 +18,20 @@ from pathlib import Path
 
 try:
     from .path_log_recovery import read_csv_log
-    from .robotrace_units import pulse_meter_for_log
+    from .robotrace_units import CURRENT_PULSE_METER, pulse_meter_for_log
 except ImportError:
     from path_log_recovery import read_csv_log
-    from robotrace_units import pulse_meter_for_log
+    from robotrace_units import CURRENT_PULSE_METER, pulse_meter_for_log
 
 
 DEFAULT_OUTPUT_DIR = Path("analysis/skid_odometry")
 PHYSICAL_TREAD_MM = 109.0
 MIN_TURN_DEG = 1.0
+MIN_TURN_RATE_DPS = 5.0
+MIN_SPEED_MPS = 0.3
+MAX_SPEED_MPS = 10.0
+MAX_CNTLOG_DELTA_MS = 0x7FFF
+MIN_TIME_OFFSET_SEGMENTS = 5
 
 
 def _number(value: str, name: str) -> float:
@@ -34,6 +39,13 @@ def _number(value: str, name: str) -> float:
     if not math.isfinite(result):
         raise ValueError(f"{name}: finite number required")
     return result
+
+
+def _integer(value: str, name: str) -> int:
+    result = _number(value, name)
+    if not result.is_integer():
+        raise ValueError(f"{name}: integer required")
+    return int(result)
 
 
 def _percentile(values: list[float], fraction: float) -> float:
@@ -44,8 +56,8 @@ def _percentile(values: list[float], fraction: float) -> float:
     return ordered[lower] + (ordered[upper] - ordered[lower]) * (position - lower)
 
 
-def _read_run(path: Path, required: set[str]):
-    log = read_csv_log(path)
+def _read_run(path: Path, required: set[str], *, strict_rows: bool = False):
+    log = read_csv_log(path, strict_rows=strict_rows)
     missing = sorted(required - set(log.fields))
     if missing:
         raise ValueError(f"{path.name}: missing columns: {', '.join(missing)}")
@@ -55,16 +67,28 @@ def _read_run(path: Path, required: set[str]):
         if _number(log.parameters[name], name) != 0:
             raise ValueError(f"{path.name}: invalid {name}={log.parameters[name]}")
     if "logExpectedRows" in log.parameters:
-        expected = int(_number(log.parameters["logExpectedRows"], "logExpectedRows"))
+        expected = _integer(log.parameters["logExpectedRows"], "logExpectedRows")
         if expected != len(log.rows):
             raise ValueError(f"{path.name}: expected {expected} rows, got {len(log.rows)}")
-    previous_ms = 0
-    for row in log.rows:
-        current_ms = int(_number(row["cntlog"], "cntlog"))
-        if not 0 < current_ms - previous_ms <= 20:
-            raise ValueError(f"{path.name}: invalid cntlog interval at {current_ms} ms")
-        previous_ms = current_ms
+    if "cntlog" in required:
+        _cntlog_deltas_ms(log, path.name)
     return log
+
+
+def _cntlog_deltas_ms(log, label: str) -> list[int]:
+    """cntlogのU16折り返しを展開し、連続する正の区間時間を返す。"""
+    deltas = []
+    previous = 0
+    for row in log.rows:
+        current = _integer(row["cntlog"], "cntlog")
+        if not 0 <= current <= 0xFFFF:
+            raise ValueError(f"{label}: cntlog outside U16 range: {current}")
+        delta = (current - previous) & 0xFFFF
+        if not 0 < delta <= MAX_CNTLOG_DELTA_MS:
+            raise ValueError(f"{label}: invalid or ambiguous cntlog interval at {current} ms")
+        deltas.append(delta)
+        previous = current
+    return deltas
 
 
 def check_distance(path: Path, nominal_ppm: float) -> dict:
@@ -94,6 +118,7 @@ def check_distance(path: Path, nominal_ppm: float) -> dict:
                 left = _number(row["left_p"], "left_p")
                 right = _number(row["right_p"], "right_p")
                 display_uncertainty_mm = 0.0
+                ppm_rounding_bound = 0.0
                 source_name = "encoder_pulses"
             elif use_display:
                 left_display_mm = (_number(row["left_end_mm"], "left_end_mm")
@@ -104,6 +129,7 @@ def check_distance(path: Path, nominal_ppm: float) -> dict:
                 right = right_display_mm * nominal_ppm / 1000.0
                 # 前後2回の1 mm丸め表示差には各側で最大±1 mmの不確かさがある。
                 display_uncertainty_mm = 1.0
+                ppm_rounding_bound = nominal_ppm / actual
                 source_name = "rounded_ui_mm"
             else:
                 left_display_mm = _number(row["left_delta_mm"], "left_delta_mm")
@@ -112,6 +138,7 @@ def check_distance(path: Path, nominal_ppm: float) -> dict:
                 right = right_display_mm * nominal_ppm / 1000.0
                 # 画面の前後表示を引いた値として、両端の丸めを最大±1 mmで扱う。
                 display_uncertainty_mm = 1.0
+                ppm_rounding_bound = nominal_ppm / actual
                 source_name = "rounded_ui_delta_mm"
             if not 900 <= actual <= 1100 or min(left, right) <= 0:
                 raise ValueError(f"run {row['run_id']}: expected forward travel near 1 m")
@@ -123,6 +150,15 @@ def check_distance(path: Path, nominal_ppm: float) -> dict:
                 "actual_mm": actual,
                 "measurement_source": source_name,
                 "display_quantization_bound_mm": display_uncertainty_mm,
+                "side_ppm_display_rounding_bound": ppm_rounding_bound,
+                "measurement_conditions": {
+                    name: (row.get(name) or "").strip() for name in reader.fieldnames
+                    if name is not None
+                    if name not in {"run_id", "actual_mm", "powered", "left_p", "right_p",
+                                    "left_start_mm", "left_end_mm", "right_start_mm",
+                                    "right_end_mm", "left_delta_mm", "right_delta_mm"}
+                    and (row.get(name) or "").strip()
+                },
                 "estimated_mm": estimated,
                 "error_percent": 100.0 * (estimated - actual) / actual,
                 "left_error_percent": 100.0 * (left_estimated - actual) / actual,
@@ -141,6 +177,13 @@ def check_distance(path: Path, nominal_ppm: float) -> dict:
         raise ValueError("three or more distinct powered runs are required")
     return {
         "nominal_ppm": nominal_ppm,
+        "measurement_source": trials[0]["measurement_source"],
+        "measurement_conditions": [trial["measurement_conditions"] for trial in trials],
+        "display_rounding_model": {
+            "display_resolution_mm": 1.0,
+            "per_side_delta_bound_mm": 1.0 if trials[0]["measurement_source"].startswith("rounded_ui") else 0.0,
+            "actual_distance_uncertainty_included": False,
+        },
         "left_ppm_median": statistics.median(t["left_ppm"] for t in trials),
         "right_ppm_median": statistics.median(t["right_ppm"] for t in trials),
         "observed_scale_within_one_percent": all(
@@ -158,32 +201,128 @@ def check_distance(path: Path, nominal_ppm: float) -> dict:
 
 def _side_scales(metadata: dict[str, str], common_ppm: float) -> tuple[float, float, str]:
     if metadata.get("headingCalibration.enabled") == "1":
-        try:
-            left = _number(metadata["headingCalibration.pulsePerMeterL"], "left ppm")
-            right = _number(metadata["headingCalibration.pulsePerMeterR"], "right ppm")
-            if all(abs(side / common_ppm - 1.0) <= 0.02 for side in (left, right)):
-                return left, right, "enabled per-side calibration"
-        except KeyError:
-            pass
+        left = _number(metadata["headingCalibration.pulsePerMeterL"], "left ppm")
+        right = _number(metadata["headingCalibration.pulsePerMeterR"], "right ppm")
+        if not all(abs(side / common_ppm - 1.0) <= 0.02 for side in (left, right)):
+            raise ValueError("enabled heading calibration side ppm must be within 2% of common scale")
+        return left, right, "existing enabled per-side calibration (diagnostic reference)"
     return common_ppm, common_ppm, "common log scale; per-side calibration not validated"
 
 
 def turn_sample(left_p: float, right_p: float, gyro_dps: float,
                 dt_s: float, left_ppm: float, right_ppm: float) -> tuple[float, float]:
     """CW正の角速度に対する診断用有効トレッド[mm]と前進速度[m/s]。"""
+    if dt_s <= 0 or left_ppm <= 0 or right_ppm <= 0:
+        raise ValueError("dt and pulse-per-meter values must be positive")
     left_mm = left_p * 1000.0 / left_ppm
     right_mm = right_p * 1000.0 / right_ppm
     delta_heading_rad = math.radians(gyro_dps * dt_s)
     return (left_mm - right_mm) / delta_heading_rad, (left_mm + right_mm) * 0.0005 / dt_s
 
 
+def _speed_band(speed_mps: float) -> str:
+    if speed_mps < 1.0:
+        return "0.3-1"
+    if speed_mps < 2.0:
+        return "1-2"
+    if speed_mps < 4.0:
+        return "2-4"
+    return "4-10"
+
+
+def _fit_time_proportional_offset(segments: list[dict]) -> dict | None:
+    """Δs=T*Δθ+q*Δt の補助回帰を残差診断用に計算する。"""
+    if len(segments) < MIN_TIME_OFFSET_SEGMENTS or \
+            {segment["turn"] for segment in segments} != {"CW", "CCW"}:
+        return None
+    xx = xz = zz = xy = zy = 0.0
+    for segment in segments:
+        theta = segment["gyro_angle_rad"]
+        duration = segment["duration_s"]
+        delta_side = segment["left_mm"] - segment["right_mm"]
+        xx += theta * theta
+        xz += theta * duration
+        zz += duration * duration
+        xy += theta * delta_side
+        zy += duration * delta_side
+    determinant = xx * zz - xz * xz
+    if determinant <= max(1e-12, xx * zz * 1e-10):
+        return None
+    tread = (xy * zz - zy * xz) / determinant
+    q_mmps = (zy * xx - xy * xz) / determinant
+    if not math.isfinite(tread) or not math.isfinite(q_mmps):
+        return None
+    deltas_side = [s["left_mm"] - s["right_mm"] for s in segments]
+    predicted = [tread * s["gyro_angle_rad"] + q_mmps * s["duration_s"]
+                 for s in segments]
+    mean_delta = statistics.mean(deltas_side)
+    residual_sum_squares = sum((actual - estimate) ** 2
+                               for actual, estimate in zip(deltas_side, predicted))
+    total_sum_squares = sum((actual - mean_delta) ** 2 for actual in deltas_side)
+    residual_rms_mm = math.sqrt(residual_sum_squares / len(segments))
+    r_squared = (1.0 - residual_sum_squares / total_sum_squares
+                 if total_sum_squares > 0 else None)
+    return {
+        "q_mmps": q_mmps,
+        "residual_rms_mm": residual_rms_mm,
+        "r_squared": r_squared,
+        "segments": len(segments),
+    }
+
+
 def diagnose_turns(path: Path, side_ppm: tuple[float, float] | None = None) -> dict:
-    log = _read_run(path, {"cntlog", "gyroVal_Z", "encIntervalL_p", "encIntervalR_p"})
-    if int(_number(log.parameters.get("logSchemaVersion", "0"), "schema")) < 9:
-        raise ValueError(f"{path.name}: interval encoders require schema 9+")
-    if _number(log.parameters.get("optimalTrace", "nan"), "optimalTrace") != 0:
-        raise ValueError(f"{path.name}: use primary-run logs for turn calibration")
+    log = _read_run(path, {"cntlog", "gyroVal_Z", "encIntervalL_p", "encIntervalR_p"},
+                    strict_rows=True)
+    required_metadata = (
+        "logSchemaVersion", "optimalTrace", "closureValid", "closureReason",
+        "distanceScaleVerified", "encoderPulsePerMeter", "imuCalibrationValid",
+        "imuCalibrationSamples", "imuCalibrationReadErrors", "gyroSampleFault",
+        "encoderIntervalFault", "logExpectedRows", "emcStop", "logOverflowFinal",
+        "dbgOverflowFinal", "headingCalibration.enabled",
+        "headingCalibration.pulsePerMeterL", "headingCalibration.pulsePerMeterR",
+        "headingCalibration.effectiveTread_mm",
+    )
+    missing_metadata = [name for name in required_metadata if name not in log.parameters]
+    if missing_metadata:
+        raise ValueError(f"{path.name}: missing metadata: {', '.join(missing_metadata)}")
+    expected_checks = {
+        "logSchemaVersion": 10,
+        "optimalTrace": 0,
+        "closureValid": 1,
+        "closureReason": 0,
+        "distanceScaleVerified": 1,
+        "encoderPulsePerMeter": int(CURRENT_PULSE_METER),
+        "imuCalibrationValid": 1,
+        "imuCalibrationSamples": 100,
+        "imuCalibrationReadErrors": 0,
+        "gyroSampleFault": 0,
+        "encoderIntervalFault": 0,
+        "emcStop": 0,
+        "logOverflowFinal": 0,
+        "dbgOverflowFinal": 0,
+    }
+    for name, expected in expected_checks.items():
+        actual = _number(log.parameters[name], name)
+        if actual != expected:
+            raise ValueError(f"{path.name}: invalid {name}={log.parameters[name]} (expected {expected})")
+    if _number(log.parameters["headingCalibration.enabled"], "headingCalibration.enabled") not in (0, 1):
+        raise ValueError(f"{path.name}: invalid headingCalibration.enabled")
+    calibration_reference = {
+        "headingCalibration.pulsePerMeterL": _number(
+            log.parameters["headingCalibration.pulsePerMeterL"], "headingCalibration.pulsePerMeterL"),
+        "headingCalibration.pulsePerMeterR": _number(
+            log.parameters["headingCalibration.pulsePerMeterR"], "headingCalibration.pulsePerMeterR"),
+        "headingCalibration.effectiveTread_mm": _number(
+            log.parameters["headingCalibration.effectiveTread_mm"], "headingCalibration.effectiveTread_mm"),
+    }
+    if any(value <= 0 for value in calibration_reference.values()):
+        raise ValueError(f"{path.name}: invalid heading calibration reference values")
+    expected_rows = _integer(log.parameters["logExpectedRows"], "logExpectedRows")
+    if expected_rows <= 0 or expected_rows != len(log.rows):
+        raise ValueError(f"{path.name}: expected {expected_rows} rows, got {len(log.rows)}")
     common_ppm = pulse_meter_for_log(log.parameters)
+    if common_ppm != CURRENT_PULSE_METER:
+        raise ValueError(f"{path.name}: unsupported pulse scale {common_ppm}")
     if side_ppm is None:
         left_ppm, right_ppm, scale_source = _side_scales(log.parameters, common_ppm)
     else:
@@ -192,43 +331,144 @@ def diagnose_turns(path: Path, side_ppm: tuple[float, float] | None = None) -> d
                abs(value / common_ppm - 1.0) > 0.02 for value in side_ppm):
             raise ValueError(f"{path.name}: side ppm must be positive and within 2% of log scale")
         scale_source = "explicit provisional side scale; not logged calibration"
-    groups: dict[tuple[str, str, str], list[float]] = {}
-    accepted = 0
-    previous_ms = 0
-    for row in log.rows:
-        time_ms = int(row["cntlog"])
-        dt = (time_ms - previous_ms) * 0.001
+    deltas_ms = _cntlog_deltas_ms(log, path.name)
+    segments: list[dict] = []
+    rejected_intervals: dict[str, int] = {}
+    rejected_segments: dict[str, int] = {}
+    active: dict | None = None
+
+    def count_rejection(target: dict[str, int], reason: str, count: int = 1) -> None:
+        target[reason] = target.get(reason, 0) + count
+
+    def finish_segment() -> None:
+        nonlocal active
+        if active is None:
+            return
+        if abs(active["gyro_angle_rad"]) < math.radians(MIN_TURN_DEG):
+            count_rejection(rejected_segments, "net_rotation_below_1deg")
+        else:
+            delta_side = active["left_mm"] - active["right_mm"]
+            raw_tread = delta_side / active["gyro_angle_rad"]
+            if not math.isfinite(raw_tread) or not 20.0 <= raw_tread <= 400.0:
+                count_rejection(rejected_segments, "raw_tread_outside_20_to_400_mm")
+            else:
+                active["raw_tread_mm"] = raw_tread
+                active["speed_mps"] = (active["left_mm"] + active["right_mm"]) * 0.0005 / active["duration_s"]
+                active["mean_sample_speed_mps"] = active["speed_sum_mps"] / active["samples"]
+                segments.append(active)
+        active = None
+
+    for row, delta_ms in zip(log.rows, deltas_ms):
+        dt = delta_ms * 0.001
         gyro = _number(row["gyroVal_Z"], "gyroVal_Z")
-        delta_deg = gyro * dt
-        if abs(delta_deg) >= MIN_TURN_DEG:
-            tread, speed = turn_sample(
-                _number(row["encIntervalL_p"], "encIntervalL_p"),
-                _number(row["encIntervalR_p"], "encIntervalR_p"),
-                gyro, dt, left_ppm, right_ppm,
-            )
-            if math.isfinite(tread) and 0.3 <= speed <= 10.0 and 20 <= tread <= 400:
-                speed_band = "0.3-1" if speed < 1 else "1-2" if speed < 2 else "2-4" if speed < 4 else "4-10"
-                radius_mm = speed * 1000.0 / abs(math.radians(gyro))
-                radius_band = "<200" if radius_mm < 200 else "200-500" if radius_mm < 500 else "500-1000" if radius_mm < 1000 else ">=1000"
-                direction = "CW" if gyro > 0 else "CCW"
-                groups.setdefault((speed_band, radius_band, direction), []).append(tread)
-                accepted += 1
-        previous_ms = time_ms
-    bins = [
-        {"speed_mps": speed, "radius_mm": radius, "turn": direction, "samples": len(values),
-         "tread_median_mm": statistics.median(values),
-         "tread_p10_mm": _percentile(values, 0.1),
-         "tread_p90_mm": _percentile(values, 0.9)}
-        for (speed, radius, direction), values in sorted(groups.items())
-    ]
+        left_mm = _number(row["encIntervalL_p"], "encIntervalL_p") * 1000.0 / left_ppm
+        right_mm = _number(row["encIntervalR_p"], "encIntervalR_p") * 1000.0 / right_ppm
+        speed = (left_mm + right_mm) * 0.0005 / dt
+        if not MIN_SPEED_MPS <= speed <= MAX_SPEED_MPS:
+            finish_segment()
+            count_rejection(rejected_intervals, "speed_outside_0.3_to_10_mps")
+            continue
+        if abs(gyro) < MIN_TURN_RATE_DPS:
+            finish_segment()
+            count_rejection(rejected_intervals, "gyro_rate_below_5_dps")
+            continue
+        direction = "CW" if gyro > 0 else "CCW"
+        band = _speed_band(speed)
+        if active is not None and (active["turn"] != direction or active["speed_band"] != band):
+            finish_segment()
+        if active is None:
+            active = {"turn": direction, "speed_band": band, "left_mm": 0.0,
+                      "right_mm": 0.0, "gyro_angle_rad": 0.0, "duration_s": 0.0,
+                      "samples": 0, "speed_sum_mps": 0.0}
+        active["left_mm"] += left_mm
+        active["right_mm"] += right_mm
+        active["gyro_angle_rad"] += math.radians(gyro * dt)
+        active["duration_s"] += dt
+        active["samples"] += 1
+        active["speed_sum_mps"] += speed
+    finish_segment()
+
+    by_speed: dict[str, list[dict]] = {}
+    for segment in segments:
+        by_speed.setdefault(segment["speed_band"], []).append(segment)
+    time_proportional_offsets = {}
+    for speed_band, speed_segments in by_speed.items():
+        offset_diagnostic = _fit_time_proportional_offset(speed_segments)
+        if offset_diagnostic is not None:
+            time_proportional_offsets[speed_band] = offset_diagnostic
+
+    groups: dict[tuple[str, str], list[dict]] = {}
+    for segment in segments:
+        groups.setdefault((segment["speed_band"], segment["turn"]), []).append(segment)
+    bins = []
+    for (speed_band, direction), values in sorted(groups.items()):
+        raw_fit = sum(s["gyro_angle_rad"] * (s["left_mm"] - s["right_mm"]) for s in values) / \
+            sum(s["gyro_angle_rad"] ** 2 for s in values)
+        yaw_errors = [math.degrees(s["gyro_angle_rad"] -
+                                   (s["left_mm"] - s["right_mm"]) / raw_fit)
+                      for s in values]
+        radii = [s["speed_mps"] * 1000.0 / abs(s["gyro_angle_rad"] / s["duration_s"])
+                 for s in values]
+        bins.append({
+            "speed_mps": speed_band,
+            "mean_speed_mps": statistics.mean(s["mean_sample_speed_mps"] for s in values),
+            "turn": direction,
+            "segments": len(values),
+            "samples": sum(s["samples"] for s in values),
+            "tread_fit_mm": raw_fit,
+            "tread_median_mm": statistics.median(s["raw_tread_mm"] for s in values),
+            "tread_p10_mm": _percentile([s["raw_tread_mm"] for s in values], 0.1),
+            "tread_p90_mm": _percentile([s["raw_tread_mm"] for s in values], 0.9),
+            "gyro_angle_minus_encoder_angle_median_deg": statistics.median(yaw_errors),
+            "gyro_angle_minus_encoder_angle_p95_abs_deg": _percentile([abs(x) for x in yaw_errors], 0.95),
+            "gyro_minus_encoder_rate_mean_dps": sum(yaw_errors) /
+            sum(s["duration_s"] for s in values),
+            "mean_turn_radius_mm": statistics.mean(radii),
+            "icr_candidate_left_mm": -raw_fit * 0.5,
+            "icr_candidate_right_mm": raw_fit * 0.5,
+        })
+
+    heading_reference = {}
+    for key in ("headingCalibration.enabled", "headingCalibration.pulsePerMeterL",
+                "headingCalibration.pulsePerMeterR", "headingCalibration.effectiveTread_mm"):
+        value = log.parameters.get(key)
+        if value is not None:
+            try:
+                heading_reference[key] = int(value) if key.endswith("enabled") else float(value)
+            except ValueError:
+                heading_reference[key] = value
+    existing_tread = heading_reference.get("headingCalibration.effectiveTread_mm")
+    for item in bins:
+        item["difference_from_heading_calibration_effective_tread_mm"] = (
+            item["tread_fit_mm"] - existing_tread if isinstance(existing_tread, (int, float)) else None
+        )
     return {
         "log": str(path), "common_ppm": common_ppm,
+        "run_conditions": {name: log.parameters.get(name) for name in (
+            "fwVersion", "gitCommit", "branch", "batteryVoltage_V", "logRecordSizeBytes",
+        )},
         "side_scale_source": scale_source, "left_ppm": left_ppm,
         "right_ppm": right_ppm, "physical_tread_mm": PHYSICAL_TREAD_MM,
-        "samples_used": accepted, "samples_total": len(log.rows),
+        "samples_used": sum(s["samples"] for s in segments), "samples_total": len(log.rows),
+        "segments_used": len(segments),
+        "input_checks": {name: log.parameters[name] for name in required_metadata},
+        "cntlog_interval_ms": {"min": min(deltas_ms), "max": max(deltas_ms),
+                               "median": statistics.median(deltas_ms),
+                               "u16_wraps": sum(1 for a, b in zip(log.rows, log.rows[1:])
+                                                if int(b["cntlog"]) < int(a["cntlog"]))},
+        "excluded_intervals": rejected_intervals,
+        "rejected_segments": rejected_segments,
+        "time_proportional_offset_by_speed_band": time_proportional_offsets,
+        "heading_calibration_reference_only": heading_reference,
+        "side_scale_difference_from_heading_calibration_ppm": {
+            "left": (left_ppm - heading_reference["headingCalibration.pulsePerMeterL"]
+                     if isinstance(heading_reference.get("headingCalibration.pulsePerMeterL"), (int, float)) else None),
+            "right": (right_ppm - heading_reference["headingCalibration.pulsePerMeterR"]
+                      if isinstance(heading_reference.get("headingCalibration.pulsePerMeterR"), (int, float)) else None),
+        },
         "closure_valid": log.parameters.get("closureValid", "unknown"),
         "bins": bins,
-        "note": "diagnostic only; do not replace gyro heading with encoder yaw",
+        "note": "offline diagnosis only; uncorrected tread and symmetric ICR candidates are not adopted or written to heading_cal.txt; the time-proportional offset is a residual diagnostic, not a physical gyro-bias estimate",
     }
 
 
@@ -281,13 +521,14 @@ def replay_lateral(path: Path, output_dir: Path, reference_path: Path | None,
         raise ValueError("time constant and lateral speed cap must be positive")
     ppm = pulse_meter_for_log(log.parameters)
     parsed = []
-    previous_time = 0
+    elapsed_ms = 0
     previous_pulse = 0
     straight_accel = []
-    for row in log.rows:
-        time_ms = int(row["cntlog"])
+    for row, delta_ms in zip(log.rows, _cntlog_deltas_ms(log, path.name)):
+        elapsed_ms += delta_ms
+        time_ms = elapsed_ms
         pulse = int(_number(row["encTotalOptimal"], "encTotalOptimal"))
-        dt_s = (time_ms - previous_time) * 0.001
+        dt_s = delta_ms * 0.001
         if pulse < previous_pulse:
             raise ValueError(f"{path.name}: negative distance increment at {time_ms} ms")
         delta_mm = (pulse - previous_pulse) * 1000.0 / ppm
@@ -296,7 +537,7 @@ def replay_lateral(path: Path, output_dir: Path, reference_path: Path | None,
         if abs(gyro) < 20 and delta_mm / (1000 * dt_s) >= 0.3:
             straight_accel.append(lateral_accel)
         parsed.append((time_ms, dt_s, delta_mm, gyro, lateral_accel))
-        previous_time, previous_pulse = time_ms, pulse
+        previous_pulse = pulse
     if len(straight_accel) < 30:
         raise ValueError(f"{path.name}: insufficient straight samples for lateral bias estimate")
     bias = statistics.median(straight_accel)
@@ -371,7 +612,7 @@ def main() -> None:
     distance.add_argument("measurements", type=Path)
     distance.add_argument("--nominal-ppm", type=float, default=58019.0)
     distance.add_argument("--output", type=Path)
-    turn = sub.add_parser("turn", help="スキーマ9+一次ログの有効トレッド診断")
+    turn = sub.add_parser("turn", help="正常なschema 10一次ログの有効トレッド・ICR診断")
     turn.add_argument("logs", nargs="+", type=Path)
     turn.add_argument("--left-ppm", type=float)
     turn.add_argument("--right-ppm", type=float)

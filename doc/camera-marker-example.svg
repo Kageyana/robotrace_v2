@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">上方撮影用マーカー配置例</title>
+  <desc id="desc">機体上面には前側の赤丸と後側の青丸を貼り、床座標の校正点は両マーカーと同じ高さに置く。撮影中は床の固定点でカメラの移動を監視する。</desc>
+  <defs>
+    <style>
+      .bg{fill:#f7f9fc}.panel{fill:#fff;stroke:#cbd5e1;stroke-width:2}.dark{fill:#102a43}.muted{fill:#526579}.thin{stroke:#9fb3c8;stroke-width:2}.dash{stroke:#829ab1;stroke-width:2;stroke-dasharray:7 6}.body{fill:#e8eef5;stroke:#334e68;stroke-width:3}.tire{fill:#243b53}.red{fill:#e23c48;stroke:#fff;stroke-width:5}.blue{fill:#1676d2;stroke:#fff;stroke-width:5}.cross{stroke:#177245;stroke-width:4;stroke-linecap:round}.check{stroke:#7c3aed;stroke-width:4;stroke-linecap:round}.small{font:20px 'Yu Gothic','Meiryo',sans-serif}.label{font:24px 'Yu Gothic','Meiryo',sans-serif;font-weight:700}.head{font:30px 'Yu Gothic','Meiryo',sans-serif;font-weight:700}.note{font:18px 'Yu Gothic','Meiryo',sans-serif}
+    </style>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M1 1 L8 4.5 L1 8" fill="none" stroke="#526579" stroke-width="1.7"/></marker>
+  </defs>
+  <rect class="bg" width="1200" height="760"/>
+  <text x="44" y="52" class="head dark">上方撮影用マーカーの配置例</text>
+  <text x="45" y="83" class="note muted">概念図：実機の寸法と取付位置は現物で測定してください</text>
+
+  <rect class="panel" x="32" y="112" width="547" height="596" rx="16"/>
+  <text x="56" y="153" class="label dark">① 機体上面：前後を別の色に</text>
+  <text x="57" y="185" class="small muted">カメラから見た真上の図</text>
+  <line x1="292" y1="226" x2="292" y2="194" stroke="#526579" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="310" y="212" class="small dark">進行方向 ＋Y</text>
+  <rect class="body" x="217" y="242" width="150" height="310" rx="24"/>
+  <rect class="tire" x="191" y="265" width="25" height="69" rx="8"/>
+  <rect class="tire" x="368" y="265" width="25" height="69" rx="8"/>
+  <rect class="tire" x="191" y="458" width="25" height="69" rx="8"/>
+  <rect class="tire" x="368" y="458" width="25" height="69" rx="8"/>
+  <line class="dash" x1="292" y1="258" x2="292" y2="534"/>
+  <circle class="red" cx="292" cy="302" r="23"/>
+  <circle class="blue" cx="292" cy="492" r="23"/>
+  <circle cx="292" cy="397" r="6" fill="#102a43"/>
+  <line x1="292" y1="302" x2="430" y2="302" class="thin"/>
+  <text x="404" y="286" class="small dark">前：赤</text>
+  <line x1="292" y1="492" x2="428" y2="492" class="thin"/>
+  <text x="404" y="477" class="small dark">後：青</text>
+  <line x1="292" y1="397" x2="94" y2="397" class="thin"/>
+  <text x="60" y="378" class="note dark">2点の中点</text>
+  <text x="60" y="413" class="note muted">→ 原点までのずれを実測</text>
+  <rect x="367" y="386" width="18" height="24" rx="3" fill="#f59e0b" stroke="#92400e" stroke-width="2"/>
+  <line x1="381" y1="398" x2="514" y2="398" class="thin"/>
+  <text x="398" y="431" class="note dark">右マーカー</text>
+  <text x="398" y="457" class="note dark">センサー</text>
+  <text x="57" y="595" class="small dark">赤・青の中心を同じ前後線上に置く</text>
+  <text x="57" y="628" class="small dark">中心間距離と床からの高さを測る</text>
+  <text x="57" y="661" class="note muted">反射しにくい、軽いマットな丸シールの例</text>
+
+  <rect class="panel" x="599" y="112" width="569" height="596" rx="16"/>
+  <text x="623" y="153" class="label dark">② 校正点：同じ高さで測る</text>
+  <text x="624" y="185" class="small muted">側面図とコースの配置例</text>
+  <rect x="649" y="238" width="462" height="28" rx="6" fill="#e8eef5" stroke="#334e68" stroke-width="2"/>
+  <circle class="red" cx="717" cy="226" r="16"/>
+  <circle class="blue" cx="786" cy="226" r="16"/>
+  <line x1="628" y1="327" x2="1132" y2="327" stroke="#6b7c8f" stroke-width="4"/>
+  <text x="1050" y="355" class="note muted">床</text>
+  <rect x="944" y="238" width="90" height="89" fill="#f3ead4" stroke="#8b7355" stroke-width="2"/>
+  <line x1="989" y1="238" x2="989" y2="214" class="cross"/>
+  <line x1="976" y1="226" x2="1002" y2="226" class="cross"/>
+  <line x1="852" y1="226" x2="1020" y2="226" class="dash"/>
+  <line x1="638" y1="226" x2="638" y2="327" stroke="#526579" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="650" y="305" class="note dark">高さ h</text>
+  <path d="M1085 313l9 9-9 9-9-9z" fill="#102a43"/>
+  <text x="1027" y="303" class="note dark">床の固定点</text>
+  <text x="624" y="391" class="small dark">緑十字：一時設置する校正点</text>
+  <text x="624" y="423" class="note muted">上面マーカーと同じ高さまで台で持ち上げる</text>
+
+  <rect x="639" y="461" width="448" height="194" rx="8" fill="#f7f9fc" stroke="#b8c6d5" stroke-width="2"/>
+  <text x="650" y="485" class="note dark">コース全域に分散</text>
+  <g class="cross">
+    <path d="M678 516h20m-10-10v20 M790 516h20m-10-10v20 M902 516h20m-10-10v20 M1033 516h20m-10-10v20 M678 615h20m-10-10v20 M790 615h20m-10-10v20 M902 615h20m-10-10v20 M1033 615h20m-10-10v20"/>
+  </g>
+  <g class="check">
+    <path d="M738 558h18m-9-9v18 M846 558h18m-9-9v18 M954 558h18m-9-9v18 M1005 558h18m-9-9v18"/>
+  </g>
+  <text x="1110" y="516" class="note muted"> </text>
+  <text x="624" y="681" class="note muted">緑8点で変換を計算 ／ 紫4点で誤差を検査</text>
+</svg>

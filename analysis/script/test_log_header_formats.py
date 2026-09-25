@@ -67,6 +67,36 @@ class LogHeaderFormatTests(unittest.TestCase):
             self.assertEqual(log.parameters, {})
             self.assertEqual(len(log.rows), 2)
 
+    def test_strict_reader_accepts_one_trailing_empty_cell_or_no_extra_cell(self) -> None:
+        with self.temporary_directory() as temp_dir:
+            path = self.write_log(
+                Path(temp_dir),
+                "logSchemaVersion=10,logExpectedRows=2\n"
+                "cntlog,gyroVal_Z,encIntervalL_p,encIntervalR_p\n"
+                "10,0,1,1,\n20,0,1,1\n",
+            )
+            log = read_csv_log(path, strict_rows=True)
+            self.assertEqual(len(log.rows), 2)
+            self.assertEqual(log.rows[0]["cntlog"], "10")
+            self.assertEqual(log.rows[1]["encIntervalR_p"], "1")
+
+    def test_strict_reader_rejects_malformed_rows_with_line_number(self) -> None:
+        malformed_rows = {
+            "extra nonempty cell": "10,0,1,1,999\n",
+            "missing cell": "10,0,1\n",
+            "empty named cell": "10,0,,1\n",
+            "multiple extra empty cells": "10,0,1,1,,\n",
+        }
+        for case, malformed in malformed_rows.items():
+            with self.subTest(case=case), self.temporary_directory() as temp_dir:
+                path = self.write_log(
+                    Path(temp_dir),
+                    "logSchemaVersion=10\n"
+                    "cntlog,gyroVal_Z,encIntervalL_p,encIntervalR_p\n" + malformed,
+                )
+                with self.assertRaisesRegex(ValueError, r"line 3"):
+                    read_csv_log(path, strict_rows=True)
+
     def test_normalizer_rejects_metadata_free_header(self) -> None:
         with self.temporary_directory() as temp_dir:
             path = self.write_log(Path(temp_dir), FIELDS + "\n" + DATA)

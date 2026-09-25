@@ -179,7 +179,7 @@ def optimal_index_error(value: Any, route_count: int) -> str:
     return "optimalIndex不正"
 
 
-def read_csv_log(path: Path) -> CsvLog:
+def read_csv_log(path: Path, strict_rows: bool = False) -> CsvLog:
     with path.open("r", encoding="utf-8-sig", newline="") as source:
         reader = csv.reader(source)
         try:
@@ -222,7 +222,24 @@ def read_csv_log(path: Path) -> CsvLog:
         rows: list[dict[str, str]] = []
         for line_number, raw in enumerate(reader, start=data_start_line):
             if len(raw) < len(fields):
+                if strict_rows:
+                    raise ValueError(
+                        f"{path}: line {line_number}: expected {len(fields)} columns, got {len(raw)}"
+                    )
                 continue
+            if strict_rows:
+                empty_named = [name for index, name in enumerate(fields)
+                               if not raw[index].strip()]
+                if empty_named:
+                    raise ValueError(
+                        f"{path}: line {line_number}: empty named column(s): "
+                        f"{', '.join(empty_named)}"
+                    )
+                extras = raw[len(fields):]
+                if extras and (len(extras) != 1 or extras[0].strip()):
+                    raise ValueError(
+                        f"{path}: line {line_number}: invalid extra column(s): {len(extras)}"
+                    )
             rows.append({name: raw[index].strip() for index, name in enumerate(fields)})
         if not rows:
             raise ValueError(f"{path}: no data rows")
