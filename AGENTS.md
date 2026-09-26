@@ -363,6 +363,8 @@ cmake --build --preset Release
 - SD カードが挿入されていて設定ファイルが存在しない場合は、対象ファイルを作成し、コード内デフォルト値を書き込む。
 - 設定ファイルの読み書き処理を変更する場合は、ファイル欠落時にデフォルト値でファイルが作成されることを確認する。
 - `shortcut.txt` は `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000` の順で保存し、改行は付けない。実測確認前の既定値は `1,080,040,3000,0600,000` とする。
+- `auto_run.txt` は2～5走目の方式を `走行番号,方式` で保存する。既定値は `2,DISTANCE / 3,SLIP / 4,PATH / 5,SHORTCUT`。起動時に読み、欠落・不正・SLIP依存関係違反は全行を既定値へ修復する。修復に失敗した場合は「設定修復失敗」、SD読込I/Oエラー時は「SD読込エラー」と表示してオートスタートを禁止する。I/Oエラー時は設定を書き換えない。SLIPの直前方式はDISTANCEに限る。
+- SD上の `auto_run.txt` を編集した場合は、反映のため再起動する。
 
 設定ファイルの保存先は `./setting/` です。詳細なファイル形式、読み書き関数、破損時の扱いは `.agents/skills/robotrace-sd-settings/SKILL.md` を使います。
 
@@ -395,6 +397,8 @@ cmake --build --preset Release
 
 - 走行開始条件は、UI 上でスタート開始動作を行ったときとする。
 - `autoStart` は、UI 上でオートスタート開始動作を行ったときに実行する。
+- オートスタートの1走目は一次走行に固定し、2～5走目の方式は起動時に読んだ `setting/auto_run.txt` に従う。DISTANCE、PATH、SHORTCUTは1走目ログを参照し、SLIPは1走目の距離基準計画へ直前DISTANCE走行のスリップを反映する。
+- 解析元ログの欠落・解析失敗、緊急停止、走行ログ保存失敗時は次走を開始しない。手動走行の選択は従来どおりとする。
 - ゴール判定条件は、ゴールマーカーを規定回数通過したときとする。
 - 正常終了時、緊急停止時ともに、ログ保存タイミングは機体停止時とする。緊急停止ログでは `emcStop` に停止要因を記録する。
 - 走行開始、ゴール判定、ログ終了処理を変更する場合は、正常終了と緊急停止のログ保存タイミングが変わらないか確認する。
@@ -468,6 +472,7 @@ cmake --build --preset Release
 - 新しい緊急停止条件を追加する場合は、`robotrace_v2/Core/Inc/emergencyStop.h` に定義を追加する。
 - ログ解析では、ラップタイム、速度追従、角速度、スリップを重視する。
 - バッテリー状態はログ内パラメータ `batteryVoltage_V` を参照する。単位は `[V]`。
+- オートスタートログは `autoRunNumber`, `requestedMode`, `primaryLogNumber`, `slipSourceLogNumber` を1行目に記録する。`requestedMode` は要求方式、`optimalTrace` は実際の走行モードであり、DISTANCEとSLIPを区別するときは両方を参照する。
 - `batteryVoltage_mV` は走行中にLPF更新したバッテリー電圧 `[mV]`、`motorVoltageCmdL_mV`, `motorVoltageCmdR_mV` はバッテリー電圧で割る前の左右モーター指令電圧 `[mV]` とする。
 - `motorpwmL`, `motorpwmR` は電圧補償後に実際にタイマへ出力した飽和後DUTYとする。
 - `LOG_SCHEMA_PROFILE_LIGHT=0` のデバッグログでは `markerSensor`（LED差分から得たマーカー状態）、`sgMarkerCount`（スタート・ゴールマーカー累積数）、`encRightMarker_p`（右マーカーからの補正後エンコーダパルス）、`patternTrace`（走行状態）を追加出力する。ログヘッダには終了時の `sgMarkerAtLogEnd` と `encRightMarkerAtLogEnd_p` も出力する。
@@ -527,6 +532,7 @@ cmake --build --preset Release
 - 2026-08-19: 現行採用の低速小Rカーブ制御を反映した。曲率FF 100%とラインセンサーFB 35%、低速BOOST_DISTANCEの角速度目標上限1200 deg/s、正規化モーター指令の公称電圧7.1 Vを使用する。2次ログ再解析は必須列をヘッダ名で解決する。
 - 2026-08-23: `BOOST_PATH_REPLAY`、40 mm経路、ヨーレート経路追従、ライン追従フォールバック、`STOP_LOCALIZATION`、`shortcut.txt`、経路追従ログ列を追加した。ショートカット形状生成は機体寸法実測完了まで安全ゲートで無効とした。
 - 2026-08-23: 機体投影半幅65 mm、外接半径100 mm、走行可能領域端まで200 mmを入力した。許容オフセット49.5 mm、境界残余50.5 mmを確認し、経路制御バージョン2でLevel 1のショートカット形状生成を有効化した。
+- 2026-09-26: `auto_run.txt` でオートスタート2～5走目の方式を指定できるようにした。一次ログと直前正常ログを分離し、要求方式と参照ログ番号を走行ログに記録する。
 
 ## 15. 機体・回路変更時にコードへ反映する項目
 

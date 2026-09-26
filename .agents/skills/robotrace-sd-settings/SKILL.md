@@ -77,6 +77,19 @@ File: `shortcut.txt`
 - Until machine footprint and sensor coordinates are verified, keep `PATH_SHORTCUT_GEOMETRY_ENABLE=0` and `lineAlpha_x1000=000`.
 - Partial reads apply valid fields; invalid or missing fields use defaults and the file is repaired.
 
+### Auto-start run modes
+
+File: `auto_run.txt`
+
+- Implementation: `autoRun.c`, `SDcard.c`, and `control.c`.
+- Format: one row for each run number 2 through 5, `runNumber,mode`; modes are `DISTANCE`, `SLIP`, `PATH`, and `SHORTCUT`.
+- Default: `2,DISTANCE`, `3,SLIP`, `4,PATH`, `5,SHORTCUT`, one row per line.
+- Duplicate modes are allowed. `SLIP` is valid only when the immediately preceding run is configured as `DISTANCE`.
+- Missing, malformed, incomplete, duplicate-run, or dependency-invalid configuration is replaced as a whole with the default order. If repair cannot be saved, auto-start is blocked.
+- Only a missing-file result or invalid content triggers repair. Other SD open/read/close errors block auto-start without writing the file; the display distinguishes an SD read error from a repair failure.
+- Read during startup; reboot after editing the SD card file.
+- Run 1 is always the primary run. `DISTANCE`, `PATH`, and `SHORTCUT` use its log. `SLIP` uses the primary log for its distance plan and the immediately preceding successful `DISTANCE` log for slip data.
+
 ### Line Sensor Calibration
 
 File: `lsval.txt`
