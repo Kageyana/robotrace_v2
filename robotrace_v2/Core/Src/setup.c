@@ -280,7 +280,7 @@ static void test_imu_deg(void)
 		ssd1306_printf(Font_7x10, "Now");
 		ssd1306_UpdateScreen();
 
-		calibratIMU = true;
+		IMU_StartCalibration();
 		calibrateMotorCurrent =true;
 		HAL_Delay(1000);
 	}

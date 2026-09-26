@@ -343,8 +343,9 @@ cmake --build --preset Release
 
 ### エンコーダ・距離換算の正
 
-- `robotrace_v2/Core/Inc/encoder.h` の `PULSE_METER = 53424`, `PULSE_MILLIMETER = 54.324F` を正とする。
+- `robotrace_v2/Core/Inc/encoder.h` の `PULSE_METER = 58019`, `PULSE_MILLIMETER = PULSE_METER / 1000.0F` を正とする。動力1 mを5走した実測平均値である。
 - `encCurrentN` は左右エンコーダの平均で、1 ms あたりのパルス数とする。距離、速度、XY 座標、速度計画で距離換算を使う場合はこの換算値を基準にする。
+- BMI088のジャイロZ温度補正係数はSDの `./setting/imu_temp.txt` に `deg/s/°C × 1000000` の整数で保存する。範囲は -100000〜100000、欠落・破損時は0で作成・修復する。温度読取異常時はその走行の温度補正を停止する。
 
 `setup.c` には `yawRate`, `yaw`, `dist` の PID 調整画面実装がありますが、現在の表示切替では一部ケースがコメントアウトされており、通常メニューから到達しない可能性があります。
 
@@ -455,10 +456,10 @@ cmake --build --preset Release
 
 実機走行ログは `F:\Dropbox\Document\robotrace\Log\v2` に保存されています。
 
-- ログファイルは CSV 形式、ヘッダ有り、文字コード UTF-8、区切り文字はカンマ。
+- ログファイルは CSV 形式、文字コード UTF-8、区切り文字はカンマ。1行目が `key=value` の走行パラメータ、2行目が列名、3行目以降が走行データ。旧ログの混在1行ヘッダも列名で判定する。
 - ログファイル名は通し番号を使う。
-- ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。実ログ側に古い形式は混在しない前提で扱う。
-- ログヘッダにはログデータ名とパラメータが含まれる。パラメータは `パラメータ名=value` 形式で記載される。
+- ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。旧形式ログも列名で解決する。
+- 1行目のパラメータは `パラメータ名=value` 形式で記載される。IMU温度校正・補正状態、温度係数、エンコーダ換算値も残す。
 - `courseAnalysis.c` の2次ログ再解析は、`courseMarker`, `encTotalOptimal`, `ROC`, `targetSpeed`, `optimalIndex`, `slipFlag`, `slipFlagLat` をCSVヘッダ名から解決する。ログ列追加時に固定列番号へ依存しない。
 - 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_MARKER`, `BOOST_DISTANCE`, `BOOST_SHORTCUT`, `BOOST_PATH_REPLAY` を正とする。
 - 新しい走行モードを追加する場合は、`robotrace_v2/Core/Inc/courseAnalysis.h` に定義を追加する。

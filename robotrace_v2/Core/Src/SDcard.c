@@ -7,6 +7,7 @@
 #include "sd_functions.h"
 #include "stdio.h"
 #include <stdint.h>
+#include <stdlib.h>
 //====================================//
 // グローバル変数の宣
 //====================================//
@@ -16,7 +17,7 @@ FIL fil_R;
 
 // ログヘッダー
 // 詳細デバッグ列を含むCSVのフォーマットと1行分を格納できるサイズにする。
-#define LOG_COLUMN_TITLE_BUFFER_SIZE 2048U
+#define LOG_COLUMN_TITLE_BUFFER_SIZE 4096U
 #define LOG_FORMAT_BUFFER_SIZE       512U
 #define LOG_CSV_LINE_BUFFER_SIZE    1024U
 char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE] = "", formatLog[LOG_FORMAT_BUFFER_SIZE] = "";
@@ -82,6 +83,46 @@ static uint8_t *logGetFreeBuffer(void);
 static bool readSavedLogNumber(int16_t *outNumber);
 static void writeSavedLogNumber(int16_t fileNumber);
 static int16_t calcNextLogNumber(void);
+static void setLogHeaderStrFPrecision(char *name, float value, unsigned precision);
+
+void readImuTempCompensation(void)
+{
+	const char fileName[] = PATH_SETTING "imu_temp.txt";
+	char buffer[24] = {0};
+	char *end = NULL;
+	FIL file;
+	UINT bytesRead = 0U;
+	uint32_t fileSize = 0U;
+	long coeffX1000000 = 0L;
+	bool valid = false;
+
+	IMU_SetTempCompensationCoefficient(0);
+	if (f_open(&file, fileName, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+	{
+		fileSize = (uint32_t)f_size(&file);
+		if (fileSize > 0U && fileSize < sizeof(buffer) &&
+			f_read(&file, buffer, (UINT)fileSize, &bytesRead) == FR_OK &&
+			bytesRead == (UINT)fileSize)
+		{
+			buffer[bytesRead] = '\0';
+			coeffX1000000 = strtol(buffer, &end, 10);
+			valid = end != buffer && *end == '\0' &&
+				coeffX1000000 >= IMU_TEMP_COEFF_MIN_X1000000 &&
+				coeffX1000000 <= IMU_TEMP_COEFF_MAX_X1000000;
+		}
+		f_close(&file);
+	}
+	if (!valid)
+	{
+		coeffX1000000 = 0L;
+		if (f_open(&file, fileName, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
+		{
+			f_printf(&file, "%ld", coeffX1000000);
+			f_close(&file);
+		}
+	}
+	IMU_SetTempCompensationCoefficient((int32_t)coeffX1000000);
+}
 
 
 bool sd_fatfs_lock(uint32_t timeout_ms)
@@ -433,14 +474,26 @@ void createLog(void)
 	formatLog[0] = 0;   // バッファを安全に初期化
 
 	updateBatteryVoltage(); // ログヘッダへ停止時点の電圧を残す
+	updateImuTempEndTemperature(); // ログ終了時の温度を取得
 
-	// ログヘッダー
-	logBuildColumns();
+	// 1行目: 走行条件と校正値
 	setLogHeaderStrS("fwVersion", FW_VERSION);
 	setLogHeaderStrS("gitCommit", GIT_COMMIT);
 	setLogHeaderStrS("buildDate", BUILD_DATE);
 	setLogHeaderStrS("buildTime", BUILD_TIME);
 	setLogHeaderStrS("branch", GIT_BRANCH);
+	setLogHeaderStrFPrecision("gyroScaleCoeff", COEFF_DPD, 6U);
+	setLogHeaderStr("imuTempCalibrationValid", imuTempCalibrationValid ? 1 : 0);
+	setLogHeaderStrFPrecision("imuTempCalibrationStart_C", imuTempCalibrationStart_C, 3U);
+	setLogHeaderStrFPrecision("imuTempCalibration_C", imuTempCalibration_C, 3U);
+	setLogHeaderStrFPrecision("imuTempCalibrationEnd_C", imuTempCalibrationEnd_C, 3U);
+	setLogHeaderStr("imuTempCalibrationSamples", imuTempCalibrationSamples);
+	setLogHeaderStr("imuTempCalibrationReadErrors", imuTempCalibrationReadErrors);
+	setLogHeaderStrFPrecision("imuGyroOffsetZ_dps", angleOffset[2], 3U);
+	setLogHeaderStr("imuTempCompEnabled", imuTempCorrectionEnabled ? 1 : 0);
+	setLogHeaderStrFPrecision("imuTempCoeff_dpsPerC", imuTempCoeff_dpsPerC, 6U);
+	setLogHeaderStrFPrecision("imuTempEnd_C", imuTempEnd_C, 3U);
+	setLogHeaderStr("encoderPulsePerMeter", PULSE_METER);
 	// 制御パラメータ
 	setLogHeaderStrF("batteryVoltage_V", batteryVoltage_V);
 	setLogHeaderStrF("optimalTrace", optimalTrace);
@@ -489,12 +542,26 @@ void createLog(void)
 	setLogHeaderStrF("distCtrl.ki", distCtrl.ki);
 	setLogHeaderStrF("distCtrl.kd", distCtrl.kd);
     strncat((char *)columnTitle, "\n", sizeof(columnTitle) - strlen((char *)columnTitle) - 1); // バッファサイズを指定して安全に改行を追加
-    strncat((char *)formatLog, "\n", sizeof(formatLog) - strlen((char *)formatLog) - 1);       // バッファサイズを指定して安全に改行を追加
 	total = (UINT)strlen(columnTitle);
 	fresult = f_write(&fil_W, columnTitle, total, &written);
 	if (fresult != FR_OK || written != total)
 	{
 		printf("createLog header write error: %d (%lu/%lu)\r\n", fresult, (unsigned long)written, (unsigned long)total);
+		f_close(&fil_W);
+		return;
+	}
+	// 2行目: 走行データ列。3行目以降はendLog()が書き込む。
+	columnTitle[0] = 0;
+	formatLog[0] = 0;
+	logBuildColumns();
+	strncat(columnTitle, "\n", sizeof(columnTitle) - strlen(columnTitle) - 1);
+	strncat(formatLog, "\n", sizeof(formatLog) - strlen(formatLog) - 1);
+	total = (UINT)strlen(columnTitle);
+	written = 0;
+	fresult = f_write(&fil_W, columnTitle, total, &written);
+	if (fresult != FR_OK || written != total)
+	{
+		printf("createLog column header write error: %d (%lu/%lu)\r\n", fresult, (unsigned long)written, (unsigned long)total);
 		f_close(&fil_W);
 		return;
 	}
@@ -1076,6 +1143,12 @@ void setLogHeaderStrF(char *name, float value)
 
     snprintf((char *)headerStr, sizeof(headerStr), "%s=%4.2f,", name, (double)value);
     strncat((char *)columnTitle, (char *)headerStr, sizeof(columnTitle) - strlen((char *)columnTitle) - 1);
+}
+static void setLogHeaderStrFPrecision(char *name, float value, unsigned precision)
+{
+	char headerStr[96];
+	snprintf(headerStr, sizeof(headerStr), "%s=%.*f,", name, (int)precision, (double)value);
+	strncat(columnTitle, headerStr, sizeof(columnTitle) - strlen(columnTitle) - 1);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setLogHeaderStrS

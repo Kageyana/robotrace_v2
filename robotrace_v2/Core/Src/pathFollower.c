@@ -27,13 +27,13 @@
 #define PATH_KHEADING_MAX_X100                3000U
 #define PATH_LINE_ALPHA_MAX_X1000             100U
 
-#define PATH_CSV_LINE_SIZE                    2048U
+#define PATH_CSV_LINE_SIZE                    4096U
 #define PATH_ANCHOR_HALF_WIDTH_MM             100.0f
 #define PATH_SMOOTH_MOVE_MAX_MM               2.0f
 #define PATH_SMOOTH_CONVERGED_MM              0.1f
 #define PATH_SMOOTH_ITERATIONS                100U
 
-// 寸法入力値はすべて[mm]。機体座標の原点は左右駆動輪の車軸中心とし、
+// 寸法入力値はすべて[mm]。機体座標原点は前車軸中心と後車軸中心の中点とし、
 // 上面から見て右を+X、左を-X、前方を+Y、後方を-Yとする。
 #define PATH_TRACKING_ERROR_BUDGET_MM         15.0f
 #define PATH_LINE_HALF_WIDTH_MM               9.5f   // コースライン実幅の1/2
@@ -471,7 +471,11 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 		sd_fatfs_unlock();
 		return -5;
 	}
-	if (f_gets(routeCsvLine, sizeof(routeCsvLine), &file) == NULL || !pathParseHeader(routeCsvLine, &columns))
+	// 新形式は1行目がパラメータ、2行目が列名。旧形式の1行ヘッダも読む。
+	if (f_gets(routeCsvLine, sizeof(routeCsvLine), &file) == NULL ||
+		(!pathParseHeader(routeCsvLine, &columns) &&
+		 (f_gets(routeCsvLine, sizeof(routeCsvLine), &file) == NULL ||
+		  !pathParseHeader(routeCsvLine, &columns))))
 	{
 		f_close(&file);
 		sd_fatfs_unlock();
@@ -520,7 +524,9 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 		return -13;
 	}
 	if (f_gets(routeCsvLine, sizeof(routeCsvLine), &file) == NULL ||
-		!pathParseHeader(routeCsvLine, &columns))
+		(!pathParseHeader(routeCsvLine, &columns) &&
+		 (f_gets(routeCsvLine, sizeof(routeCsvLine), &file) == NULL ||
+		  !pathParseHeader(routeCsvLine, &columns))))
 	{
 		f_close(&file);
 		sd_fatfs_unlock();

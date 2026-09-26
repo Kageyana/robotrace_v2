@@ -11,6 +11,7 @@ int16_t encCurrentN = 0;
 int32_t encTotalR = 0;
 int32_t encTotalL = 0;
 int32_t encTotalN = 0;
+static int8_t encHalfPulseRemainder = 0;
 
 // 外部変数
 int32_t enc1 = 0;
@@ -35,7 +36,11 @@ void getEncoder(void)
 	// 1msあたりのカウント
 	encCurrentR = encRawR - encBufR;
 	encCurrentL = encBufL - encRawL;
-	encCurrentN = (encCurrentR + encCurrentL) / 2;
+	// 左右平均の0.5パルス端数を次周期へ渡し、積算時の切り捨て偏りを防ぐ。
+	int32_t sumWithRemainder = (int32_t)encCurrentR + (int32_t)encCurrentL
+		+ (int32_t)encHalfPulseRemainder;
+	encCurrentN = (int16_t)(sumWithRemainder / 2);
+	encHalfPulseRemainder = (int8_t)(sumWithRemainder - 2 * (int32_t)encCurrentN);
 	// カウントの積算(回転方向が逆なのでマイナスで積算)
 	encTotalR += encCurrentR;
 	encTotalL += encCurrentL;

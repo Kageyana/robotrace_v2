@@ -30,7 +30,7 @@
 #define ROC_STRAIGHT_MAX 3000.0F		// 直線とみなす曲率半径の閾値[mm]
 
 // 3次走行用スリップ解析(2次ログ)の調整用定数
-#define CA_SECOND_LOG_LINE_BUFSIZE 1600		// 2次ログ1行バッファサイズ
+#define CA_SECOND_LOG_LINE_BUFSIZE 4096		// メタデータ行と走行データ行を読むバッファ
 #define CA_SLIP_CNT_MIN 3				// スリップ回数のノイズ除外閾値(値↑で判定が厳しくなりリスク↓→減速弱)
 #define CA_SLIP_FRAC_FULL 0.60f			// risk=1.0とみなすスリップ割合(値↑でフルリスク到達しにくく減速弱、例:0.60→0.70)
 #define CA_SLIP_EXPAND_1 0.50f			// 近傍拡張係数(±1)(値↑で周辺にもリスク拡散→減速範囲広、例:0.25→0.40)

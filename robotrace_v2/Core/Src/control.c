@@ -244,6 +244,7 @@ void initSystem(void)
 			readLinesenval(); // ラインセンサの最大値と最小値を取得
 			readTgtspeeds();  // 目標速度を取得
 			readShortcutSettings(); // 経路追従・ショートカット設定を取得
+			readImuTempCompensation(); // BMI088ジャイロZ温度係数を取得
 
 			if (modeDSP)
 			{
@@ -589,13 +590,11 @@ void loopSystem(void)
 			{
 				ssd1306_SetCursor(56, 28);
 				ssd1306_printf(Font_16x26, "1");
-				calibratIMU = true;		// IMUキャリブレーションを開始
-				calibrateMotorCurrent = true; // 電流センサキャリブレーションを開始
 			}
 		}
 
 		// IMUのキャリブレーションが終了したら走行開始
-		if (!calibratIMU && !calibrateMotorCurrent && countdown == 0)
+		if (!calibratIMU && IMU_CalibrationReady() && !calibrateMotorCurrent && countdown == 0)
 		{
 			updateBatteryVoltage(); // 走行開始直前の電圧を反映
 			powerLineSensors(1);   // ラインセンサ点灯
@@ -1010,7 +1009,14 @@ void emergencyStop(void)
 void countDown(void)
 {
 	if (countdown > 0)
+	{
 		countdown--;
+		if (countdown == 2000)
+		{
+			IMU_StartCalibration(); // 100サンプルを20ms間隔で取得する
+			calibrateMotorCurrent = true;
+		}
+	}
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 changeGain

@@ -48,6 +48,8 @@ def load_log(number: int):
             if "=" in field:
                 key, value = field.split("=", 1)
                 params[key] = value
+        if params and not any(field == "cntlog" for field in header):
+            header = next(reader)
         rows = []
         for raw in reader:
             if len(raw) < len(DATA_FIELDS):

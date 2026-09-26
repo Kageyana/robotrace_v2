@@ -8,6 +8,7 @@
 #include "control.h"
 #include "lineSensor.h"
 #include "pathFollower.h"
+#include <math.h>
 #include <stdint.h>
 #define STRAIGHT_STATE_THRESHOLD_MM	70	// 直線判定の距離閾値[mm]
 //====================================//
@@ -187,7 +188,10 @@ void Interrupt1ms(void)
 		{
 			if (!calibratIMU)
 			{
-				BMI088getTemp(); 	// 温度取得
+				if (!BMI088getTemp() || !BMI088val.tempValid || !isfinite(BMI088val.temp))
+				{
+					imuTempCorrectionEnabled = false;
+				}
 				imuVal.temp = BMI088val.temp;
 			}
 		}

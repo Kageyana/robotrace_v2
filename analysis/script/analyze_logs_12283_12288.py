@@ -65,10 +65,12 @@ def load_log(number: int) -> dict:
         header = next(reader)
         data_names = [name for name in header if name and "=" not in name]
         params = {}
-        for item in header[len(data_names) :]:
+        for item in header:
             if "=" in item:
                 key, value = item.split("=", 1)
                 params[key] = value
+        if not data_names:
+            data_names = [name for name in next(reader) if name]
 
         rows = []
         row_width_mismatch = 0

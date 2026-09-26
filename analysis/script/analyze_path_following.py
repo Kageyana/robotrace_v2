@@ -79,20 +79,27 @@ def read_log(path: Path) -> tuple[RunSummary, list[dict[str, float]]]:
         except StopIteration as exc:
             raise ValueError(f"{path}: empty CSV") from exc
 
-        columns = {name.strip(): index for index, name in enumerate(header) if name.strip() in REQUIRED_COLUMNS}
-        missing = sorted(REQUIRED_COLUMNS - columns.keys())
-        if missing:
-            raise ValueError(f"{path}: missing columns: {', '.join(missing)}")
-
         parameters: dict[str, str] = {}
         for cell in header:
             parsed = parse_parameter(cell)
             if parsed is not None:
                 parameters[parsed[0]] = parsed[1]
 
+        first_data_line = 2
+        if parameters and not REQUIRED_COLUMNS.issubset(set(header)):
+            try:
+                header = next(reader)
+            except StopIteration as exc:
+                raise ValueError(f"{path}: missing data header") from exc
+            first_data_line = 3
+        columns = {name.strip(): index for index, name in enumerate(header) if name.strip() in REQUIRED_COLUMNS}
+        missing = sorted(REQUIRED_COLUMNS - columns.keys())
+        if missing:
+            raise ValueError(f"{path}: missing columns: {', '.join(missing)}")
+
         rows: list[dict[str, float]] = []
         max_index = max(columns.values())
-        for line_number, row in enumerate(reader, start=2):
+        for line_number, row in enumerate(reader, start=first_data_line):
             if len(row) <= max_index:
                 continue
             try:

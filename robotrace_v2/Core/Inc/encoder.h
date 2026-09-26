@@ -8,8 +8,8 @@
 //====================================//
 // シンボル定義
 //====================================//
-#define PULSE_METER 53424		 // 1m走行時のカウント
-#define PULSE_MILLIMETER 54.324F // 1mmのカウント↑を1/1000
+#define PULSE_METER 58019		 // 動力1m×5走で左右平均距離を検証。左右個別値は診断用[pulse/m]
+#define PULSE_MILLIMETER (PULSE_METER / 1000.0F) // 1mmのカウント
 
 #define ENC_TIM_HANDLER_R htim8
 #define ENC_TIM_HANDLER_L htim4

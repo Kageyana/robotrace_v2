@@ -11,11 +11,20 @@
 // シンボル定義
 //====================================//
 #define DEFF_TIME 0.001F				// 制御周期[s]（1ms）
+#define IMU_CALIBRATION_SAMPLE_COUNT 100U	// ジャイロ・加速度校正のサンプル数
+#define IMU_CALIBRATION_SAMPLE_INTERVAL_MS 20U	// 校正サンプルの取得間隔[ms]
+#define IMU_TEMP_COEFF_SCALE 1000000L		// 温度係数の保存倍率
+#define IMU_TEMP_COEFF_MIN_X1000000 (-100000L)	// 温度係数設定の下限
+#define IMU_TEMP_COEFF_MAX_X1000000 100000L	// 温度係数設定の上限
+#define IMU_TEMP_CALIBRATION_INTERVAL_SAMPLES 5U	// 温度取得間隔（IMU校正サンプル数）
+#define IMU_TEMP_CALIBRATION_TOTAL_SAMPLES \
+	(IMU_CALIBRATION_SAMPLE_COUNT / IMU_TEMP_CALIBRATION_INTERVAL_SAMPLES)
+#define IMU_TEMP_CALIBRATION_MIN_VALID_SAMPLES 16U	// 温度校正を有効とする最小有効数
 #define COEFF_COMPFILTER 0.96F			// ジャイロと加速度のコンプリメンタリフィルタ係数（ジャイロの方が信頼できる場合は大きくする）
-#define COEFF_DPD -0.996F				// ジャイロの符号と単位変換（DPS→RAD/s）を兼ねる係数（-1に近い値を調整して入れる）
+#define COEFF_DPD -0.9924F				// ジャイロの符号と単位変換（DPS→RAD/s）を兼ねる係数（-1に近い値を調整して入れる）
 #define USE_IMU_ROT_CENTER_CORRECTION	// ジャイロzを角加速度に変換して遠心加速度補正に使う（旋回中心からIMUまでの距離がある場合はON推奨）
-#define IMU_OFFSET_X_M 0.0F 			// TODO: 旋回中心から IMU までのオフセット[m]。imuVal の座標系基準
-#define IMU_OFFSET_Y_M 0.0236F 			// TODO: 旋回中心から IMU までのオフセット[m]。imuVal の座標系基準
+#define IMU_OFFSET_X_M  0.0F			// 機体基準点（前後車軸中心の中点）からBMI088中心までの左右オフセット[m]。右を+X
+#define IMU_OFFSET_Y_M (-0.03168F)		// 機体基準点（前後車軸中心の中点）からBMI088中心までの前後オフセット[m]。前方を+Y
 #define GRAVITY_MPS2 9.80665F			// 重力加速度[m/s^2]
 #define DEG2RAD (M_PI / 180.0F)			// deg→rad
 #define RAD2DEG (180.0F / M_PI)			// rad→deg
@@ -27,6 +36,15 @@
 extern bool calibratIMU;		// IMUキャリブレーション中フラグ
 extern volatile IMUval imuVal;	// IMUの実行時変数
 extern float angleOffset[3];	// ジャイロオフセット[deg/s]
+extern float imuTempCoeff_dpsPerC;	// BMI088ジャイロZ温度係数[deg/s/°C]
+extern bool imuTempCalibrationValid;	// 温度校正が有効か
+extern float imuTempCalibrationStart_C;	// 温度校正開始時の最初の有効温度[°C]
+extern float imuTempCalibration_C;	// 温度校正中の有効温度平均[°C]
+extern float imuTempCalibrationEnd_C;	// 温度校正終了時の最後の有効温度[°C]
+extern uint16_t imuTempCalibrationSamples;	// 温度校正の有効サンプル数
+extern uint16_t imuTempCalibrationReadErrors;	// 温度校正の読取エラー数
+extern bool imuTempCorrectionEnabled;	// 走行中の温度補正有効フラグ
+extern float imuTempEnd_C;	// ログ終了時の温度[°C]
 #ifdef USE_ACCELE
 extern float acceleOffset[3];	// 加速度オフセット[g]
 #endif
@@ -37,5 +55,15 @@ void calcDegrees(void);
 void calcVelocity(void);
 void clearIMUval(void);
 void calibrationIMU(void);
+void IMU_StartCalibration(void);
+void IMU_SetTempCompensationCoefficient(int32_t coeffX1000000);
+void updateImuTempEndTemperature(void);
+bool IMU_CalibrationReady(void);
+uint16_t IMU_CalibrationSamples(void);
+uint16_t IMU_CalibrationReadErrors(void);
+float IMU_GetLinearAccelerationXMps2(void);
+float IMU_GetLinearAccelerationYMps2(void);
+float IMU_GetLinearAccelerationZMps2(void);
+float IMU_GetForwardAccelerationMps2(void);
 
 #endif // IMU_H_

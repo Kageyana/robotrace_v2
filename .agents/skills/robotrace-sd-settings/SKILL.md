@@ -20,6 +20,14 @@ Use this skill when editing or reviewing SD-card setting file behavior. Treat `A
 
 ## Setting File Formats
 
+### IMU temperature compensation
+
+File: `imu_temp.txt`
+
+- Implementation: `SDcard.c` and `IMU.c`.
+- Format: one signed integer without a newline, representing the BMI088 gyro Z temperature coefficient `[deg/s/°C]` multiplied by 1,000,000.
+- Accepted range: `-100000..100000`. Missing or invalid content is repaired to `0`; zero disables compensation.
+
 ### PID Gains
 
 Files: `line.txt`, `lineomega.txt`, `speed.txt`, `yawRate.txt`, `yaw.txt`, `dist.txt`

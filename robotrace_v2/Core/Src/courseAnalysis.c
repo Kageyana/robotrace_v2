@@ -450,7 +450,7 @@ int16_t readLogDistance(int logNumber)
 	{
 		fileOpened = true; // 豁｣蟶ｸ縺ｫ髢九￠縺溷ｴ蜷医・縺ｿ繧ｯ繝ｭ繝ｼ繧ｺ蜃ｦ逅・ｒ譛牙柑蛹・
 		// 繝ｭ繧ｰ繝・・繧ｿ縺ｮ蜿門ｾ・
-		TCHAR log[512];
+		static TCHAR log[4096];
 		const int log_len = (int)(sizeof(log) / sizeof(log[0]));
 		int32_t time, marker, velo, distance, roc, i = 0;
 		float angVelo;
@@ -465,6 +465,10 @@ int16_t readLogDistance(int logNumber)
 		memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
 
 		TCHAR *header = f_gets(log, log_len, &fil_Read); // 1陦檎岼縺ｯ繝倥ャ繝縺ｪ縺ｮ縺ｧ隱ｭ縺ｿ鬟帙・縺・
+		if (header && strchr((const char *)header, '=') != NULL)
+		{
+			header = f_gets(log, log_len, &fil_Read); // 新形式の2行目は列名
+		}
 		if (!header && f_error(&fil_Read))
 		{
 			ret = -5;
@@ -489,7 +493,10 @@ int16_t readLogDistance(int logNumber)
 			}
 			lineNo++;
 
-			sscanf(log, "%d,%d,%f,%d,%d,%d,", &time, &velo, &angVelo, &marker, &distance, &roc);
+			if (sscanf(log, "%ld,%ld,%f,%ld,%ld,%ld,", &time, &velo, &angVelo, &marker, &distance, &roc) != 6)
+			{
+				continue;
+			}
 			// 隗｣譫仙・逅・
 			// marker==3: 莠､蟾ｮ邱壹・繝ｼ繧ｫ繝ｼ
 			// marker==2: 蟾ｦ繝槭・繧ｫ繝ｼ縲ら峩邱夊ｵｰ陦御ｸｭ縺ｮ縺ｿ繧ｫ繝ｼ繝悶・繝ｼ繧ｫ繝ｼ縺ｨ縺励※謇ｱ縺・
@@ -919,7 +926,9 @@ int16_t readLogDistanceSlip(int logNumber)
 		}
 		goto cleanup;
 	}
-	if (!parseSecondLogHeader((const char *)header, &secondLogColumns))
+	if (!parseSecondLogHeader((const char *)header, &secondLogColumns) &&
+		(f_gets(log, log_len, &fil_Read) == NULL ||
+		 !parseSecondLogHeader((const char *)log, &secondLogColumns)))
 	{
 		ret = -2; // 2次ログに必要な列がない
 		goto cleanup;
@@ -1280,7 +1289,7 @@ int16_t readLogTest(int logNumber)
 
 	if (fresult == FR_OK)
 	{
-		TCHAR log[512];
+		static TCHAR log[4096];
 		const int log_len = (int)(sizeof(log) / sizeof(log[0]));
 		int32_t time, marker, velo, distance;
 		float angVelo;
@@ -1294,7 +1303,10 @@ int16_t readLogTest(int logNumber)
 		// 繝ｭ繧ｰ繝・・繧ｿ蜿門ｾ鈴幕蟋・
 		while (f_gets(log, log_len, &fil_Read))
 		{
-			sscanf(log, "%d,%d,%f,%d,%d", &time, &velo, &angVelo, &marker, &distance);
+			if (sscanf(log, "%ld,%ld,%f,%ld,%ld", &time, &velo, &angVelo, &marker, &distance) != 5)
+			{
+				continue; // メタデータ行と列名行を除外
+			}
 
 			// 隗｣譫仙・逅・
 			if (marker == 1 && beforeMarker == 0)

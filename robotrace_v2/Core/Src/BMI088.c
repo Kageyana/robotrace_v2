@@ -64,10 +64,10 @@ static void BMI088writeByte(bool sensorType, uint8_t reg, uint8_t val)
 /////////////////////////////////////////////////////////////////////
 // モジュール名 BMI088ReadAxisDataG
 // 処理概要     指定レジスタの読み出し(ジャイロセンサ部)
-// 引数         reg:レジスタアドレス
-// 戻り値       読み出したデータ
+// 引数         sensorType:センサー種別、reg:レジスタアドレス、rxData:受信先、rxNum:受信バイト数
+// 戻り値       true:読出し成功 false:SPIエラー
 /////////////////////////////////////////////////////////////////////
-static void BMI088readAxisData(bool sensorType, uint8_t reg, uint8_t *rxData, uint8_t rxNum)
+static bool BMI088readAxisData(bool sensorType, uint8_t reg, uint8_t *rxData, uint8_t rxNum)
 {
 	uint8_t txData[20] = {0}, rxDatabuff[20];
 
@@ -80,8 +80,11 @@ static void BMI088readAxisData(bool sensorType, uint8_t reg, uint8_t *rxData, ui
 		CSB2_RESET;
 	}
 
-	HAL_SPI_TransmitReceive(&SPI_Handle_IMU, txData, rxDatabuff, rxNum+1, 1000);
-	memcpy(rxData,rxDatabuff+1,rxNum); // レジスタ送信時の受信データを除いてコピー
+	HAL_StatusTypeDef status = HAL_SPI_TransmitReceive(&SPI_Handle_IMU, txData, rxDatabuff, rxNum+1, 1000);
+	if (status == HAL_OK)
+	{
+		memcpy(rxData,rxDatabuff+1,rxNum); // レジスタ送信時の受信データを除いてコピー
+	}
 
 	if(sensorType == ACCELE)
 	{
@@ -89,6 +92,7 @@ static void BMI088readAxisData(bool sensorType, uint8_t reg, uint8_t *rxData, ui
 	} else {
 		CSB2_SET;
 	}
+	return status == HAL_OK;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 initBMI088
@@ -134,19 +138,19 @@ bool initBMI088(void)
 // モジュール名 BMI088getGyro
 // 処理概要     角速度の取得
 // 引数         なし
-// 戻り値       なし
+// 戻り値       true:取得成功 false:読出し失敗
 /////////////////////////////////////////////////////////////////////
-void BMI088getGyro(void)
+bool BMI088getGyro(void)
 {
 	if(!BMI088val.Initialized)
 	{
-		return;
+		return false;
 	}
 	uint8_t rawData[6];
 	int16_t gyroVal[3];
 
 	// 角速度の生データを取得
-	BMI088readAxisData(GYRO, REG_RATE_X_LSB, rawData, 6); // x,y,z軸の生データを取得
+	if (!BMI088readAxisData(GYRO, REG_RATE_X_LSB, rawData, 6)) return false;
 	// LSBとMSBを結合
 	gyroVal[0] = ((rawData[1] << 8) | rawData[0]); // x軸角速度
 	gyroVal[1] = ((rawData[3] << 8) | rawData[2]); // y軸角速度
@@ -155,25 +159,26 @@ void BMI088getGyro(void)
 	BMI088val.gyro.x = (float)gyroVal[0] / GYROLSB; // x軸角速度[deg/s]
 	BMI088val.gyro.y = (float)gyroVal[1] / GYROLSB; // y軸角速度[deg/s]
 	BMI088val.gyro.z = (float)gyroVal[2] / GYROLSB; // z軸角速度[deg/s]
+	return true;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 BMI088getAccele
 // 処理概要     加速度の取得（角度補正に使用）
 // 引数         なし
-// 戻り値       なし
+// 戻り値       true:取得成功 false:読出し失敗
 /////////////////////////////////////////////////////////////////////
-void BMI088getAccele(void)
+bool BMI088getAccele(void)
 {
 #ifdef USE_ACCELE
 	if(!BMI088val.Initialized)
 	{
-		return;
+		return false;
 	}
 	uint8_t rawData[8];
 	int16_t accelVal[3];
 
 	// 加速度の生データを取得
-	BMI088readAxisData(ACCELE, REG_ACC_X_LSB, rawData, 7);
+	if (!BMI088readAxisData(ACCELE, REG_ACC_X_LSB, rawData, 7)) return false;
 	// LSBとMSBを結合
 	// 最初のデータは破棄する
 	accelVal[0] = ((rawData[2] << 8) | rawData[1]);
@@ -184,35 +189,61 @@ void BMI088getAccele(void)
 	BMI088val.accele.y = (float)accelVal[1] / ACCELELSB * -1; // y軸加速度[g]
 	BMI088val.accele.z = (float)accelVal[2] / ACCELELSB; // z軸加速度[g]
 #endif
+	return true;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 BMI088getTemp
 // 処理概要     温度の取得
 // 引数         なし
-// 戻り値       なし
+// 戻り値       true:SPI読出し成功 false:読出し失敗
 /////////////////////////////////////////////////////////////////////
-void BMI088getTemp(void)
+bool BMI088getTemp(void)
 {
 	if(!BMI088val.Initialized)
 	{
-		return;
+		return false;
 	}
 	uint8_t rawData[3];
-	uint16_t tempValu;
-	int16_t tempVal;
+	uint16_t temperatureCode;
+	float temperatureC = BMI088_TEMP_INVALID_C;
 
-	// 温度の生データを取得
-	BMI088readAxisData(ACCELE, REG_TEMP_MSB, rawData, 3);
-	// LSBとMSBを結合
-	tempValu = (rawData[1] << 3) | (rawData[2] >> 5);
-	if (tempValu > 1023)
+	// 加速度センサーのSPI読み出しは先頭1バイトがダミーのため破棄する
+	if (!BMI088readAxisData(ACCELE, REG_TEMP_MSB, rawData, 3))
 	{
-		tempVal = ~tempValu + 0x8000;
+		BMI088val.tempValid = false;
+		BMI088val.temp = BMI088_TEMP_INVALID_C;
+		return false;
+	}
+	temperatureCode = ((uint16_t)rawData[1] << 3) | ((uint16_t)rawData[2] >> 5);
+	BMI088val.tempRaw = temperatureCode;
+	BMI088val.tempValid = BMI088DecodeTemperature(rawData[1], rawData[2], &temperatureC);
+	BMI088val.temp = BMI088val.tempValid ? temperatureC : BMI088_TEMP_INVALID_C;
+	return true;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 BMI088DecodeTemperature
+// 処理概要     BMI088温度レジスタを11ビット2の補数で摂氏へ復号する
+// 引数         tempMsb: 温度MSB、tempLsb: 温度LSB、temperatureC: 復号結果[°C]
+// 戻り値       true: 有効、false: 無効値
+/////////////////////////////////////////////////////////////////////
+bool BMI088DecodeTemperature(uint8_t tempMsb, uint8_t tempLsb, float *temperatureC)
+{
+	uint16_t temperatureCode = ((uint16_t)tempMsb << 3) | ((uint16_t)tempLsb >> 5);
+	int16_t signedCode;
+
+	if (temperatureC == NULL || temperatureCode == BMI088_TEMP_INVALID_CODE)
+	{
+		return false;
+	}
+
+	if ((temperatureCode & 0x0400U) != 0U)
+	{
+		signedCode = (int16_t)temperatureCode - 2048;
 	}
 	else
 	{
-		tempVal = tempValu;
+		signedCode = (int16_t)temperatureCode;
 	}
-
-	BMI088val.temp = ((float)tempVal * 0.125F) + 23.0F;
+	*temperatureC = 23.0F + ((float)signedCode * 0.125F);
+	return true;
 }
