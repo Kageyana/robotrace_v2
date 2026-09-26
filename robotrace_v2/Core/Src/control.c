@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "control.h"
+#include "autoRun.h"
 #include "pathFollower.h"
 #include "BMI088.h"
 #include "PIDcontrol.h"
@@ -30,6 +31,8 @@ static bool softreset = false;		// ソフトウェアリセット	false:リセ�
 uint8_t autoStart = 0;				// 5走を自動で開始する
 int16_t autoStartAnalyze = 0; 		// 自動走行で使用するログの解析番号
 
+static AutoRunPlan autoRunCurrentPlan = {0U, AUTO_RUN_MODE_INVALID, 0, 0};
+static AutoRunConfigLoadResult autoRunConfigLoadResult = AUTO_RUN_CONFIG_LOAD_IO_ERROR;
 bool stateCrossLine = false;		// クロスライン検出状態
 float rocrun = 2000;		// 曲率半径計算用変数
 
@@ -219,6 +222,8 @@ void initSystem(void)
 	sendLED();
 
 	// microSD
+	autoRunState.configReady = false;
+	autoRunConfigLoadResult = AUTO_RUN_CONFIG_LOAD_IO_ERROR;
 	ssd1306_SetCursor(0, 28);
 	if (insertSD())
 	{
@@ -244,6 +249,7 @@ void initSystem(void)
 			readLinesenval(); // ラインセンサの最大値と最小値を取得
 			readTgtspeeds();  // 目標速度を取得
 			readShortcutSettings(); // 経路追従・ショートカット設定を取得
+			autoRunConfigLoadResult = readAutoRunSettings(); // オートスタート2～5走目の方式を取得
 			readImuTempCompensation(); // BMI088ジャイロZ温度係数を取得
 
 			if (modeDSP)
@@ -435,6 +441,19 @@ static void showRunStartBlocked(const char *reason)
 ///////////////////////////////////////////////////////////////////////////
 static bool blockRunStartIfNeeded(void)
 {
+	if (autoStart > 0U && !autoRunState.configReady)
+	{
+		const char *reason = (autoRunConfigLoadResult == AUTO_RUN_CONFIG_LOAD_IO_ERROR) ?
+			"SD READ ERROR" : "CFG REPAIR NG";
+		motorCommandOut(0, 0);
+		powerLineSensors(0);
+		setupFlags.start = 0;
+		autoStart = 0;
+		autoStartAnalyze = 0;
+		autoRunAbortSeries(&autoRunState);
+		showRunStartBlocked(reason);
+		return true;
+	}
 	if (isRunStartAllowed())
 	{
 		return false;
@@ -445,6 +464,7 @@ static bool blockRunStartIfNeeded(void)
 	setupFlags.start = 0;
 	autoStart = 0;
 	autoStartAnalyze = 0;
+	autoRunAbortSeries(&autoRunState);
 	pattern.calibration = 1;
 	showRunStartBlocked(getRunStartBlockReason());
 	return true;
@@ -477,6 +497,14 @@ void loopSystem(void)
 
 		if (autoStart > 1)
 		{
+			if (!autoRunPrepareRun(&autoRunState, autoStart, &autoRunCurrentPlan))
+			{
+				autoStart = 0U;
+				autoStartAnalyze = 0;
+				autoRunAbortSeries(&autoRunState);
+				showRunStartBlocked("auto_run source missing");
+				break;
+			}
 			// 2次走行
 			motorCommandOut(0, 0);
 
@@ -486,29 +514,30 @@ void loopSystem(void)
 			ssd1306_SetCursor(0, 25);
 			ssd1306_printf(Font_11x18, "Analyzing");
 			ssd1306_SetCursor(0, 50);
-			ssd1306_printf(Font_6x8, "log %d", autoStartAnalyze);	// 追加: 解析対象ログ番号を表示
+			ssd1306_printf(Font_6x8, "%s %d", autoRunModeName(autoRunCurrentPlan.requestedMode),
+				autoRunCurrentPlan.requestedMode == AUTO_RUN_MODE_SLIP ? autoRunCurrentPlan.slipSourceLogNumber :
+				autoRunCurrentPlan.primaryLogNumber);
 			// Ensure SD write buffers are flushed before analysis
 			sd_flush_log();
 
-			if (autoStart == 2)
+			switch (autoRunCurrentPlan.requestedMode)
 			{
-				// 2走目は一次走行ログからコース通りの再走行経路を生成
-				ret = routeBuildFromLog(autoStartAnalyze, 0U);
-			}
-			else
-			{
-				// 3走目以降は一次走行ログを再利用し、許可済みレベルまで段階的に短縮
-				uint8_t requestedLevel = (uint8_t)(autoStart - 2U);
-				if (requestedLevel > shortcutSettings.maxLevel)
-				{
-					requestedLevel = shortcutSettings.maxLevel;
-				}
-				int16_t sourceLog = pathRouteSourceLog();
-				if (sourceLog <= 0)
-				{
-					sourceLog = autoStartAnalyze;
-				}
-				ret = routeBuildFromLog(sourceLog, requestedLevel);
+			case AUTO_RUN_MODE_DISTANCE:
+				ret = readLogDistance(autoRunCurrentPlan.primaryLogNumber);
+				break;
+			case AUTO_RUN_MODE_SLIP:
+				ret = readLogDistanceSlip(autoRunCurrentPlan.primaryLogNumber,
+					autoRunCurrentPlan.slipSourceLogNumber);
+				break;
+			case AUTO_RUN_MODE_PATH:
+				ret = routeBuildFromLog(autoRunCurrentPlan.primaryLogNumber, 0U);
+				break;
+			case AUTO_RUN_MODE_SHORTCUT:
+				ret = routeBuildFromLog(autoRunCurrentPlan.primaryLogNumber, shortcutSettings.maxLevel);
+				break;
+			default:
+				ret = -1;
+				break;
 			}
 			if(ret > 0)
 			{
@@ -534,6 +563,7 @@ void loopSystem(void)
 				patternTrace = 0;
 				autoStart = 0;
 				autoStartAnalyze = 0;
+				autoRunAbortSeries(&autoRunState);
 			}
 		}
 		else
@@ -553,6 +583,18 @@ void loopSystem(void)
 				if (blockRunStartIfNeeded())
 				{
 					break;
+				}
+				if (autoStart == 1U)
+				{
+					autoRunBeginSeries(&autoRunState);
+					if (!autoRunPrepareRun(&autoRunState, 1U, &autoRunCurrentPlan))
+					{
+						autoStart = 0U;
+						autoRunAbortSeries(&autoRunState);
+						showRunStartBlocked("auto_run config invalid");
+						break;
+					}
+					optimalTrace = BOOST_NONE;
 				}
 
 				motorCommandOut(0, 0);
@@ -796,8 +838,8 @@ void loopSystem(void)
 		setTargetSpeed(0);
 		motorCommandOutSynth(0, 0, 0, 0);
 
-		int16_t savedLogNo = 0;	// 追加: 保存実績ログ番号
-		int16_t endIdxBefore = endFileIndex;	// 追加: endLog前のログ末尾を保持
+		int16_t savedLogNo = 0;
+		bool logSaved = false;
 		// 追加: 表示用の予測ログ番号はSD空でも落ちないようガード
 		int16_t predictedLogNo = getNextLogNumber();
 		if (modeLOG)
@@ -808,30 +850,36 @@ void loopSystem(void)
 			ssd1306_SetCursor(0, 45);
 			ssd1306_printf(Font_11x18, "Writing");
 
-			endLog(); // ログ保存終了
+			logSaved = endLog(); // ログ保存終了
 
 			ssd1306_SetCursor(0, 45);
-			ssd1306_printf(Font_11x18, "Written");
+			ssd1306_printf(Font_11x18, logSaved ? "Written" : "Write failed");
 		}
 
 		if (autoStart > 0)
 		{
-			// 追加: 保存成功時のみ解析対象を更新し、失敗時は自動走行を停止
-			if (endFileIndex > endIdxBefore)
+			if (logSaved)
 			{
-				savedLogNo = fileNumbers[endFileIndex];	// 追加: 実際に保存されたログ番号を採用
-				autoStartAnalyze = savedLogNo;
-				// 自動走行モードのときは再度走行準備へ
-				autoStart++;
+				savedLogNo = getLastLogNumber();
 			}
-			else
+			if (!autoRunCompleteRun(&autoRunState, &autoRunCurrentPlan, savedLogNo,
+				(emcStop == 0U), logSaved))
 			{
 				autoStart = 0;
 				autoStartAnalyze = 0;
+				autoRunAbortSeries(&autoRunState);
 			}
 
-			if (autoStart > 5)
+			if (autoStart == 0U)
 			{
+				patternTrace = 103;
+				break;
+			}
+			if (autoStart >= 5U)
+			{
+				autoStart = 0U;
+				autoStartAnalyze = 0;
+				autoRunAbortSeries(&autoRunState);
 				// 5走終了
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(0, 15);
@@ -844,6 +892,8 @@ void loopSystem(void)
 			}
 			else
 			{
+				autoStartAnalyze = savedLogNo;
+				autoStart++;
 				// 走行準備へ
 				powerLineSensors(0);
 				powerMarkerSensors(0);
@@ -998,6 +1048,9 @@ void emergencyStop(void)
 		}
 	}
 
+	autoStart = 0U;
+	autoStartAnalyze = 0;
+	autoRunAbortSeries(&autoRunState);
 	patternTrace = 103;
 }
 ///////////////////////////////////////////////////////////////////////////

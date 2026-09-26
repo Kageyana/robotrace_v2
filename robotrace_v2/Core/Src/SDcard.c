@@ -2,12 +2,14 @@
 // インクルード
 //====================================//
 #include "SDcard.h"
+#include "autoRun.h"
 #include "courseAnalysis.h"
 #include "firmware_version.h"
 #include "sd_functions.h"
 #include "stdio.h"
 #include <stdint.h>
 #include <stdlib.h>
+#include <limits.h>
 //====================================//
 // グローバル変数の宣
 //====================================//
@@ -58,6 +60,7 @@ bool getFileNumbersError = false; // getFileNumbersでエラーが発生した�
 static volatile bool sd_fatfs_locked = false;
 static volatile bool sd_analysis_active = false;
 static volatile bool create_log_ready = false;
+static volatile bool logWriteFailed = false;
 
 // スキーマ順で生成するレコード配置。
 typedef struct
@@ -122,6 +125,86 @@ void readImuTempCompensation(void)
 		}
 	}
 	IMU_SetTempCompensationCoefficient((int32_t)coeffX1000000);
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 readAutoRunConfigFile
+// 処理概要     SDカードからオートスタート方式設定を読み込む
+// 引数         context: 未使用, buffer: 読込先, capacity: 読込容量, length: 読込文字数
+// 戻り値       読込成功、欠落、内容不正、またはI/Oエラー
+/////////////////////////////////////////////////////////////////////
+static AutoRunConfigReadResult readAutoRunConfigFile(void *context, char *buffer, size_t capacity, size_t *length)
+{
+	FIL file;
+	FSIZE_t fileSize;
+	UINT bytesRead = 0U;
+	FRESULT result;
+	FRESULT closeResult;
+	(void)context;
+	if (buffer == NULL || length == NULL || capacity < 2U)
+	{
+		return AUTO_RUN_CONFIG_READ_IO_ERROR;
+	}
+	result = f_open(&file, FILENAME_AUTORUN, FA_OPEN_EXISTING | FA_READ);
+	if (result == FR_NO_FILE)
+	{
+		return AUTO_RUN_CONFIG_READ_MISSING;
+	}
+	if (result != FR_OK)
+	{
+		return AUTO_RUN_CONFIG_READ_IO_ERROR;
+	}
+	fileSize = f_size(&file);
+	if (fileSize >= capacity)
+	{
+		closeResult = f_close(&file);
+		return (closeResult == FR_OK) ? AUTO_RUN_CONFIG_READ_INVALID : AUTO_RUN_CONFIG_READ_IO_ERROR;
+	}
+	result = f_read(&file, buffer, (UINT)fileSize, &bytesRead);
+	closeResult = f_close(&file);
+	if (result != FR_OK || bytesRead != (UINT)fileSize || closeResult != FR_OK)
+	{
+		return AUTO_RUN_CONFIG_READ_IO_ERROR;
+	}
+	buffer[bytesRead] = '\0';
+	*length = (size_t)bytesRead;
+	return AUTO_RUN_CONFIG_READ_SUCCESS;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 writeAutoRunConfigFile
+// 処理概要     SDカード上のオートスタート方式設定を全体置換で保存する
+// 引数         context: 未使用, text: 保存内容, length: 保存文字数
+// 戻り値       true: 保存成功 false: 書込または同期エラー
+/////////////////////////////////////////////////////////////////////
+static bool writeAutoRunConfigFile(void *context, const char *text, size_t length)
+{
+	FIL file;
+	UINT bytesWritten = 0U;
+	FRESULT result;
+	(void)context;
+	if (text == NULL || length > UINT_MAX || f_open(&file, FILENAME_AUTORUN, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK)
+	{
+		return false;
+	}
+	result = f_write(&file, text, (UINT)length, &bytesWritten);
+	if (result == FR_OK && bytesWritten == (UINT)length)
+	{
+		result = f_sync(&file);
+	}
+	FRESULT closeResult = f_close(&file);
+	return result == FR_OK && bytesWritten == (UINT)length && closeResult == FR_OK;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 readAutoRunSettings
+// 処理概要     オートスタート方式設定を読み込み、欠落・不正時は既定順へ修復する
+// 引数         なし
+// 戻り値       設定利用可能、修復失敗、またはSD読込エラー
+/////////////////////////////////////////////////////////////////////
+AutoRunConfigLoadResult readAutoRunSettings(void)
+{
+	return autoRunLoadConfig(&autoRunState, readAutoRunConfigFile, writeAutoRunConfigFile, NULL);
 }
 
 
@@ -424,6 +507,17 @@ int16_t getNextLogNumber(void)
 	// 直前採番の次を返す
 	return (int16_t)(logFileNumber + 1);
 }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 getLastLogNumber
+// 処理概要     直前にCSV保存処理で採番したログ番号を取得する
+// 引数         なし
+// 戻り値       直前ログ番号。未採番の場合は0
+/////////////////////////////////////////////////////////////////////
+int16_t getLastLogNumber(void)
+{
+	return (logFileNumber <= INT16_MAX) ? (int16_t)logFileNumber : 0;
+}
 /////////////////////////////////////////////////////////////////////
 // モジュール名 createLog
 // 処理概要     ログファイルを作成し、ヘッダ情報を出力する
@@ -499,6 +593,20 @@ void createLog(void)
 	setLogHeaderStrF("optimalTrace", optimalTrace);
 	setLogHeaderStrF("autoStart", autoStart);
 	setLogHeaderStrF("emcStop", emcStop);
+	if (autoRunState.currentPlanValid && autoStart > 0U)
+	{
+		setLogHeaderStr("autoRunNumber", autoRunState.currentRunNumber);
+		setLogHeaderStrS("requestedMode", autoRunModeName(autoRunState.currentMode));
+		setLogHeaderStr("primaryLogNumber", autoRunPrimaryLogForHeader(&autoRunState, (int16_t)logFileNumber));
+		setLogHeaderStr("slipSourceLogNumber", autoRunState.slipSourceLogNumber);
+	}
+	else
+	{
+		setLogHeaderStr("autoRunNumber", 0);
+		setLogHeaderStrS("requestedMode", "MANUAL");
+		setLogHeaderStr("primaryLogNumber", 0);
+		setLogHeaderStr("slipSourceLogNumber", 0);
+	}
 	// ゴール誤検出調査用。行ログが終了直前で途切れても累積値を確認できる。
 	setLogHeaderStr("sgMarkerAtLogEnd", (int32_t)SGmarker);
 	setLogHeaderStr("encRightMarkerAtLogEnd_p", encRightMarker);
@@ -610,6 +718,8 @@ void initLog(void)
 	sendSD = false;						// 書き込み要求をリセット
 	sendSD_pending = false;
 	dbg_overflow = 0;
+	logWriteFailed = false;
+	markerOverflow = false;
 	logOverflow = false;				// ログバッファ状態フラグをリセット
 }
 
@@ -740,6 +850,7 @@ void writeLogPuts(void)
 		fresult = f_write(&fil_W, flushBuf, logBuffSendIndex, &writtenlog);
 		if (fresult != FR_OK || writtenlog != logBuffSendIndex)
 		{
+			logWriteFailed = true;
 			uint32_t primask = __get_PRIMASK();
 			__disable_irq();
 			sendSD = false;
@@ -784,9 +895,9 @@ void endTempFile(void)
 // モジュール名 endLog
 // 処理概要     ロギング終了処理
 // 引数         なし
-// 戻り値       なし
+// 戻り値       true: CSVログ保存完了 false: 保存失敗
 /////////////////////////////////////////////////////////////////////
-void endLog(void)
+bool endLog(void)
 {
 	modeLOG = false; // stop logging
 	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY);
@@ -812,20 +923,30 @@ void endLog(void)
 	{
 		writeLogPuts();
 	}
+	if (logWriteFailed || logOverflow || markerOverflow)
+	{
+		f_close(&fil_W);
+		return false;
+	}
 
 	logBuffSendIndex = logBuffIndex;
 	fresult = f_write(&fil_W, activeBuf, logBuffSendIndex, &writtenlog);
 	if (fresult != FR_OK || writtenlog != logBuffSendIndex)
 	{
 		printf("f_write error in endLog: %d (%lu/%lu)\r\n", fresult, (unsigned long)writtenlog, (unsigned long)logBuffSendIndex);
+		f_close(&fil_W);
+		return false;
 	}
-	f_close(&fil_W);
+	if (f_close(&fil_W) != FR_OK)
+	{
+		return false;
+	}
 
 	createLog();
 	if (!create_log_ready)
 	{
 		printf("endLog: createLog failed\r\n");
-		return;
+		return false;
 	}
 
 	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ);
@@ -833,7 +954,7 @@ void endLog(void)
 	{
 		printf("f_open error in endLog\r\n");
 		f_close(&fil_W);
-		return;
+		return false;
 	}
 
 	// クロスライン前後100mm直線化のため、2パスで補正する
@@ -845,16 +966,12 @@ void endLog(void)
 	for (j = 0; j < cntSend; j++)
 	{
 		fresult = f_read(&fil, log, sizeof(log), &readByte);
-		if (readByte != LOG_SIZE)
-		{
-			break;
-		}
-		if (fresult != FR_OK)
+		if (fresult != FR_OK || readByte != LOG_SIZE)
 		{
 			printf("f_read error in endLog\r\n");
 			f_close(&fil_W);
 			f_close(&fil);
-			return;
+			return false;
 		}
 		logaddress = log;
 		logReadRecord(&rec);
@@ -895,13 +1012,17 @@ void endLog(void)
 		cross_count++;
 	}
 
-	f_close(&fil);
+	if (f_close(&fil) != FR_OK)
+	{
+		f_close(&fil_W);
+		return false;
+	}
 	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ);
 	if (fresult != FR_OK)
 	{
 		printf("f_open error in endLog\r\n");
 		f_close(&fil_W);
-		return;
+		return false;
 	}
 	clearXYcie();
 	beforeTime = 0;
@@ -912,16 +1033,12 @@ void endLog(void)
 	for (j = 0; j < cntSend; j++)
 	{
 		fresult = f_read(&fil, log, sizeof(log), &readByte);
-		if (readByte != LOG_SIZE)
-		{
-			break;
-		}
-		if (fresult != FR_OK)
+		if (fresult != FR_OK || readByte != LOG_SIZE)
 		{
 			printf("f_read error in endLog\r\n");
 			f_close(&fil_W);
 			f_close(&fil);
-			return;
+			return false;
 		}
 		logaddress = log;
 		logReadRecord(&rec);
@@ -988,7 +1105,7 @@ void endLog(void)
 			printf("CSV log line truncated in endLog: %d bytes\r\n", csvLength);
 			f_close(&fil_W);
 			f_close(&fil);
-			return;
+			return false;
 		}
 
 		if (f_puts(logStr, &fil_W) < 0)
@@ -996,18 +1113,27 @@ void endLog(void)
 			printf("f_puts error in endLog\r\n");
 			f_close(&fil_W);
 			f_close(&fil);
-			return;
+			return false;
 		}
 	}
 
-	f_sync(&fil_W);
-	f_sync(&fil);
-	f_close(&fil_W);
-	f_close(&fil);
+	if (f_sync(&fil_W) != FR_OK || f_sync(&fil) != FR_OK)
+	{
+		f_close(&fil_W);
+		f_close(&fil);
+		return false;
+	}
+	FRESULT closeOutput = f_close(&fil_W);
+	FRESULT closeInput = f_close(&fil);
+	if (closeOutput != FR_OK || closeInput != FR_OK)
+	{
+		return false;
+	}
 
 	f_unlink("temp");
 
 	cntSend = 0;
+	return true;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getFileNumbers

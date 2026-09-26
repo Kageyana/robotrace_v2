@@ -114,7 +114,7 @@ float calcROC(int16_t velo, float angvelo, float dt);
 void saveLogNumber(int16_t fileNumber);
 void getLogNumber(void);
 int16_t readLogDistance(int logNumber);
-int16_t readLogDistanceSlip(int logNumber);
+int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber);
 float asignVelocity(int16_t ROC);
 int cmpfloat(const void *n1, const void *n2);
 int16_t readLogTest(int logNumber);

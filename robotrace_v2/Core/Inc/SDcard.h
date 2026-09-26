@@ -4,6 +4,7 @@
 // インクルード
 //====================================//
 #include "main.h"
+#include "autoRun.h"
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
@@ -22,6 +23,7 @@
 
 #define PATH_SETTING "./setting/"
 #define FILENAME_LOGNUMBER "lognum"	// 保存ログ番号ファイル名(拡張子なし)
+#define FILENAME_AUTORUN "./setting/auto_run.txt"
 
 //====================================//
 // グローバル変数の宣言
@@ -41,8 +43,9 @@ bool insertSD(void);
 bool initMicroSD(void);
 void createLog(void);
 void readImuTempCompensation(void);
+AutoRunConfigLoadResult readAutoRunSettings(void);
 void endTempFile(void);
-void endLog(void);
+bool endLog(void);
 void writeMarkerPos(uint32_t distance, uint8_t marker);
 void initLog(void);
 // スキーマ順で1レコードを書き込む。
@@ -53,6 +56,7 @@ void send16bit(uint16_t data);
 void send32bit(uint32_t data);
 int16_t getFileNumbers(void);
 int16_t getNextLogNumber(void);
+int16_t getLastLogNumber(void);
 void setLogStr(char *column, char *format);
 void setLogHeaderStr(char *name, int32_t value);
 void setLogHeaderStrF(char *name, float value);
