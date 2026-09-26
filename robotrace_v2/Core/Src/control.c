@@ -513,7 +513,7 @@ void loopSystem(void)
 			if(ret > 0)
 			{
 				// コース解析成功
-				countdown = 2000;							  // カウントダウンスタート
+				countdown = 3000;							  // 3秒カウントダウンを開始
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56, 28);
 				ssd1306_printf(Font_16x26, "%d", autoStart);	// 追加: 走行回数を表示
@@ -556,10 +556,10 @@ void loopSystem(void)
 				}
 
 				motorCommandOut(0, 0);
-				countdown = 2000;							  // カウントダウンスタート
+				countdown = 3000;							  // 3秒カウントダウンを開始
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56, 28);
-				ssd1306_printf(Font_16x26, "5");
+				ssd1306_printf(Font_16x26, "3");
 
 				patternTrace = 1;
 			}
