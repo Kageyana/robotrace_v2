@@ -72,11 +72,11 @@ File: `targetSpeeds.txt`
 File: `shortcut.txt`
 
 - Implementation: `pathFollower.c`, `writeShortcutSettings()`, `readShortcutSettings()`
-- Format: `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000,thetaGain_x1000`
+- Format: `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000,lineThetaGain_x1e9`
 - Write format: `%u,%03u,%03u,%04u,%04u,%03u,%04u`
 - No newline.
 - `maxLevel` is `0..1`; default settings are `1,080,040,3000,0600,010,000`.
-- A valid six-field legacy file retains its values and is repaired by appending default `thetaGain_x1000`.
+- A valid six-field legacy file retains its values and is repaired by appending default `lineThetaGain_x1e9`.
 - The sensor ordering and relative positions are matched to the KiCad board footprints. The existing central sensor forward offset is 95 mm; it was not independently remeasured against the STEP axle origin in this change.
 - Partial reads apply valid fields; invalid or missing fields use defaults and the file is repaired.
 

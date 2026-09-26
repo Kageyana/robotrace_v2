@@ -363,7 +363,7 @@ cmake --build --preset Release
 - SD カードが挿入されていて設定ファイルが存在しない場合は、対象ファイルを作成し、コード内デフォルト値を書き込む。
 - 設定ファイルの読み書き処理を変更する場合は、ファイル欠落時にデフォルト値でファイルが作成されることを確認する。
 - `targetSpeeds.txt` は既存18項目の末尾に `pathReplay` を加えた19項目形式とする。旧18項目は有効値を保ち、末尾に `pathReplay` の既定値を追加して修復する。
-- `shortcut.txt` は `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000,thetaGain_x1000` の順で保存し、改行は付けない。既定値は `1,080,040,3000,0600,010,000`。旧6項目は有効値を保ち、`thetaGain_x1000` を補って修復する。
+- `shortcut.txt` は `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000,lineThetaGain_x1e9` の順で保存し、改行は付けない。既定値は `1,080,040,3000,0600,010,000`。旧6項目は有効値を保ち、`lineThetaGain_x1e9` を補って修復する。
 - `auto_run.txt` は2～5走目の方式を `走行番号,方式` で保存する。既定値は `2,DISTANCE / 3,SLIP / 4,PATH / 5,SHORTCUT`。起動時に読み、欠落・不正・SLIP依存関係違反は全行を既定値へ修復する。修復に失敗した場合は「設定修復失敗」、SD読込I/Oエラー時は「SD読込エラー」と表示してオートスタートを禁止する。I/Oエラー時は設定を書き換えない。SLIPの直前方式はDISTANCEに限る。
 - SD上の `auto_run.txt` を編集した場合は、反映のため再起動する。
 
@@ -536,7 +536,7 @@ cmake --build --preset Release
 - 2026-08-23: `BOOST_PATH_REPLAY`、40 mm経路、ヨーレート経路追従、ライン追従フォールバック、`STOP_LOCALIZATION`、`shortcut.txt`、経路追従ログ列を追加した。ショートカット形状生成は機体寸法実測完了まで安全ゲートで無効とした。
 - 2026-08-23: 機体投影半幅65 mm、外接半径100 mm、走行可能領域端まで200 mmを入力した。許容オフセット49.5 mm、境界残余50.5 mmを確認し、経路制御バージョン2でLevel 1のショートカット形状生成を有効化した。
 - 2026-09-26: `auto_run.txt` でオートスタート2～5走目の方式を指定できるようにした。一次ログと直前正常ログを分離し、要求方式と参照ログ番号を走行ログに記録する。
-- 2026-09-26: `codex/imu-distance-kalman` からPATH REPLAY Level 0とSHORTCUT Level 1の経路追従、対応点制限、ライン姿勢補正、直線回廊生成、経路延長ゴールを機能単位で移植した。距離カルマン融合は移植していない。一次ログへPATH経路元検証メタデータを追加し、旧形式・不正ログを拒否する。`pathReplay` を速度設定19項目目、`thetaGain_x1000` をshortcut設定7項目目に追加し、旧形式設定を有効値保持で修復する。PCテストとDebug/Releaseビルドで確認。実機走行前のため追従・速度性能の採否は未確定。
+- 2026-09-26: `codex/imu-distance-kalman` からPATH REPLAY Level 0とSHORTCUT Level 1の経路追従、対応点制限、ライン姿勢補正、直線回廊生成、経路延長ゴールを機能単位で移植した。距離カルマン融合は移植していない。一次ログへPATH経路元検証メタデータを追加し、旧形式・不正ログを拒否する。`pathReplay` を速度設定19項目目、`lineThetaGain_x1e9` をshortcut設定7項目目に追加し、旧形式設定を有効値保持で修復する。PCテストとDebug/Releaseビルドで確認。実機走行前のため追従・速度性能の採否は未確定。
 
 ## 15. 機体・回路変更時にコードへ反映する項目
 
