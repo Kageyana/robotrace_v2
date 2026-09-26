@@ -5,6 +5,7 @@
 // インクルード
 //====================================//
 #include "main.h"
+#include <stdbool.h>
 #include <stdint.h>
 //====================================//
 // シンボル定義
@@ -24,6 +25,8 @@
 //====================================//
 extern uint8_t  markerSensor;
 extern uint8_t  SGmarker;
+extern volatile uint8_t goalMarkerOnsetValid;
+extern volatile int32_t goalMarkerOnset_p;
 //====================================//
 // プロトタイプ宣言
 //====================================//
@@ -31,5 +34,6 @@ void getMarkerSensor (void);
 void initMarkerSensor(void);
 uint8_t checkMarker(void);
 void checkStartGoalMarker(void);
+bool markerGetGoalOnsetPulse(int32_t *pulse);
 void powerMarkerSensors(uint8_t onoff);
 #endif // MARKERSENSOR_H_

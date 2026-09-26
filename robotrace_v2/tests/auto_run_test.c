@@ -15,6 +15,9 @@
 		} \
 	} while (0)
 
+void testPathPolicy(void);
+void testPathRouteBuilder(void);
+
 typedef struct
 {
 	bool exists;
@@ -247,6 +250,8 @@ int main(void)
 	testConfigParsingAndRepair();
 	testRunLogSelection();
 	testNewAndLegacyCsvRows();
-	puts("All auto-run and CSV parsing tests passed.");
+	testPathPolicy();
+	testPathRouteBuilder();
+	puts("All auto-run, CSV, and PATH integration tests passed.");
 	return EXIT_SUCCESS;
 }

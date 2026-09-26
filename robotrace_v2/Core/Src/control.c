@@ -3,6 +3,7 @@
 //====================================//
 #include "control.h"
 #include "autoRun.h"
+#include "pathPolicy.h"
 #include "pathFollower.h"
 #include "BMI088.h"
 #include "PIDcontrol.h"
@@ -59,7 +60,8 @@ speedParam tgtParam = {
 	MACHINEACCELE,
 	MACHINEDECREACE,
 	PARAM_SHORTCUT,
-	PARAM_DECEL_LEAD_MM};
+	PARAM_DECEL_LEAD_MM,
+	PARAM_PATH_REPLAY};
 // スリップ検出用の状態（1ms割り込みで軽量に処理するためここで管理）
 static float slipEncSpeedHist[SLIP_WINDOW_SAMPLES];		// 時間窓の開始時点のエンコーダ由来速度[m/s]（リングバッファ）
 static uint16_t slipBufIndex = 0;						// リングバッファの書き込み位置
@@ -530,10 +532,12 @@ void loopSystem(void)
 					autoRunCurrentPlan.slipSourceLogNumber);
 				break;
 			case AUTO_RUN_MODE_PATH:
-				ret = routeBuildFromLog(autoRunCurrentPlan.primaryLogNumber, 0U);
+				ret = routeBuildFromLog(autoRunCurrentPlan.primaryLogNumber,
+					pathPolicyGenerationLevel(false, shortcutSettings.maxLevel));
 				break;
 			case AUTO_RUN_MODE_SHORTCUT:
-				ret = routeBuildFromLog(autoRunCurrentPlan.primaryLogNumber, shortcutSettings.maxLevel);
+				ret = routeBuildFromLog(autoRunCurrentPlan.primaryLogNumber,
+					pathPolicyGenerationLevel(true, shortcutSettings.maxLevel));
 				break;
 			default:
 				ret = -1;
@@ -801,10 +805,10 @@ void loopSystem(void)
 			motorCommandOutSynth(0, veloCtrl.pwm, steeringPwm, 0);
 		}
 
-		// 通常走行はゴールマーカーを正とする。PATH系は経路終端付近でのみ有効にする。
-		if (SGmarker >= COUNT_GOAL &&
-			((optimalTrace != BOOST_PATH_REPLAY && optimalTrace != BOOST_SHORTCUT) ||
-			 pathFollowerGoalWindowOpen()))
+		// 通常走行はゴールマーカー、PATH系は中間延長点の経路弧長をゴールとする。
+		bool pathGoalMode = (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT);
+		if (pathPolicyGoalRequest(pathGoalMode, SGmarker >= COUNT_GOAL,
+			pathGoalMode && pathFollowerGoalReached()))
 		{
 			goalTime = cntRun;
 			enc1 = 0;
@@ -862,7 +866,9 @@ void loopSystem(void)
 			{
 				savedLogNo = getLastLogNumber();
 			}
-			if (!autoRunCompleteRun(&autoRunState, &autoRunCurrentPlan, savedLogNo,
+			bool primaryRouteValid = (autoRunCurrentPlan.requestedMode != AUTO_RUN_MODE_PRIMARY) ||
+				logLastPrimaryRouteValid();
+			if (!primaryRouteValid || !autoRunCompleteRun(&autoRunState, &autoRunCurrentPlan, savedLogNo,
 				(emcStop == 0U), logSaved))
 			{
 				autoStart = 0;
@@ -1861,28 +1867,6 @@ float Control_GetSlipDistScaleRaw(void)
 #define TARGET_SPEED_PARAM_COUNT ((int16_t)(sizeof(speedParam) / sizeof(float)))
 
 ///////////////////////////////////////////////////////////////////////////
-// モジュール名 isTargetSpeedStoredValueInRange
-// 処理概要     targetSpeeds.txtの保存値が項目ごとの許容範囲内か判定する
-// 引数         index:速度パラメータ番号, value:保存値
-// 戻り値       true:範囲内 false:範囲外
-///////////////////////////////////////////////////////////////////////////
-static bool isTargetSpeedStoredValueInRange(int16_t index, int16_t value)
-{
-	int16_t maxValue = 1000; // 10.00m/s
-
-	if (index == 14 || index == 15)
-	{
-		maxValue = 2000; // 20.00m/s^2
-	}
-	else if (index == 17)
-	{
-		maxValue = 9900; // 99.00mm
-	}
-
-	return value >= 0 && value <= maxValue;
-}
-
-///////////////////////////////////////////////////////////////////////////
 // モジュール名 applyTargetSpeedStoredValue
 // 処理概要     targetSpeeds.txtの保存値を速度パラメータへ反映する
 // 引数         index:速度パラメータ番号, value:保存値
@@ -1912,6 +1896,7 @@ static void applyTargetSpeedStoredValue(int16_t index, int16_t value)
 	case 15: tgtParam.acceleD = converted; break;
 	case 16: tgtParam.shortCut = converted; break;
 	case 17: tgtParam.decelLeadMm = converted; break;
+	case 18: tgtParam.pathReplay = converted; break;
 	default: break;
 	}
 }
@@ -1995,7 +1980,8 @@ void writeTgtspeeds(void)
 										(int32_t)(round(tgtParam.acceleF * 100)),
 										(int32_t)(round(tgtParam.acceleD * 100)),
 										(int32_t)(round(tgtParam.shortCut * 100)),
-										(int32_t)(round(tgtParam.decelLeadMm * 100)));
+										(int32_t)(round(tgtParam.decelLeadMm * 100)),
+										(int32_t)(round(tgtParam.pathReplay * 100)));
 		f_close(&fil);
 	}
 }
@@ -2011,8 +1997,23 @@ void readTgtspeeds(void)
 	FRESULT fresult;
 	char fileName[30] = PATH_SETTING;
 	TCHAR paramStr[100];
-	int16_t i;
+	int values[TARGET_SPEED_PARAM_COUNT] = {0};
+	int defaults[TARGET_SPEED_PARAM_COUNT];
+	int minimums[TARGET_SPEED_PARAM_COUNT] = {0};
+	int maximums[TARGET_SPEED_PARAM_COUNT];
+	bool present[TARGET_SPEED_PARAM_COUNT] = {false};
 	bool repair = false;
+	const float defaultSpeedValues[TARGET_SPEED_PARAM_COUNT] = {
+		tgtParam.search, tgtParam.stop, tgtParam.bstStraight, tgtParam.bst1500,
+		tgtParam.bst1300, tgtParam.bst1000, tgtParam.bst800, tgtParam.bst700,
+		tgtParam.bst600, tgtParam.bst500, tgtParam.bst400, tgtParam.bst300,
+		tgtParam.bst200, tgtParam.bst100, tgtParam.acceleF, tgtParam.acceleD,
+		tgtParam.shortCut, tgtParam.decelLeadMm, tgtParam.pathReplay};
+	for (int16_t i = 0; i < TARGET_SPEED_PARAM_COUNT; i++)
+	{
+		defaults[i] = (int)lroundf(defaultSpeedValues[i] * 100.0F);
+		maximums[i] = (i == 14 || i == 15) ? 2000 : ((i == 17) ? 9900 : 1000);
+	}
 
 	// ファイル読み込み
 	strcat(fileName, FILENAME_TARGET_SPEED);					  // ファイル名追加
@@ -2022,7 +2023,7 @@ void readTgtspeeds(void)
 	if (fresult == FR_OK)
 	{
 		// speedParamの定義順で読み取る。途中で終端した場合はそこで打ち切る。
-		for (i = 0; i < TARGET_SPEED_PARAM_COUNT; i++)
+		for (int16_t i = 0; i < TARGET_SPEED_PARAM_COUNT; i++)
 		{
 			int16_t value = 0;
 			if (f_gets(paramStr, 6, &fil) == NULL)
@@ -2035,18 +2036,8 @@ void readTgtspeeds(void)
 				repair = true;
 				break;
 			}
-			if (isTargetSpeedStoredValueInRange(i, value))
-			{
-				applyTargetSpeedStoredValue(i, value);
-			}
-			else
-			{
-				repair = true;
-			}
-		}
-		if (i < TARGET_SPEED_PARAM_COUNT)
-		{
-			repair = true;
+			values[i] = (int)value;
+			present[i] = true;
 		}
 		f_close(&fil);
 	}
@@ -2055,6 +2046,12 @@ void readTgtspeeds(void)
 		repair = true;
 	}
 
+	repair = pathPolicyMergeSparseSettings(values, present, defaults,
+		minimums, maximums, TARGET_SPEED_PARAM_COUNT) || repair;
+	for (int16_t i = 0; i < TARGET_SPEED_PARAM_COUNT; i++)
+	{
+		applyTargetSpeedStoredValue(i, (int16_t)values[i]);
+	}
 	if (repair)
 	{
 		writeTgtspeeds();

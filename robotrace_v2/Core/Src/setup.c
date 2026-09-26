@@ -129,7 +129,8 @@ static const SpeedParamInfo speedParamTable[] = {
 	{"BST acceleF", &tgtParam.acceleF, 0.1, 0.0, 20.0, "m/ss"},
 	{"BST acceleD", &tgtParam.acceleD, 0.1, 0.0, 20.0, "m/ss"},
 	{"BST shortCut", &tgtParam.shortCut, 0.1, 0.0, 10.0, "m/s"},
-	{"BST dLead", &tgtParam.decelLeadMm, 1.0, 0.0, 99.0, "mm"}
+	{"BST dLead", &tgtParam.decelLeadMm, 1.0, 0.0, 99.0, "mm"},
+	{"PATH L0", &tgtParam.pathReplay, 0.1, 0.0, 10.0, "m/s"}
 }; // 速度パラメータの対応テーブル
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_speed_param

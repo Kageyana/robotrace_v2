@@ -46,6 +46,7 @@ void readImuTempCompensation(void);
 AutoRunConfigLoadResult readAutoRunSettings(void);
 void endTempFile(void);
 bool endLog(void);
+bool logLastPrimaryRouteValid(void);
 void writeMarkerPos(uint32_t distance, uint8_t marker);
 void initLog(void);
 // スキーマ順で1レコードを書き込む。
