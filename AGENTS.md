@@ -362,7 +362,8 @@ cmake --build --preset Release
 - SD カード未挿入でも走行は可能とする。ただし、警告を画面に表示する。
 - SD カードが挿入されていて設定ファイルが存在しない場合は、対象ファイルを作成し、コード内デフォルト値を書き込む。
 - 設定ファイルの読み書き処理を変更する場合は、ファイル欠落時にデフォルト値でファイルが作成されることを確認する。
-- `shortcut.txt` は `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000` の順で保存し、改行は付けない。実測確認前の既定値は `1,080,040,3000,0600,000` とする。
+- `targetSpeeds.txt` は既存18項目の末尾に `pathReplay` を加えた19項目形式とする。旧18項目は有効値を保ち、末尾に `pathReplay` の既定値を追加して修復する。
+- `shortcut.txt` は `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000,thetaGain_x1000` の順で保存し、改行は付けない。既定値は `1,080,040,3000,0600,010,000`。旧6項目は有効値を保ち、`thetaGain_x1000` を補って修復する。
 - `auto_run.txt` は2～5走目の方式を `走行番号,方式` で保存する。既定値は `2,DISTANCE / 3,SLIP / 4,PATH / 5,SHORTCUT`。起動時に読み、欠落・不正・SLIP依存関係違反は全行を既定値へ修復する。修復に失敗した場合は「設定修復失敗」、SD読込I/Oエラー時は「SD読込エラー」と表示してオートスタートを禁止する。I/Oエラー時は設定を書き換えない。SLIPの直前方式はDISTANCEに限る。
 - SD上の `auto_run.txt` を編集した場合は、反映のため再起動する。
 
@@ -399,7 +400,8 @@ cmake --build --preset Release
 - `autoStart` は、UI 上でオートスタート開始動作を行ったときに実行する。
 - オートスタートの1走目は一次走行に固定し、2～5走目の方式は起動時に読んだ `setting/auto_run.txt` に従う。DISTANCE、PATH、SHORTCUTは1走目ログを参照し、SLIPは1走目の距離基準計画へ直前DISTANCE走行のスリップを反映する。
 - 解析元ログの欠落・解析失敗、緊急停止、走行ログ保存失敗時は次走を開始しない。手動走行の選択は従来どおりとする。
-- ゴール判定条件は、ゴールマーカーを規定回数通過したときとする。
+- 通常走行のゴール判定はゴールマーカー規定回数を使う。PATH REPLAY / SHORTCUT はマーカー回数を使わず、一次経路終端から原点方向へ延長した中間点の経路弧長に到達したときにゴールとする。
+- PATH系の経路元は `pathSourceFormatVersion=1`、正常終了、閉路有効、期待行数一致、IMU校正成功、距離換算検証成功の一次ログに限る。旧形式・不正ログ・経路生成エラーでは走行を開始せず、自動走行中に一次ログの検証が失敗した場合も次走へ進まない。
 - 正常終了時、緊急停止時ともに、ログ保存タイミングは機体停止時とする。緊急停止ログでは `emcStop` に停止要因を記録する。
 - 走行開始、ゴール判定、ログ終了処理を変更する場合は、正常終了と緊急停止のログ保存タイミングが変わらないか確認する。
 
@@ -429,9 +431,9 @@ cmake --build --preset Release
 - `BOOST_NONE`: 1次走行。距離、角速度、マーカー、曲率半径を記録し、2次走行用のログを取る。
 - `BOOST_MARKER`: マーカー位置によって区間速度を決定するモード。現在は使用していない。
 - `BOOST_DISTANCE`: 1次走行の走行距離と比較し、現在の走行位置と曲率半径から速度を決定して走行する。
-- `BOOST_SHORTCUT`: `BOOST_PATH_REPLAY` の経路へ制約付きElastic Bandを適用し、合法余裕を検証した短縮経路をヨーレート制御で走行する。機体投影寸法の実測完了までは安全ゲートで生成禁止とする。
-- `BOOST_PATH_REPLAY`: 1次走行ログの `x`, `y`, `courseMarker` をヘッダ名で読み、40 mm間隔に再標本化した経路をラインセンサー非依存で再走行する。ラインセンサーは限定的な位置補正とロスト時フォールバックにだけ使う。
-- `BOOST_PATH_REPLAY` / `BOOST_SHORTCUT` のゴール判定は、通常右マーカーの誤カウントによる早期終了を防ぐため経路終端付近でのみ有効とする。
+- `BOOST_SHORTCUT`: `BOOST_PATH_REPLAY` の経路にLevel 1の直線回廊短縮を適用し、合法余裕を確認してヨーレート制御で走行する。
+- `BOOST_PATH_REPLAY`: 条件を満たす一次ログの `x`, `y`, `encTotalOptimal` を列名で解決し、40 mm間隔に再標本化した経路を走行する。ラインセンサーは限定的な実座標姿勢補正とロスト時フォールバックに使う。Level 0専用速度は `targetSpeeds.txt` の `pathReplay` とする。
+- PATH REPLAY / SHORTCUT は一次経路の終端から原点までの距離の半分だけ経路を延長し、その延長点をゴールとする。経路延長不能、配列容量超過、無効な経路元は生成エラーとして走行開始を禁止する。自己位置喪失時の停止を維持する。
 
 ### 速度計画と確認観点
 
@@ -464,6 +466,7 @@ cmake --build --preset Release
 - ログファイル名は通し番号を使う。
 - ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。旧形式ログも列名で解決する。
 - 1行目のパラメータは `パラメータ名=value` 形式で記載される。IMU温度校正・補正状態、温度係数、エンコーダ換算値も残す。
+- 一次ログの1行目には `pathSourceFormatVersion=1`, `closureValid`, `closureReason`, `logExpectedRows`, `imuCalibrationValid`, `imuCalibrationSamples`, `imuCalibrationReadErrors`, `distanceScaleVerified`, `distanceScalePulsePerMeter`, `distanceScaleError_p` を記録する。PATH経路元には、正常終了かつ閉路有効・行数一致・IMU校正成功・距離換算検証成功のログだけを使う。保存済み旧形式ログはPATH経路元として受け付けない。これらはCSV列およびバイナリレコード構成を変更しない。
 - `courseAnalysis.c` の2次ログ再解析は、`courseMarker`, `encTotalOptimal`, `ROC`, `targetSpeed`, `optimalIndex`, `slipFlag`, `slipFlagLat` をCSVヘッダ名から解決する。ログ列追加時に固定列番号へ依存しない。
 - 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_MARKER`, `BOOST_DISTANCE`, `BOOST_SHORTCUT`, `BOOST_PATH_REPLAY` を正とする。
 - 新しい走行モードを追加する場合は、`robotrace_v2/Core/Inc/courseAnalysis.h` に定義を追加する。
@@ -512,13 +515,13 @@ cmake --build --preset Release
 
 現時点の要確認項目:
 
-- ラインセンサー10個の実座標と `sensor[0]` からの配線順を照合し、センサー位置補正モデルを確定する。完了までは `shortcut.txt` の `lineAlpha_x1000=000` を維持する。
+- PATH REPLAY と SHORTCUT を実機で各10本以上走行し、まず完走率と停止位置の再現性を確認する。その後に速度・追従調整の性能採否を判断する。性能上の採否は未確定。
+- KiCadラインセンサー基板で10センサーの左右順と基板上の相対座標を照合済み。中央センサーの前方95 mmは既存の実測値だが、STEPの車軸原点との距離は今回独立に再確認していない。
 
 ### 実装未対応箇所の対応優先順位
 
-1. 低速の `BOOST_PATH_REPLAY` を10本検証し、再現性を確認する。
-2. 低速のLevel 1ショートカットを10本検証し、再現性と合法余裕を確認する。
-3. ラインセンサー実座標と配線順の照合後、`lineAlpha_x1000` を段階的に調整する。
+1. Level 0 と Level 1 を同じ条件で各10本以上検証し、完走率と停止位置の再現性を確認する。
+2. 実走行結果を見て、追従・速度調整の性能採否を判断する。
 
 ### `AGENTS.md` 更新タイミング
 
@@ -533,6 +536,7 @@ cmake --build --preset Release
 - 2026-08-23: `BOOST_PATH_REPLAY`、40 mm経路、ヨーレート経路追従、ライン追従フォールバック、`STOP_LOCALIZATION`、`shortcut.txt`、経路追従ログ列を追加した。ショートカット形状生成は機体寸法実測完了まで安全ゲートで無効とした。
 - 2026-08-23: 機体投影半幅65 mm、外接半径100 mm、走行可能領域端まで200 mmを入力した。許容オフセット49.5 mm、境界残余50.5 mmを確認し、経路制御バージョン2でLevel 1のショートカット形状生成を有効化した。
 - 2026-09-26: `auto_run.txt` でオートスタート2～5走目の方式を指定できるようにした。一次ログと直前正常ログを分離し、要求方式と参照ログ番号を走行ログに記録する。
+- 2026-09-26: `codex/imu-distance-kalman` からPATH REPLAY Level 0とSHORTCUT Level 1の経路追従、対応点制限、ライン姿勢補正、直線回廊生成、経路延長ゴールを機能単位で移植した。距離カルマン融合は移植していない。一次ログへPATH経路元検証メタデータを追加し、旧形式・不正ログを拒否する。`pathReplay` を速度設定19項目目、`thetaGain_x1000` をshortcut設定7項目目に追加し、旧形式設定を有効値保持で修復する。PCテストとDebug/Releaseビルドで確認。実機走行前のため追従・速度性能の採否は未確定。
 
 ## 15. 機体・回路変更時にコードへ反映する項目
 

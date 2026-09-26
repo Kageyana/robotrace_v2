@@ -55,26 +55,29 @@ File: `speed_ff.txt`
 File: `targetSpeeds.txt`
 
 - Implementation: `control.c`, `writeTgtspeeds()`, `readTgtspeeds()`
-- Format: 18 fixed-width comma-separated fields.
+- Format: 19 fixed-width comma-separated fields.
 - Write format: each item `%04d,`
 - Read format: each item `%04hd,`
 - No newline.
 - Stored values are rounded real values multiplied by 100, then divided by 100 on read.
-- Order: `search`, `stop`, `bstStraight`, `bst1500`, `bst1300`, `bst1000`, `bst800`, `bst700`, `bst600`, `bst500`, `bst400`, `bst300`, `bst200`, `bst100`, `acceleF`, `acceleD`, `shortCut`, `decelLeadMm`.
+- Order: `search`, `stop`, `bstStraight`, `bst1500`, `bst1300`, `bst1000`, `bst800`, `bst700`, `bst600`, `bst500`, `bst400`, `bst300`, `bst200`, `bst100`, `acceleF`, `acceleD`, `shortCut`, `decelLeadMm`, `pathReplay`.
 - `search`, `stop`, `bst*`, `shortCut` are speeds `[m/s]`.
 - `acceleF`, `acceleD` are accelerations `[m/s^2]`.
 - `decelLeadMm` is distance `[mm]`.
+- `pathReplay` is the Level 0 PATH REPLAY speed `[m/s]`.
+- An 18-field legacy file retains its valid values and is repaired by appending the default `pathReplay` value.
 
 ### Path Replay and Shortcut
 
 File: `shortcut.txt`
 
 - Implementation: `pathFollower.c`, `writeShortcutSettings()`, `readShortcutSettings()`
-- Format: `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000`
-- Write format: `%u,%03u,%03u,%04u,%04u,%03u`
+- Format: `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000,thetaGain_x1000`
+- Write format: `%u,%03u,%03u,%04u,%04u,%03u,%04u`
 - No newline.
-- `maxLevel` is `0..3`; SD absent keeps Level 0.
-- Until machine footprint and sensor coordinates are verified, keep `PATH_SHORTCUT_GEOMETRY_ENABLE=0` and `lineAlpha_x1000=000`.
+- `maxLevel` is `0..1`; default settings are `1,080,040,3000,0600,010,000`.
+- A valid six-field legacy file retains its values and is repaired by appending default `thetaGain_x1000`.
+- The sensor ordering and relative positions are matched to the KiCad board footprints. The existing central sensor forward offset is 95 mm; it was not independently remeasured against the STEP axle origin in this change.
 - Partial reads apply valid fields; invalid or missing fields use defaults and the file is repaired.
 
 ### Auto-start run modes

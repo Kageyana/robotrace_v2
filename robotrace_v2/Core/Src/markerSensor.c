@@ -3,6 +3,7 @@
 //====================================//
 #include "markerSensor.h"
 #include "control.h"
+#include "courseAnalysis.h"
 #include "encoder.h"
 #include <stdint.h>
 //====================================//
@@ -10,6 +11,8 @@
 //====================================//
 uint8_t markerSensor = 0;
 uint8_t SGmarker = 0;
+volatile uint8_t goalMarkerOnsetValid = 0U;
+volatile int32_t goalMarkerOnset_p = 0;
 static int32_t encMarkerL = PULSE_METER/10, encMarkerR = (PULSE_METER/10) + 1;
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getMarksensor
@@ -59,6 +62,8 @@ void initMarkerSensor(void)
 {
     markerSensor = 0;
     SGmarker = 0;
+    goalMarkerOnsetValid = 0U;
+    goalMarkerOnset_p = 0;
     encMarkerL = PULSE_METER/10;
     encMarkerR = (PULSE_METER/10) + 1;
 }
@@ -158,6 +163,11 @@ void checkStartGoalMarker(void)
 		if (courseMarker == RIGHTMARKER && encRightMarker > encMM(1000))
 		{ // 1000mm以上離れたらゴールマーカー検出可能
 			SGmarker++;
+			if (SGmarker >= COUNT_GOAL)
+			{
+				goalMarkerOnset_p = encTotalOptimal;
+				goalMarkerOnsetValid = 1U;
+			}
 			encRightMarker = 0;
 		}
 	}
@@ -169,6 +179,18 @@ void checkStartGoalMarker(void)
 			encRightMarker = 0;
 		}
 	}
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 markerGetGoalOnsetPulse
+// 処理概要     最後に通過したゴールマーカー位置を取得する
+// 引数         pulse: 累積距離パルスの格納先
+// 戻り値       true: 取得済み false: 未検出または格納先なし
+/////////////////////////////////////////////////////////////////////
+bool markerGetGoalOnsetPulse(int32_t *pulse)
+{
+	if (pulse == 0 || goalMarkerOnsetValid == 0U) return false;
+	*pulse = goalMarkerOnset_p;
+	return true;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 powerMarkerSensors

@@ -15,6 +15,8 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - Logs are CSV, UTF-8, comma-separated. New logs have `key=value` metadata on line 1, column names on line 2, and data from line 3. Older logs may combine column names and metadata on line 1; resolve columns by name.
 - The schema source is `robotrace_v2/Core/Inc/log_schema.h`.
 - The log header contains data names and `parameter=value` entries.
+- New primary logs record `pathSourceFormatVersion=1`, `closureValid`, `closureReason`, `logExpectedRows`, IMU calibration validity/sample/error counts, and distance-scale verification fields in the metadata row. These fields do not change CSV columns or binary records.
+- A PATH route source must be a normally completed primary log with source format version 1, valid closure, exact expected row count, successful IMU calibration, and verified distance conversion. Saved legacy-format and invalid primary logs must be rejected as route sources; if the primary validation fails, autorun must stop before the next run.
 - Firmware-side secondary-log parsing resolves required fields by header name, not fixed column number. Required fields are `courseMarker`, `encTotalOptimal`, `ROC`, `targetSpeed`, `optimalIndex`, `slipFlag`, and `slipFlagLat`.
 - Distinguish run mode by `optimalTrace`.
 - Exclude failed runs when `emcStop != 0`.
@@ -66,8 +68,10 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - `BOOST_NONE`: verify distance, angular velocity, markers, curvature radius, and XY plot. Pay special attention to angle drift.
 - `BOOST_MARKER`: verify all markers detected in the first run are detected.
 - `BOOST_DISTANCE`: verify current course position matches the estimated position and first-run distance.
-- `BOOST_PATH_REPLAY`: verify path lateral/heading error, fallback count, and line correction validity against the first-run route.
-- `BOOST_SHORTCUT`: verify the robot follows the validated shortcut, `pathLegalMargin_mm` remains non-negative, and no localization fallback occurs.
+- `BOOST_PATH_REPLAY`: verify path lateral/heading error, fallback count, and bounded line-position/heading correction against the validated primary route. Goal is the halfway extension from the primary endpoint toward the origin; marker count does not terminate PATH mode.
+- `BOOST_SHORTCUT`: verify the Level 1 straight corridor route, `pathLegalMargin_mm` remains non-negative, and no localization fallback occurs. Goal uses the same extended-route arc length as PATH REPLAY.
+- Route generation failure, extension failure, or point-capacity overflow must block route start. For automatic runs, invalid primary-source metadata blocks progression to the next run.
+- PATH/SHORTCUT tuning remains unadopted until same-condition real-world runs provide at least 10 logs per level; assess completion rate and stop-position repeatability before lap time.
 - Compare only logs with the same run mode; distance, path replay, and shortcut modes are not equivalent.
 
 ## Output Rules

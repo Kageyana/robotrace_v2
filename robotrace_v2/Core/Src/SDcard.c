@@ -5,8 +5,11 @@
 #include "autoRun.h"
 #include "courseAnalysis.h"
 #include "firmware_version.h"
+#include "IMU.h"
+#include "markerSensor.h"
 #include "sd_functions.h"
 #include "stdio.h"
+#include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <limits.h>
@@ -61,6 +64,24 @@ static volatile bool sd_fatfs_locked = false;
 static volatile bool sd_analysis_active = false;
 static volatile bool create_log_ready = false;
 static volatile bool logWriteFailed = false;
+static bool lastRunSaved = false;
+static bool lastPrimaryRouteValid = false;
+static bool runImuCalibrationValid = false;
+static uint16_t runImuCalibrationSamples = 0U;
+static uint16_t runImuCalibrationReadErrors = 0U;
+
+typedef struct
+{
+	bool closureValid;
+	bool goalMarkerOnsetValid;
+	bool distanceScaleVerified;
+	int32_t goalMarkerOnset_p;
+	int32_t distanceScaleError_p;
+	float goalMarkerX_mm;
+	uint8_t reason;
+} PrimaryRouteValidation;
+
+static PrimaryRouteValidation primaryRouteValidation = {false, false, false, 0, 0, 0.0F, 1U};
 
 // スキーマ順で生成するレコード配置。
 typedef struct
@@ -519,6 +540,16 @@ int16_t getLastLogNumber(void)
 	return (logFileNumber <= INT16_MAX) ? (int16_t)logFileNumber : 0;
 }
 /////////////////////////////////////////////////////////////////////
+// モジュール名 logLastPrimaryRouteValid
+// 処理概要     直前に保存した一次走行ログの経路採用可否を返す
+// 引数         なし
+// 戻り値       true:採用可能 false:保存失敗または検証不成立
+/////////////////////////////////////////////////////////////////////
+bool logLastPrimaryRouteValid(void)
+{
+	return lastRunSaved && lastPrimaryRouteValid;
+}
+/////////////////////////////////////////////////////////////////////
 // モジュール名 createLog
 // 処理概要     ログファイルを作成し、ヘッダ情報を出力する
 // 引数         なし
@@ -588,6 +619,19 @@ void createLog(void)
 	setLogHeaderStrFPrecision("imuTempCoeff_dpsPerC", imuTempCoeff_dpsPerC, 6U);
 	setLogHeaderStrFPrecision("imuTempEnd_C", imuTempEnd_C, 3U);
 	setLogHeaderStr("encoderPulsePerMeter", PULSE_METER);
+	setLogHeaderStr("pathSourceFormatVersion", PATH_SOURCE_FORMAT_VERSION);
+	setLogHeaderStr("closureValid", primaryRouteValidation.closureValid ? 1 : 0);
+	setLogHeaderStr("closureReason", primaryRouteValidation.reason);
+	setLogHeaderStr("goalMarkerOnsetValid", primaryRouteValidation.goalMarkerOnsetValid ? 1 : 0);
+	setLogHeaderStr("goalMarkerOnset_p", primaryRouteValidation.goalMarkerOnset_p);
+	setLogHeaderStrFPrecision("goalMarkerX_mm", primaryRouteValidation.goalMarkerX_mm, 2U);
+	setLogHeaderStr("logExpectedRows", cntSend);
+	setLogHeaderStr("imuCalibrationValid", runImuCalibrationValid ? 1 : 0);
+	setLogHeaderStr("imuCalibrationSamples", runImuCalibrationSamples);
+	setLogHeaderStr("imuCalibrationReadErrors", runImuCalibrationReadErrors);
+	setLogHeaderStr("distanceScaleVerified", primaryRouteValidation.distanceScaleVerified ? 1 : 0);
+	setLogHeaderStr("distanceScalePulsePerMeter", PULSE_METER);
+	setLogHeaderStr("distanceScaleError_p", primaryRouteValidation.distanceScaleError_p);
 	// 制御パラメータ
 	setLogHeaderStrF("batteryVoltage_V", batteryVoltage_V);
 	setLogHeaderStrF("optimalTrace", optimalTrace);
@@ -691,6 +735,12 @@ void createLog(void)
 void initLog(void)
 {
 	FRESULT fresult;		// f_write status
+	lastRunSaved = false;
+	lastPrimaryRouteValid = false;
+	runImuCalibrationValid = IMU_CalibrationReady();
+	runImuCalibrationSamples = IMU_CalibrationSamples();
+	runImuCalibrationReadErrors = IMU_CalibrationReadErrors();
+	primaryRouteValidation = (PrimaryRouteValidation){false, false, false, 0, 0, 0.0F, 1U};
 	// CSV変換ループの実行回数を走行ごとに正しく制御するため送信カウンタをリセット
 	cntSend = 0;
 	fresult = f_open(&fil_W, "temp", FA_CREATE_ALWAYS | FA_WRITE); // create/overwrite file
@@ -899,6 +949,8 @@ void endTempFile(void)
 /////////////////////////////////////////////////////////////////////
 bool endLog(void)
 {
+	lastRunSaved = false;
+	lastPrimaryRouteValid = false;
 	modeLOG = false; // stop logging
 	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY);
 	FRESULT fresult;		// f_write status
@@ -912,6 +964,14 @@ bool endLog(void)
 	float dt, zg;
 	float log_roc, log_x, log_y;
 	LogRecord rec;
+	int32_t goalMarkerPulse = 0;
+	int32_t previousTotalPulse = 0;
+	int64_t correctedPulseTotal = 0;
+	bool goalMarkerBracketFound = false;
+	bool totalPulseMonotonic = true;
+	float goalMarkerX = 0.0F;
+	uint16_t csvRowsWritten = 0U;
+	uint16_t expectedRows = cntSend;
 
 	float cross_start_mm[CROSSSEG_MAX];
 	float cross_end_mm[CROSSSEG_MAX];
@@ -942,13 +1002,6 @@ bool endLog(void)
 		return false;
 	}
 
-	createLog();
-	if (!create_log_ready)
-	{
-		printf("endLog: createLog failed\r\n");
-		return false;
-	}
-
 	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ);
 	if (fresult != FR_OK)
 	{
@@ -963,6 +1016,11 @@ bool endLog(void)
 	beforeSpeed = 0;
 	dist_mm = 0.0f;
 	in_cross = false;
+	clearXYcie();
+	primaryRouteValidation = (PrimaryRouteValidation){false, false, false, 0, 0, 0.0F, 1U};
+	primaryRouteValidation.goalMarkerOnsetValid =
+		markerGetGoalOnsetPulse(&goalMarkerPulse) && goalMarkerPulse > 0;
+	primaryRouteValidation.goalMarkerOnset_p = goalMarkerPulse;
 	for (j = 0; j < cntSend; j++)
 	{
 		fresult = f_read(&fil, log, sizeof(log), &readByte);
@@ -978,12 +1036,37 @@ bool endLog(void)
 
 		time = rec.cntlog;
 		speed = (int16_t)rec.encCurrentN;
+		zg = rec.gyroVal_Z;
+		int32_t totalPulse = (int32_t)rec.encTotalOptimal;
+		int32_t correctedPulse = (int32_t)rec.encCurrentCorr_p;
+		int32_t pulseDelta = totalPulse - previousTotalPulse;
+		if (pulseDelta < 0 || correctedPulse < 0 || correctedPulse > INT16_MAX)
+		{
+			totalPulseMonotonic = false;
+		}
+		if (correctedPulse >= 0) correctedPulseTotal += correctedPulse;
 		if (abs((int32_t)speed - (int32_t)beforeSpeed) > 500)
 		{
 			speed = beforeSpeed;
 		}
 		beforeSpeed = speed;
 		dt = (float)(time - beforeTime) / 1000.0f;
+		float previousX = xycie.x;
+		if (correctedPulse >= 0 && correctedPulse <= INT16_MAX)
+		{
+			calcXYcie((int16_t)correctedPulse, zg, dt);
+		}
+		if (!goalMarkerBracketFound && primaryRouteValidation.goalMarkerOnsetValid &&
+			pulseDelta >= 0 && goalMarkerPulse >= previousTotalPulse && goalMarkerPulse <= totalPulse)
+		{
+			float ratio = (pulseDelta > 0) ?
+				(float)(goalMarkerPulse - previousTotalPulse) / (float)pulseDelta : 1.0F;
+			if (ratio < 0.0F) ratio = 0.0F;
+			if (ratio > 1.0F) ratio = 1.0F;
+			goalMarkerX = previousX + ((xycie.x - previousX) * ratio);
+			goalMarkerBracketFound = true;
+		}
+		previousTotalPulse = totalPulse;
 		dist_mm += calcDlMm(speed, dt);
 		beforeTime = time;
 
@@ -1015,6 +1098,65 @@ bool endLog(void)
 	if (f_close(&fil) != FR_OK)
 	{
 		f_close(&fil_W);
+		return false;
+	}
+	primaryRouteValidation.goalMarkerX_mm = goalMarkerX;
+	if (optimalTrace == BOOST_NONE)
+	{
+		if (!primaryRouteValidation.goalMarkerOnsetValid || SGmarker < COUNT_GOAL)
+		{
+			primaryRouteValidation.reason = 2U;
+		}
+		else if (logOverflow || markerOverflow || logWriteFailed || dbg_overflow != 0U ||
+			emcStop != 0U || j != cntSend)
+		{
+			primaryRouteValidation.reason = 3U;
+		}
+		else if (!runImuCalibrationValid ||
+			runImuCalibrationSamples != IMU_CALIBRATION_SAMPLE_COUNT ||
+			runImuCalibrationReadErrors != 0U)
+		{
+			primaryRouteValidation.reason = 9U;
+		}
+		else if (!goalMarkerBracketFound || goalMarkerPulse <= 0)
+		{
+			primaryRouteValidation.reason = 5U;
+		}
+		else
+		{
+			int64_t scaleError = (int64_t)previousTotalPulse - correctedPulseTotal;
+			int64_t scaleErrorAbs = (scaleError < 0) ? -scaleError : scaleError;
+			int64_t scaleTolerance = (int64_t)lroundf(fmaxf(
+				50.0F * PULSE_MILLIMETER, (float)previousTotalPulse * 0.05F));
+			if (scaleError > INT32_MAX) scaleError = INT32_MAX;
+			if (scaleError < INT32_MIN) scaleError = INT32_MIN;
+			primaryRouteValidation.distanceScaleError_p = (int32_t)scaleError;
+			primaryRouteValidation.distanceScaleVerified =
+				totalPulseMonotonic && previousTotalPulse > 0 && scaleErrorAbs <= scaleTolerance &&
+				PULSE_METER == 58019;
+			if (!primaryRouteValidation.distanceScaleVerified)
+			{
+				primaryRouteValidation.reason = 10U;
+			}
+			else if (!isfinite(goalMarkerX) || fabsf(goalMarkerX) > 20.0F)
+			{
+				primaryRouteValidation.reason = 8U;
+			}
+			else
+			{
+				primaryRouteValidation.reason = 0U;
+				primaryRouteValidation.closureValid = true;
+			}
+		}
+	}
+	else
+	{
+		primaryRouteValidation.reason = 1U;
+	}
+	createLog();
+	if (!create_log_ready)
+	{
+		printf("endLog: createLog failed\r\n");
 		return false;
 	}
 	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ);
@@ -1115,6 +1257,7 @@ bool endLog(void)
 			f_close(&fil);
 			return false;
 		}
+		csvRowsWritten++;
 	}
 
 	if (f_sync(&fil_W) != FR_OK || f_sync(&fil) != FR_OK)
@@ -1132,7 +1275,10 @@ bool endLog(void)
 
 	f_unlink("temp");
 
+	lastPrimaryRouteValid = optimalTrace == BOOST_NONE && primaryRouteValidation.closureValid &&
+		csvRowsWritten == expectedRows;
 	cntSend = 0;
+	lastRunSaved = true;
 	return true;
 }
 /////////////////////////////////////////////////////////////////////
