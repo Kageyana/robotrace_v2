@@ -328,14 +328,13 @@ static void applyDecelLeadToArray(float *speed, int16_t count)
 	}
 }
 /////////////////////////////////////////////////////////////////////
-// 繝｢繧ｸ繝･繝ｼ繝ｫ蜷・readLogDistance
-// 蜃ｦ逅・ｦりｦ・    霍晞屬蝓ｺ貅・谺｡襍ｰ陦後・隗｣譫・
-// 蠑墓焚         繝ｭ繧ｰ逡ｪ蜿ｷ(繝輔ぃ繧､繝ｫ蜷・
-// 謌ｻ繧雁､       譛驕ｩ騾溷ｺｦ驟榊・縺ｮ譛螟ｧ隕∫ｴ謨ｰ
-//              -1: 隗｣譫千畑驟榊・縺ｮ繧ｵ繧､繧ｺ繧定ｶ・℃
-//              -4: 繝ｭ繧ｰ繝輔ぃ繧､繝ｫ縺ｮ繧ｪ繝ｼ繝励Φ螟ｱ謨・
+// モジュール名 readLogDistanceProgress
+// 処理概要     一次ログから距離基準の速度計画を生成する
+// 引数         logNumber: 一次ログ番号、progress: 解析進捗の通知関数
+// 戻り値       計画の要素数、失敗時は負のエラーコード
 /////////////////////////////////////////////////////////////////////
-int16_t readLogDistance(int logNumber)
+static int16_t readLogDistanceProgress(int logNumber,
+	void (*progress)(const char *stage, uint32_t lineNo))
 {
 	// 繝輔ぃ繧､繝ｫ隱ｭ縺ｿ霎ｼ縺ｿ
 	FIL fil_Read;
@@ -356,18 +355,23 @@ int16_t readLogDistance(int logNumber)
 	snprintf(fileName, sizeof(fileName), "%d", logNumber);			   // 謨ｰ蛟､繧呈枚蟄怜・縺ｫ螟画鋤
 	strcat(fileName, ".csv");										   // 諡｡蠑ｵ蟄舌ｒ霑ｽ蜉
 	retry_open:
-	// 隗｣譫仙燕縺ｫ蜀阪・繧ｦ繝ｳ繝医＠縺ｦFAT縺ｮ謨ｴ蜷医ｒ蜿悶ｊ逶ｴ縺・
-	if (!sd_remount_for_analysis()) {
+	// 保存時に同期・クローズ済みのログを開く。I/Oエラー後の再試行時だけ再マウントする。
+	if (retried && !sd_remount_for_analysis()) {
 		ret = -6;
 		goto cleanup_read;
 	}
 	fresult = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // csv繝輔ぃ繧､繝ｫ繧帝幕縺・
+	if (!retried && (fresult == FR_DISK_ERR || fresult == FR_INT_ERR || fresult == FR_NOT_READY))
+	{
+		retried = true;
+		goto retry_open;
+	}
 
 	if (fresult == FR_OK)
 	{
 		fileOpened = true; // 豁｣蟶ｸ縺ｫ髢九￠縺溷ｴ蜷医・縺ｿ繧ｯ繝ｭ繝ｼ繧ｺ蜃ｦ逅・ｒ譛牙柑蛹・
 		// 繝ｭ繧ｰ繝・・繧ｿ縺ｮ蜿門ｾ・
-		static TCHAR log[4096];
+	static TCHAR log[4096];
 		const int log_len = (int)(sizeof(log) / sizeof(log[0]));
 		int32_t marker, distance, roc, i = 0;
 		int32_t numD = 0, numM = 0, cntCurR = 0, numStraight = 0;
@@ -400,6 +404,7 @@ int16_t readLogDistance(int logNumber)
 		}
 
 		UINT lineNo = 0;
+		if (progress) progress("Base read", 0U);
 		// 繝ｭ繧ｰ繝・・繧ｿ蜿門ｾ鈴幕蟋・
 		while (!errorDetected)
 		{
@@ -415,6 +420,7 @@ int16_t readLogDistance(int logNumber)
 				break;
 			}
 			lineNo++;
+			if (progress && (lineNo % 512U) == 0U) progress("Base read", lineNo);
 
 			CourseLogDistanceRow row;
 			if (!courseLogParseDistanceRow((const char *)log, &distanceColumns, &row))
@@ -515,6 +521,7 @@ int16_t readLogDistance(int logNumber)
 
 		if (!errorDetected)
 		{
+			if (progress) progress("Base plan", lineNo);
 			// 繧､繝ｳ繝・ャ繧ｯ繧ｹ縺・螟壹￥縺ｪ繧九・縺ｧ隱ｿ謨ｴ
 			if (numM > 0)
 			{
@@ -657,6 +664,16 @@ cleanup_read:
 	return ret;
 }
 /////////////////////////////////////////////////////////////////////
+// モジュール名 readLogDistance
+// 処理概要     一次ログから距離基準の速度計画を生成する
+// 引数         logNumber: 一次ログ番号
+// 戻り値       計画の要素数、失敗時は負のエラーコード
+/////////////////////////////////////////////////////////////////////
+int16_t readLogDistance(int logNumber)
+{
+	return readLogDistanceProgress(logNumber, NULL);
+}
+/////////////////////////////////////////////////////////////////////
 // 繝ｭ繝ｼ繧ｫ繝ｫ髢｢謨ｰ parseSecondLogLine
 // 蜃ｦ逅・ｦりｦ・ 2谺｡襍ｰ陦後Ο繧ｰ縺ｮ蠢・ｦ∝・縺ｮ縺ｿ繧呈歓蜃ｺ縺吶ｋ
 // 蠑墓焚	 line: 1陦梧枚蟄怜・, 蜷・・蜉帛・繝昴う繝ｳ繧ｿ
@@ -686,52 +703,53 @@ static bool parseSecondLogLine(const char *line, const SecondLogColumnMap *map,
 }
 static void logReadSlipIoError(int logNumber, UINT lineNo, FIL *fil, const char *tag)
 {
-	FIL fil_Boost;
-	FRESULT fresult_Boost;
-	char boostFileName[32];
 	DWORD pos = f_tell(fil);
 	DWORD size = f_size(fil);
 	int eof = f_eof(fil);
 	int err = f_error(fil);
-
-	snprintf(boostFileName, sizeof(boostFileName), "%sboost_%05d.csv", PATH_SETTING, logNumber);
-	fresult_Boost = f_open(&fil_Boost, boostFileName, FA_OPEN_ALWAYS | FA_WRITE);
-	if (fresult_Boost == FR_OK)
-	{
-		// 繝輔ぃ繧､繝ｫ邨らｫｯ縺ｸ遘ｻ蜍・繝輔ぃ繧､繝ｫ霑ｽ險倥・貅門ｙ)
-		f_lseek(&fil_Boost, f_size(&fil_Boost));
-		f_printf(&fil_Boost,
-			"readLogDistanceSlip %s: line=%lu pos=%lu size=%lu eof=%d err=%d sd_sector=%lu sd_count=%u sd_rb=%d sd_rm=%d\n",
-			(tag != NULL) ? tag : "io",
-			(unsigned long)lineNo, (unsigned long)pos, (unsigned long)size, eof, err,
-			(unsigned long)g_sd_last_read_sector, (unsigned int)g_sd_last_read_count,
-			g_sd_last_read_blocks_status, g_sd_last_read_multi_status);
-		f_close(&fil_Boost);
-	}
+	// 読み取りエラー中のSDカードに診断を書き込まない。
+	printf("readLogDistanceSlip log=%d %s: line=%lu pos=%lu size=%lu eof=%d err=%d sd_sector=%lu sd_count=%u sd_rb=%d sd_rm=%d\n",
+		logNumber, (tag != NULL) ? tag : "io",
+		(unsigned long)lineNo, (unsigned long)pos, (unsigned long)size, eof, err,
+		(unsigned long)g_sd_last_read_sector, (unsigned int)g_sd_last_read_count,
+		g_sd_last_read_blocks_status, g_sd_last_read_multi_status);
 }
 /////////////////////////////////////////////////////////////////////
-// 繝｢繧ｸ繝･繝ｼ繝ｫ蜷・readLogDistanceSlip
-// 蜃ｦ逅・ｦりｦ・    2谺｡襍ｰ陦後Ο繧ｰ縺九ｉ繧ｹ繝ｪ繝・・繧定・・縺励◆3谺｡襍ｰ陦檎畑騾溷ｺｦ險育判繧剃ｽ懈・縺吶ｋ
-// 蠑墓焚         繝ｭ繧ｰ逡ｪ蜿ｷ(繝輔ぃ繧､繝ｫ蜷・
-// 謌ｻ繧雁､       譛驕ｩ騾溷ｺｦ驟榊・縺ｮ譛螟ｧ隕∫ｴ謨ｰ
+// モジュール名 readLogDistanceSlip
+// 処理概要     一次ログの距離計画に直前走行のスリップを反映する
+// 引数         baseLogNumber: 一次ログ番号、slipLogNumber: 直前走行ログ番号
+//              progress: 解析段階と読込行数を通知する関数
+// 戻り値       計画の要素数、失敗時は負のエラーコード
 /////////////////////////////////////////////////////////////////////
-int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber)
+int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
+	void (*progress)(const char *stage, uint32_t lineNo))
 {
 	if (baseLogNumber <= 0 || slipLogNumber <= 0)
 	{
 		return -4;
 	}
-	// 一次ログから距離基準計画を作り、指定された直前ログだけからスリップを集計する。
-	int16_t baseRet = readLogDistance(baseLogNumber);
-	if (baseRet < 0)
+	// 直前DISTANCE走行の計画が同じ一次ログを元にしていれば再利用する。
+	// 計画が無い場合だけ一次ログを読み直す。
+	if (optimalTrace == BOOST_DISTANCE && analyzedNumber == baseLogNumber &&
+		numPPADarry > 0 && numPPADarry <= OPT_BUFF_SIZE)
 	{
-		return baseRet;
+		if (progress) progress("Base cached", (uint32_t)numPPADarry);
+	}
+	else
+	{
+		if (progress) progress("Base", 0U);
+		int16_t baseRet = readLogDistanceProgress(baseLogNumber, progress);
+		if (baseRet < 0)
+		{
+			return baseRet;
+		}
 	}
 	int16_t baseCount = numPPADarry;
 	if (baseCount <= 0)
 	{
 		return -2; // 隗｣譫仙ｯｾ雎｡縺檎┌縺・
 	}
+	if (progress) progress("Slip open", 0U);
 
 	FIL fil_Read;
 	FRESULT fresult;
@@ -762,12 +780,18 @@ int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber)
 	snprintf(fileName, sizeof(fileName), "%d", slipLogNumber);			   // 謨ｰ蛟､繧呈枚蟄怜・縺ｫ螟画鋤
 	strcat(fileName, ".csv");										   // 諡｡蠑ｵ蟄舌ｒ霑ｽ蜉
 	retry_open_slip:
-	// 隗｣譫仙燕縺ｫ蜀阪・繧ｦ繝ｳ繝医＠縺ｦFAT縺ｮ謨ｴ蜷医ｒ蜿悶ｊ逶ｴ縺・
-	if (!sd_remount_for_analysis()) {
+	if (retried && progress) progress("Slip retry", 0U);
+	// 一次ログ解析後も同じマウントを使い、I/Oエラー後だけ再マウントする。
+	if (retried && !sd_remount_for_analysis()) {
 		ret = -6;
 		goto cleanup;
 	}
 	fresult = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // csv繝輔ぃ繧､繝ｫ繧帝幕縺・
+	if (!retried && (fresult == FR_DISK_ERR || fresult == FR_INT_ERR || fresult == FR_NOT_READY))
+	{
+		retried = true;
+		goto retry_open_slip;
+	}
 	if (fresult != FR_OK)
 	{
 		ret = -4; // 繝ｭ繧ｰ繝輔ぃ繧､繝ｫ縺ｮ繧ｪ繝ｼ繝励Φ螟ｱ謨・
@@ -821,6 +845,7 @@ int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber)
 
 	UINT lineNo = 0;
 	bool fgets_null = false;
+	if (progress) progress("Slip read", 0U);
 
 	while (1) {
 		TCHAR* s = f_gets(log, log_len, &fil_Read);
@@ -830,10 +855,13 @@ int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber)
 			break;
 		}
 		lineNo++;
+		if (progress && (lineNo % 512U) == 0U) progress("Slip read", lineNo);
 
 		if (f_error(&fil_Read))
 		{
 			logReadSlipIoError(slipLogNumber, lineNo, &fil_Read, "io_err");
+			ret = -5;
+			break;
 		}
 
 		uint8_t courseMarker = 0;
@@ -903,6 +931,7 @@ int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber)
 		ret = 0;
 		goto retry_open_slip;
 	}
+	if (progress) progress("Slip plan", lineNo);
 
 cleanup:
 	if (fileOpened)

@@ -27,6 +27,7 @@ extern volatile int g_sd_last_read_multi_status;
 
 #define USE_DMA 1
 #define SD_DMA_WAIT_TIMEOUT_MS 50U
+#define SD_SPI_BYTE_TIMEOUT_MS 20U
 
 // extern SPI_HandleTypeDef hspi3;
 #define SD_SPI_HANDLE hspi3
@@ -58,13 +59,19 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
 }
 #endif
 
+static uint8_t sd_byte_io_failed = 0;
+
 static void SD_TransmitByte(uint8_t data) {
-    HAL_SPI_Transmit(&SD_SPI_HANDLE, &data, 1, HAL_MAX_DELAY);
+    if (HAL_SPI_Transmit(&SD_SPI_HANDLE, &data, 1, SD_SPI_BYTE_TIMEOUT_MS) != HAL_OK) {
+        sd_byte_io_failed = 1;
+    }
 }
 
 static uint8_t SD_ReceiveByte(void) {
-    uint8_t dummy = 0xFF, data = 0;
-    HAL_SPI_TransmitReceive(&SD_SPI_HANDLE, &dummy, &data, 1, HAL_MAX_DELAY);
+    uint8_t dummy = 0xFF, data = 0xFF;
+    if (HAL_SPI_TransmitReceive(&SD_SPI_HANDLE, &dummy, &data, 1, SD_SPI_BYTE_TIMEOUT_MS) != HAL_OK) {
+        sd_byte_io_failed = 1;
+    }
     return data;
 }
 
@@ -119,6 +126,7 @@ static SD_Status SD_ReceiveBuffer(uint8_t *buffer, uint16_t len) {
 #endif
 }
 
+#if SD_SPI_CRC_CHECK
 static uint16_t SD_CalcCrc16(const uint8_t *data, uint16_t len) {
     uint16_t crc = 0;
     while (len--) {
@@ -133,6 +141,7 @@ static uint16_t SD_CalcCrc16(const uint8_t *data, uint16_t len) {
     }
     return crc;
 }
+#endif
 
 
 bool SD_SetSpiPrescaler(uint32_t prescaler) {
@@ -161,6 +170,7 @@ static SD_Status SD_WaitReadyInternal(uint32_t timeout_ms) {
     uint8_t resp;
     do {
         resp = SD_ReceiveByte();
+        if (sd_byte_io_failed) return SD_ERROR;
         if (resp == 0xFF) return SD_OK;
     } while (HAL_GetTick() < timeout);
     return SD_ERROR;
@@ -182,9 +192,11 @@ static uint8_t SD_SendCommand(uint8_t cmd, uint32_t arg, uint8_t crc) {
     SD_TransmitByte(arg >> 8);
     SD_TransmitByte(arg);
     SD_TransmitByte(crc);
+    if (sd_byte_io_failed) return 0xFF;
 
     do {
         response = SD_ReceiveByte();
+        if (sd_byte_io_failed) return 0xFF;
     } while ((response & 0x80) && --retry);
 
     return response;
@@ -196,15 +208,17 @@ uint8_t sd_is_sdhc(void) {
 }
 
 SD_Status SD_WaitReadyMs(uint32_t timeout_ms) {
+    sd_byte_io_failed = 0;
     return SD_WaitReadyInternal(timeout_ms);
 }
 
 SD_Status SD_Sync(uint32_t timeout_ms) {
+    sd_byte_io_failed = 0;
     SD_CS_LOW();
     SD_Status status = SD_WaitReadyInternal(timeout_ms);
     SD_CS_HIGH();
     SD_TransmitByte(0xFF);
-    return status;
+    return sd_byte_io_failed ? SD_ERROR : status;
 }
 uint8_t card_initialized = 0;
 
@@ -217,6 +231,7 @@ static SD_Status SD_WaitDataToken(uint8_t token, uint32_t timeout_ms) {
     uint8_t resp;
     do {
         resp = SD_ReceiveByte();
+        if (sd_byte_io_failed) return SD_ERROR;
         if (resp == token) return SD_OK;
     } while (HAL_GetTick() < timeout);
     return SD_ERROR;
@@ -243,6 +258,7 @@ static SD_Status SD_StopTransmission(void) {
 }
 
 static SD_Status SD_ReadCSD(uint8_t *csd) {
+    sd_byte_io_failed = 0;
     if (csd == NULL) return SD_ERROR;
 
     SD_CS_LOW();
@@ -267,7 +283,7 @@ static SD_Status SD_ReadCSD(uint8_t *csd) {
     SD_ReceiveByte();
     SD_CS_HIGH();
     SD_TransmitByte(0xFF);
-    return SD_OK;
+    return sd_byte_io_failed ? SD_ERROR : SD_OK;
 }
 
 SD_Status SD_SPI_Init(void) {
@@ -275,6 +291,7 @@ SD_Status SD_SPI_Init(void) {
     uint8_t r7[4];
     uint32_t retry;
 
+    sd_byte_io_failed = 0;
     SD_SetSpeedSlow();
     SD_CS_HIGH();
     SD_TransmitByte(0xFF);
@@ -325,10 +342,11 @@ SD_Status SD_SPI_Init(void) {
 
     card_initialized = 1;
     SD_SetSpeedFast();
-    return SD_OK;
+    return sd_byte_io_failed ? SD_ERROR : SD_OK;
 }
 
 SD_Status SD_ReadBlocks(uint8_t *buff, uint32_t sector, uint32_t count) {
+    sd_byte_io_failed = 0;
     if (!count) return SD_ERROR;
 
     if (count == 1) {
@@ -360,16 +378,20 @@ SD_Status SD_ReadBlocks(uint8_t *buff, uint32_t sector, uint32_t count) {
             SD_TransmitByte(0xFF);
             return SD_ERROR;
         }
+#else
+        (void)crc_hi;
+        (void)crc_lo;
 #endif
         SD_CS_HIGH();
         SD_TransmitByte(0xFF);
-        return SD_OK;
+        return sd_byte_io_failed ? SD_ERROR : SD_OK;
     } else {
         return SD_ReadMultiBlocks(buff, sector, count);
     }
 }
 
 SD_Status SD_ReadMultiBlocks(uint8_t *buff, uint32_t sector, uint32_t count) {
+    sd_byte_io_failed = 0;
     if (!count) {
         g_sd_last_read_multi_status = (int)SD_ERROR;
         return SD_ERROR;
@@ -411,6 +433,9 @@ SD_Status SD_ReadMultiBlocks(uint8_t *buff, uint32_t sector, uint32_t count) {
             g_sd_last_read_multi_status = (int)SD_ERROR;
             return SD_ERROR;
         }
+#else
+        (void)crc_hi;
+        (void)crc_lo;
 #endif
 
         buff += 512;
@@ -425,11 +450,12 @@ SD_Status SD_ReadMultiBlocks(uint8_t *buff, uint32_t sector, uint32_t count) {
     SD_CS_HIGH();
     SD_TransmitByte(0xFF);
 
-    g_sd_last_read_multi_status = (int)SD_OK;
-    return SD_OK;
+    g_sd_last_read_multi_status = sd_byte_io_failed ? (int)SD_ERROR : (int)SD_OK;
+    return sd_byte_io_failed ? SD_ERROR : SD_OK;
 }
 
 SD_Status SD_WriteBlocks(const uint8_t *buff, uint32_t sector, uint32_t count) {
+    sd_byte_io_failed = 0;
     if (!count) return SD_ERROR;
 
     if (count == 1) {
@@ -465,13 +491,14 @@ SD_Status SD_WriteBlocks(const uint8_t *buff, uint32_t sector, uint32_t count) {
         SD_CS_HIGH();
         SD_TransmitByte(0xFF);
 
-        return SD_OK;
+        return sd_byte_io_failed ? SD_ERROR : SD_OK;
     } else {
         return SD_WriteMultiBlocks(buff, sector, count);
     }
 }
 
 SD_Status SD_WriteMultiBlocks(const uint8_t *buff, uint32_t sector, uint32_t count) {
+    sd_byte_io_failed = 0;
     if (!count) return SD_ERROR;
     uint32_t addr = SD_SectorToAddress(sector);
 
@@ -519,7 +546,7 @@ SD_Status SD_WriteMultiBlocks(const uint8_t *buff, uint32_t sector, uint32_t cou
 
     SD_TransmitByte(0xFF);
 
-    return SD_OK;
+    return sd_byte_io_failed ? SD_ERROR : SD_OK;
 }
 
 SD_Status SD_GetSectorCount(uint32_t *sector_count) {

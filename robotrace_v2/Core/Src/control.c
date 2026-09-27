@@ -141,6 +141,28 @@ static bool updateDisplayDmaAndWait(uint32_t timeout_ms)
 
 	return true;
 }
+/////////////////////////////////////////////////////////////////////
+// モジュール名 showSlipAnalysisProgress
+// 処理概要     SLIP解析の段階と読込行数を画面に表示する
+// 引数         stage: 解析段階、lineNo: 読み込んだ行数
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void showSlipAnalysisProgress(const char *stage, uint32_t lineNo)
+{
+	if (!modeDSP)
+	{
+		return;
+	}
+	ssd1306_FillRectangle(0, 42, 127, 63, Black);
+	ssd1306_SetCursor(0, 42);
+	ssd1306_printf(Font_6x8, "SLIP %d", autoRunCurrentPlan.slipSourceLogNumber);
+	ssd1306_SetCursor(0, 53);
+	ssd1306_printf(Font_6x8, "%s %lu", stage, (unsigned long)lineNo);
+	if (!ssd1306_IsDMARunning())
+	{
+		(void)updateDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS);
+	}
+}
 // タイマ関連
 uint32_t cntRun = 0;
 int16_t countdown;
@@ -519,8 +541,7 @@ void loopSystem(void)
 			ssd1306_printf(Font_6x8, "%s %d", autoRunModeName(autoRunCurrentPlan.requestedMode),
 				autoRunCurrentPlan.requestedMode == AUTO_RUN_MODE_SLIP ? autoRunCurrentPlan.slipSourceLogNumber :
 				autoRunCurrentPlan.primaryLogNumber);
-			// Ensure SD write buffers are flushed before analysis
-			sd_flush_log();
+			// endLog() はログを同期・クローズ済み。閉じたログの追加同期は不要。
 
 			switch (autoRunCurrentPlan.requestedMode)
 			{
@@ -529,7 +550,7 @@ void loopSystem(void)
 				break;
 			case AUTO_RUN_MODE_SLIP:
 				ret = readLogDistanceSlip(autoRunCurrentPlan.primaryLogNumber,
-					autoRunCurrentPlan.slipSourceLogNumber);
+					autoRunCurrentPlan.slipSourceLogNumber, showSlipAnalysisProgress);
 				break;
 			case AUTO_RUN_MODE_PATH:
 				ret = routeBuildFromLog(autoRunCurrentPlan.primaryLogNumber,

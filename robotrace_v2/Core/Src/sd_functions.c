@@ -122,12 +122,22 @@ int sd_unmount(void) {
 	return res;
 }
 
+/////////////////////////////////////////////////////////////////////
+// モジュール名 sd_remount
+// 処理概要     解析時のI/O再試行用にSDを再初期化する
+// 引数         なし
+// 戻り値       FatFsの結果コード
+/////////////////////////////////////////////////////////////////////
 int sd_remount(void) {
 	int res = sd_unmount();
 	if (res != FR_OK) {
 		return res;
 	}
-	return sd_mount();
+	// 読込エラーからの復旧時は空き容量走査と自動フォーマットを行わない。
+	if (disk_initialize(0) != 0) {
+		return FR_NOT_READY;
+	}
+	return f_mount(&fs, sd_path, 1);
 }
 
 int sd_write_file(const char *filename, const char *text) {

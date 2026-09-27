@@ -133,7 +133,7 @@ File: `boost_%05d.csv`
 - Written when `WRITE_BOOSTSPEED_LOG` is enabled.
 - Header: `index,boost_speed`
 - Row format: `index,boost_speed`, with `boost_speed` as `%.3f`.
-- Slip-analysis SD read errors can append diagnostic rows to the same file.
+- Slip-analysis SD read errors are reported through ITM and do not write diagnostic rows to the SD card.
 
 ## Corruption Handling
 
