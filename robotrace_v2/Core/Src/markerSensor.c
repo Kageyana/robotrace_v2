@@ -13,6 +13,9 @@ uint8_t markerSensor = 0;
 uint8_t SGmarker = 0;
 volatile uint8_t goalMarkerOnsetValid = 0U;
 volatile int32_t goalMarkerOnset_p = 0;
+static int32_t rightMarkerCandidate_p = 0;
+static int32_t rightMarkerQualified_p = 0;
+static uint8_t rightMarkerQualified = 0U;
 static int32_t encMarkerL = PULSE_METER/10, encMarkerR = (PULSE_METER/10) + 1;
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getMarksensor
@@ -64,6 +67,9 @@ void initMarkerSensor(void)
     SGmarker = 0;
     goalMarkerOnsetValid = 0U;
     goalMarkerOnset_p = 0;
+    rightMarkerCandidate_p = 0;
+    rightMarkerQualified_p = 0;
+    rightMarkerQualified = 0U;
     encMarkerL = PULSE_METER/10;
     encMarkerR = (PULSE_METER/10) + 1;
 }
@@ -89,6 +95,15 @@ uint8_t checkMarker(void)
 		existMarker = nowMarker;   // 最初に検知したマーカーを記録
 		checkStart = 1;			   // マーカー幅計測開始
 		encMarkerN = nowEncTotalN; // 距離計測開始
+		// 右マーカー判定は確認位置から60mm以内に起きる。古い候補だけ破棄する。
+		if (rightMarkerQualified != 0U && nowEncTotalN - encMarkerR > encMM(100))
+		{
+			rightMarkerQualified = 0U;
+		}
+		if (nowMarker == RIGHTMARKER && SGmarker > 0U && rightMarkerQualified == 0U)
+		{
+			rightMarkerCandidate_p = encTotalOptimal;
+		}
 	}
 	if (checkStart == 1)
 	{
@@ -113,6 +128,8 @@ uint8_t checkMarker(void)
 			if (existMarker == 0x1)
 			{
 				encMarkerR = nowEncTotalN;
+				rightMarkerQualified_p = rightMarkerCandidate_p;
+				rightMarkerQualified = 1U;
 			}
 			else if (existMarker == 0x2)
 			{
@@ -165,9 +182,13 @@ void checkStartGoalMarker(void)
 			SGmarker++;
 			if (SGmarker >= COUNT_GOAL)
 			{
-				goalMarkerOnset_p = encTotalOptimal;
-				goalMarkerOnsetValid = 1U;
+				if (rightMarkerQualified != 0U)
+				{
+					goalMarkerOnset_p = rightMarkerQualified_p;
+					goalMarkerOnsetValid = 1U;
+				}
 			}
+			rightMarkerQualified = 0U;
 			encRightMarker = 0;
 		}
 	}

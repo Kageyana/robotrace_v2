@@ -550,6 +550,16 @@ bool logLastPrimaryRouteValid(void)
 	return lastRunSaved && lastPrimaryRouteValid;
 }
 /////////////////////////////////////////////////////////////////////
+// モジュール名 logLastPrimaryRouteReason
+// 処理概要     直前の一次走行ログの経路不採用理由を返す
+// 引数         なし
+// 戻り値       経路検証の理由コード
+/////////////////////////////////////////////////////////////////////
+uint8_t logLastPrimaryRouteReason(void)
+{
+	return primaryRouteValidation.reason;
+}
+/////////////////////////////////////////////////////////////////////
 // モジュール名 createLog
 // 処理概要     ログファイルを作成し、ヘッダ情報を出力する
 // 引数         なし
@@ -1044,7 +1054,8 @@ bool endLog(void)
 		{
 			totalPulseMonotonic = false;
 		}
-		if (correctedPulse >= 0) correctedPulseTotal += correctedPulse;
+		// encCurrentCorr_p は1ms当たりのパルス数。ログ間隔[ms]を掛けて累積距離と比較する。
+		if (correctedPulse >= 0) correctedPulseTotal += (int64_t)correctedPulse * (time - beforeTime);
 		if (abs((int32_t)speed - (int32_t)beforeSpeed) > 500)
 		{
 			speed = beforeSpeed;

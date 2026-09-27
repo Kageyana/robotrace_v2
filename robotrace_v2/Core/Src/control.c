@@ -822,7 +822,7 @@ void loopSystem(void)
 			ssd1306_UpdateScreen_DMA();        // 停止していた画面更新を再開
 		}
 		// 停止速度まで減速
-		if (enc1 >= encMM(10))
+		if (enc1 >= encMM(50))
 		{
 			setTargetSpeed(0);
 		}
@@ -871,6 +871,19 @@ void loopSystem(void)
 			if (!primaryRouteValid || !autoRunCompleteRun(&autoRunState, &autoRunCurrentPlan, savedLogNo,
 				(emcStop == 0U), logSaved))
 			{
+				if (modeDSP)
+				{
+					ssd1306_FillRectangle(0, 15, 127, 63, Black);
+					ssd1306_SetCursor(0, 25);
+					ssd1306_printf(Font_11x18, "Auto stop");
+					ssd1306_SetCursor(0, 45);
+					if (!logSaved)
+						ssd1306_printf(Font_11x18, "Log failed");
+					else if (!primaryRouteValid)
+						ssd1306_printf(Font_6x8, "Route reason %u", logLastPrimaryRouteReason());
+					else
+						ssd1306_printf(Font_11x18, "Run invalid");
+				}
 				autoStart = 0;
 				autoStartAnalyze = 0;
 				autoRunAbortSeries(&autoRunState);
