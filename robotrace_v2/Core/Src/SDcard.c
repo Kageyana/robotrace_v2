@@ -32,6 +32,7 @@ char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE] = "", formatLog[LOG_FORMAT_BUFFER
 
 #define CROSS_STRAIGHT_MM 100.0f
 #define CROSSSEG_MAX 128
+#define PRIMARY_ROUTE_GOAL_X_LIMIT_MM 60.0F
 #define LOG_BUFFER_COUNT 3
 #define LOG_TEMP_PREALLOC_BYTES (2UL * 1024UL * 1024UL)
 uint8_t logBuffer[LOG_BUFFER_COUNT][BUFFER_SIZE_LOG];
@@ -1149,7 +1150,7 @@ bool endLog(void)
 			{
 				primaryRouteValidation.reason = 10U;
 			}
-			else if (!isfinite(goalMarkerX) || fabsf(goalMarkerX) > 20.0F)
+			else if (!isfinite(goalMarkerX) || fabsf(goalMarkerX) > PRIMARY_ROUTE_GOAL_X_LIMIT_MM)
 			{
 				primaryRouteValidation.reason = 8U;
 			}
