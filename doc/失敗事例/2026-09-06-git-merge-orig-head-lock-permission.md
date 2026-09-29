@@ -2,7 +2,7 @@
 type: codex-failure
 date: 2026-09-06
 task: "codex/shortcut-path の変更を main へマージする"
-status: open
+status: resolved
 severity: medium
 tags:
   - codex/failure
@@ -41,12 +41,13 @@ fatal: update_ref failed for ref 'ORIG_HEAD': cannot lock ref 'ORIG_HEAD': Unabl
 
 ## 解決・回避策
 
-未確認。`.git` への書き込みが許可された環境または権限でマージを再実行する。
+2026-09-30、`codex/imu-distance-kalman` へのマージでも同じエラーが再発した。作業ツリーがクリーンで、`.git/ORIG_HEAD.lock` が残っていないことを確認した後、Git 書き込み権限を付けて同じ `git merge --no-ff main` を再実行した。Git はマージを開始できたため、権限エラーの回避を確認した。マージ自体はコード競合により未完了となり、別途対象変更だけを移植した。
 
 ## 今後の予防策
 
 - マージ前に作業ツリーがクリーンであることと、`.git` 内に対象ロックファイルが残っていないことを確認する。
 - `ORIG_HEAD.lock` 作成の権限エラーが発生した場合は、ロックファイルを推測で削除せず、既存プロセスとファイル権限を確認してから、Git を書き込み可能な権限で再実行する。
+- 書き込み権限で再実行した後は、権限エラーが解消したかとコード競合の有無を別々に判定する。
 - マージ成功後に `git status`、`git log --decorate`、必要に応じて `git merge-base --is-ancestor` で反映結果を確認する。
 
 ## 関連

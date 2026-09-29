@@ -13,7 +13,7 @@
 //====================================//
 #include "log_schema.h" // フィールド順とレコードサイズを定義。
 
-#define BUFFER_SIZE_LOG 512
+#define BUFFER_SIZE_LOG 2048U
 #define LOG_SIZE LOG_RECORD_SIZE_BYTES // スキーマ由来のレコードサイズ。
 
 #define BUFFER_SIZE_MARKER 500
