@@ -467,7 +467,9 @@ cmake --build --preset Release
 - ログファイル名は通し番号を使う。
 - ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。旧形式ログも列名で解決する。
 - 1行目のパラメータは `パラメータ名=value` 形式で記載される。IMU温度校正・補正状態、温度係数、エンコーダ換算値も残す。
+- 走行ログの1行目には `logDistanceTargetMm=5` を記録する。
 - 一次ログの1行目には `pathSourceFormatVersion=1`, `closureValid`, `closureReason`, `logExpectedRows`, `imuCalibrationValid`, `imuCalibrationSamples`, `imuCalibrationReadErrors`, `distanceScaleVerified`, `distanceScalePulsePerMeter`, `distanceScaleError_p` を記録する。PATH経路元には、正常終了かつ閉路有効・行数一致・IMU校正成功・距離換算検証成功のログだけを使う。保存済み旧形式ログはPATH経路元として受け付けない。これらはCSV列およびバイナリレコード構成を変更しない。
+- ログ取得の目標距離間隔は `robotrace_v2/Core/Inc/SDcard.h` の `LOG_DISTANCE_MM=5` を正とする。センサー値は1 ms周期で更新するため、高速時は実際のログ行間隔が5 mmを超えることがある。実間隔は `encTotalOptimal` の差で評価する。
 - `goalMarkerOnset_p` は幅を確認したゴールマーカーの検出開始位置とする。`distanceScaleError_p` はログ行間の経過msを掛けて積算した `encCurrentCorr_p` と最終 `encTotalOptimal` の差とする。オートスタートが一次走行後に止まったら、まず `closureReason` とログ最終行の距離を確認する。
 - `courseAnalysis.c` の2次ログ再解析は、`courseMarker`, `encTotalOptimal`, `ROC`, `targetSpeed`, `optimalIndex`, `slipFlag`, `slipFlagLat` をCSVヘッダ名から解決する。ログ列追加時に固定列番号へ依存しない。
 - 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_MARKER`, `BOOST_DISTANCE`, `BOOST_SHORTCUT`, `BOOST_PATH_REPLAY` を正とする。
@@ -539,6 +541,7 @@ cmake --build --preset Release
 - 2026-08-23: 機体投影半幅65 mm、外接半径100 mm、走行可能領域端まで200 mmを入力した。許容オフセット49.5 mm、境界残余50.5 mmを確認し、経路制御バージョン2でLevel 1のショートカット形状生成を有効化した。
 - 2026-09-26: `auto_run.txt` でオートスタート2～5走目の方式を指定できるようにした。一次ログと直前正常ログを分離し、要求方式と参照ログ番号を走行ログに記録する。
 - 2026-09-26: `codex/imu-distance-kalman` からPATH REPLAY Level 0とSHORTCUT Level 1の経路追従、対応点制限、ライン姿勢補正、直線回廊生成、経路延長ゴールを機能単位で移植した。距離カルマン融合は移植していない。一次ログへPATH経路元検証メタデータを追加し、旧形式・不正ログを拒否する。`pathReplay` を速度設定19項目目、`lineThetaGain_x1e9` をshortcut設定7項目目に追加し、旧形式設定を有効値保持で修復する。PCテストとDebug/Releaseビルドで確認。実機走行前のため追従・速度性能の採否は未確定。
+- 2026-09-30: ログ取得の目標距離間隔を10 mmから5 mmへ変更し、ログヘッダへ `logDistanceTargetMm` を追加した。1 ms更新制約による実際の行間隔の変動を考慮し、距離解析は実距離基準とする。
 
 ## 15. 機体・回路変更時にコードへ反映する項目
 

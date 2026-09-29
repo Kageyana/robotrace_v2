@@ -352,15 +352,15 @@ static int16_t readLogDistanceProgress(int logNumber,
 	}
 	// 隗｣譫蝉ｸｭ縺ｯ繝ｭ繧ｰ譖ｸ縺崎ｾｼ縺ｿ繧呈椛蛻ｶ縺吶ｋ
 	sd_set_analysis_active(true); // SD/FatFs菴ｿ逕ｨ荳ｭ
-	snprintf(fileName, sizeof(fileName), "%d", logNumber);			   // 謨ｰ蛟､繧呈枚蟄怜・縺ｫ螟画鋤
-	strcat(fileName, ".csv");										   // 諡｡蠑ｵ蟄舌ｒ霑ｽ蜉
+	snprintf(fileName, sizeof(fileName), "%d", logNumber); // ログ番号をファイル名に変換する
+	strcat(fileName, ".csv"); // CSV拡張子を追加する
 	retry_open:
-	// 保存時に同期・クローズ済みのログを開く。I/Oエラー後の再試行時だけ再マウントする。
+	// ログ保存時に同期・クローズ済みのファイルを開く。I/Oエラー時の再試行だけ再マウントする。
 	if (retried && !sd_remount_for_analysis()) {
 		ret = -6;
 		goto cleanup_read;
 	}
-	fresult = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // csv繝輔ぃ繧､繝ｫ繧帝幕縺・
+	fresult = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // CSVファイルを読み取り専用で開く
 	if (!retried && (fresult == FR_DISK_ERR || fresult == FR_INT_ERR || fresult == FR_NOT_READY))
 	{
 		retried = true;
@@ -369,19 +369,21 @@ static int16_t readLogDistanceProgress(int logNumber,
 
 	if (fresult == FR_OK)
 	{
-		fileOpened = true; // 豁｣蟶ｸ縺ｫ髢九￠縺溷ｴ蜷医・縺ｿ繧ｯ繝ｭ繝ｼ繧ｺ蜃ｦ逅・ｒ譛牙柑蛹・
-		// 繝ｭ繧ｰ繝・・繧ｿ縺ｮ蜿門ｾ・
+		fileOpened = true; // 正常に開けたファイルだけを後で閉じる
+		// ログデータを取得する
 	static TCHAR log[4096];
 		const int log_len = (int)(sizeof(log) / sizeof(log[0]));
-		int32_t marker, distance, roc, i = 0;
+		int32_t marker, distance, roc;
 		int32_t numD = 0, numM = 0, cntCurR = 0, numStraight = 0;
+		int32_t previousDistance = 0, analysisBaseDistance = 0;
+		bool havePreviousDistance = false;
 		static int16_t ROCbuff[600] = {0};
-		int16_t sortROC[CALCDISTANCE / 10];	// sortROC縺ｮ譛螟ｧ隕∫ｴ謨ｰ縺ｯCALCDISTANCE/10(=5)縲ょ虚逧・｢ｺ菫昴→繝・ヰ繝・げprintf繧呈賜髯､縺吶ｋ縺溘ａ閾ｪ蜍暮・蛻励ｒ蛻ｩ逕ｨ
+		int16_t sortROC[(CALCDISTANCE / LOG_DISTANCE_MM) + 2U];
 		int32_t straightMeter = 0;
 		bool straightState = false;
 
-		// 蜑榊・逅・
-		// 讒矩菴馴・蛻励・蛻晄悄蛹・
+		// 解析前にデータ配列を初期化する
+		// PPAD配列をゼロクリアする
 		memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
 
 		CourseLogColumnMap distanceColumns;
@@ -405,7 +407,7 @@ static int16_t readLogDistanceProgress(int logNumber,
 
 		UINT lineNo = 0;
 		if (progress) progress("Base read", 0U);
-		// 繝ｭ繧ｰ繝・・繧ｿ蜿門ｾ鈴幕蟋・
+		// ログデータの読み込みを開始する
 		while (!errorDetected)
 		{
 			TCHAR *s = f_gets(log, log_len, &fil_Read);
@@ -430,54 +432,60 @@ static int16_t readLogDistanceProgress(int logNumber,
 			marker = row.courseMarker;
 			distance = row.encTotalOptimal;
 			roc = (int32_t)lroundf(row.ROC);
-			// 隗｣譫仙・逅・
-			// marker==3: 莠､蟾ｮ邱壹・繝ｼ繧ｫ繝ｼ
-			// marker==2: 蟾ｦ繝槭・繧ｫ繝ｼ縲ら峩邱夊ｵｰ陦御ｸｭ縺ｮ縺ｿ繧ｫ繝ｼ繝悶・繝ｼ繧ｫ繝ｼ縺ｨ縺励※謇ｱ縺・
+			if (!havePreviousDistance)
+			{
+				previousDistance = distance;
+				analysisBaseDistance = distance;
+				havePreviousDistance = true;
+			}
+			// マーカー状態を解析する
+			// marker==3は交差ラインのマーカー
+			// marker==2は左マーカー。直線走行中だけカーブマーカーとして扱う
 			if (marker == 3 || (marker == 2 && straightState))
 			{
-				// 繧ｫ繝ｼ繝悶・繝ｼ繧ｫ繝ｼ繧帝夐℃縺励◆縺ｨ縺阪↓繝槭・繧ｫ繝ｼ菴咲ｽｮ繧定ｨ倬鹸
+				// カーブマーカー通過時に位置を記録する
 				markerPos[numM].distance = distance;
 				markerPos[numM].indexPPAD = numD;
 
 				if (marker == 2 && straightState)
 				{
-				// 逶ｴ邱壼ｾ後・蟾ｦ繝槭・繧ｫ繝ｼ讀懷・縺ｧ繝輔Λ繧ｰ縺ｨ霍晞屬繧偵Μ繧ｻ繝・ヨ
+				// 直線後の左マーカーを検出したら直線状態と距離をリセットする
 					straightState = false;
 					straightMeter = 0;
 				}
 
-				numM++; // 繝槭・繧ｫ繝ｼ隗｣譫舌う繝ｳ繝・ャ繧ｯ繧ｹ譖ｴ譁ｰ
+				numM++; // マーカー解析インデックスを更新する
 			}
 
-			// 荳螳夊ｷ晞屬縺斐→縺ｫ蜃ｦ逅・
-			if (i > 0 && i % (CALCDISTANCE / 10) == 0) // i==0縺ｧ縺ｯ蜃ｦ逅・＠縺ｪ縺・
+			// 行間隔の変動を考慮し、実距離50 mmごとに解析する。
+			if (distance - analysisBaseDistance >= encMM(CALCDISTANCE))
 			{
-				int32_t copyCount = cntCurR;	    // 莉雁屓繧ｽ繝ｼ繝医☆繧玖ｦ∫ｴ謨ｰ繧帝驕ｿ
-				if (copyCount > (CALCDISTANCE / 10))
+				int32_t copyCount = cntCurR;
+				if (copyCount > (int32_t)(sizeof(sortROC) / sizeof(sortROC[0])))
 				{
-					copyCount = (CALCDISTANCE / 10); // 逅・ｫ紋ｸ雁芦驕斐＠縺ｪ縺・′縲∝ｮ牙・縺ｮ縺溘ａ荳企剞繧帝←逕ｨ
+					copyCount = (int32_t)(sizeof(sortROC) / sizeof(sortROC[0]));
 				}
 				for (int32_t sortIndex = 0; sortIndex < copyCount; sortIndex++)
 				{
-					sortROC[sortIndex] = ROCbuff[sortIndex]; // 蠢・ｦ√↑隕∫ｴ縺ｮ縺ｿ繧呈焔蜍輔さ繝斐・縺励※荳ｭ螟ｮ蛟､邂怜・逕ｨ縺ｫ騾驕ｿ
+					sortROC[sortIndex] = ROCbuff[sortIndex]; // 中央値計算に必要な範囲をコピーする
 				}
-				sortInt16Ascending(sortROC, (uint16_t)copyCount); // 蟆城・蛻励・蜊倡ｴ斐た繝ｼ繝医〒蜊∝・縺ｪ縺溘ａqsort蜻ｼ縺ｳ蜃ｺ縺励ｒ蜑頑ｸ・
+				sortInt16Ascending(sortROC, (uint16_t)copyCount); // 曲率半径の中央値算出用に昇順ソートする
 
-				// 譖ｲ邇・濠蠕・ｒ險倬鹸縺吶ｋ
+				// 曲率半径の中央値を求める
 				if (copyCount % 2 == 0)
 				{
-					// 荳ｭ螟ｮ蛟､繧定ｨ倬鹸(驟榊・隕∫ｴ謨ｰ縺悟・謨ｰ縺ｮ縺ｨ縺・ 荳ｭ螟ｮ2縺､縺ｮ蟷ｳ蝮・､
+					// サンプル数が偶数なら中央2値の平均を使う
 					PPAD[numD].ROC = (sortROC[copyCount / 2] + sortROC[copyCount / 2 - 1]) / 2;
 				}
 				else
 				{
-					// 荳ｭ螟ｮ蛟､繧定ｨ倬鹸(驟榊・隕∫ｴ謨ｰ縺悟･・焚縺ｮ縺ｨ縺・
+					// サンプル数が奇数なら中央の値を使う
 					PPAD[numD].ROC = sortROC[copyCount / 2];
 				}
 
-				PPAD[numD].boostSpeed = asignVelocity(PPAD[numD].ROC); // 譖ｲ邇・濠蠕・＃縺ｨ縺ｮ騾溷ｺｦ繧定ｨ育ｮ励☆繧・
+				PPAD[numD].boostSpeed = asignVelocity(PPAD[numD].ROC); // 曲率半径から目標速度を計算する
 
-				// 蜑榊屓縺ｮ譖ｲ邇・濠蠕・→豈碑ｼ・numD縺・莉･荳翫・蝣ｴ蜷医・縺ｿ)
+				// 前区間と同じ曲率半径なら直線区間数を加算する
 				if (numD >= 1 && PPAD[numD].ROC == PPAD[numD - 1].ROC)
 				{
 					numStraight++;
@@ -487,36 +495,43 @@ static int16_t readLogDistanceProgress(int logNumber,
 					numStraight = 0;
 				}
 
-				cntCurR = 0; // 譖ｲ邇・濠蠕・畑驟榊・縺ｮ繧ｫ繧ｦ繝ｳ繝医け繝ｪ繧｢
-				numD++;		 // 霍晞屬隗｣譫舌う繝ｳ繝・ャ繧ｯ繧ｹ譖ｴ譁ｰ
+				cntCurR = 0; // 曲率半径用サンプル数をクリアする
+				numD++; // 距離解析インデックスを更新する
+				analysisBaseDistance += encMM(CALCDISTANCE);
 				if (numD >= OPT_BUFF_SIZE)
 				{
-					ret = -1; // 隗｣譫千畑驟榊・縺ｮ繧ｵ繧､繧ｺ雜・℃繧呈､懷・縺励◆繧峨お繝ｩ繝ｼ謇ｱ縺・→縺吶ｋ
-					errorDetected = true; // 繧ｨ繝ｩ繝ｼ繝輔Λ繧ｰ繧堤ｫ九※縺ｦ蜈ｱ騾壹け繝ｪ繝ｼ繝ｳ繧｢繝・・縺ｸ驕ｷ遘ｻ
-					break; // 蜊ｳ譎Ｓeturn縺帙★繝ｫ繝ｼ繝励ｒ謚懊￠繧・
+					ret = -1; // 解析配列の容量超過をエラーとして返す
+					errorDetected = true; // 共通クリーンアップへ移る
+					break; // 解析ループを終了する
 				}
 			}
-			// 譖ｲ邇・濠蠕・・險育ｮ・
-			ROCbuff[cntCurR] = roc;
-
-			if (abs(ROCbuff[cntCurR]) >= 700)
+			// 曲率判定と直線距離を、直前ログ行からの距離差で更新する。
+			int32_t distanceStep_p = distance - previousDistance;
+			if (abs(roc) >= 700)
 			{
-				straightMeter += CALCDISTANCE_SHORTCUT;
+				if (distanceStep_p > 0)
+				{
+					straightMeter += (int32_t)lroundf((float)distanceStep_p / PULSE_MILLIMETER);
+				}
 			}
 			else
 			{
 				straightMeter = 0;
 			}
 
-			// 逶ｴ邱壼玄髢薙′100mm莉･荳顔ｶ壹＞縺溘ｉ逶ｴ邱夊ｵｰ陦御ｸｭ縺ｨ蛻､螳壹＠縲・
-			// 谺｡縺ｫ讀懷・縺吶ｋ蟾ｦ繝槭・繧ｫ繝ｼ繧偵き繝ｼ繝夜幕蟋九→縺吶ｋ縺溘ａ縺ｮ繝輔Λ繧ｰ繧堤ｫ九※繧・
+			// 直線距離が100 mm以上続いたら直線走行中と判定する。
+			// 次に検出する左マーカーをカーブ開始位置として扱う。
 			if (straightMeter >= 100)
 			{
 				straightState = true;
 			}
 
-			cntCurR++; // 譖ｲ邇・濠蠕・畑驟榊・縺ｮ繧ｫ繧ｦ繝ｳ繝・
-			i++;
+			if (cntCurR < (int32_t)(sizeof(sortROC) / sizeof(sortROC[0])))
+			{
+				ROCbuff[cntCurR] = (int16_t)roc;
+				cntCurR++;
+			}
+			previousDistance = distance;
 		}
 
 		if (!errorDetected)

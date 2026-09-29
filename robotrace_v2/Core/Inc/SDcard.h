@@ -15,6 +15,7 @@
 
 #define BUFFER_SIZE_LOG 2048U
 #define LOG_SIZE LOG_RECORD_SIZE_BYTES // スキーマ由来のレコードサイズ。
+#define LOG_DISTANCE_MM 5U // ログ取得の目標距離間隔[mm]
 
 #define BUFFER_SIZE_MARKER 500
 #define FILENUMBER_NUM 1000		// ログファイルナンバーの上限

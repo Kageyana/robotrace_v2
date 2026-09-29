@@ -8,6 +8,8 @@
 #include "control.h"
 #include "lineSensor.h"
 #include "pathFollower.h"
+#include "SDcard.h"
+#include "encoder.h"
 #include <math.h>
 #include <stdint.h>
 #define STRAIGHT_STATE_THRESHOLD_MM	70	// 直線判定の距離閾値[mm]
@@ -27,6 +29,11 @@ static volatile bool logWriteReq = false;
 /////////////////////////////////////////////////////////////////////
 void Interrupt1ms(void)
 {
+	static int32_t logDistanceRemainder_p = 0;
+	if (patternTrace < 12 || patternTrace >= 100)
+	{
+		logDistanceRemainder_p = 0;
+	}
 
 	// Interrupt 1ms
 	cntRun++;
@@ -126,14 +133,22 @@ void Interrupt1ms(void)
 		if(courseMarker != 0)
 			courseMarkerLog = courseMarker; // ログ用にマーカー状態を保存
 
-		// 一定距離ごとに処理
-		if (encLog >= encMM(CALCDISTANCE_SHORTCUT))
+		// 目標距離間隔ごとに処理し、1 msあたり最大1レコードに制限する。
+		const int32_t logDistanceThreshold_p = encMM((int32_t)LOG_DISTANCE_MM);
+		if (encLog >= logDistanceThreshold_p)
 		{
+			int32_t logDistanceStep_p = encLog - logDistanceRemainder_p;
+			if (logDistanceStep_p < 0)
+			{
+				logDistanceStep_p = 0;
+			}
+			int32_t logDistanceStep_mm = (int32_t)lroundf((float)logDistanceStep_p / PULSE_MILLIMETER);
+
 			// ROC(曲率半径)計算
 			rocrun = calcROC(encCurrentN, BMI088val.gyro.z, (float)cntLog / 1000);
 			if (rocrun >= 700.0F) // 直線判断
 			{
-				straightMeter += CALCDISTANCE_SHORTCUT; // 距離積算
+				straightMeter += logDistanceStep_mm; // 実際に進んだ距離を積算
 			}
 			else
 			{
@@ -153,13 +168,19 @@ void Interrupt1ms(void)
 				straightState = false;
 			}
 
+			encLog -= logDistanceThreshold_p;
+			if (encLog >= logDistanceThreshold_p)
+			{
+				encLog = 0; // 1ms更新の範囲を超えた距離分は捨て、記録負荷を抑える
+			}
+			logDistanceRemainder_p = encLog;
+
 			if (modeLOG)
 			{
-				// CALCDISTANCEごとにログを保存
+				// 目標距離間隔ごとにログを保存
 				writeLogBufferPuts();
 				courseMarkerLog = 0; // ログ用マーカー状態をリセット
 				straightMarkerPendingLog = 0;
-				encLog = 0;	// ログ用エンコーダパルスをリセット
 				cntLog = 0;
 			}
 		}

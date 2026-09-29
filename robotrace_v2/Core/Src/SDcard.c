@@ -615,6 +615,7 @@ void createLog(void)
 	setLogHeaderStrFPrecision("imuTempCoeff_dpsPerC", imuTempCoeff_dpsPerC, 6U);
 	setLogHeaderStrFPrecision("imuTempEnd_C", imuTempEnd_C, 3U);
 	setLogHeaderStr("encoderPulsePerMeter", PULSE_METER);
+	setLogHeaderStr("logDistanceTargetMm", (int32_t)LOG_DISTANCE_MM);
 	setLogHeaderStr("pathSourceFormatVersion", PATH_SOURCE_FORMAT_VERSION);
 	setLogHeaderStr("closureValid", primaryRouteValidation.closureValid ? 1 : 0);
 	setLogHeaderStr("closureReason", primaryRouteValidation.reason);
