@@ -53,6 +53,13 @@ Error: No STM32 target found!
 - この再発時点では、GDBとGDBサーバーは終了済み。Flash書き込みや測定開始は行っていない。
 - 原因は未確定。SWDIO、SWCLK、GND、NRST、電源接続状態を再確認してから再試行する。
 
+### 2026-09-29 再発後の復旧と再々発
+
+- 後続の接続では、100 kHz・Under ResetでSTM32F446のDevice ID `0x421`を取得し、Release詳細ログ版の書込みとベリファイに成功した。
+- Release軽量版へ切り替える今回の再接続では、同じ条件の `-c port=SWD mode=UR reset=HWrst freq=100 -l` でST-Link SN `066EFF574881774867025549` とターゲット電圧3.24 Vは認識されたが、Core ID取得に失敗した。
+- 今回は書込み・測定を行っていない。接続状態が再び変化した原因は未確定。
+- 次回はSWDIO、SWCLK、GND、NRST、ターゲット電源の接続を確認し、Core ID取得が成功するまで書き込みを開始しない。
+
 ## 今後の予防策
 
 - 「ST-Linkが検出されたこと」と「STM32ターゲットに接続できたこと」を別々に確認して報告する。
