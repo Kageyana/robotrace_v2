@@ -29,7 +29,7 @@
             "inherits": "default",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "ROBOTRACE_LOG_SCHEMA_PROFILE_LIGHT": "0"
+                "ROBOTRACE_LOG_SCHEMA_PROFILE_LIGHT": "1"
             }
         }
     ],
