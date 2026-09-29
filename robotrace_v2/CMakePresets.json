@@ -28,7 +28,8 @@
             "name": "Release",
             "inherits": "default",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
+                "CMAKE_BUILD_TYPE": "Release",
+                "ROBOTRACE_LOG_SCHEMA_PROFILE_LIGHT": "0"
             }
         }
     ],
