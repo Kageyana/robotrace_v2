@@ -6,6 +6,7 @@
 #include "courseAnalysis.h"
 #include "firmware_version.h"
 #include "IMU.h"
+#include "logBufferWriter.h"
 #include "markerSensor.h"
 #include "sd_functions.h"
 #include "stdio.h"
@@ -25,6 +26,7 @@ FIL fil_R;
 #define LOG_COLUMN_TITLE_BUFFER_SIZE 4096U
 #define LOG_FORMAT_BUFFER_SIZE       512U
 #define LOG_CSV_LINE_BUFFER_SIZE    1024U
+#define LOG_TEMP_PREALLOC_BYTES (2UL * 1024UL * 1024UL)
 char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE] = "", formatLog[LOG_FORMAT_BUFFER_SIZE] = "";
 
 // ログバッファ
@@ -33,17 +35,14 @@ char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE] = "", formatLog[LOG_FORMAT_BUFFER
 #define CROSS_STRAIGHT_MM 100.0f
 #define CROSSSEG_MAX 128
 #define PRIMARY_ROUTE_GOAL_X_LIMIT_MM 60.0F
-#define LOG_BUFFER_COUNT 3
-#define LOG_TEMP_PREALLOC_BYTES (2UL * 1024UL * 1024UL)
-uint8_t logBuffer[LOG_BUFFER_COUNT][BUFFER_SIZE_LOG];
-uint8_t *activeBuf = logBuffer[0];
-uint8_t *flushBuf = logBuffer[1];
-uint8_t *pendingBuf = logBuffer[2];
-int16_t logBuffIndex = 0;
-uint32_t logBuffSendIndex = 0;
-uint32_t logBuffPendingIndex = 0;
-volatile bool sendSD = false;
-volatile bool sendSD_pending = false;
+_Static_assert(BUFFER_SIZE_LOG == LOG_BUFFER_SIZE_BYTES, "log buffer size mismatch");
+_Static_assert((BUFFER_SIZE_LOG % LOG_BUFFER_SECTOR_SIZE_BYTES) == 0U, "log buffer must be sector aligned");
+_Static_assert(LOG_RECORD_SIZE_BYTES <= LOG_BUFFER_SIZE_BYTES, "log record must fit in one log buffer");
+static LogBufferWriter logBufferWriter;
+static _Alignas(LOG_BUFFER_SECTOR_SIZE_BYTES)
+	uint8_t logBuffers[LOG_BUFFER_COUNT][LOG_BUFFER_SIZE_BYTES];
+static float cross_start_mm[CROSSSEG_MAX];
+static float cross_end_mm[CROSSSEG_MAX];
 uint16_t cntSend = 0;
 uint8_t *logaddress;
 uint16_t logValIndex = 0;
@@ -64,7 +63,6 @@ bool getFileNumbersError = false; // getFileNumbersでエラーが発生した�
 static volatile bool sd_fatfs_locked = false;
 static volatile bool sd_analysis_active = false;
 static volatile bool create_log_ready = false;
-static volatile bool logWriteFailed = false;
 static bool lastRunSaved = false;
 static bool lastPrimaryRouteValid = false;
 static bool runImuCalibrationValid = false;
@@ -94,7 +92,6 @@ typedef struct
 #undef LOG_STRUCT_SKIP
 } LogRecord;
 
-
 // スキーマ関連のヘルパー宣言。
 static void logSendFloat(float value);
 static uint8_t logReadU8(void);
@@ -102,9 +99,9 @@ static uint16_t logReadU16(void);
 static int16_t logReadS16(void);
 static uint32_t logReadU32(void);
 static float logReadF32(void);
+
 static void logReadRecord(LogRecord *rec);
 static void logBuildColumns(void);
-static uint8_t *logGetFreeBuffer(void);
 static bool readSavedLogNumber(int16_t *outNumber);
 static void writeSavedLogNumber(int16_t fileNumber);
 static int16_t calcNextLogNumber(void);
@@ -299,21 +296,9 @@ void sd_flush_log(void)
 	}
 
 	// drain pending writes before analysis
-	while (sendSD)
+	while (logBufferWriter.flushPending || logBufferWriter.pendingPending)
 	{
 		writeLogPuts();
-	}
-	if (sendSD_pending)
-	{
-		uint32_t primask = __get_PRIMASK();
-		__disable_irq();
-		sendSD = true;
-		__set_PRIMASK(primask);
-		writeLogPuts();
-		while (sendSD)
-		{
-			writeLogPuts();
-		}
 	}
 
 	if (sd_fatfs_try_lock())
@@ -761,7 +746,7 @@ void initLog(void)
 		initMSD = false; // ファイルオープンに失敗した場合はmicroSDを使用不可とする
 		return;          // ログ初期化を中止
 	}
-	logBuffIndex = 0;					// 書込位置を初期化
+	logBufferWriterInit(&logBufferWriter, logBuffers);
 #if _USE_EXPAND
 	/* Best-effort contiguous preallocation to reduce FAT updates during logging. */
 	fresult = f_expand(&fil_W, (FSIZE_t)LOG_TEMP_PREALLOC_BYTES, 1);
@@ -770,40 +755,18 @@ void initLog(void)
 		printf("f_expand failed: %d\r\n", fresult);
 	}
 #endif
-	f_lseek(&fil_W, 0);
-	activeBuf = logBuffer[0];			// アクティブバッファを初期化
-	flushBuf = logBuffer[1];			// フラッシュバッファを初期化
-	pendingBuf = logBuffer[2];
-	logBuffSendIndex = logBuffIndex;	// バッファのバイト数を記録
-	logBuffPendingIndex = 0;
-	sendSD = false;						// 書き込み要求をリセット
-	sendSD_pending = false;
+	fresult = f_lseek(&fil_W, 0U);
+	if (fresult != FR_OK)
+	{
+		printf("initLog f_lseek error: %d\r\n", fresult);
+		f_close(&fil_W);
+		logBufferWriter.writeFailed = true;
+		initMSD = false;
+		return;
+	}
 	dbg_overflow = 0;
-	logWriteFailed = false;
 	markerOverflow = false;
 	logOverflow = false;				// ログバッファ状態フラグをリセット
-}
-
-static uint8_t *logGetFreeBuffer(void)
-{
-	for (uint32_t i = 0; i < LOG_BUFFER_COUNT; i++)
-	{
-		uint8_t *buf = logBuffer[i];
-		if (buf == activeBuf)
-		{
-			continue;
-		}
-		if (sendSD && buf == flushBuf)
-		{
-			continue;
-		}
-		if (sendSD_pending && buf == pendingBuf)
-		{
-			continue;
-		}
-		return buf;
-	}
-	return NULL;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogBufferPuts
@@ -819,41 +782,16 @@ void writeLogBufferPuts(void)
 		{
 			return;
 		}
-		// スキーマから固定レコードサイズを算出。
-		const uint16_t requiredSize = (uint16_t)LOG_RECORD_SIZE_BYTES;
-
-		if (logBuffIndex + requiredSize > BUFFER_SIZE_LOG)
+		if (logBufferWriter.writeFailed || logBufferWriter.overflow)
 		{
-			if (sendSD && sendSD_pending)
-			{
-				logOverflow = true;
-				dbg_overflow++;
-				return;
-			}
-
-			uint8_t *newBuf = logGetFreeBuffer();
-			if (newBuf == NULL)
-			{
-				logOverflow = true;
-				dbg_overflow++;
-				return;
-			}
-
-			if (sendSD)
-			{
-				logBuffPendingIndex = logBuffIndex;
-				pendingBuf = activeBuf;
-				sendSD_pending = true;
-			}
-			else
-			{
-				logBuffSendIndex = logBuffIndex;
-				flushBuf = activeBuf;
-				sendSD = true;
-			}
-
-			activeBuf = newBuf;
-			logBuffIndex = 0;
+			return;
+		}
+		// スキーマから固定レコードサイズを算出。
+		if (!logBufferWriterBeginRecord(&logBufferWriter, (uint32_t)LOG_RECORD_SIZE_BYTES))
+		{
+			logOverflow = true;
+			dbg_overflow++;
+			return;
 		}
 
 		// スキーマ順でバイナリ書き込みを展開。
@@ -873,7 +811,15 @@ void writeLogBufferPuts(void)
 #undef LOG_SEND_U32
 #undef LOG_SEND_F32
 
-		cntSend++;
+		if (logBufferWriterEndRecord(&logBufferWriter))
+		{
+			cntSend++;
+		}
+		else
+		{
+			logOverflow = true;
+			dbg_overflow++;
+		}
 	}
 }
 
@@ -897,25 +843,25 @@ void writeLogPuts(void)
 	{
 		return; // skip while SD is locked
 	}
-	if (!modeLOG && !sendSD)
+	if (!modeLOG && !logBufferWriter.flushPending)
 	{
 		return; // skip if no pending write
 	}
 
-	if (sendSD)
+	if (logBufferWriter.flushPending)
 	{
 		if (!sd_fatfs_try_lock())
 		{
 			return;
 		}
-		fresult = f_write(&fil_W, flushBuf, logBuffSendIndex, &writtenlog);
-		if (fresult != FR_OK || writtenlog != logBuffSendIndex)
+		uint32_t writeLength = logBufferWriter.flushLength;
+		fresult = f_write(&fil_W, logBufferWriter.flushBuffer, (UINT)writeLength, &writtenlog);
+		if (fresult != FR_OK || writtenlog != (UINT)writeLength)
 		{
-			logWriteFailed = true;
 			uint32_t primask = __get_PRIMASK();
 			__disable_irq();
-			sendSD = false;
-			sendSD_pending = false;
+			(void)logBufferWriterWriteSucceeded(&logBufferWriter,
+				fresult == FR_OK, writeLength, (uint32_t)writtenlog);
 			__set_PRIMASK(primask);
 			sd_fatfs_unlock();
 			return;
@@ -924,17 +870,7 @@ void writeLogPuts(void)
 		{
 			uint32_t primask = __get_PRIMASK();
 			__disable_irq();
-			if (sendSD_pending)
-			{
-				flushBuf = pendingBuf;
-				logBuffSendIndex = logBuffPendingIndex;
-				sendSD_pending = false;
-				sendSD = true;
-			}
-			else
-			{
-				sendSD = false;
-			}
+			logBufferWriterCompleteWrite(&logBufferWriter);
 			__set_PRIMASK(primask);
 		}
 		sd_fatfs_unlock();
@@ -984,29 +920,33 @@ bool endLog(void)
 	uint16_t csvRowsWritten = 0U;
 	uint16_t expectedRows = cntSend;
 
-	float cross_start_mm[CROSSSEG_MAX];
-	float cross_end_mm[CROSSSEG_MAX];
 	uint16_t cross_count = 0;
 	float dist_mm = 0.0f;
 	bool in_cross = false;
 
-	while (sendSD || sendSD_pending) // drain pending writes before CSV conversion
+	while (logBufferWriter.flushPending || logBufferWriter.pendingPending) // drain pending writes before CSV conversion
 	{
 		writeLogPuts();
 	}
-	if (logWriteFailed || logOverflow || markerOverflow)
+	if (logBufferWriter.writeFailed || logOverflow || markerOverflow)
 	{
 		f_close(&fil_W);
 		return false;
 	}
 
-	logBuffSendIndex = logBuffIndex;
-	fresult = f_write(&fil_W, activeBuf, logBuffSendIndex, &writtenlog);
-	if (fresult != FR_OK || writtenlog != logBuffSendIndex)
+	uint32_t finalWriteLength = logBufferWriterPrepareFinalWrite(&logBufferWriter);
+	if (finalWriteLength > 0U)
 	{
-		printf("f_write error in endLog: %d (%lu/%lu)\r\n", fresult, (unsigned long)writtenlog, (unsigned long)logBuffSendIndex);
-		f_close(&fil_W);
-		return false;
+		fresult = f_write(&fil_W, logBufferWriter.activeBuffer, (UINT)finalWriteLength, &writtenlog);
+		if (fresult != FR_OK || writtenlog != (UINT)finalWriteLength)
+		{
+			(void)logBufferWriterWriteSucceeded(&logBufferWriter,
+				fresult == FR_OK, finalWriteLength, (uint32_t)writtenlog);
+			printf("f_write error in endLog: %d (%lu/%lu)\r\n", fresult,
+				(unsigned long)writtenlog, (unsigned long)finalWriteLength);
+			f_close(&fil_W);
+			return false;
+		}
 	}
 	if (f_close(&fil_W) != FR_OK)
 	{
@@ -1119,7 +1059,7 @@ bool endLog(void)
 		{
 			primaryRouteValidation.reason = 2U;
 		}
-		else if (logOverflow || markerOverflow || logWriteFailed || dbg_overflow != 0U ||
+		else if (logOverflow || markerOverflow || logBufferWriter.writeFailed || dbg_overflow != 0U ||
 			emcStop != 0U || j != cntSend)
 		{
 			primaryRouteValidation.reason = 3U;
@@ -1262,7 +1202,8 @@ bool endLog(void)
 			return false;
 		}
 
-		if (f_puts(logStr, &fil_W) < 0)
+		int putResult = f_puts(logStr, &fil_W);
+		if (putResult < 0)
 		{
 			printf("f_puts error in endLog\r\n");
 			f_close(&fil_W);
@@ -1272,7 +1213,15 @@ bool endLog(void)
 		csvRowsWritten++;
 	}
 
-	if (f_sync(&fil_W) != FR_OK || f_sync(&fil) != FR_OK)
+	FRESULT outputSyncResult = f_sync(&fil_W);
+	if (outputSyncResult != FR_OK)
+	{
+		f_close(&fil_W);
+		f_close(&fil);
+		return false;
+	}
+	FRESULT inputSyncResult = f_sync(&fil);
+	if (inputSyncResult != FR_OK)
 	{
 		f_close(&fil_W);
 		f_close(&fil);
@@ -1293,6 +1242,8 @@ bool endLog(void)
 	lastRunSaved = true;
 	return true;
 }
+
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getFileNumbers
 // 処理概要     ファイル名から番号を取得し配列に格納する
@@ -1511,8 +1462,7 @@ void createDir(char *dirName)
 /////////////////////////////////////////////////////////////////////
 void send8bit(uint8_t data)
 {
-	// アクティブバッファに値を格納し、書き込み位置を進める
-	activeBuf[logBuffIndex++] = data;
+	(void)logBufferWriterAppendU8(&logBufferWriter, data);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 send16bit
@@ -1522,8 +1472,7 @@ void send8bit(uint8_t data)
 /////////////////////////////////////////////////////////////////////
 void send16bit(uint16_t data)
 {
-	activeBuf[logBuffIndex++] = (data >> 8); // 上位バイトをバッファに格納
-	activeBuf[logBuffIndex++] = data;        // 下位バイトをバッファに格納
+	(void)logBufferWriterAppendU16(&logBufferWriter, data);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 send32bit
@@ -1533,10 +1482,7 @@ void send16bit(uint16_t data)
 /////////////////////////////////////////////////////////////////////
 void send32bit(uint32_t data)
 {
-	activeBuf[logBuffIndex++] = (data >> 24); // 最上位バイトをバッファに格納
-	activeBuf[logBuffIndex++] = (data >> 16); // 上位から2番目のバイトをバッファに格納
-	activeBuf[logBuffIndex++] = (data >> 8);  // 上位から3番目のバイトをバッファに格納
-	activeBuf[logBuffIndex++] = data;         // 最下位バイトをバッファに格納
+	(void)logBufferWriterAppendU32(&logBufferWriter, data);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logSendFloat

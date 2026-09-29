@@ -1,5 +1,6 @@
 .metadata/
 build/
+__pycache__/
 
 robotrace_v2/Debug/
 robotrace_v2/.settings/
@@ -29,6 +30,7 @@ fp-info-cache
 analysis/
 !analysis/
 analysis/*
+!analysis/debug-bench-results-2026-09-29.md
 !analysis/script/
 analysis/script/*
 !analysis/script/*.py

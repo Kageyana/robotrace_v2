@@ -1,63 +1,47 @@
 ---
 name: robotrace-flash-debug
-description: STM32CubeCLT、STM32_Programmer_CLI、ST-Linkを使ってrobotrace_v2へ書き込みやデバッグを行うときに使う。実機接続条件、ビルド、書き込み、空転確認、緊急停止無効化条件を扱う。
+description: robotrace_v2をSTM32CubeCLT、STM32_Programmer_CLI、ST-Link/GDBでビルド・書き込み・デバッグするときに使う。Codexからの接続確認、停止・復旧と失敗手順の回避も扱う。
 ---
 
-# Robotrace Flash Debug
+# robotrace_v2 書き込み・ST-Linkデバッグ
 
-## Overview
+## 基本方針
 
-Use this skill for firmware build, flash, and ST-Link debug workflows. Keep command definitions and safety policy in `AGENTS.md` as the source of truth.
+- 接続・安全条件はリポジトリの `AGENTS.md` を正とする。書き込みは機体とST-Linkが接続されているときだけ実行する。
+- ST-Link接続中に実走行しない。空転確認では機体を固定して車輪を浮かせる。緊急停止条件の一時無効化は、静止状態で確認できる対象条件に限る。
+- 操作を始める前に `doc/失敗事例/` から関連事例を検索する。失敗した接続・停止操作を繰り返さず、対象MCUと安全状態を確認してから進む。
+- CodexからCLI/GDBで操作する場合は、先に [CodexからのST-Link操作手順](references/codex-stlink-cli-debug.md) を読む。
 
-## Preconditions
+## ビルド
 
-- Build before flashing.
-- Flash only when the robot and ST-Link are connected.
-- Debugging with ST-Link is allowed.
-- Real running is not allowed during wired ST-Link debugging.
-- The robot may be lifted for no-load motor checks, but it will not move forward and can quickly hit emergency-stop conditions.
-- Disable emergency-stop conditions only for no-load, stationary, or non-moving checks where the target observation is possible without real travel.
-
-## Build Commands
-
-Run from `robotrace_v2/`:
+`robotrace_v2/` で対象構成をビルドする。書き込むELFとデバッグに読み込むELFを同じ構成にする。
 
 ```powershell
 cmake --preset Debug
 cmake --build --preset Debug
 ```
 
-For release:
+Releaseの場合:
 
 ```powershell
 cmake --preset Release
 cmake --build --preset Release
 ```
 
-If tools are missing, do not report build success. Report the missing tool or failed command.
+ツール不足やコマンド失敗をビルド成功として扱わない。
 
-## Flash Workflow
+## 書き込み
 
-1. Confirm ST-Link and robot connection.
-2. Build the intended preset.
-3. Run the configured VS Code task or equivalent `STM32_Programmer_CLI` SWD command.
-4. Confirm the flash command exits successfully.
-5. Report command, success/failure, and connection condition.
+1. 機体とST-Linkの接続、対象MCUのDevice ID、ビルド成果物を確認する。ST-Linkの列挙とターゲット電圧だけではMCU接続成功と判定しない。
+2. VS Codeの `CubeProg: Flash project (SWD)` タスク、または `STM32_Programmer_CLI` で意図したELFを書き込む。通常SWDで接続できない場合は、参照手順にある100 kHz・Under Resetを使う。
+3. 書き込み・照合・起動の成否をコマンド出力で確認する。Device IDが取得できない状態で書き込みを続けない。
 
-## Debug Workflow
+## デバッグ
 
-1. Confirm robot and ST-Link are wired.
-2. Use the configured launch setting:
-   - `Build & Debug Microcontroller - ST-Link`
-   - `Attach to Microcontroller - ST-Link`
-3. Do not perform real running while wired.
-4. For lifted no-load checks, clearly state that encoder-stop or movement-related emergency stops may trigger.
-5. If emergency-stop conditions are disabled for debug, state which condition, why, and what risk remains.
+VS Codeからは `Build & Debug Microcontroller - ST-Link` または `Attach to Microcontroller - ST-Link` を使う。Codexからの直接操作は参照手順に従い、GDBサーバーとProgrammer CLIでST-Linkを同時に保持しない。モーター回転中は不要なブレークポイントでコアを停止しない。
 
-## Post-Flash Checks
+## 実行後
 
-- Confirm the write command completed normally.
-- Sensor checks happen through `initSystem()`.
-- Motor no-load check is not required by default.
-- Before high-speed running, confirm sensors initialized normally.
-- High-speed running requires at least `7.5 V` battery voltage by operation policy.
+- 書き込み成功と `initSystem()` のセンサー初期化結果を確認する。通常の書き込みだけなら空転確認は必須ではない。
+- 高速走行前はセンサー初期化成功とバッテリー電圧7.5 V以上を確認する。
+- 緊急停止条件を一時変更した場合は、変更条件、理由、残る実機リスクを報告する。
