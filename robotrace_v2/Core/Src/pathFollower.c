@@ -1068,6 +1068,82 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	return (int16_t)routeCount;
 }
 
+#ifdef DEBUG
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathFollowerLoadDebugBenchRoute
+// 処理概要     Debugベンチ用の保存経路をRAMへ設定し、PATH系経路を生成する
+// 引数         route:40mm間隔のXY経路, pointCount:経路点数,
+//              shortcutLevel:短縮レベル, sourceLog:経路元ログ番号
+// 戻り値       true:経路設定成功 false:経路設定失敗
+/////////////////////////////////////////////////////////////////////
+bool pathFollowerLoadDebugBenchRoute(const PathBenchRoutePoint *route,
+	uint16_t pointCount, uint8_t shortcutLevel, int16_t sourceLog)
+{
+	if (route == NULL || pointCount < 2U ||
+		pointCount > PATH_ROUTE_MAX_POINTS - PATH_GOAL_RESERVED_POINTS)
+	{
+		return false;
+	}
+
+	memset(lineRoute, 0, sizeof(lineRoute));
+	memset(driveRoute, 0, sizeof(driveRoute));
+	memset(routeFlags, 0, sizeof(routeFlags));
+	routeCount = pointCount;
+	for (uint16_t i = 0U; i < pointCount; i++)
+	{
+		lineRoute[i].x_mm = route[i].x_mm;
+		lineRoute[i].y_mm = route[i].y_mm;
+	}
+	pathComputeHeadings(lineRoute, routeCount);
+	pathBuildSpeedProfile(lineRoute, routeCount, 0U);
+	memcpy(driveRoute, lineRoute, sizeof(RoutePoint) * routeCount);
+	routeShortcutRequestedLevel = shortcutLevel;
+	routeShortcutLevel = 0U;
+	routeShortcutBuildStatus = PATH_SHORTCUT_BUILD_NOT_REQUESTED;
+	routeShortcutCorridorCount = 0U;
+	routeShortcutReductionMm = 0.0F;
+	bool shortcutOk = false;
+	if (shortcutLevel > 0U)
+	{
+		if (shortcutSettings.maxLevel == 0U)
+		{
+			routeShortcutBuildStatus = PATH_SHORTCUT_BUILD_DISABLED_BY_SETTING;
+			return false;
+		}
+		if (shortcutLevel > shortcutSettings.maxLevel) shortcutLevel = shortcutSettings.maxLevel;
+		shortcutOk = routeGenerateShortcut(shortcutLevel);
+		if (!shortcutOk) return false;
+		optimalTrace = BOOST_SHORTCUT;
+	}
+	else
+	{
+		pathBuildSpeedProfile(driveRoute, routeCount, 0U);
+		optimalTrace = BOOST_PATH_REPLAY;
+	}
+
+	if (!pathExtendDriveRouteTowardOrigin(routeShortcutLevel)) return false;
+	pathBuildDriveRouteArcLength();
+	routeSourceLog = sourceLog;
+	routeGeometryCrc32 = pathComputeRouteGeometryCrc32();
+	routeGenerationSettings = shortcutSettings;
+	runStartSettings = shortcutSettings;
+	runGenerationSettings = shortcutSettings;
+	runRouteSourceLog = sourceLog;
+	runRouteRequestedLevel = routeShortcutRequestedLevel;
+	runRouteShortcutLevel = routeShortcutLevel;
+	runRouteShortcutBuildStatus = routeShortcutBuildStatus;
+	runRouteShortcutCorridorCount = routeShortcutCorridorCount;
+	runRouteShortcutReductionMm = routeShortcutReductionMm;
+	runRouteCount = routeCount;
+	runRouteGeometryCrc32 = routeGeometryCrc32;
+	runStartSettingsValid = true;
+	indexSC = (int16_t)routeCount;
+	optimalIndex = 0U;
+	analyzedNumber = sourceLog;
+	return true;
+}
+#endif
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathSenseLine
 // 処理概要     単一ラインを検出し機体座標系の受光位置を推定する
@@ -1204,6 +1280,51 @@ void pathFollowerUpdatePose1ms(int32_t encoderPulse, float gyroDegPerSec)
 	pathPose.x_mm += distanceMm * sinf(headingRad);
 	pathPose.y_mm += distanceMm * cosf(headingRad);
 }
+
+#ifdef DEBUG
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathFollowerSetDebugBenchProgressPose
+// 処理概要     記録進捗に対応する経路位置と記録方位をDebug自己位置へ設定する
+// 引数         progressPermille:経路進捗[‰], headingDeg:記録方位[deg]
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void pathFollowerSetDebugBenchProgressPose(uint16_t progressPermille, float headingDeg)
+{
+	if (routeCount < 2U || pathGoalArcMm == 0U ||
+		followerState == PATH_STATE_INACTIVE || followerState == PATH_STATE_LOCALIZATION_LOST) return;
+	if (progressPermille > 1000U) progressPermille = 1000U;
+	uint16_t travelMm = (uint16_t)(((uint32_t)pathGoalArcMm * progressPermille) / 1000U);
+	uint16_t lower = 0U;
+	uint16_t upper = (uint16_t)(routeCount - 1U);
+	for (uint8_t iteration = 0U; lower < upper && iteration < 11U; iteration++)
+	{
+		uint16_t middle = (uint16_t)(lower + ((upper - lower) / 2U));
+		if (driveRouteArcMm[middle] < travelMm)
+		{
+			lower = (uint16_t)(middle + 1U);
+		}
+		else
+		{
+			upper = middle;
+		}
+	}
+	uint16_t nextIndex = lower;
+	uint16_t index = (nextIndex > 0U) ? (uint16_t)(nextIndex - 1U) : 0U;
+	if (nextIndex >= routeCount) nextIndex = (uint16_t)(routeCount - 1U);
+	if (nextIndex < index) nextIndex = index;
+	uint16_t segmentLength = (uint16_t)(driveRouteArcMm[nextIndex] - driveRouteArcMm[index]);
+	float ratio = (segmentLength > 0U) ?
+		(float)(travelMm - driveRouteArcMm[index]) / (float)segmentLength : 0.0F;
+	if (ratio < 0.0F) ratio = 0.0F;
+	if (ratio > 1.0F) ratio = 1.0F;
+	pathPose.x_mm = (float)driveRoute[index].x_mm +
+		(((float)driveRoute[nextIndex].x_mm - (float)driveRoute[index].x_mm) * ratio);
+	pathPose.y_mm = (float)driveRoute[index].y_mm +
+		(((float)driveRoute[nextIndex].y_mm - (float)driveRoute[index].y_mm) * ratio);
+	pathPose.heading_deg = pathWrapDeg(headingDeg);
+	pathTravelMm = (float)travelMm;
+}
+#endif
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathFollowerUpdateTarget5ms

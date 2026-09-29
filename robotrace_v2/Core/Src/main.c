@@ -22,6 +22,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#ifdef DEBUG
+#include "debugBench.h"
+#endif
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -110,6 +113,10 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
+#ifdef DEBUG
+	// HAL_Init後に呼び出し、SysTick利用とリセット要因の保存を両立する。
+	debugBenchCaptureResetCause();
+#endif
 
   /* USER CODE END Init */
 

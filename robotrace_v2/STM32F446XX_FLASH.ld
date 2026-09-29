@@ -55,7 +55,9 @@ ENTRY(Reset_Handler)
 /* Specify the memory areas */
 MEMORY
 {
-RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 128K
+/* Reset marker is isolated from the descending runtime stack. */
+NOINIT (rw)     : ORIGIN = 0x20000000, LENGTH = 16
+RAM (xrw)       : ORIGIN = 0x20000010, LENGTH = 128K - 16
 FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 512K
 }
 
@@ -221,6 +223,13 @@ SECTIONS
       PROVIDE( __bss_end = .);
   } >RAM
   PROVIDE( __non_tls_bss_start = ADDR(.bss) );
+
+  /* DebugベンチのIWDGリセット印をソフトウェア初期化から除外する */
+  .noinit (NOLOAD) : ALIGN(4)
+  {
+    *(.noinit .noinit.*)
+    . = ALIGN(4);
+  } >NOINIT
 
   PROVIDE( __bss_start = __tbss_start );
   PROVIDE( __bss_size = __bss_end - __bss_start );

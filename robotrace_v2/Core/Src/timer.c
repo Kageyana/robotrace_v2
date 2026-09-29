@@ -8,6 +8,10 @@
 #include "control.h"
 #include "lineSensor.h"
 #include "pathFollower.h"
+#ifdef DEBUG
+#include "debugBench.h"
+#include "encoder.h"
+#endif
 #include <math.h>
 #include <stdint.h>
 #define STRAIGHT_STATE_THRESHOLD_MM	70	// 直線判定の距離閾値[mm]
@@ -36,6 +40,11 @@ void Interrupt1ms(void)
 
 	// 割り込み時間計測
 	uint32_t freqCount = getCycleCounter();
+#ifdef DEBUG
+	debugBenchRecordPeriod(freqCount);
+	uint32_t debugBenchElapsed = debugBenchAdvance1ms();
+	uint32_t syntheticPoseCycles = 0U;
+#endif
 	resetCycleCounter();
 	bootTime = getTimeMs(freqCount);
 	updateBatteryVoltage();
@@ -108,12 +117,24 @@ void Interrupt1ms(void)
 		// if (cntEmcStopAngleY()) emcStop = STOP_ANGLE_Y;
 		if (cntEmcStopEncStop())
 			emcStop = STOP_ENCODER_STOP;
-		if (cntEmcStopLineSensorBright() && !pathModeActive)
+		bool lineBrightStop = cntEmcStopLineSensorBright();
+		bool lineUnbrightStop = cntEmcStopLineSensorUnbright();
+		bool overSpeedStop = judgeOverSpeed();
+#ifdef DEBUG
+		if (debugBenchIsRunning())
+		{
+			debugBenchRecordJudgements(lineBrightStop, lineUnbrightStop, overSpeedStop);
+		}
+		else
+#endif
+		{
+		if (lineBrightStop && !pathModeActive)
 			emcStop = STOP_LINESENSOR_BRIGHT;
-		if (cntEmcStopLineSensorUnbright() && !pathModeActive)
+		if (lineUnbrightStop && !pathModeActive)
 			emcStop = STOP_LINESENSOR_UNBRIGHT;
-		if (judgeOverSpeed())
+		if (overSpeedStop)
 			emcStop = STOP_OVERSPEED;
+		}
 		if (pathModeActive && pathFollowerGetStatus() == PATH_STATE_LOCALIZATION_LOST)
 			emcStop = STOP_LOCALIZATION;
 
@@ -179,8 +200,26 @@ void Interrupt1ms(void)
 		// 経路投影と目標更新は5ms周期で実行し、1ms割り込み負荷を抑える。
 		if (pathModeActive && patternTrace >= 12 && patternTrace < 100)
 		{
+			#ifdef DEBUG
+			if (debugBenchIsRunning())
+			{
+				uint32_t poseStartCycles = DWT->CYCCNT;
+				debugBenchApplyPlaybackHeading(debugBenchElapsed);
+				syntheticPoseCycles = DWT->CYCCNT - poseStartCycles;
+				debugBenchRecordSyntheticPoseCycles(syntheticPoseCycles);
+			}
+			#endif
 			pathFollowerUpdateTarget5ms();
+			#ifdef DEBUG
+			if (debugBenchIsRunning()) setTargetSpeed(pathFollowerGetTargetSpeedMps());
+			#endif
 		}
+		#ifdef DEBUG
+		else if (debugBenchIsRunning() && debugBenchMode() == DEBUG_BENCH_MODE_PRIMARY)
+		{
+			setTargetSpeed(tgtParam.search);
+		}
+		#endif
 		encPulse5ms = 0; // 累積値をリセット
 		break;
 	case 2:
@@ -224,6 +263,57 @@ void Interrupt1ms(void)
 		cnt10 = 0;
 		break;
 	}
+
+#ifdef DEBUG
+	if (debugBenchIsRunning())
+	{
+		int32_t encoderSpeed = (int32_t)encCurrentN;
+		uint32_t encoderSpeedAbs = (uint32_t)((encoderSpeed < 0) ? -encoderSpeed : encoderSpeed);
+		if (encoderSpeedAbs > debugBenchResult.peakEncoderPulsesPerMs)
+		{
+			debugBenchResult.peakEncoderPulsesPerMs = encoderSpeedAbs;
+		}
+		if (sdBenchHasWriteFailure())
+		{
+			debugBenchLatchStop(DEBUG_BENCH_STOP_SD_ERROR);
+		}
+		else if (logOverflow || dbg_overflow != 0U || markerOverflow)
+		{
+			debugBenchLatchStop(DEBUG_BENCH_STOP_BUFFER_OVERFLOW);
+		}
+		else if (sdBenchHasMetricsOverflow())
+		{
+			debugBenchLatchStop(DEBUG_BENCH_STOP_WRITE_METRICS_FULL);
+		}
+		else if ((optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT) &&
+			pathFollowerGetStatus() == PATH_STATE_LOCALIZATION_LOST)
+		{
+			debugBenchResult.pathLostCount++;
+			debugBenchLatchStop(DEBUG_BENCH_STOP_PATH_LOST);
+		}
+		else if ((uint64_t)encoderSpeedAbs * 1000ULL > (uint64_t)PULSE_METER * 10ULL)
+		{
+			debugBenchLatchStop(DEBUG_BENCH_STOP_OVERSPEED);
+		}
+		else if (emcStop != 0U)
+		{
+			debugBenchLatchStop(DEBUG_BENCH_STOP_EMERGENCY);
+		}
+		else if (debugBenchElapsed >= 40000U)
+		{
+			debugBenchLatchStop(DEBUG_BENCH_STOP_TIMEOUT);
+		}
+		else if ((debugBenchMode() == DEBUG_BENCH_MODE_PRIMARY &&
+			debugBenchElapsed >= DEBUG_BENCH_PRIMARY_DURATION_MS) ||
+			(debugBenchMode() != DEBUG_BENCH_MODE_PRIMARY &&
+			debugBenchElapsed >= DEBUG_BENCH_REPLAY_DURATION_MS))
+		{
+			debugBenchLatchStop(DEBUG_BENCH_STOP_TRACE_END);
+		}
+	}
+	uint32_t interruptCycles = getCycleCounter();
+	debugBenchRecordInterruptTime(interruptCycles, syntheticPoseCycles);
+#endif
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 Interrupt500us

@@ -8,12 +8,15 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#ifdef DEBUG
+#include "debugBench.h"
+#endif
 //====================================//
 // シンボル定義
 //====================================//
 #include "log_schema.h" // フィールド順とレコードサイズを定義。
 
-#define BUFFER_SIZE_LOG 512
+#define BUFFER_SIZE_LOG 2048U
 #define LOG_SIZE LOG_RECORD_SIZE_BYTES // スキーマ由来のレコードサイズ。
 
 #define BUFFER_SIZE_MARKER 500
@@ -72,4 +75,53 @@ bool sd_fatfs_try_lock(void);
 void sd_set_analysis_active(bool active);
 bool sd_is_analysis_active(void);
 void sd_flush_log(void);
+#ifdef DEBUG
+typedef struct
+{
+	uint32_t expectedRows;
+	uint32_t csvRows;
+	uint32_t csvColumns;
+	uint32_t csvColumnMismatchRows;
+	uint32_t csvFirstBadRow;
+	uint32_t csvFirstBadColumnCount;
+	uint32_t csvValidated;
+	uint32_t firstCntlog;
+	uint32_t lastCntlog;
+	uint32_t cntlogMonotonic;
+	uint32_t writeCount;
+	uint32_t writeAlignmentErrors;
+	uint32_t writeMetricOverflow;
+	uint32_t maxWriteWaitMs;
+	uint32_t lastWritePosition;
+	uint32_t lastWriteLength;
+	uint32_t lastWriteWritten;
+	uint32_t lastWriteResult;
+	uint32_t logOverflowCount;
+	uint32_t writeFailed;
+	uint32_t metricsCsvSaved;
+} SdBenchStorageResult;
+
+typedef struct
+{
+	uint32_t maxInterruptCycles;
+	uint32_t maxSyntheticPoseCycles;
+	uint32_t maxRunEquivalentInterruptCycles;
+	uint32_t maxPeriodCycles;
+	uint32_t oneMsPeriodOverruns;
+	uint32_t pathLostCount;
+	uint32_t lineBrightJudgeCount;
+	uint32_t lineUnbrightJudgeCount;
+	uint32_t overSpeedJudgeCount;
+	uint32_t peakEncoderPulsesPerMs;
+	uint32_t sdWriteCallCount;
+	uint32_t maxSdWriteSectors;
+	uint32_t multiSectorWriteCalls;
+} SdBenchRuntimeMetrics;
+
+bool sdBenchStart(const char *csvName, const char *metricsName, const char *modeName);
+void sdBenchSetRuntimeMetrics(const SdBenchRuntimeMetrics *metrics);
+bool sdBenchFinish(uint32_t stopReason, uint32_t elapsedMs, SdBenchStorageResult *result);
+bool sdBenchHasWriteFailure(void);
+bool sdBenchHasMetricsOverflow(void);
+#endif
 #endif // SDCARD_H_

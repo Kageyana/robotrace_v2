@@ -35,6 +35,14 @@ typedef struct
 	uint16_t lineThetaGain_x1e9;
 } ShortcutSettings;
 
+#ifdef DEBUG
+typedef struct
+{
+	int16_t x_mm;
+	int16_t y_mm;
+} PathBenchRoutePoint;
+#endif
+
 typedef enum
 {
 	PATH_STATE_INACTIVE = 0,
@@ -91,6 +99,11 @@ uint16_t pathRunRouteCount(void);
 uint32_t pathRunRouteGeometryCrc32(void);
 void pathFollowerReset(void);
 void pathFollowerUpdatePose1ms(int32_t encoderPulse, float gyroDegPerSec);
+#ifdef DEBUG
+bool pathFollowerLoadDebugBenchRoute(const PathBenchRoutePoint *route,
+	uint16_t pointCount, uint8_t shortcutLevel, int16_t sourceLog);
+void pathFollowerSetDebugBenchProgressPose(uint16_t progressPermille, float headingDeg);
+#endif
 void pathFollowerUpdateTarget5ms(void);
 PathFollowerState pathFollowerGetStatus(void);
 uint16_t pathFollowerGetPathBlendPermille(void);

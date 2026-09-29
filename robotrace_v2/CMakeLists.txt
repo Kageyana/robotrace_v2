@@ -37,6 +37,16 @@ add_executable(${CMAKE_PROJECT_NAME})
 # ログスキーマのプロファイル。1:通常の軽量ログ、0:詳細デバッグ列を含むログ。
 # マーカー誤検出の調査時は -DROBOTRACE_LOG_SCHEMA_PROFILE_LIGHT=0 を指定する。
 set(ROBOTRACE_LOG_SCHEMA_PROFILE_LIGHT "1" CACHE STRING "1=light log schema, 0=debug log schema")
+# Debug負荷試験でレコード末尾へ追加するダミーバイト数。Releaseでは常に0。
+set(ROBOTRACE_LOG_DUMMY_BYTES "42" CACHE STRING "Debug-only dummy bytes appended to each binary log record")
+if(NOT ROBOTRACE_LOG_DUMMY_BYTES MATCHES "^[0-9]+$")
+    message(FATAL_ERROR "ROBOTRACE_LOG_DUMMY_BYTES must be a non-negative integer")
+endif()
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(LOG_SCHEMA_DUMMY_BYTES_FOR_BUILD ${ROBOTRACE_LOG_DUMMY_BYTES})
+else()
+    set(LOG_SCHEMA_DUMMY_BYTES_FOR_BUILD 0)
+endif()
 
 execute_process(
     COMMAND git rev-parse --short HEAD
@@ -75,6 +85,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 	${CMAKE_SOURCE_DIR}/Core/Src/BMI088.c
 	${CMAKE_SOURCE_DIR}/Core/Src/IMU.c
 	${CMAKE_SOURCE_DIR}/Core/Src/control.c
+	${CMAKE_SOURCE_DIR}/Core/Src/debugBench.c
 	${CMAKE_SOURCE_DIR}/Core/Src/autoRun.c
 	${CMAKE_SOURCE_DIR}/Core/Src/courseAnalysis.c
 	${CMAKE_SOURCE_DIR}/Core/Src/courseLogCsv.c
@@ -112,6 +123,7 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     GIT_COMMIT="${GIT_COMMIT_SHORT}"
     GIT_BRANCH="${GIT_BRANCH_NAME}"
     LOG_SCHEMA_PROFILE_LIGHT=${ROBOTRACE_LOG_SCHEMA_PROFILE_LIGHT}
+    LOG_SCHEMA_DUMMY_BYTES=${LOG_SCHEMA_DUMMY_BYTES_FOR_BUILD}
 )
 
 # Remove wrong libob.a library dependency when using cpp files

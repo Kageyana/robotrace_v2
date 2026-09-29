@@ -3,6 +3,9 @@
 //====================================//
 #include "motor.h"
 #include "battery.h"
+#ifdef DEBUG
+#include "debugBench.h"
+#endif
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -163,6 +166,19 @@ void motorVoltageOut(float voltageL_V, float voltageR_V)
 ///////////////////////////////////////////////////////////////////////////
 void motorCommandOut(int16_t cmdL, int16_t cmdR)
 {
+#ifdef DEBUG
+	uint8_t benchOutput = debugBenchMotorOutputMode();
+	if (benchOutput == DEBUG_BENCH_OUTPUT_FIXED_100)
+	{
+		motorDutyOut(100, 100);
+		return;
+	}
+	if (benchOutput == DEBUG_BENCH_OUTPUT_STOPPED)
+	{
+		motorDutyOut(0, 0);
+		return;
+	}
+#endif
 	motorVoltageOut(motorCommandToVoltage_V(cmdL), motorCommandToVoltage_V(cmdR));
 }
 ///////////////////////////////////////////////////////////////////////////

@@ -164,6 +164,9 @@ extern int16_t countdown;
 //====================================//
 void initSystem(void);
 void loopSystem(void);
+#ifdef DEBUG
+void controlDebugBenchStart(uint8_t mode);
+#endif
 void emergencyStop(void);
 void countDown(void);
 void changeGain(void);

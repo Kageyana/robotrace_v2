@@ -17,6 +17,9 @@
 #include "diskio.h"
 #include "sd_spi.h"
 #include "ff_gen_drv.h"
+#ifdef DEBUG
+#include "debugBench.h"
+#endif
 // Debug: last SD read request/status for f_gets error logs
 volatile DWORD g_sd_last_read_sector = 0;
 volatile UINT g_sd_last_read_count = 0;
@@ -90,6 +93,17 @@ DRESULT SD_disk_read(BYTE pdrv, BYTE *buff, DWORD sector, UINT count) {
 
 DRESULT SD_disk_write(BYTE pdrv,  BYTE *buff, DWORD sector, UINT count) {
     if (pdrv || !count) return RES_PARERR;
+#ifdef DEBUG
+    if (debugBenchIsRunning()) {
+        debugBenchResult.sdWriteCallCount++;
+        if (count > debugBenchResult.maxSdWriteSectors) {
+            debugBenchResult.maxSdWriteSectors = count;
+        }
+        if (count > 1U) {
+            debugBenchResult.multiSectorWriteCalls++;
+        }
+    }
+#endif
     if (!card_initialized) return RES_NOTRDY;
     if (!sd_sector_count_valid) {
         uint32_t sector_count = 0;

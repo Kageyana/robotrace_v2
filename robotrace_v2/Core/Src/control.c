@@ -11,6 +11,9 @@
 #include "motor.h"
 #include "fatfs.h"
 #include "battery.h"
+#ifdef DEBUG
+#include "debugBench.h"
+#endif
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -405,6 +408,73 @@ void initSystem(void)
 	printf("hello \n");
 }
 
+#ifdef DEBUG
+/////////////////////////////////////////////////////////////////////
+// モジュール名 controlDebugBenchStart
+// 処理概要     Debugベンチ用に走行状態を初期化して一次またはPATH走行を開始する
+// 引数         mode:測定モード
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void controlDebugBenchStart(uint8_t mode)
+{
+	patternTrace = 0U;
+	modeLOG = true;
+	autoStart = 0U;
+	countdown = 0;
+	if (mode == DEBUG_BENCH_MODE_PRIMARY)
+	{
+		optimalTrace = BOOST_NONE;
+	}
+	else if (mode == DEBUG_BENCH_MODE_SHORTCUT)
+	{
+		optimalTrace = BOOST_SHORTCUT;
+	}
+	else
+	{
+		optimalTrace = BOOST_PATH_REPLAY;
+	}
+	resetEmcStop();
+	encTotalN = 0;
+	encTotalOptimal = 0;
+	encLog = 0;
+	encPID = 0;
+	enc1 = 0;
+	encCurve = 0;
+	encChangeGain = 0;
+	cntRun = 0U;
+	cntLog = 0U;
+	courseMarker = 0U;
+	courseMarkerLog = 0U;
+	straightMarkerPendingLog = 0U;
+	stateCrossLine = false;
+	DistanceOptimal = 0;
+	optimalIndex = 0U;
+	veloCtrl.Int = 0.0F;
+	lineTraceCtrl.Int = 0.0F;
+	lineTraceOmegaFBCtrl.Int = 0.0F;
+	yawRateCtrl.Int = 0.0F;
+	yawCtrl.Int = 0.0F;
+	distCtrl.Int = 0.0F;
+	slipResetAll(&slipDetState);
+	slipDistReset();
+	clearMarkerProcessState();
+	clearIMUval();
+	clearXYcie();
+	if (mode != DEBUG_BENCH_MODE_PRIMARY)
+	{
+		pathFollowerReset();
+		setTargetSpeed(pathFollowerGetTargetSpeedMps());
+	}
+	else
+	{
+		setTargetSpeed(tgtParam.search);
+	}
+	powerLineSensors(1U);
+	powerMarkerSensors(1U);
+	patternTrace = 12U;
+}
+#endif
+
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 getRunStartBlockReason
 // 処理概要     走行開始を禁止する理由を取得する
@@ -501,6 +571,9 @@ static bool blockRunStartIfNeeded(void)
 ///////////////////////////////////////////////////////////////////////////
 void loopSystem(void)
 {
+#ifdef DEBUG
+	if (debugBenchMainLoop()) return;
+#endif
 	int16_t ret = 0;
 
     // 緊急停止処理

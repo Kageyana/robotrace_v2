@@ -6,6 +6,7 @@
 #include "courseAnalysis.h"
 #include "firmware_version.h"
 #include "IMU.h"
+#include "logBufferWriter.h"
 #include "markerSensor.h"
 #include "sd_functions.h"
 #include "stdio.h"
@@ -25,6 +26,7 @@ FIL fil_R;
 #define LOG_COLUMN_TITLE_BUFFER_SIZE 4096U
 #define LOG_FORMAT_BUFFER_SIZE       512U
 #define LOG_CSV_LINE_BUFFER_SIZE    1024U
+#define LOG_TEMP_PREALLOC_BYTES (2UL * 1024UL * 1024UL)
 char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE] = "", formatLog[LOG_FORMAT_BUFFER_SIZE] = "";
 
 // ログバッファ
@@ -33,17 +35,17 @@ char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE] = "", formatLog[LOG_FORMAT_BUFFER
 #define CROSS_STRAIGHT_MM 100.0f
 #define CROSSSEG_MAX 128
 #define PRIMARY_ROUTE_GOAL_X_LIMIT_MM 60.0F
-#define LOG_BUFFER_COUNT 3
-#define LOG_TEMP_PREALLOC_BYTES (2UL * 1024UL * 1024UL)
-uint8_t logBuffer[LOG_BUFFER_COUNT][BUFFER_SIZE_LOG];
-uint8_t *activeBuf = logBuffer[0];
-uint8_t *flushBuf = logBuffer[1];
-uint8_t *pendingBuf = logBuffer[2];
-int16_t logBuffIndex = 0;
-uint32_t logBuffSendIndex = 0;
-uint32_t logBuffPendingIndex = 0;
-volatile bool sendSD = false;
-volatile bool sendSD_pending = false;
+_Static_assert(BUFFER_SIZE_LOG == LOG_BUFFER_SIZE_BYTES, "log buffer size mismatch");
+_Static_assert((BUFFER_SIZE_LOG % LOG_BUFFER_SECTOR_SIZE_BYTES) == 0U, "log buffer must be sector aligned");
+_Static_assert(LOG_RECORD_SIZE_BYTES <= LOG_BUFFER_SIZE_BYTES, "log record must fit in one log buffer");
+static LogBufferWriter logBufferWriter;
+#if LOG_SCHEMA_DUMMY_BYTES > 0U
+static const uint8_t logDummyPadding[LOG_SCHEMA_DUMMY_BYTES] = {0U};
+#endif
+static _Alignas(LOG_BUFFER_SECTOR_SIZE_BYTES)
+	uint8_t logBuffers[LOG_BUFFER_COUNT][LOG_BUFFER_SIZE_BYTES];
+static float cross_start_mm[CROSSSEG_MAX];
+static float cross_end_mm[CROSSSEG_MAX];
 uint16_t cntSend = 0;
 uint8_t *logaddress;
 uint16_t logValIndex = 0;
@@ -64,12 +66,48 @@ bool getFileNumbersError = false; // getFileNumbersでエラーが発生した�
 static volatile bool sd_fatfs_locked = false;
 static volatile bool sd_analysis_active = false;
 static volatile bool create_log_ready = false;
-static volatile bool logWriteFailed = false;
 static bool lastRunSaved = false;
 static bool lastPrimaryRouteValid = false;
 static bool runImuCalibrationValid = false;
 static uint16_t runImuCalibrationSamples = 0U;
 static uint16_t runImuCalibrationReadErrors = 0U;
+#ifdef DEBUG
+#define SD_BENCH_WRITE_METRIC_MAX 256U
+typedef struct
+{
+	uint32_t position;
+	uint16_t length;
+	uint16_t waitMs;
+} SdBenchWriteMetric;
+static SdBenchWriteMetric sdBenchWriteMetrics[SD_BENCH_WRITE_METRIC_MAX];
+static char sdBenchCsvName[13];
+static char sdBenchMetricsName[13];
+static char sdBenchModeName[16];
+static bool sdBenchActive = false;
+static bool sdBenchTempOpen = false;
+static bool sdBenchPreallocationOk = true;
+static bool sdBenchWriteFailed = false;
+static bool sdBenchMetricsOverflow = false;
+static uint32_t sdBenchStopReason = 0U;
+static uint32_t sdBenchElapsedMs = 0U;
+static uint32_t sdBenchWriteCount = 0U;
+static uint32_t sdBenchWriteAlignmentErrors = 0U;
+static uint32_t sdBenchMaxWriteWaitMs = 0U;
+static uint32_t sdBenchLastWritePosition = 0U;
+static uint32_t sdBenchLastWriteLength = 0U;
+static uint32_t sdBenchLastWriteWritten = 0U;
+static uint32_t sdBenchLastWriteResult = 0U;
+static uint32_t sdBenchExpectedRows = 0U;
+static uint32_t csvRowsWrittenLast = 0U;
+static SdBenchRuntimeMetrics sdBenchRuntimeMetrics;
+static void sdBenchRecordWrite(FSIZE_t position, UINT requested, UINT written,
+	FRESULT result, uint32_t waitMs);
+static bool sdBenchValidateCsv(SdBenchStorageResult *result);
+static bool sdBenchWriteMetricsCsv(void);
+#define SD_BENCH_WATCHDOG_REFRESH() do { if (sdBenchActive) debugBenchWatchdogRefresh(); } while (0)
+#else
+#define SD_BENCH_WATCHDOG_REFRESH() ((void)0)
+#endif
 
 typedef struct
 {
@@ -94,6 +132,10 @@ typedef struct
 #undef LOG_STRUCT_SKIP
 } LogRecord;
 
+#define LOG_CSV_COLUMN_COUNT_ADD(type, name, fmt, expr) + 1U
+enum { LOG_CSV_COLUMN_COUNT = 0U LOG_FIELD_LIST(LOG_CSV_COLUMN_COUNT_ADD, LOG_CSV_COLUMN_COUNT_ADD) };
+#undef LOG_CSV_COLUMN_COUNT_ADD
+
 
 // スキーマ関連のヘルパー宣言。
 static void logSendFloat(float value);
@@ -102,9 +144,236 @@ static uint16_t logReadU16(void);
 static int16_t logReadS16(void);
 static uint32_t logReadU32(void);
 static float logReadF32(void);
+
+#ifdef DEBUG
+/////////////////////////////////////////////////////////////////////
+// モジュール名 sdBenchRecordWrite
+// 処理概要     走行中の二進ログf_write位置、長さ、待ち時間を記録する
+// 引数         position:書込位置[byte], requested:要求長[byte], written:実書込長[byte],
+//              result:FatFs結果, waitMs:待ち時間[ms]
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void sdBenchRecordWrite(FSIZE_t position, UINT requested, UINT written,
+	FRESULT result, uint32_t waitMs)
+{
+	if (!sdBenchActive) return;
+	if (((uint32_t)position % LOG_BUFFER_SECTOR_SIZE_BYTES) != 0U ||
+		(requested % LOG_BUFFER_SECTOR_SIZE_BYTES) != 0U)
+	{
+		sdBenchWriteAlignmentErrors++;
+	}
+	if (sdBenchWriteCount < SD_BENCH_WRITE_METRIC_MAX)
+	{
+		sdBenchWriteMetrics[sdBenchWriteCount].position = (uint32_t)position;
+		sdBenchWriteMetrics[sdBenchWriteCount].length = (uint16_t)requested;
+		sdBenchWriteMetrics[sdBenchWriteCount].waitMs =
+			(uint16_t)((waitMs > UINT16_MAX) ? UINT16_MAX : waitMs);
+	}
+	else
+	{
+		sdBenchMetricsOverflow = true;
+	}
+	sdBenchWriteCount++;
+	sdBenchMaxWriteWaitMs = (waitMs > sdBenchMaxWriteWaitMs) ? waitMs : sdBenchMaxWriteWaitMs;
+	sdBenchLastWritePosition = (uint32_t)position;
+	sdBenchLastWriteLength = (uint32_t)requested;
+	sdBenchLastWriteWritten = (uint32_t)written;
+	sdBenchLastWriteResult = (uint32_t)result;
+	if (result != FR_OK || written != requested)
+	{
+		sdBenchWriteFailed = true;
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 sdBenchCsvFieldCount
+// 処理概要     CSV行の列数を数える
+// 引数         line:CSV行
+// 戻り値       列数
+/////////////////////////////////////////////////////////////////////
+static uint32_t sdBenchCsvFieldCount(const char *line)
+{
+	uint32_t fields = 1U;
+	bool quoted = false;
+	for (const char *p = line; *p != '\0' && *p != '\r' && *p != '\n'; p++)
+	{
+		if (*p == '"') quoted = !quoted;
+		else if (*p == ',' && !quoted) fields++;
+	}
+	return fields;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 sdBenchValidateCsv
+// 処理概要     専用CSVの行数、列数、cntlog連続性を読み戻して検証する
+// 引数         result:検証結果の格納先
+// 戻り値       true:検証成功 false:検証失敗
+/////////////////////////////////////////////////////////////////////
+static bool sdBenchValidateCsv(SdBenchStorageResult *result)
+{
+	FIL file;
+	FRESULT fsResult;
+	char line[2048U];
+	bool valid = true;
+	bool cntlogValid = true;
+	bool headerFound = false;
+	uint32_t rows = 0U;
+	uint32_t previousCntlog = 0U;
+	uint32_t columnMismatchRows = 0U;
+	if (!sd_fatfs_lock(1000U)) return false;
+	SD_BENCH_WATCHDOG_REFRESH();
+	fsResult = f_open(&file, sdBenchCsvName, FA_OPEN_EXISTING | FA_READ);
+	SD_BENCH_WATCHDOG_REFRESH();
+	if (fsResult != FR_OK)
+	{
+		sd_fatfs_unlock();
+		return false;
+	}
+	SD_BENCH_WATCHDOG_REFRESH();
+	while (f_gets(line, sizeof(line), &file) != NULL)
+	{
+		SD_BENCH_WATCHDOG_REFRESH();
+		// メタデータ行は列数が多く、固定長バッファで複数回に分かれることがある。
+		// cntlog列の見出しを検索してからデータ行の検査を始める。
+		if (strncmp(line, "cntlog,", 7U) == 0)
+		{
+			headerFound = true;
+			result->csvColumns = sdBenchCsvFieldCount(line);
+			// 既存CSVはヘッダーとデータ行の末尾に空列を表すカンマを持つ。
+			if (result->csvColumns != ((uint32_t)LOG_CSV_COLUMN_COUNT + 1U)) valid = false;
+			break;
+		}
+	}
+	if (!headerFound)
+	{
+		valid = false;
+		cntlogValid = false;
+	}
+	else
+	{
+		SD_BENCH_WATCHDOG_REFRESH();
+		while (f_gets(line, sizeof(line), &file) != NULL)
+		{
+			char *end = NULL;
+			unsigned long currentCntlog;
+			SD_BENCH_WATCHDOG_REFRESH();
+			if (line[0] == '\r' || line[0] == '\n' || line[0] == '\0') continue;
+			uint32_t rowColumns = sdBenchCsvFieldCount(line);
+			if (rowColumns != result->csvColumns)
+			{
+				if (columnMismatchRows == 0U)
+				{
+					result->csvFirstBadRow = rows + 1U;
+					result->csvFirstBadColumnCount = rowColumns;
+				}
+				columnMismatchRows++;
+				valid = false;
+			}
+			currentCntlog = strtoul(line, &end, 10);
+			if (end == line || (*end != ',' && *end != '\r' && *end != '\n' && *end != '\0'))
+			{
+				valid = false;
+				cntlogValid = false;
+			}
+			else if (rows > 0U && currentCntlog <= previousCntlog)
+			{
+				valid = false;
+				cntlogValid = false;
+			}
+			if (end != line && (*end == ',' || *end == '\r' || *end == '\n' || *end == '\0'))
+			{
+				if (rows == 0U) result->firstCntlog = (uint32_t)currentCntlog;
+				previousCntlog = (uint32_t)currentCntlog;
+			}
+			rows++;
+		}
+	}
+	SD_BENCH_WATCHDOG_REFRESH();
+	if (f_close(&file) != FR_OK) valid = false;
+	SD_BENCH_WATCHDOG_REFRESH();
+	sd_fatfs_unlock();
+	result->csvRows = rows;
+	result->csvColumnMismatchRows = columnMismatchRows;
+	result->lastCntlog = (rows > 0U) ? previousCntlog : 0U;
+	result->cntlogMonotonic = cntlogValid ? 1U : 0U;
+	result->csvValidated = (valid && cntlogValid && rows == sdBenchExpectedRows && rows >= 128U) ? 1U : 0U;
+	return result->csvValidated != 0U;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 sdBenchWriteMetricsCsv
+// 処理概要     計測した走行中のf_write一覧を専用CSVへ保存する
+// 引数         なし
+// 戻り値       true:保存成功 false:保存失敗
+/////////////////////////////////////////////////////////////////////
+static bool sdBenchWriteMetricsCsv(void)
+{
+	FIL file;
+	FRESULT fsResult;
+	UINT written;
+	char line[128];
+	if (!sd_fatfs_lock(1000U)) return false;
+	SD_BENCH_WATCHDOG_REFRESH();
+	fsResult = f_open(&file, sdBenchMetricsName, FA_CREATE_ALWAYS | FA_WRITE);
+	SD_BENCH_WATCHDOG_REFRESH();
+	if (fsResult != FR_OK)
+	{
+		sd_fatfs_unlock();
+		return false;
+	}
+	int length = snprintf(line, sizeof(line), "index,position_bytes,length_bytes,wait_ms\r\n");
+	SD_BENCH_WATCHDOG_REFRESH();
+	fsResult = f_write(&file, line, (UINT)length, &written);
+	SD_BENCH_WATCHDOG_REFRESH();
+	if (fsResult != FR_OK || written != (UINT)length)
+	{
+		f_close(&file);
+		sd_fatfs_unlock();
+		return false;
+	}
+	uint32_t savedCount = (sdBenchWriteCount < SD_BENCH_WRITE_METRIC_MAX) ?
+		sdBenchWriteCount : SD_BENCH_WRITE_METRIC_MAX;
+	for (uint32_t i = 0U; i < savedCount; i++)
+	{
+		SD_BENCH_WATCHDOG_REFRESH();
+		length = snprintf(line, sizeof(line), "%lu,%lu,%u,%u\r\n",
+			(unsigned long)i,
+			(unsigned long)sdBenchWriteMetrics[i].position,
+			(unsigned)sdBenchWriteMetrics[i].length,
+			(unsigned)sdBenchWriteMetrics[i].waitMs);
+		if (length < 0 || (size_t)length >= sizeof(line))
+		{
+			f_close(&file);
+			sd_fatfs_unlock();
+			return false;
+		}
+		SD_BENCH_WATCHDOG_REFRESH();
+		fsResult = f_write(&file, line, (UINT)length, &written);
+		SD_BENCH_WATCHDOG_REFRESH();
+		if (fsResult != FR_OK || written != (UINT)length)
+		{
+			f_close(&file);
+			sd_fatfs_unlock();
+			return false;
+		}
+	}
+	SD_BENCH_WATCHDOG_REFRESH();
+	fsResult = f_sync(&file);
+	SD_BENCH_WATCHDOG_REFRESH();
+	SD_BENCH_WATCHDOG_REFRESH();
+	FRESULT closeResult = f_close(&file);
+	SD_BENCH_WATCHDOG_REFRESH();
+	if (closeResult != FR_OK || fsResult != FR_OK)
+	{
+		sd_fatfs_unlock();
+		return false;
+	}
+	sd_fatfs_unlock();
+	return true;
+}
+#endif
 static void logReadRecord(LogRecord *rec);
 static void logBuildColumns(void);
-static uint8_t *logGetFreeBuffer(void);
 static bool readSavedLogNumber(int16_t *outNumber);
 static void writeSavedLogNumber(int16_t fileNumber);
 static int16_t calcNextLogNumber(void);
@@ -299,21 +568,9 @@ void sd_flush_log(void)
 	}
 
 	// drain pending writes before analysis
-	while (sendSD)
+	while (logBufferWriter.flushPending || logBufferWriter.pendingPending)
 	{
 		writeLogPuts();
-	}
-	if (sendSD_pending)
-	{
-		uint32_t primask = __get_PRIMASK();
-		__disable_irq();
-		sendSD = true;
-		__set_PRIMASK(primask);
-		writeLogPuts();
-		while (sendSD)
-		{
-			writeLogPuts();
-		}
 	}
 
 	if (sd_fatfs_try_lock())
@@ -574,6 +831,14 @@ void createLog(void)
 	UINT total = 0;
 	create_log_ready = false;
 
+#ifdef DEBUG
+	if (sdBenchActive)
+	{
+		snprintf(fileName, sizeof(fileName), "%s", sdBenchCsvName);
+	}
+	else
+#endif
+	{
 	// 初回は保存値/SD内最大から次番号を決定
 	if (logFileNumber == 0)
 	{
@@ -589,12 +854,19 @@ void createLog(void)
 	snprintf((char *)fileName, sizeof(fileName), "%d", logFileNumber);
 	// バッファサイズを指定して安全に拡張子を追加
 	strncat((char *)fileName, ".csv", sizeof(fileName) - strlen((char *)fileName) - 1);
+	}
+	SD_BENCH_WATCHDOG_REFRESH();
 	fresult = f_open(&fil_W, fileName, FA_CREATE_ALWAYS | FA_WRITE); // create/overwrite file
+	SD_BENCH_WATCHDOG_REFRESH();
 	if (fresult != FR_OK)
 	{
 		// ファイルオープンに失敗した場合はログ作成を中止する
 		return; // エラーが発生したため処理を終了
 	}
+#ifdef DEBUG
+	if (!sdBenchActive)
+#endif
+	{
 	// 作成できた番号を保存ファイルへ反映
 	writeSavedLogNumber((int16_t)logFileNumber);
 	// 追加: 作成したログ番号を一覧に反映（savedLogNo 計算の整合を取る）
@@ -604,6 +876,7 @@ void createLog(void)
 		endFileIndex++;
 		fileNumbers[endFileIndex] = (int16_t)logFileNumber;
 		fileIndexLog = endFileIndex;
+	}
 	}
 
 	columnTitle[0] = 0; // バッファを安全に初期化
@@ -648,6 +921,35 @@ void createLog(void)
 	setLogHeaderStrF("optimalTrace", optimalTrace);
 	setLogHeaderStrF("autoStart", autoStart);
 	setLogHeaderStrF("emcStop", emcStop);
+#ifdef DEBUG
+	if (sdBenchActive)
+	{
+		setLogHeaderStrS("benchMode", sdBenchModeName);
+		setLogHeaderStr("benchStopReason", (int32_t)sdBenchStopReason);
+		setLogHeaderStr("benchElapsedMs", (int32_t)sdBenchElapsedMs);
+		setLogHeaderStr("benchWriteCount", (int32_t)sdBenchWriteCount);
+		setLogHeaderStr("benchWriteAlignmentErrors", (int32_t)sdBenchWriteAlignmentErrors);
+		setLogHeaderStr("benchWriteMetricOverflow", sdBenchMetricsOverflow ? 1 : 0);
+		setLogHeaderStr("benchMaxWriteWaitMs", (int32_t)sdBenchMaxWriteWaitMs);
+		setLogHeaderStr("benchLastWritePosition", (int32_t)sdBenchLastWritePosition);
+		setLogHeaderStr("benchLastWriteLength", (int32_t)sdBenchLastWriteLength);
+		setLogHeaderStr("benchLastWriteWritten", (int32_t)sdBenchLastWriteWritten);
+		setLogHeaderStr("benchLastWriteResult", (int32_t)sdBenchLastWriteResult);
+		setLogHeaderStr("benchMaxInterruptCycles", (int32_t)sdBenchRuntimeMetrics.maxInterruptCycles);
+		setLogHeaderStr("benchMaxSyntheticPoseCycles", (int32_t)sdBenchRuntimeMetrics.maxSyntheticPoseCycles);
+		setLogHeaderStr("benchMaxRunEquivalentInterruptCycles", (int32_t)sdBenchRuntimeMetrics.maxRunEquivalentInterruptCycles);
+		setLogHeaderStr("benchMaxPeriodCycles", (int32_t)sdBenchRuntimeMetrics.maxPeriodCycles);
+		setLogHeaderStr("benchOneMsPeriodOverruns", (int32_t)sdBenchRuntimeMetrics.oneMsPeriodOverruns);
+		setLogHeaderStr("benchPathLostCount", (int32_t)sdBenchRuntimeMetrics.pathLostCount);
+		setLogHeaderStr("benchLineBrightJudgeCount", (int32_t)sdBenchRuntimeMetrics.lineBrightJudgeCount);
+		setLogHeaderStr("benchLineUnbrightJudgeCount", (int32_t)sdBenchRuntimeMetrics.lineUnbrightJudgeCount);
+		setLogHeaderStr("benchOverSpeedJudgeCount", (int32_t)sdBenchRuntimeMetrics.overSpeedJudgeCount);
+		setLogHeaderStr("benchPeakEncoderPulsePerMs", (int32_t)sdBenchRuntimeMetrics.peakEncoderPulsesPerMs);
+		setLogHeaderStr("benchSdWriteCallCount", (int32_t)sdBenchRuntimeMetrics.sdWriteCallCount);
+		setLogHeaderStr("benchMaxSdWriteSectors", (int32_t)sdBenchRuntimeMetrics.maxSdWriteSectors);
+		setLogHeaderStr("benchMultiSectorWriteCalls", (int32_t)sdBenchRuntimeMetrics.multiSectorWriteCalls);
+	}
+#endif
 	if (autoRunState.currentPlanValid && autoStart > 0U)
 	{
 		setLogHeaderStr("autoRunNumber", autoRunState.currentRunNumber);
@@ -706,7 +1008,9 @@ void createLog(void)
 	setLogHeaderStrF("distCtrl.kd", distCtrl.kd);
     strncat((char *)columnTitle, "\n", sizeof(columnTitle) - strlen((char *)columnTitle) - 1); // バッファサイズを指定して安全に改行を追加
 	total = (UINT)strlen(columnTitle);
+	SD_BENCH_WATCHDOG_REFRESH();
 	fresult = f_write(&fil_W, columnTitle, total, &written);
+	SD_BENCH_WATCHDOG_REFRESH();
 	if (fresult != FR_OK || written != total)
 	{
 		printf("createLog header write error: %d (%lu/%lu)\r\n", fresult, (unsigned long)written, (unsigned long)total);
@@ -721,14 +1025,18 @@ void createLog(void)
 	strncat(formatLog, "\n", sizeof(formatLog) - strlen(formatLog) - 1);
 	total = (UINT)strlen(columnTitle);
 	written = 0;
+	SD_BENCH_WATCHDOG_REFRESH();
 	fresult = f_write(&fil_W, columnTitle, total, &written);
+	SD_BENCH_WATCHDOG_REFRESH();
 	if (fresult != FR_OK || written != total)
 	{
 		printf("createLog column header write error: %d (%lu/%lu)\r\n", fresult, (unsigned long)written, (unsigned long)total);
 		f_close(&fil_W);
 		return;
 	}
+	SD_BENCH_WATCHDOG_REFRESH();
 	fresult = f_sync(&fil_W);
+	SD_BENCH_WATCHDOG_REFRESH();
 	if (fresult != FR_OK)
 	{
 		printf("createLog f_sync error: %d\r\n", fresult);
@@ -746,6 +1054,9 @@ void createLog(void)
 void initLog(void)
 {
 	FRESULT fresult;		// f_write status
+#ifdef DEBUG
+	sdBenchTempOpen = false;
+#endif
 	lastRunSaved = false;
 	lastPrimaryRouteValid = false;
 	runImuCalibrationValid = IMU_CalibrationReady();
@@ -761,49 +1072,36 @@ void initLog(void)
 		initMSD = false; // ファイルオープンに失敗した場合はmicroSDを使用不可とする
 		return;          // ログ初期化を中止
 	}
-	logBuffIndex = 0;					// 書込位置を初期化
+#ifdef DEBUG
+	sdBenchTempOpen = true;
+#endif
+	logBufferWriterInit(&logBufferWriter, logBuffers);
 #if _USE_EXPAND
 	/* Best-effort contiguous preallocation to reduce FAT updates during logging. */
 	fresult = f_expand(&fil_W, (FSIZE_t)LOG_TEMP_PREALLOC_BYTES, 1);
 	if (fresult != FR_OK)
 	{
 		printf("f_expand failed: %d\r\n", fresult);
+#ifdef DEBUG
+		if (sdBenchActive) sdBenchPreallocationOk = false;
+#endif
 	}
 #endif
-	f_lseek(&fil_W, 0);
-	activeBuf = logBuffer[0];			// アクティブバッファを初期化
-	flushBuf = logBuffer[1];			// フラッシュバッファを初期化
-	pendingBuf = logBuffer[2];
-	logBuffSendIndex = logBuffIndex;	// バッファのバイト数を記録
-	logBuffPendingIndex = 0;
-	sendSD = false;						// 書き込み要求をリセット
-	sendSD_pending = false;
+	fresult = f_lseek(&fil_W, 0U);
+	if (fresult != FR_OK)
+	{
+		printf("initLog f_lseek error: %d\r\n", fresult);
+		f_close(&fil_W);
+#ifdef DEBUG
+		sdBenchTempOpen = false;
+#endif
+		logBufferWriter.writeFailed = true;
+		initMSD = false;
+		return;
+	}
 	dbg_overflow = 0;
-	logWriteFailed = false;
 	markerOverflow = false;
 	logOverflow = false;				// ログバッファ状態フラグをリセット
-}
-
-static uint8_t *logGetFreeBuffer(void)
-{
-	for (uint32_t i = 0; i < LOG_BUFFER_COUNT; i++)
-	{
-		uint8_t *buf = logBuffer[i];
-		if (buf == activeBuf)
-		{
-			continue;
-		}
-		if (sendSD && buf == flushBuf)
-		{
-			continue;
-		}
-		if (sendSD_pending && buf == pendingBuf)
-		{
-			continue;
-		}
-		return buf;
-	}
-	return NULL;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 writeLogBufferPuts
@@ -819,41 +1117,16 @@ void writeLogBufferPuts(void)
 		{
 			return;
 		}
-		// スキーマから固定レコードサイズを算出。
-		const uint16_t requiredSize = (uint16_t)LOG_RECORD_SIZE_BYTES;
-
-		if (logBuffIndex + requiredSize > BUFFER_SIZE_LOG)
+		if (logBufferWriter.writeFailed || logBufferWriter.overflow)
 		{
-			if (sendSD && sendSD_pending)
-			{
-				logOverflow = true;
-				dbg_overflow++;
-				return;
-			}
-
-			uint8_t *newBuf = logGetFreeBuffer();
-			if (newBuf == NULL)
-			{
-				logOverflow = true;
-				dbg_overflow++;
-				return;
-			}
-
-			if (sendSD)
-			{
-				logBuffPendingIndex = logBuffIndex;
-				pendingBuf = activeBuf;
-				sendSD_pending = true;
-			}
-			else
-			{
-				logBuffSendIndex = logBuffIndex;
-				flushBuf = activeBuf;
-				sendSD = true;
-			}
-
-			activeBuf = newBuf;
-			logBuffIndex = 0;
+			return;
+		}
+		// スキーマから固定レコードサイズを算出。
+		if (!logBufferWriterBeginRecord(&logBufferWriter, (uint32_t)LOG_RECORD_SIZE_BYTES))
+		{
+			logOverflow = true;
+			dbg_overflow++;
+			return;
 		}
 
 		// スキーマ順でバイナリ書き込みを展開。
@@ -865,6 +1138,10 @@ void writeLogBufferPuts(void)
 #define LOG_SEND_FIELD(type, name, fmt, expr) LOG_SEND_##type(expr);
 #define LOG_SEND_SKIP(type, name, fmt, expr)
 		LOG_FIELD_LIST(LOG_SEND_FIELD, LOG_SEND_SKIP)
+#if LOG_SCHEMA_DUMMY_BYTES > 0U
+		// Debug負荷試験用。実データ項目やCSV列に含めず、レコード末尾へゼロを追加する。
+		(void)logBufferWriterAppendBytes(&logBufferWriter, logDummyPadding, sizeof(logDummyPadding));
+#endif
 #undef LOG_SEND_FIELD
 #undef LOG_SEND_SKIP
 #undef LOG_SEND_U8
@@ -873,7 +1150,15 @@ void writeLogBufferPuts(void)
 #undef LOG_SEND_U32
 #undef LOG_SEND_F32
 
-		cntSend++;
+		if (logBufferWriterEndRecord(&logBufferWriter))
+		{
+			cntSend++;
+		}
+		else
+		{
+			logOverflow = true;
+			dbg_overflow++;
+		}
 	}
 }
 
@@ -897,25 +1182,33 @@ void writeLogPuts(void)
 	{
 		return; // skip while SD is locked
 	}
-	if (!modeLOG && !sendSD)
+	if (!modeLOG && !logBufferWriter.flushPending)
 	{
 		return; // skip if no pending write
 	}
 
-	if (sendSD)
+	if (logBufferWriter.flushPending)
 	{
 		if (!sd_fatfs_try_lock())
 		{
 			return;
 		}
-		fresult = f_write(&fil_W, flushBuf, logBuffSendIndex, &writtenlog);
-		if (fresult != FR_OK || writtenlog != logBuffSendIndex)
+		uint32_t writeLength = logBufferWriter.flushLength;
+#ifdef DEBUG
+		FSIZE_t writePosition = f_tell(&fil_W);
+		uint32_t writeStartTick = HAL_GetTick();
+#endif
+		fresult = f_write(&fil_W, logBufferWriter.flushBuffer, (UINT)writeLength, &writtenlog);
+#ifdef DEBUG
+		sdBenchRecordWrite(writePosition, (UINT)writeLength, writtenlog, fresult,
+			HAL_GetTick() - writeStartTick);
+#endif
+		if (fresult != FR_OK || writtenlog != (UINT)writeLength)
 		{
-			logWriteFailed = true;
 			uint32_t primask = __get_PRIMASK();
 			__disable_irq();
-			sendSD = false;
-			sendSD_pending = false;
+			(void)logBufferWriterWriteSucceeded(&logBufferWriter,
+				fresult == FR_OK, writeLength, (uint32_t)writtenlog);
 			__set_PRIMASK(primask);
 			sd_fatfs_unlock();
 			return;
@@ -924,17 +1217,7 @@ void writeLogPuts(void)
 		{
 			uint32_t primask = __get_PRIMASK();
 			__disable_irq();
-			if (sendSD_pending)
-			{
-				flushBuf = pendingBuf;
-				logBuffSendIndex = logBuffPendingIndex;
-				sendSD_pending = false;
-				sendSD = true;
-			}
-			else
-			{
-				sendSD = false;
-			}
+			logBufferWriterCompleteWrite(&logBufferWriter);
 			__set_PRIMASK(primask);
 		}
 		sd_fatfs_unlock();
@@ -983,37 +1266,61 @@ bool endLog(void)
 	float goalMarkerX = 0.0F;
 	uint16_t csvRowsWritten = 0U;
 	uint16_t expectedRows = cntSend;
+#ifdef DEBUG
+	csvRowsWrittenLast = 0U;
+#endif
 
-	float cross_start_mm[CROSSSEG_MAX];
-	float cross_end_mm[CROSSSEG_MAX];
 	uint16_t cross_count = 0;
 	float dist_mm = 0.0f;
 	bool in_cross = false;
 
-	while (sendSD || sendSD_pending) // drain pending writes before CSV conversion
+	while (logBufferWriter.flushPending || logBufferWriter.pendingPending) // drain pending writes before CSV conversion
 	{
+#ifdef DEBUG
+		if (sdBenchActive) debugBenchWatchdogRefresh();
+#endif
 		writeLogPuts();
 	}
-	if (logWriteFailed || logOverflow || markerOverflow)
+	if (logBufferWriter.writeFailed || logOverflow || markerOverflow)
 	{
 		f_close(&fil_W);
 		return false;
 	}
 
-	logBuffSendIndex = logBuffIndex;
-	fresult = f_write(&fil_W, activeBuf, logBuffSendIndex, &writtenlog);
-	if (fresult != FR_OK || writtenlog != logBuffSendIndex)
+	uint32_t finalWriteLength = logBufferWriterPrepareFinalWrite(&logBufferWriter);
+	if (finalWriteLength > 0U)
 	{
-		printf("f_write error in endLog: %d (%lu/%lu)\r\n", fresult, (unsigned long)writtenlog, (unsigned long)logBuffSendIndex);
-		f_close(&fil_W);
-		return false;
+#ifdef DEBUG
+		FSIZE_t writePosition = f_tell(&fil_W);
+		uint32_t writeStartTick = HAL_GetTick();
+#endif
+		SD_BENCH_WATCHDOG_REFRESH();
+		fresult = f_write(&fil_W, logBufferWriter.activeBuffer, (UINT)finalWriteLength, &writtenlog);
+		SD_BENCH_WATCHDOG_REFRESH();
+#ifdef DEBUG
+		sdBenchRecordWrite(writePosition, (UINT)finalWriteLength, writtenlog, fresult,
+			HAL_GetTick() - writeStartTick);
+#endif
+		if (fresult != FR_OK || writtenlog != (UINT)finalWriteLength)
+		{
+			(void)logBufferWriterWriteSucceeded(&logBufferWriter,
+				fresult == FR_OK, finalWriteLength, (uint32_t)writtenlog);
+			printf("f_write error in endLog: %d (%lu/%lu)\r\n", fresult,
+				(unsigned long)writtenlog, (unsigned long)finalWriteLength);
+			f_close(&fil_W);
+			return false;
+		}
 	}
+	SD_BENCH_WATCHDOG_REFRESH();
 	if (f_close(&fil_W) != FR_OK)
 	{
 		return false;
 	}
+	SD_BENCH_WATCHDOG_REFRESH();
 
+	SD_BENCH_WATCHDOG_REFRESH();
 	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ);
+	SD_BENCH_WATCHDOG_REFRESH();
 	if (fresult != FR_OK)
 	{
 		printf("f_open error in endLog\r\n");
@@ -1034,7 +1341,12 @@ bool endLog(void)
 	primaryRouteValidation.goalMarkerOnset_p = goalMarkerPulse;
 	for (j = 0; j < cntSend; j++)
 	{
+#ifdef DEBUG
+		if (sdBenchActive && (j & 63U) == 0U) debugBenchWatchdogRefresh();
+#endif
+		SD_BENCH_WATCHDOG_REFRESH();
 		fresult = f_read(&fil, log, sizeof(log), &readByte);
+		SD_BENCH_WATCHDOG_REFRESH();
 		if (fresult != FR_OK || readByte != LOG_SIZE)
 		{
 			printf("f_read error in endLog\r\n");
@@ -1119,7 +1431,7 @@ bool endLog(void)
 		{
 			primaryRouteValidation.reason = 2U;
 		}
-		else if (logOverflow || markerOverflow || logWriteFailed || dbg_overflow != 0U ||
+		else if (logOverflow || markerOverflow || logBufferWriter.writeFailed || dbg_overflow != 0U ||
 			emcStop != 0U || j != cntSend)
 		{
 			primaryRouteValidation.reason = 3U;
@@ -1165,13 +1477,17 @@ bool endLog(void)
 	{
 		primaryRouteValidation.reason = 1U;
 	}
+	SD_BENCH_WATCHDOG_REFRESH();
 	createLog();
+	SD_BENCH_WATCHDOG_REFRESH();
 	if (!create_log_ready)
 	{
 		printf("endLog: createLog failed\r\n");
 		return false;
 	}
+	SD_BENCH_WATCHDOG_REFRESH();
 	fresult = f_open(&fil, "temp", FA_OPEN_EXISTING | FA_READ);
+	SD_BENCH_WATCHDOG_REFRESH();
 	if (fresult != FR_OK)
 	{
 		printf("f_open error in endLog\r\n");
@@ -1186,7 +1502,12 @@ bool endLog(void)
 	// pass2: 抽出した区間の前後100mmを直線ROCに補正してCSV出力
 	for (j = 0; j < cntSend; j++)
 	{
+#ifdef DEBUG
+		if (sdBenchActive && (j & 63U) == 0U) debugBenchWatchdogRefresh();
+#endif
+		SD_BENCH_WATCHDOG_REFRESH();
 		fresult = f_read(&fil, log, sizeof(log), &readByte);
+		SD_BENCH_WATCHDOG_REFRESH();
 		if (fresult != FR_OK || readByte != LOG_SIZE)
 		{
 			printf("f_read error in endLog\r\n");
@@ -1262,7 +1583,10 @@ bool endLog(void)
 			return false;
 		}
 
-		if (f_puts(logStr, &fil_W) < 0)
+		SD_BENCH_WATCHDOG_REFRESH();
+		int putResult = f_puts(logStr, &fil_W);
+		SD_BENCH_WATCHDOG_REFRESH();
+		if (putResult < 0)
 		{
 			printf("f_puts error in endLog\r\n");
 			f_close(&fil_W);
@@ -1270,16 +1594,34 @@ bool endLog(void)
 			return false;
 		}
 		csvRowsWritten++;
+#ifdef DEBUG
+		csvRowsWrittenLast = csvRowsWritten;
+#endif
 	}
 
-	if (f_sync(&fil_W) != FR_OK || f_sync(&fil) != FR_OK)
+	SD_BENCH_WATCHDOG_REFRESH();
+	FRESULT outputSyncResult = f_sync(&fil_W);
+	SD_BENCH_WATCHDOG_REFRESH();
+	if (outputSyncResult != FR_OK)
 	{
 		f_close(&fil_W);
 		f_close(&fil);
 		return false;
 	}
+	SD_BENCH_WATCHDOG_REFRESH();
+	FRESULT inputSyncResult = f_sync(&fil);
+	SD_BENCH_WATCHDOG_REFRESH();
+	if (inputSyncResult != FR_OK)
+	{
+		f_close(&fil_W);
+		f_close(&fil);
+		return false;
+	}
+	SD_BENCH_WATCHDOG_REFRESH();
 	FRESULT closeOutput = f_close(&fil_W);
+	SD_BENCH_WATCHDOG_REFRESH();
 	FRESULT closeInput = f_close(&fil);
+	SD_BENCH_WATCHDOG_REFRESH();
 	if (closeOutput != FR_OK || closeInput != FR_OK)
 	{
 		return false;
@@ -1291,8 +1633,138 @@ bool endLog(void)
 		csvRowsWritten == expectedRows;
 	cntSend = 0;
 	lastRunSaved = true;
+#ifdef DEBUG
+	csvRowsWrittenLast = csvRowsWritten;
+#endif
 	return true;
 }
+
+#ifdef DEBUG
+/////////////////////////////////////////////////////////////////////
+// モジュール名 sdBenchStart
+// 処理概要     Debugベンチ専用の二進ログ一時ファイルを準備する
+// 引数         csvName:出力CSV名, metricsName:f_write計測CSV名, modeName:測定モード名
+// 戻り値       true:準備成功 false:準備失敗
+/////////////////////////////////////////////////////////////////////
+bool sdBenchStart(const char *csvName, const char *metricsName, const char *modeName)
+{
+	if (sdBenchActive || csvName == NULL || metricsName == NULL || modeName == NULL ||
+		strlen(csvName) >= sizeof(sdBenchCsvName) ||
+		strlen(metricsName) >= sizeof(sdBenchMetricsName) ||
+		strlen(modeName) >= sizeof(sdBenchModeName))
+	{
+		return false;
+	}
+	snprintf(sdBenchCsvName, sizeof(sdBenchCsvName), "%s", csvName);
+	snprintf(sdBenchMetricsName, sizeof(sdBenchMetricsName), "%s", metricsName);
+	snprintf(sdBenchModeName, sizeof(sdBenchModeName), "%s", modeName);
+	sdBenchActive = true;
+	sdBenchTempOpen = false;
+	sdBenchPreallocationOk = true;
+	sdBenchWriteFailed = false;
+	sdBenchMetricsOverflow = false;
+	sdBenchStopReason = DEBUG_BENCH_STOP_NONE;
+	sdBenchElapsedMs = 0U;
+	sdBenchWriteCount = 0U;
+	sdBenchWriteAlignmentErrors = 0U;
+	sdBenchMaxWriteWaitMs = 0U;
+	sdBenchLastWritePosition = 0U;
+	sdBenchLastWriteLength = 0U;
+	sdBenchLastWriteWritten = 0U;
+	sdBenchLastWriteResult = 0U;
+	sdBenchExpectedRows = 0U;
+	csvRowsWrittenLast = 0U;
+	memset(&sdBenchRuntimeMetrics, 0, sizeof(sdBenchRuntimeMetrics));
+	memset(sdBenchWriteMetrics, 0, sizeof(sdBenchWriteMetrics));
+	initLog();
+	if (!sdBenchTempOpen || !sdBenchPreallocationOk || logBufferWriter.writeFailed)
+	{
+		if (sdBenchTempOpen) f_close(&fil_W);
+		sdBenchTempOpen = false;
+		sdBenchActive = false;
+		return false;
+	}
+	modeLOG = true;
+	return true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 sdBenchSetRuntimeMetrics
+// 処理概要     割り込みとSDドライバの走行中測定値をCSVメタデータへ渡す
+// 引数         metrics:走行中計測値
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void sdBenchSetRuntimeMetrics(const SdBenchRuntimeMetrics *metrics)
+{
+	if (sdBenchActive && metrics != NULL)
+	{
+		sdBenchRuntimeMetrics = *metrics;
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 sdBenchFinish
+// 処理概要     二進ログをCSV化し、CSV内容と書込み計測を検証・保存する
+// 引数         stopReason:終了理由, elapsedMs:走行時間[ms], result:検証結果格納先
+// 戻り値       true:保存・検証成功 false:保存または検証失敗
+/////////////////////////////////////////////////////////////////////
+bool sdBenchFinish(uint32_t stopReason, uint32_t elapsedMs, SdBenchStorageResult *result)
+{
+	if (!sdBenchActive || result == NULL) return false;
+	memset(result, 0, sizeof(*result));
+	sdBenchStopReason = stopReason;
+	sdBenchElapsedMs = elapsedMs;
+	sdBenchExpectedRows = cntSend;
+	modeLOG = false;
+	SD_BENCH_WATCHDOG_REFRESH();
+	bool logSaved = endLog();
+	SD_BENCH_WATCHDOG_REFRESH();
+	result->expectedRows = sdBenchExpectedRows;
+	result->writeCount = sdBenchWriteCount;
+	result->writeAlignmentErrors = sdBenchWriteAlignmentErrors;
+	result->writeMetricOverflow = sdBenchMetricsOverflow ? 1U : 0U;
+	result->maxWriteWaitMs = sdBenchMaxWriteWaitMs;
+	result->lastWritePosition = sdBenchLastWritePosition;
+	result->lastWriteLength = sdBenchLastWriteLength;
+	result->lastWriteWritten = sdBenchLastWriteWritten;
+	result->lastWriteResult = sdBenchLastWriteResult;
+	result->logOverflowCount = dbg_overflow;
+	result->writeFailed = (sdBenchWriteFailed || logBufferWriter.writeFailed) ? 1U : 0U;
+	SD_BENCH_WATCHDOG_REFRESH();
+	bool csvValid = logSaved && sdBenchValidateCsv(result);
+	SD_BENCH_WATCHDOG_REFRESH();
+	bool metricsSaved = sdBenchWriteMetricsCsv();
+	SD_BENCH_WATCHDOG_REFRESH();
+	result->metricsCsvSaved = metricsSaved ? 1U : 0U;
+	sdBenchActive = false;
+	sdBenchTempOpen = false;
+	return logSaved && csvValid && metricsSaved && result->writeFailed == 0U &&
+		result->writeAlignmentErrors == 0U && result->writeMetricOverflow == 0U;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 sdBenchHasWriteFailure
+// 処理概要     Debugベンチ走行中のSD書き込み失敗状態を取得する
+// 引数         なし
+// 戻り値       true:失敗あり false:失敗なし
+/////////////////////////////////////////////////////////////////////
+bool sdBenchHasWriteFailure(void)
+{
+	return sdBenchWriteFailed || logBufferWriter.writeFailed;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 sdBenchHasMetricsOverflow
+// 処理概要     f_write計測配列の容量超過状態を取得する
+// 引数         なし
+// 戻り値       true:容量超過 false:容量内
+/////////////////////////////////////////////////////////////////////
+bool sdBenchHasMetricsOverflow(void)
+{
+	return sdBenchMetricsOverflow;
+}
+#endif
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getFileNumbers
 // 処理概要     ファイル名から番号を取得し配列に格納する
@@ -1511,8 +1983,7 @@ void createDir(char *dirName)
 /////////////////////////////////////////////////////////////////////
 void send8bit(uint8_t data)
 {
-	// アクティブバッファに値を格納し、書き込み位置を進める
-	activeBuf[logBuffIndex++] = data;
+	(void)logBufferWriterAppendU8(&logBufferWriter, data);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 send16bit
@@ -1522,8 +1993,7 @@ void send8bit(uint8_t data)
 /////////////////////////////////////////////////////////////////////
 void send16bit(uint16_t data)
 {
-	activeBuf[logBuffIndex++] = (data >> 8); // 上位バイトをバッファに格納
-	activeBuf[logBuffIndex++] = data;        // 下位バイトをバッファに格納
+	(void)logBufferWriterAppendU16(&logBufferWriter, data);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 send32bit
@@ -1533,10 +2003,7 @@ void send16bit(uint16_t data)
 /////////////////////////////////////////////////////////////////////
 void send32bit(uint32_t data)
 {
-	activeBuf[logBuffIndex++] = (data >> 24); // 最上位バイトをバッファに格納
-	activeBuf[logBuffIndex++] = (data >> 16); // 上位から2番目のバイトをバッファに格納
-	activeBuf[logBuffIndex++] = (data >> 8);  // 上位から3番目のバイトをバッファに格納
-	activeBuf[logBuffIndex++] = data;         // 最下位バイトをバッファに格納
+	(void)logBufferWriterAppendU32(&logBufferWriter, data);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logSendFloat
