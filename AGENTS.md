@@ -481,11 +481,14 @@ cmake --build --preset Release
 - バッテリー状態はログ内パラメータ `batteryVoltage_V` を参照する。単位は `[V]`。
 - オートスタートログは `autoRunNumber`, `requestedMode`, `primaryLogNumber`, `slipSourceLogNumber` を1行目に記録する。`requestedMode` は要求方式、`optimalTrace` は実際の走行モードであり、DISTANCEとSLIPを区別するときは両方を参照する。
 - `batteryVoltage_mV` は走行中にLPF更新したバッテリー電圧 `[mV]`、`motorVoltageCmdL_mV`, `motorVoltageCmdR_mV` はバッテリー電圧で割る前の左右モーター指令電圧 `[mV]` とする。
-- `motorpwmL`, `motorpwmR` は電圧補償後に実際にタイマへ出力した飽和後DUTYとする。
+- 左右実DUTYの `motorpwmL`, `motorpwmR` は通常・詳細ともにログへ出力しない。
+- 通常・詳細ログに左右個別の `encCurrentL`, `encCurrentR`（符号付き16bit、1 msあたりのパルス数 `[pulse/ms]`）と `encTotalL`, `encTotalR`（符号付き32bit、電源投入からの累積パルス数 `[pulse]`）を出力する。前進を正とし、累積値は走行開始時にリセットしない。走行中の距離は開始付近の値との差で確認する。速度 `[m/s]` は `encCurrentL/R / PULSE_MILLIMETER`、距離 `[mm]` は累積パルス差 `/ PULSE_MILLIMETER` で換算する。左右個別値は診断用であり、距離換算の実測検証は左右平均を対象とする。
+- 通常・詳細ログに `lSensorCari0`～`lSensorCari9` を出力する。`lSensorCari[0]`～`[9]` の校正済み正規化値（0～4095、無次元）で、0は左端、9は右端。ログ取得時点の最新値を保存する。
 - `LOG_SCHEMA_PROFILE_LIGHT=0` のデバッグログでは `markerSensor`（LED差分から得たマーカー状態）、`sgMarkerCount`（スタート・ゴールマーカー累積数）、`encRightMarker_p`（右マーカーからの補正後エンコーダパルス）、`patternTrace`（走行状態）を追加出力する。ログヘッダには終了時の `sgMarkerAtLogEnd` と `encRightMarkerAtLogEnd_p` も出力する。
-- 経路追従ログの `linePointX_mm`, `linePointY_mm` は対応する一次走行ライン点 [mm]、`lineValid` は限定補正可能状態、`pathErrorY_mm` は経路横偏差 [mm]、`pathErrorHeading_cdeg` は方位偏差 [0.01 deg]、`pathState` は追従状態、`pathLegalMargin_mm` は追従誤差予算差引後のライン重なり余裕 [mm] とする。
-- 通常ログは `LOG_SCHEMA_PROFILE_LIGHT=1` を既定とし、ラップタイム、速度追従、角速度、マーカー、スリップフラグ、電圧指令、実DUTY、XY確認に必要な列だけを残す。
-- 加速度、電流、スリップ内部量などの詳細デバッグ列が必要な場合は、ビルド定義で `LOG_SCHEMA_PROFILE_LIGHT=0` にして一時的に出力する。
+- 経路追従専用列 `linePointX_mm`, `linePointY_mm`, `lineValid`, `pathErrorY_mm`, `pathErrorHeading_cdeg`, `pathState`, `pathLegalMargin_mm` は通常・詳細ともにログへ出力しない。一次経路生成・距離検証に必要な `x`, `y`, `encCurrentCorr_p` は維持する。これらの専用列を必須とする過去ログ用解析スクリプトは、新ログには使用できない。
+- 通常ログは `LOG_SCHEMA_PROFILE_LIGHT=1` を既定とし、ラップタイム、速度追従、角速度、マーカー、スリップフラグ、電圧指令、XY確認に必要な列だけを残す。
+- 通常・詳細ログに3軸加速度 `acceleVal_X`, `acceleVal_Y`, `acceleVal_Z` をfloatで出力する。値は `imuVal.accele.x/y/z`、単位は `[g]`（`m/s^2`への換算は `GRAVITY_MPS2` を掛ける）。IMUオフセット校正後の値で重力成分を含み、X・Yには既存の旋回中心補正を適用する。
+- 電流、スリップ内部量などの詳細デバッグ列が必要な場合は、ビルド定義で `LOG_SCHEMA_PROFILE_LIGHT=0` にして一時的に出力する。
 - ログ同士を比較する場合は、`batteryVoltage_V` の差を考慮する。電圧差によるモーター出力、速度追従、加速性能、スリップ傾向の変化を無視しない。
 - ログ形式を安易に変更しない。形式変更が必要な場合は、スキーマまたはドキュメントも合わせて更新する。
 - 詳細な解析手順は `.agents/skills/robotrace-log-analysis/SKILL.md` を使う。
@@ -542,6 +545,9 @@ cmake --build --preset Release
 - 2026-09-26: `auto_run.txt` でオートスタート2～5走目の方式を指定できるようにした。一次ログと直前正常ログを分離し、要求方式と参照ログ番号を走行ログに記録する。
 - 2026-09-26: `codex/imu-distance-kalman` からPATH REPLAY Level 0とSHORTCUT Level 1の経路追従、対応点制限、ライン姿勢補正、直線回廊生成、経路延長ゴールを機能単位で移植した。距離カルマン融合は移植していない。一次ログへPATH経路元検証メタデータを追加し、旧形式・不正ログを拒否する。`pathReplay` を速度設定19項目目、`lineThetaGain_x1e9` をshortcut設定7項目目に追加し、旧形式設定を有効値保持で修復する。PCテストとDebug/Releaseビルドで確認。実機走行前のため追従・速度性能の採否は未確定。
 - 2026-09-30: ログ取得の目標距離間隔を10 mmから5 mmへ変更し、ログヘッダへ `logDistanceTargetMm` を追加した。1 ms更新制約による実際の行間隔の変動を考慮し、距離解析は実距離基準とする。
+- 2026-09-30: 通常・詳細ログから左右PWMと経路追従専用7列を削除した。バイナリレコードは通常32 B、詳細85 Bとし、CSVデータ列は通常18列、詳細37列（末尾空列を除く）とする。
+- 2026-09-30: 左右エンコーダ速度・累積距離4列と校正済みラインセンサー10列を通常・詳細ログへ追加した。バイナリレコードは通常64 B、詳細117 B、CSVデータ列は通常32列、詳細51列（末尾空列を除く）とする。
+- 2026-09-30: 3軸加速度を通常ログにも出力し、詳細ログのX・Y列を共通列へ移動してZ列を追加した。バイナリレコードは通常76 B、詳細121 B、CSVデータ列は通常35列、詳細52列（末尾空列を除く）とする。
 
 ## 15. 機体・回路変更時にコードへ反映する項目
 

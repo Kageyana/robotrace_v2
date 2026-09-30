@@ -23,7 +23,14 @@
 #define LOG_FIELD_LIST_CORE(STORED, DERIVED) \
 	STORED(U16, cntlog, "%d", (uint16_t)cntRun) \
 	STORED(U16, encCurrentN, "%d", (uint16_t)encCurrentN) \
+	STORED(S16, encCurrentL, "%d", encCurrentL) \
+	STORED(S16, encCurrentR, "%d", encCurrentR) \
+	STORED(S32, encTotalL, "%ld", (int32_t)encTotalL) \
+	STORED(S32, encTotalR, "%ld", (int32_t)encTotalR) \
 	STORED(F32, gyroVal_Z, "%f", imuVal.gyro.z) \
+	STORED(F32, acceleVal_X, "%f", imuVal.accele.x) \
+	STORED(F32, acceleVal_Y, "%f", imuVal.accele.y) \
+	STORED(F32, acceleVal_Z, "%f", imuVal.accele.z) \
 	STORED(U8, courseMarker, "%d", courseMarkerLog) \
 	STORED(U32, encTotalOptimal, "%d", (uint32_t)encTotalOptimal) \
 	DERIVED(F32, ROC, "%f", log_roc) \
@@ -33,25 +40,24 @@
 	STORED(U8, slipFlagLat, "%d", (uint8_t)getSlipFlagLat()) \
 	STORED(S16, lineTraceCtrl, "%d", (int16_t)lineTraceOmegaFBCtrl.pwm) \
 	STORED(S16, targetAngularvelo, "%d", (int16_t)log_targetAngularVelocity) \
-	STORED(S16, motorpwmL, "%d", (int16_t)motorpwmL) \
-	STORED(S16, motorpwmR, "%d", (int16_t)motorpwmR) \
 	STORED(U16, batteryVoltage_mV, "%d", (uint16_t)(batteryVoltage_V * 1000.0f)) \
 	STORED(S16, motorVoltageCmdL_mV, "%d", (int16_t)(motorVoltageCmdL_V * 1000.0f)) \
 	STORED(S16, motorVoltageCmdR_mV, "%d", (int16_t)(motorVoltageCmdR_V * 1000.0f)) \
 	STORED(U32, encCurrentCorr_p, "%d", (uint32_t)Control_GetEncCurrentCorr_p()) \
-	STORED(F32, linePointX_mm, "%f", pathLogLinePointX_mm) \
-	STORED(F32, linePointY_mm, "%f", pathLogLinePointY_mm) \
-	STORED(U8, lineValid, "%d", pathLogLineValid) \
-	STORED(F32, pathErrorY_mm, "%f", pathLogErrorY_mm) \
-	STORED(S16, pathErrorHeading_cdeg, "%d", pathLogErrorHeading_cdeg) \
-	STORED(U8, pathState, "%d", pathLogState) \
-	STORED(F32, pathLegalMargin_mm, "%f", pathLogLegalMargin_mm) \
+	STORED(U16, lSensorCari0, "%d", lSensorCari[0]) \
+	STORED(U16, lSensorCari1, "%d", lSensorCari[1]) \
+	STORED(U16, lSensorCari2, "%d", lSensorCari[2]) \
+	STORED(U16, lSensorCari3, "%d", lSensorCari[3]) \
+	STORED(U16, lSensorCari4, "%d", lSensorCari[4]) \
+	STORED(U16, lSensorCari5, "%d", lSensorCari[5]) \
+	STORED(U16, lSensorCari6, "%d", lSensorCari[6]) \
+	STORED(U16, lSensorCari7, "%d", lSensorCari[7]) \
+	STORED(U16, lSensorCari8, "%d", lSensorCari[8]) \
+	STORED(U16, lSensorCari9, "%d", lSensorCari[9]) \
 	DERIVED(F32, x, "%f", log_x) \
 	DERIVED(F32, y, "%f", log_y)
 
 #define LOG_FIELD_LIST_DEBUG(STORED, DERIVED) \
-	STORED(F32, acceleVal_X, "%f", imuVal.accele.x) \
-	STORED(F32, acceleVal_Y, "%f", imuVal.accele.y) \
 	STORED(U8, markerSensor, "%d", (uint8_t)markerSensor) \
 	STORED(U8, sgMarkerCount, "%d", (uint8_t)SGmarker) \
 	STORED(U32, encRightMarker_p, "%d", (uint32_t)encRightMarker) \
@@ -87,12 +93,14 @@
 #define LOG_CTYPE_U16 uint16_t
 #define LOG_CTYPE_S16 int16_t
 #define LOG_CTYPE_U32 uint32_t
+#define LOG_CTYPE_S32 int32_t
 #define LOG_CTYPE_F32 float
 
 #define LOG_FIELD_SIZE_U8  1U
 #define LOG_FIELD_SIZE_U16 2U
 #define LOG_FIELD_SIZE_S16 2U
 #define LOG_FIELD_SIZE_U32 4U
+#define LOG_FIELD_SIZE_S32 4U
 #define LOG_FIELD_SIZE_F32 4U
 
 #define LOG_RECORD_SIZE_ADD(type, name, fmt, expr) + LOG_FIELD_SIZE_##type

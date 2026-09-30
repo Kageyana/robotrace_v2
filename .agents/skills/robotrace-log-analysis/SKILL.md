@@ -46,7 +46,11 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 
 - `cntlog`: time after run start, based on `cntRun`, `[ms]`.
 - `encCurrentN`: average left/right encoder pulse count per 1 ms.
+- `encCurrentL`, `encCurrentR`: signed left/right pulse counts per 1 ms `[pulse/ms]`; divide by `PULSE_MILLIMETER` for `[m/s]`.
+- `encTotalL`, `encTotalR`: signed left/right accumulated pulses since power-on `[pulse]`, not reset for each run. Subtract the initial logged value and divide by `PULSE_MILLIMETER` for relative distance `[mm]`. Individual wheel conversion is diagnostic; the measured scale was verified for the left/right average.
+- `lSensorCari0` through `lSensorCari9`: calibrated, normalized line sensor values, dimensionless `0..4095`; index 0 is the leftmost sensor. These 14 columns are included in both light and debug profiles.
 - `gyroVal_Z`: IMU Z angular velocity, `[deg/s]`.
+- `acceleVal_X`, `acceleVal_Y`, `acceleVal_Z`: IMU acceleration after offset calibration, `[g]`, including gravity; X/Y also include the existing rotation-center correction. Multiply by `GRAVITY_MPS2` for `[m/s^2]`. All three axes are included in both light and debug profiles.
 - `courseMarker`: confirmed marker state while running.
 - `encTotalOptimal`: corrected distance count for secondary runs.
 - `ROC`: curvature radius, `[mm]`.
@@ -56,7 +60,7 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - `slipFlagLat`: lateral slip flag.
 - `lineTraceCtrl`: current log column name; value is `lineTraceOmegaFBCtrl.pwm`.
 - `targetAngularvelo`: log target angular velocity, `[deg/s]`.
-- `motorpwmL`, `motorpwmR`: left/right motor PWM.
+- 2026-09-30以降の通常・詳細ログは `motorpwmL`, `motorpwmR` と経路追従専用7列（`linePointX_mm`, `linePointY_mm`, `lineValid`, `pathErrorY_mm`, `pathErrorHeading_cdeg`, `pathState`, `pathLegalMargin_mm`）を出力しない。以下の経路追従専用列の意味は過去ログ向け。専用列必須の解析スクリプトは新ログに使用しない。
 - `x`, `y`: estimated position from the start marker origin, `[mm]`.
 - `linePointX_mm`, `linePointY_mm`: corresponding first-run line point, `[mm]`.
 - `pathErrorY_mm`: signed lateral path error, `[mm]`.
@@ -69,8 +73,8 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - `BOOST_NONE`: verify distance, angular velocity, markers, curvature radius, and XY plot. Pay special attention to angle drift.
 - `BOOST_MARKER`: verify all markers detected in the first run are detected.
 - `BOOST_DISTANCE`: verify current course position matches the estimated position and first-run distance.
-- `BOOST_PATH_REPLAY`: verify path lateral/heading error, fallback count, and bounded line-position/heading correction against the validated primary route. Goal is the halfway extension from the primary endpoint toward the origin; marker count does not terminate PATH mode.
-- `BOOST_SHORTCUT`: verify the Level 1 straight corridor route, `pathLegalMargin_mm` remains non-negative, and no localization fallback occurs. Goal uses the same extended-route arc length as PATH REPLAY.
+- `BOOST_PATH_REPLAY`: verify XY trajectory and completion against the validated primary route. For legacy logs with path diagnostics, also verify lateral/heading error, fallback count, and line-position/heading correction. Goal is the halfway extension from the primary endpoint toward the origin; marker count does not terminate PATH mode.
+- `BOOST_SHORTCUT`: verify the Level 1 straight corridor trajectory and completion. For legacy logs with path diagnostics, also verify non-negative `pathLegalMargin_mm` and absence of localization fallback. New logs cannot establish these diagnostic conditions directly. Goal uses the same extended-route arc length as PATH REPLAY.
 - Route generation failure, extension failure, or point-capacity overflow must block route start. For automatic runs, invalid primary-source metadata blocks progression to the next run.
 - PATH/SHORTCUT tuning remains unadopted until same-condition real-world runs provide at least 10 logs per level; assess completion rate and stop-position repeatability before lap time.
 - Compare only logs with the same run mode; distance, path replay, and shortcut modes are not equivalent.

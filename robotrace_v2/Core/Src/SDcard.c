@@ -98,6 +98,7 @@ static uint8_t logReadU8(void);
 static uint16_t logReadU16(void);
 static int16_t logReadS16(void);
 static uint32_t logReadU32(void);
+static int32_t logReadS32(void);
 static float logReadF32(void);
 
 static void logReadRecord(LogRecord *rec);
@@ -800,6 +801,7 @@ void writeLogBufferPuts(void)
 #define LOG_SEND_U16(value) send16bit((uint16_t)(value))
 #define LOG_SEND_S16(value) send16bit((uint16_t)(int16_t)(value))
 #define LOG_SEND_U32(value) send32bit((uint32_t)(value))
+#define LOG_SEND_S32(value) send32bit((uint32_t)(int32_t)(value))
 #define LOG_SEND_F32(value) logSendFloat((float)(value))
 #define LOG_SEND_FIELD(type, name, fmt, expr) LOG_SEND_##type(expr);
 #define LOG_SEND_SKIP(type, name, fmt, expr)
@@ -810,6 +812,7 @@ void writeLogBufferPuts(void)
 #undef LOG_SEND_U16
 #undef LOG_SEND_S16
 #undef LOG_SEND_U32
+#undef LOG_SEND_S32
 #undef LOG_SEND_F32
 
 		if (logBufferWriterEndRecord(&logBufferWriter))
@@ -1182,6 +1185,7 @@ bool endLog(void)
 #define LOG_FORMAT_VALUE_U16(value) (value)
 #define LOG_FORMAT_VALUE_S16(value) (value)
 #define LOG_FORMAT_VALUE_U32(value) ((int32_t)(value))
+#define LOG_FORMAT_VALUE_S32(value) ((long)(value))
 #define LOG_FORMAT_VALUE_F32(value) (value)
 #define LOG_CSV_ARG_STORED(type, name, fmt, expr) , LOG_FORMAT_VALUE_##type(rec.name)
 #define LOG_CSV_ARG_DERIVED(type, name, fmt, expr) , LOG_FORMAT_VALUE_##type(expr)
@@ -1193,6 +1197,7 @@ bool endLog(void)
 #undef LOG_FORMAT_VALUE_U16
 #undef LOG_FORMAT_VALUE_S16
 #undef LOG_FORMAT_VALUE_U32
+#undef LOG_FORMAT_VALUE_S32
 #undef LOG_FORMAT_VALUE_F32
 
 		if (csvLength < 0 || (size_t)csvLength >= sizeof(logStr))
@@ -1549,6 +1554,16 @@ static uint32_t logReadU32(void)
 	value |= (uint32_t)*logaddress++ << 8;
 	value |= (uint32_t)*logaddress++;
 	return value;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logReadS32
+// 処理概要     32bitを読み出して符号付きへ変換する
+// 引数         なし
+// 戻り値       読み出した32bitの符号付き値
+/////////////////////////////////////////////////////////////////////
+static int32_t logReadS32(void)
+{
+	return (int32_t)logReadU32();
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logReadF32
