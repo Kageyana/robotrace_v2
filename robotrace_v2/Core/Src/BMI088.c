@@ -4,18 +4,19 @@
 #include "main.h"
 #include "BMI088.h"
 //====================================//
-// グローバル変数の宣
+// グローバル変数の宣言
 //====================================//
 volatile IMUval BMI088val;
 /////////////////////////////////////////////////////////////////////
-// モジュール名 BMI088ReadByteG
-// 処理概要     指定レジスタの値を読み出す(ジャイロセンサ部)
-// 引数         reg: レジスタのアドレス
-// 戻り値       読み出した値
+// モジュール名 BMI088readByte
+// 処理概要     センサー別のSPIダミーを除去し、単一レジスタを読む
+// 引数         sensorType: センサー種別、reg: アドレス、value: 読出し先
+// 戻り値       true: 読出し成功、false: SPIエラー
 ////////////////////////////////////////////////////////////////////
-static uint8_t BMI088readByte(bool sensorType, uint8_t reg)
+static bool BMI088readByte(bool sensorType, uint8_t reg, uint8_t *value)
 {
-	uint8_t txData[2]={reg | 0x80, 0x0}, rxData[2] = {0x0};
+	uint8_t txData[3] = {reg | 0x80, 0x00, 0x00}, rxData[3] = {0};
+	uint16_t size = (sensorType == ACCELE) ? 3U : 2U;
 
 	if(sensorType == ACCELE)
 	{
@@ -24,7 +25,7 @@ static uint8_t BMI088readByte(bool sensorType, uint8_t reg)
 		CSB2_RESET;
 	}
 
-	HAL_SPI_TransmitReceive(&SPI_Handle_IMU, txData, rxData, sizeof(txData), 1000);
+	HAL_StatusTypeDef status = HAL_SPI_TransmitReceive(&SPI_Handle_IMU, txData, rxData, size, 1000);
 
 	if(sensorType == ACCELE)
 	{
@@ -33,15 +34,19 @@ static uint8_t BMI088readByte(bool sensorType, uint8_t reg)
 		CSB2_SET;
 	}
 
-	return rxData[1];
+	if (status == HAL_OK)
+	{
+		*value = rxData[size - 1U];
+	}
+	return status == HAL_OK;
 }
 /////////////////////////////////////////////////////////////////////
-// モジュール名 BMI088WriteByteG
-// 処理概要     指定レジスタに値を書き込む(ジャイロセンサ部)
-// 引数         reg: レジスタのアドレス val: 書き込む値
-// 戻り値       なし
+// モジュール名 BMI088writeByte
+// 処理概要     初期化用レジスタを書き込み、次のアクセスまで待つ
+// 引数         sensorType: センサー種別、reg: アドレス、val: 書込み値
+// 戻り値       true: 書込み成功、false: SPIエラー
 ////////////////////////////////////////////////////////////////////
-static void BMI088writeByte(bool sensorType, uint8_t reg, uint8_t val)
+static bool BMI088writeByte(bool sensorType, uint8_t reg, uint8_t val)
 {
 	uint8_t txData[2] = {reg, val}, rxData[2];
 
@@ -52,7 +57,7 @@ static void BMI088writeByte(bool sensorType, uint8_t reg, uint8_t val)
 		CSB2_RESET;
 	}
 
-	HAL_SPI_TransmitReceive(&SPI_Handle_IMU, txData, rxData, sizeof(txData), 1000);;
+	HAL_StatusTypeDef status = HAL_SPI_TransmitReceive(&SPI_Handle_IMU, txData, rxData, sizeof(txData), 1000);
 
 	if(sensorType == ACCELE)
 	{
@@ -60,6 +65,20 @@ static void BMI088writeByte(bool sensorType, uint8_t reg, uint8_t val)
 	} else {
 		CSB2_SET;
 	}
+	// 初期化専用。Suspend時の450usを含む書込み後の待機を確保する。
+	HAL_Delay(1);
+	return status == HAL_OK;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 BMI088checkRegister
+// 処理概要     読出し専用・予約ビットを除き初期化設定を照合する
+// 引数         sensorType: 種別、reg: アドレス、mask: 比較ビット、expected: 期待値
+// 戻り値       true: 通信成功かつ設定一致、false: 通信失敗または不一致
+/////////////////////////////////////////////////////////////////////
+static bool BMI088checkRegister(bool sensorType, uint8_t reg, uint8_t mask, uint8_t expected)
+{
+	uint8_t value = 0;
+	return BMI088readByte(sensorType, reg, &value) && (value & mask) == expected;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 BMI088ReadAxisDataG
@@ -96,43 +115,51 @@ static bool BMI088readAxisData(bool sensorType, uint8_t reg, uint8_t *rxData, ui
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 initBMI088
-// 処理概要     初期設定パラメータの書き込み
+// 処理概要     センサーID、設定書込み、読戻しを検証して初期化する
 // 引数         なし
-// 戻り値       なし
+// 戻り値       true: 初期化成功、false: 通信失敗または設定不一致
 /////////////////////////////////////////////////////////////////////
 bool initBMI088(void)
 {
-	HAL_Delay(20);
-	BMI088readByte(ACCELE, REG_ACC_CHIP_ID); // 加速度センサSPIモードに切り替え(SPIダミーリード)
-	BMI088writeByte(ACCELE, REG_ACC_PWR_CTRL, 0x04); // 加速度センサノーマルモードに移行
-	HAL_Delay(10);
-	BMI088readByte(ACCELE, REG_ACC_CHIP_ID); // 加速度センサSPIモードに切り替え(SPIダミーリード)
-	BMI088val.Aid = BMI088readByte(ACCELE, REG_ACC_CHIP_ID); // ノーマルモード移行前にチップIDを読む
-	BMI088val.Gid = BMI088readByte(GYRO, REG_GYRO_CHIP_ID);
-	
-	if (BMI088val.Gid == 0x0f && BMI088val.Aid == 0x1e)
-	{
-		// コンフィグ設定
-		// 加速度
-		BMI088writeByte(ACCELE, REG_ACC_PWR_CTRL, 0x04); // 加速度センサノーマルモードに移行
-		BMI088writeByte(ACCELE, REG_ACC_RANGE, 0x01); // レンジを6gに設定
-		BMI088writeByte(ACCELE, REG_ACC_CONF, 0xAc);  // ODRを1600Hzに設定
-		HAL_Delay(10);
-		
-		// ジャイロ
-		BMI088writeByte(GYRO, REG_GYRO_SOFTRESET, 0xB6); // ソフトウェアリセット
-		HAL_Delay(10);
-		BMI088writeByte(GYRO, REG_GYRO_BANDWISTH, 0x02); // ODRを1kHz バンドフィルタ116Hzに設定
-		BMI088writeByte(GYRO, REG_GYRO_RANGE, 0x00);	// レンジを2000dpsに設定
+	uint8_t value = 0;
+	BMI088val.Initialized = 0;
+	BMI088val.Aid = 0;
+	BMI088val.Gid = 0;
+	BMI088val.tempValid = false;
+	HAL_Delay(30); // 電源投入後のジャイロ起動を待つ。
+	// 最初の加速度アクセスはSPIモード切替用。応答値は採用しない。
+	if (!BMI088readByte(ACCELE, REG_ACC_CHIP_ID, &value) ||
+		!BMI088readByte(ACCELE, REG_ACC_CHIP_ID, &value)) return false;
+	BMI088val.Aid = value;
+	if (!BMI088readByte(GYRO, REG_GYRO_CHIP_ID, &value)) return false;
+	BMI088val.Gid = value;
+	if (BMI088val.Aid != 0x1e || BMI088val.Gid != 0x0f) return false;
 
-		BMI088val.Initialized = 1;
+	if (!BMI088writeByte(GYRO, REG_GYRO_SOFTRESET, 0xB6)) return false;
+	HAL_Delay(30); // リセット完了前に設定を書き込まない。
+	if (!BMI088writeByte(GYRO, REG_GYRO_BANDWISTH, 0x02) ||
+		!BMI088writeByte(GYRO, REG_GYRO_RANGE, 0x00)) return false;
 
-		return true;
-	}
-	else
-	{
-		return false;
-	}
+	// Suspend解除とセンサーONの両方を明示する。
+	if (!BMI088writeByte(ACCELE, REG_ACC_PWR_CONF, 0x00) ||
+		!BMI088writeByte(ACCELE, REG_ACC_PWR_CTRL, 0x04) ||
+		!BMI088writeByte(ACCELE, REG_ACC_RANGE, 0x01) ||
+		!BMI088writeByte(ACCELE, REG_ACC_CONF, 0xAC)) return false;
+	HAL_Delay(10); // 加速度の設定反映と最初の有効サンプルを待つ。
+
+	// 帯域レジスタのbit7は読出し専用で常に1のため比較対象から除く。
+	if (!BMI088checkRegister(GYRO, REG_GYRO_CHIP_ID, 0xFF, 0x0F) ||
+		!BMI088checkRegister(GYRO, REG_GYRO_BANDWISTH, 0x7F, 0x02) ||
+		!BMI088checkRegister(GYRO, REG_GYRO_RANGE, 0x07, 0x00) ||
+		!BMI088checkRegister(GYRO, REG_GYRO_LPM1, 0xA0, 0x00) ||
+		!BMI088checkRegister(ACCELE, REG_ACC_CHIP_ID, 0xFF, 0x1E) ||
+		!BMI088checkRegister(ACCELE, REG_ACC_PWR_CONF, 0x03, 0x00) ||
+		!BMI088checkRegister(ACCELE, REG_ACC_PWR_CTRL, 0x04, 0x04) ||
+		!BMI088checkRegister(ACCELE, REG_ACC_RANGE, 0x03, 0x01) ||
+		!BMI088checkRegister(ACCELE, REG_ACC_CONF, 0xFF, 0xAC)) return false;
+
+	BMI088val.Initialized = 1;
+	return true;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 BMI088getGyro
