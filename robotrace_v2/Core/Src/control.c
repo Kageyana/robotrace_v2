@@ -1,4 +1,4 @@
-//====================================//
+﻿//====================================//
 // インクルード
 //====================================//
 #include "control.h"
@@ -567,7 +567,7 @@ void loopSystem(void)
 			if(ret > 0)
 			{
 				// コース解析成功
-				countdown = 3000;							  // 3秒カウントダウンを開始
+				countdown = 7000;							  // 3秒カウントダウンを開始
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56, 28);
 				ssd1306_printf(Font_16x26, "%d", autoStart);	// 追加: 走行回数を表示
@@ -623,7 +623,7 @@ void loopSystem(void)
 				}
 
 				motorCommandOut(0, 0);
-				countdown = 3000;							  // 3秒カウントダウンを開始
+				countdown = 7000;							  // 3秒カウントダウンを開始
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56, 28);
 				ssd1306_printf(Font_16x26, "3");
@@ -729,6 +729,8 @@ void loopSystem(void)
 			// スタート地点基準で状態を初期化
 			// スリップ距離補正（パルス版）
 			encTotalN = 0;
+			encTotalL = 0;
+			encTotalR = 0;
 			encTotalOptimal = 0;
 			encLog = 0;
 			encPID = 0;
@@ -1104,7 +1106,7 @@ void countDown(void)
 	if (countdown > 0)
 	{
 		countdown--;
-		if (countdown == 2000)
+		if (countdown == 5000)
 		{
 			IMU_StartCalibration(); // 100サンプルを20ms間隔で取得する
 			calibrateMotorCurrent = true;
