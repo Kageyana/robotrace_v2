@@ -1,0 +1,15 @@
+{
+  "input_contract": "PASS (raw encoders, gyro, sensor values only)",
+  "health": "PASS (10 logs, exact expected rows, 6 events per anchor, monotonic time and raw-derived distance)",
+  "scalar_vs_vector_max_mm": 4.945377440890297e-12,
+  "known_rigid_transform_mse_mm2": 7.34543567874843e-29,
+  "lever_arm_identity_max_midpoint_discretization_error_mm": 0.0661096345456677,
+  "lever_arm_identity_derived_error_bound_max_mm": 0.24631079752240498,
+  "axle_trapezoid_comparison": {
+    "0": 7.8908735643285075,
+    "-63": 99.06265281009111,
+    "-20.5": 34.327213764541916,
+    "1": 7.674282208479417
+  },
+  "all_25_pairs_are_not_independent_trials": true
+}

@@ -1,0 +1,60 @@
+{
+  "repository_head": "e6a71edbbdfbd73fada44ffd98cbe347520a4d92",
+  "inspection_date_JST": "2026-10-03",
+  "user_confirmed": [
+    "mounting unchanged since logs",
+    "physical right U2 only",
+    "physical left U1/U2 OR",
+    "CCW GPIO left/right swapped"
+  ],
+  "sources": [
+    {
+      "path": "D:\\robotrace\\robotrace_v2\\AGENTS.md",
+      "sha256": "b3a75bb166146b49c407adbabb51c9a4c84ae425e71b34ffc045ff91ca12352b"
+    },
+    {
+      "path": "D:\\robotrace\\robotrace_v2\\Machine\\robotrace_v3.STEP",
+      "sha256": "5d732af5e9ccd6df55d13dc2d8b93cea36fa91f473c9dc34044f9515e89c57af"
+    },
+    {
+      "path": "D:\\robotrace\\robotrace_v2\\Circuit\\robotrace_v2_Sidemarker\\robotrace_v2_Sidemarker.kicad_pcb",
+      "sha256": "dfa38de674f95a9e66c42204b0a614aaa35bbfed5799abc47d4b0615cdbde755"
+    },
+    {
+      "path": "D:\\robotrace\\robotrace_v2\\Circuit\\robotrace_v2_Sidemarker\\robotrace_v2_Sidemarker.kicad_sch",
+      "sha256": "5a0e65e55571c556e9f4a172d8d2066f5736ecfd106192c85ff4725510f9edc1"
+    },
+    {
+      "path": "D:\\robotrace\\robotrace_v2\\Circuit\\robotrace_v2_Linesensor\\robotrace_v2_Linesensor.kicad_pcb",
+      "sha256": "685f7b00b5c6004d6ba94cba6c39a33a617fe3149aaecc7f1f9515c689511f7a"
+    },
+    {
+      "path": "D:\\robotrace\\robotrace_v2\\robotrace_v2\\robotrace_v2.ioc",
+      "sha256": "e3df650870ad892b52b20fa44801b03799d88935babdaf484526515cf1ece2cc"
+    },
+    {
+      "path": "D:\\robotrace\\robotrace_v2\\robotrace_v2\\Core\\Inc\\IMU.h",
+      "sha256": "9f835a7c67a7d91dfd98549e0b9aceef28356b3a914ab7beb76d9327978c0fb6"
+    },
+    {
+      "path": "D:\\robotrace\\robotrace_v2\\robotrace_v2\\Core\\Src\\IMU.c",
+      "sha256": "b30568ef4c6aecf205a2cda0f0a5a620f75762c816ea1b132dcf45ebb4ecca70"
+    },
+    {
+      "path": "D:\\robotrace\\robotrace_v2\\robotrace_v2\\Core\\Src\\markerSensor.c",
+      "sha256": "eb7f03a19fa4786318322d1139a23abd59856c36148972f31cf74ab66103c009"
+    },
+    {
+      "path": "D:\\robotrace\\robotrace_v2\\robotrace_v2\\Core\\Src\\courseAnalysis.c",
+      "sha256": "2adaa6a369dacf910935d7f14e7ecd30eba3ad830de1d17cadd1ec9b786f1039"
+    },
+    {
+      "path": "D:\\robotrace\\robotrace_v2\\robotrace_v2\\Core\\Src\\pathFollower.c",
+      "sha256": "0f3b2928ffec05a015e058f5536e18d1fdf8cf0cf84b68ba4e05972f8504e2d6"
+    },
+    {
+      "path": "D:\\robotrace\\robotrace_v2\\robotrace_v2\\Core\\Inc\\log_schema.h",
+      "sha256": "a8da86f4f962b1ea5553a12c442fe6f77e0b6ef6d4f6ae407d264d9e5817554c"
+    }
+  ]
+}

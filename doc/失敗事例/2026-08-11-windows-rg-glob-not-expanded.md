@@ -50,3 +50,7 @@ PowerShell と Unix シェルでワイルドカード展開の挙動が異なる
 
 - 関連ノート:
 - 参考リンク:
+
+## 2026-10-03 再発と追加確認
+
+yI検証で `rg ... robotrace_v2/Core/Inc/*h` を渡してos error 123が再発した。既存の対策がそのコマンドで適用されなかった。検索を `rg ... robotrace_v2/Core/Inc -g '*.h'` へ変更し、main.hとmarkerSensor.hのGPIO定義を取得できた。今後の検索はファイル列挙後に実在パスを使うか、ディレクトリ＋-gに限定する。存在を推測したlocalization.cも使わず、rg --filesで実装の所在を確認する。対処を検証したのでresolvedを維持する。

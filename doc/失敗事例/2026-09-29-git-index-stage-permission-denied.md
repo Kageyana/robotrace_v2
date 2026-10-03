@@ -50,3 +50,7 @@ fatal: Unable to create 'D:/robotrace/robotrace_v2/.git/index.lock': Permission 
 ## 関連
 
 - `doc/失敗事例/2026-09-26-git-index-permission-recurrence.md`
+
+## 2026-10-03 再発
+
+IMU yI検証結果の登録時も通常権限のgit addがindex.lock作成拒否で失敗した。既存対策を初回に適用できていなかった。require_escalatedで対象結果ファイルのみを登録し成功した。今後はpermission_profileの.gitへのread指定をGit更新前に確認し、readのみなら初回から昇格する。ステージ結果で登録成功を確認済み。statusはresolved。
