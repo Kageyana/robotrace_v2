@@ -35,6 +35,7 @@ int16_t analyzedNumber = 0;	 // 蜑榊屓隗｣譫舌＠縺溘Ο繧ｰ逡ｪ蜿�
 int32_t encTotalOptimal = 0; // 2谺｡襍ｰ陦檎畑縺ｮ霍晞屬螟画焚(霍晞屬陬懈ｭ｣繧偵☆繧・
 int32_t encPID = 0;			 // 霍晞屬蛻ｶ蠕｡逕ｨ縺ｮ霍晞屬螟画焚
 float xydegz = 0;
+static int32_t xyPreviousTotalPulse = 0;
 int32_t straightMeter;
 bool straightState;
 bool straightMarkerPending;
@@ -1284,20 +1285,19 @@ int16_t calcXYcies(int logNumber)
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 calcXYcie
-// 処理概要     エンコーダと角速度からログ用XY座標を積分する
-// 引数         encpulse: 移動パルス, angVelo: 角速度[deg/s], dt: 経過時間[s]
+// 処理概要     累積距離と1ms積算角度からログ用XY座標を積分する
+// 引数         totalPulse: スタート基準の累積距離[pulse], angleDeg: 積算角度[deg]
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void calcXYcie(int16_t encpulse, float angVelo, float dt)
+void calcXYcie(int32_t totalPulse, float angleDeg)
 {
-	static float velocity, degzR;
-
-	xydegz = xydegz + (angVelo * dt);		// 積算角度[deg]
-	degzR = xydegz * (M_PI / 180.0F);		// radへ変換
-	velocity = (float)encpulse / PULSE_MILLIMETER * 1000; // 移動速度[mm/s]
-
-	xycie.x = xycie.x + (velocity * sin(degzR) * dt);
-	xycie.y = xycie.y + (velocity * cos(degzR) * dt);
+	// ログ間の距離差と区間両端の平均姿勢を使い、疎な瞬時角速度の再積分を避ける。
+	float distanceMm = (float)((int64_t)totalPulse - xyPreviousTotalPulse) / PULSE_MILLIMETER;
+	float headingRad = (xydegz + angleDeg) * 0.5F * (M_PI / 180.0F);
+	xycie.x += distanceMm * sinf(headingRad);
+	xycie.y += distanceMm * cosf(headingRad);
+	xyPreviousTotalPulse = totalPulse;
+	xydegz = angleDeg;
 }
 // モジュール名 clearXYcie
 // 処理概要     ログ用XY座標と積算角度を初期化する
@@ -1309,6 +1309,7 @@ void clearXYcie(void)
 	xycie.x = 0;
 	xycie.y = 0;
 	xydegz = 0;
+	xyPreviousTotalPulse = 0;
 }
 /////////////////////////////////////////////////////////////////////
 // ローカル関数 clampMarkerIndex

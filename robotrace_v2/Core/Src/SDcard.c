@@ -1010,7 +1010,7 @@ bool endLog(void)
 		float previousX = xycie.x;
 		if (correctedPulse >= 0 && correctedPulse <= INT16_MAX)
 		{
-			calcXYcie((int16_t)correctedPulse, zg, dt);
+			calcXYcie(totalPulse, rec.imuAngle_Z);
 		}
 		if (!goalMarkerBracketFound && primaryRouteValidation.goalMarkerOnsetValid &&
 			pulseDelta >= 0 && goalMarkerPulse >= previousTotalPulse && goalMarkerPulse <= totalPulse)
@@ -1155,7 +1155,7 @@ bool endLog(void)
 		dt = (float)(time - beforeTime) / 1000.0f;
 		log_roc = calcROC(speed, zg, dt);
 
-		calcXYcie((int16_t)rec.encCurrentCorr_p, zg, dt);
+		calcXYcie((int32_t)rec.encTotalOptimal, rec.imuAngle_Z);
 		log_x = xycie.x;
 		log_y = xycie.y;
 		dist_mm += calcDlMm(speed, dt);
