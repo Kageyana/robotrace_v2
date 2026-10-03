@@ -156,6 +156,11 @@ int main(int argc, char **argv) {
 
 
 def build_and_audit(variant, primary):
+    dirty = run(['git', 'status', '--porcelain', '--', 'robotrace_v2/Core',
+                 'robotrace_v2/CMakeLists.txt', 'robotrace_v2/cmake',
+                 'analysis/script/fpu_float_validation.py'], cwd=ROOT).strip()
+    if dirty:
+        raise RuntimeError('Commit firmware and validation script before archiving: ' + dirty)
     destination = OUT / variant
     destination.mkdir(parents=True, exist_ok=True)
     commit = run(['git', 'rev-parse', 'HEAD'], cwd=ROOT).strip()

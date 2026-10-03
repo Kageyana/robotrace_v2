@@ -26,8 +26,9 @@
 #define IMU_OFFSET_X_M  0.0F			// 機体基準点（前後車軸中心の中点）からBMI088中心までの左右オフセット[m]。右を+X
 #define IMU_OFFSET_Y_M (-0.03168F)		// 機体基準点（前後車軸中心の中点）からBMI088中心までの前後オフセット[m]。前方を+Y
 #define GRAVITY_MPS2 9.80665F			// 重力加速度[m/s^2]
-#define DEG2RAD (M_PI / 180.0F)			// deg→rad
-#define RAD2DEG (180.0F / M_PI)			// rad→deg
+#define IMU_PI_F 3.14159265358979323846F	// 単精度の円周率（角度変換をFPUで計算）
+#define DEG2RAD (IMU_PI_F / 180.0F)		// deg→rad
+#define RAD2DEG (180.0F / IMU_PI_F)		// rad→deg
 #define DPS2RADS(dps) ((dps) * DEG2RAD)	// deg/s → rad/s
 #define IMU_ALPHA_LPF_COEF 0.8F			// 角加速度のLPF係数（大きいほどノイズが減るが遅れる。0.8で約20ms程度の時定数）	
 //====================================//

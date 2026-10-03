@@ -157,8 +157,8 @@ void calcDegrees(void)
 
 #ifdef USE_ACCELE
 	// 加速度からpitch/roll角を推定
-	volatile float pitchAccele = atan2f(imuVal.accele.y, imuVal.accele.z) * 180.0f / M_PI;
-	volatile float rollAccele = atan2f(imuVal.accele.x, sqrtf(imuVal.accele.y * imuVal.accele.y + imuVal.accele.z * imuVal.accele.z)) * 180.0f / M_PI;
+	volatile float pitchAccele = atan2f(imuVal.accele.y, imuVal.accele.z) * RAD2DEG;
+	volatile float rollAccele = atan2f(imuVal.accele.x, sqrtf(imuVal.accele.y * imuVal.accele.y + imuVal.accele.z * imuVal.accele.z)) * RAD2DEG;
 
 	// ドリフト低減のためコンプリメンタリフィルタを適用
 	imuVal.angle.x = COEFF_COMPFILTER * imuVal.angle.x + (1.0f - COEFF_COMPFILTER) * pitchAccele;

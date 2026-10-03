@@ -244,11 +244,11 @@ void motorControlTrace(void)
 	Dev = senR - senL;
 
 	// I成分積算
-	lineTraceCtrl.Int += (float)Dev * 0.001;
-	if (lineTraceCtrl.Int > 10000.0)
-		lineTraceCtrl.Int = 10000.0; // I成分リミット
-	else if (lineTraceCtrl.Int < -10000.0)
-		lineTraceCtrl.Int = -10000.0;
+	lineTraceCtrl.Int += (float)Dev * 0.001f;
+	if (lineTraceCtrl.Int > 10000.0f)
+		lineTraceCtrl.Int = 10000.0f; // I成分リミット
+	else if (lineTraceCtrl.Int < -10000.0f)
+		lineTraceCtrl.Int = -10000.0f;
 	Dif = (Dev - traceBefore) * 1; // dゲイン1/1000倍
 
 	iP = lineTraceCtrl.kp * Dev;			   // 比例
@@ -330,7 +330,7 @@ void motorControlTraceOmegaFB(void)
 	// I成分積算
 	if(lineTraceOmegaFBCtrl.pwm <= 900 && lineTraceOmegaFBCtrl.pwm >= -900)
 	{
-		lineTraceOmegaFBCtrl.Int += (float)Dev * 0.001;
+		lineTraceOmegaFBCtrl.Int += (float)Dev * 0.001f;
 	}
 	if (lineTraceOmegaFBCtrl.Int > 10000.0f)
 		lineTraceOmegaFBCtrl.Int = 10000.0f; // I成分リミット
@@ -389,14 +389,14 @@ void motorControlSpeed(void)
 	// I成分積算 アンチワインドアップ
 	if(veloCtrl.pwm <= 1000 && veloCtrl.pwm >= -1000)
 	{
-		veloCtrl.Int += (float)Dev * 0.001;
+		veloCtrl.Int += (float)Dev * 0.001f;
 	}
-	if (veloCtrl.Int > 10000.0)
-		veloCtrl.Int = 10000.0; // I成分リミット
-	else if (veloCtrl.Int < -10000.0)
-		veloCtrl.Int = -10000.0;
+	if (veloCtrl.Int > 10000.0f)
+		veloCtrl.Int = 10000.0f; // I成分リミット
+	else if (veloCtrl.Int < -10000.0f)
+		veloCtrl.Int = -10000.0f;
 
-	// veloCtrl.Int += (float)Dev * 0.001;	// 時間積分
+	// veloCtrl.Int += (float)Dev * 0.001f;	// 時間積分
 	Dif = Dev - speedEncoderBefore;		// 微分　dゲイン1/1000倍
 
 	iP = veloCtrl.kp * Dev;		// 比例
@@ -550,7 +550,7 @@ void motorControlYaw(void)
 
 	Dev = (targetAngle - imuVal.angle.z) * 20; // 目標値-現在値
 	// I成分積算
-	yawCtrl.Int += Dev * 0.005;
+	yawCtrl.Int += Dev * 0.005f;
 	// 目標値を変更したらI成分リセット
 	// if ( targetAngle != targetAngleBefore ) yawCtrl.Int = 0;
 	Dif = (Dev - angleBefore) * 1; // dゲイン1/1000倍
@@ -584,7 +584,7 @@ void motorControldist(void)
 
 	Dev = (targetDist - encPID) * 1; // 目標値-現在値
 	// I成分積算
-	distCtrl.Int += Dev * 0.001;
+	distCtrl.Int += Dev * 0.001f;
 	// 目標値を変更したらI成分リセット
 	// if ( targetDist != targetDistBefore ) distCtrl.Int = 0;
 	Dif = (Dev - distBefore) * 1; // dゲイン1/1000倍

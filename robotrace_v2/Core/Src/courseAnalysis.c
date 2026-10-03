@@ -1293,7 +1293,7 @@ void calcXYcie(int32_t totalPulse, float angleDeg)
 {
 	// ログ間の距離差と区間両端の平均姿勢を使い、疎な瞬時角速度の再積分を避ける。
 	float distanceMm = (float)((int64_t)totalPulse - xyPreviousTotalPulse) / PULSE_MILLIMETER;
-	float headingRad = (xydegz + angleDeg) * 0.5F * (M_PI / 180.0F);
+	float headingRad = (xydegz + angleDeg) * 0.5F * DEG2RAD;
 	xycie.x += distanceMm * sinf(headingRad);
 	xycie.y += distanceMm * cosf(headingRad);
 	xyPreviousTotalPulse = totalPulse;

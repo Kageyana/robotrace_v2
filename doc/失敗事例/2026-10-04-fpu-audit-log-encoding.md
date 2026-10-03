@@ -1,5 +1,5 @@
 ---
-status: open
+status: resolved
 ---
 
 # FPU比較スクリプトの保存ログ読取文字コード
@@ -14,4 +14,4 @@ status: open
 
 再発防止: 検証スクリプトでテキストの読み書きに文字コードを明示する。変更前/変更後とも最後まで再実行し、manifest.json生成、ELFハッシュ、通常warning一覧、全PC検証の成功を確認する。
 
-確認方法: analysis/script/fpu_float_validation.pyを両版で実行する。対処後の全工程確認待ち。
+確認方法: 対処後、変更前版のDebug/Release、追加診断、PC経路/XY/スキーマテスト、計測集計テスト、一次ログ2本のリプレイが成功し、manifest.jsonとELFハッシュを生成できた。UTF-8読取の修正を確認済み。float化版でも同じ手順を使用する。

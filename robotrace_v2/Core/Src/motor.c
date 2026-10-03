@@ -242,8 +242,8 @@ void getMotorCurrent(void)
 	dvL = (float)((int32_t)motorCurrentADL - (int32_t)motorCurrentADLoffset) / 4095 * adcVref;
 	dvR = (float)((int32_t)motorCurrentADR - (int32_t)motorCurrentADRoffset) / 4095 * adcVref;
 
-	motorCurrentL = 10000.0 * (dvL) / RREF;
-	motorCurrentR = 10000.0 * (dvR) / RREF;
+	motorCurrentL = 10000.0f * (dvL) / RREF;
+	motorCurrentR = 10000.0f * (dvR) / RREF;
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 calibrationMotorCurrent
