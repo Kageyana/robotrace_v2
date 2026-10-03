@@ -42,14 +42,22 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 5. Save generated graphs and tables under `analysis/`.
 6. Report comparison target logs, changed condition, adoption decision, and remaining issues.
 
+## Light and debug profiles
+
+- The default light profile has 41 CSV columns and a 100-byte stored record, including individual encoders, line sensors, acceleration and six IMU diagnostic columns. The trailing empty CSV cell is excluded from this count.
+- Logs 12872–12878 used the temporary minimal 13-column/22-byte profile. Raw-wheel, independent line-CROSS, temperature-series and XYZ-angle analyses cannot use those logs; check required column names before analysis.
+- The debug profile retains 58 columns and 145 bytes, including all diagnostic fields. Metadata validation and firmware secondary-run required fields remain available in both profiles.
+
 ## Column Meanings
 
 - `cntlog`: time after run start, based on `cntRun`, `[ms]`.
 - `encCurrentN`: average left/right encoder pulse count per 1 ms.
 - `encCurrentL`, `encCurrentR`: signed left/right pulse counts per 1 ms `[pulse/ms]`; divide by `PULSE_MILLIMETER` for `[m/s]`.
-- `encTotalL`, `encTotalR`: signed left/right accumulated pulses since power-on `[pulse]`, not reset for each run. Subtract the initial logged value and divide by `PULSE_MILLIMETER` for relative distance `[mm]`. Individual wheel conversion is diagnostic; the measured scale was verified for the left/right average.
-- `lSensorCari0` through `lSensorCari9`: calibrated, normalized line sensor values, dimensionless `0..4095`; index 0 is the leftmost sensor. These 14 columns are included in both light and debug profiles.
+- `encTotalL`, `encTotalR`: signed left/right accumulated pulses `[pulse]`, reset only at the start-marker transition to the timed run. New logs use the start marker as the origin; logs through 12878 accumulated since power-on. The first logged row is after the marker, so it may already be nonzero. Subtract the initial logged value and divide by `PULSE_MILLIMETER` for relative distance from the first row `[mm]`. Individual wheel conversion is diagnostic; the measured scale was verified for the left/right average.
+- `lSensorCari0` through `lSensorCari9`: calibrated, normalized line sensor values, dimensionless `0..4095`; index 0 is the leftmost sensor. These and the four individual encoder columns are included in both light and debug profiles.
 - `gyroVal_Z`: IMU Z angular velocity, `[deg/s]`.
+- `gyroVal_X`, `gyroVal_Y`: offset/direction-corrected X/Y angular velocity, `[deg/s]`. `imuTemp_C`: latest IMU temperature, `[°C]`, acquired every 5 ms; `-999` means invalid.
+- `imuAngle_X`, `imuAngle_Y`, `imuAngle_Z`: existing `imuVal.angle.x/y/z`, `[deg]`, reset to zero at the start marker. X/Y are accelerometer-fused attitude; Z is the unwrapped integral of corrected gyro values at 1 ms, including the existing temperature correction. Use Z for yaw drift analysis instead of reintegrating sparsely logged gyro values. These six diagnostic columns are appended in both light and debug profiles; temporary minimal logs lack them.
 - `acceleVal_X`, `acceleVal_Y`, `acceleVal_Z`: IMU acceleration after offset calibration, `[g]`, including gravity; X/Y also include the existing rotation-center correction. Multiply by `GRAVITY_MPS2` for `[m/s^2]`. All three axes are included in both light and debug profiles.
 - `courseMarker`: confirmed marker state while running.
 - `encTotalOptimal`: corrected distance count for secondary runs.
@@ -61,7 +69,7 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - `lineTraceCtrl`: current log column name; value is `lineTraceOmegaFBCtrl.pwm`.
 - `targetAngularvelo`: log target angular velocity, `[deg/s]`.
 - 2026-09-30以降の通常・詳細ログは `motorpwmL`, `motorpwmR` と経路追従専用7列（`linePointX_mm`, `linePointY_mm`, `lineValid`, `pathErrorY_mm`, `pathErrorHeading_cdeg`, `pathState`, `pathLegalMargin_mm`）を出力しない。以下の経路追従専用列の意味は過去ログ向け。専用列必須の解析スクリプトは新ログに使用しない。
-- `x`, `y`: estimated position from the start marker origin, `[mm]`.
+- `x`, `y`: estimated position from the start marker origin, `[mm]`. After the 12879–12884 recovery, firmware CSV generation uses `encTotalOptimal` differences and midpoint heading from stored 1-ms `imuAngle_Z`; the closure X check uses the same integration. Earlier firmware reintegrated sparse `gyroVal_Z` and held the latest corrected speed across each logging interval. Sparse integration can alias and must be compared with stored yaw before interpreting large course distortions.
 - `linePointX_mm`, `linePointY_mm`: corresponding first-run line point, `[mm]`.
 - `pathErrorY_mm`: signed lateral path error, `[mm]`.
 - `pathErrorHeading_cdeg`: heading error, `[0.01 deg]`.

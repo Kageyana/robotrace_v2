@@ -127,6 +127,7 @@ Codex は主にファームウェア開発に使用します。必要に応じ�
 - 減速比: 2。
 - マーカーセンサー: 2 個。
 - IMU: 1 個。
+- BMI088のSPI2通信はAPB1 45 MHzの8分周、5.625 MHzとする。CubeMXの`.ioc`と生成コードの設定を一致させる。
 - ディスプレイ: 1 個。
 - ボタン: 5 個。
 - microSD カード: 1 個。
@@ -384,6 +385,7 @@ cmake --build --preset Release
 
 - SD カード初期化失敗時は、警告を画面に表示したうえで走行可能とする。
 - IMU 初期化失敗時は走行禁止とする。
+- BMI088初期化はSPI通信成否、両センサーのCHIP_ID、電源・レンジ・ODR/帯域の読戻し一致を確認して成功とする。ジャイロのソフトリセット後は30 ms以上待つ。
 - ラインセンサー異常時は走行禁止とする。
 - 電流センサー初期化失敗時は警告のみとし、走行は可能とする。
 - 拡張 UI 基板が接続されていない場合でも走行可能とする。
@@ -483,12 +485,14 @@ cmake --build --preset Release
 - オートスタートログは `autoRunNumber`, `requestedMode`, `primaryLogNumber`, `slipSourceLogNumber` を1行目に記録する。`requestedMode` は要求方式、`optimalTrace` は実際の走行モードであり、DISTANCEとSLIPを区別するときは両方を参照する。
 - `batteryVoltage_mV` は走行中にLPF更新したバッテリー電圧 `[mV]`、`motorVoltageCmdL_mV`, `motorVoltageCmdR_mV` はバッテリー電圧で割る前の左右モーター指令電圧 `[mV]` とする。
 - 左右実DUTYの `motorpwmL`, `motorpwmR` は通常・詳細ともにログへ出力しない。
-- 通常・詳細ログに左右個別の `encCurrentL`, `encCurrentR`（符号付き16bit、1 msあたりのパルス数 `[pulse/ms]`）と `encTotalL`, `encTotalR`（符号付き32bit、電源投入からの累積パルス数 `[pulse]`）を出力する。前進を正とし、累積値は走行開始時にリセットしない。走行中の距離は開始付近の値との差で確認する。速度 `[m/s]` は `encCurrentL/R / PULSE_MILLIMETER`、距離 `[mm]` は累積パルス差 `/ PULSE_MILLIMETER` で換算する。左右個別値は診断用であり、距離換算の実測検証は左右平均を対象とする。
+- 通常・詳細ログに左右個別の `encCurrentL`, `encCurrentR`（符号付き16bit、1 msあたりのパルス数 `[pulse/ms]`）と `encTotalL`, `encTotalR`（符号付き32bit、スタートマーカー基準の累積パルス数 `[pulse]`）を出力する。前進を正とし、累積値はスタートマーカー通過時だけ0へリセットする。停止時には保持し、ログ先頭はマーカー通過後なので0とは限らない。12878までのログは電源投入からの累積値だった。走行中の距離は開始付近の値との差で確認する。速度 `[m/s]` は `encCurrentL/R / PULSE_MILLIMETER`、距離 `[mm]` は累積パルス差 `/ PULSE_MILLIMETER` で換算する。左右個別値は診断用であり、距離換算の実測検証は左右平均を対象とする。
 - 通常・詳細ログに `lSensorCari0`～`lSensorCari9` を出力する。`lSensorCari[0]`～`[9]` の校正済み正規化値（0～4095、無次元）で、0は左端、9は右端。ログ取得時点の最新値を保存する。
 - `LOG_SCHEMA_PROFILE_LIGHT=0` のデバッグログでは `markerSensor`（LED差分から得たマーカー状態）、`sgMarkerCount`（スタート・ゴールマーカー累積数）、`encRightMarker_p`（右マーカーからの補正後エンコーダパルス）、`patternTrace`（走行状態）を追加出力する。ログヘッダには終了時の `sgMarkerAtLogEnd` と `encRightMarkerAtLogEnd_p` も出力する。
+- ログの `x`, `y` とゴールマーカー閉路Xは、`encTotalOptimal` のレコード間差分と `imuAngle_Z` の区間両端平均角度から計算する。疎な瞬時角速度の再積分は行わない。制御中の自己位置更新は従来どおりとする。
 - 経路追従専用列 `linePointX_mm`, `linePointY_mm`, `lineValid`, `pathErrorY_mm`, `pathErrorHeading_cdeg`, `pathState`, `pathLegalMargin_mm` は通常・詳細ともにログへ出力しない。一次経路生成・距離検証に必要な `x`, `y`, `encCurrentCorr_p` は維持する。これらの専用列を必須とする過去ログ用解析スクリプトは、新ログには使用できない。
 - 通常ログは `LOG_SCHEMA_PROFILE_LIGHT=1` を既定とし、ラップタイム、速度追従、角速度、マーカー、スリップフラグ、電圧指令、XY確認に必要な列だけを残す。
 - 通常・詳細ログに3軸加速度 `acceleVal_X`, `acceleVal_Y`, `acceleVal_Z` をfloatで出力する。値は `imuVal.accele.x/y/z`、単位は `[g]`（`m/s^2`への換算は `GRAVITY_MPS2` を掛ける）。IMUオフセット校正後の値で重力成分を含み、X・Yには既存の旋回中心補正を適用する。
+- 通常・詳細ログの既存列の末尾に `imuTemp_C`（最新IMU温度 `[°C]`、5 ms周期取得、無効時 `-999`）、`gyroVal_X`, `gyroVal_Y`（オフセット・方向係数補正済み角速度 `[deg/s]`）、`imuAngle_X`, `imuAngle_Y`, `imuAngle_Z`（既存 `imuVal.angle.x/y/z` の角度 `[deg]`）をfloatで出力する。X・Yは既存の加速度融合済み姿勢角、Zは温度補正済みジャイロ角速度の1 ms積算角度で360°で折り返さない。スタートマーカー通過時の既存 `clearIMUval()` でXYZとも0へ初期化する。通常41列・100バイト/レコード、詳細58列・145バイト/レコード（CSV末尾空列は列数から除く）。形式変更後最初の実機ログで列数、cntlog、温度更新、角度値を確認する。
 - 電流、スリップ内部量などの詳細デバッグ列が必要な場合は、ビルド定義で `LOG_SCHEMA_PROFILE_LIGHT=0` にして一時的に出力する。
 - ログ同士を比較する場合は、`batteryVoltage_V` の差を考慮する。電圧差によるモーター出力、速度追従、加速性能、スリップ傾向の変化を無視しない。
 - ログ形式を安易に変更しない。形式変更が必要な場合は、スキーマまたはドキュメントも合わせて更新する。

@@ -47,6 +47,8 @@ Debug build found missing fixture setting macros and a stale route fixture type.
 
 ## 今後の予防策
 
+- 2026-10-03にAGENTS.md更新をファームウェアサブディレクトリで実行してFileNotFoundErrorが再発した。更新処理はルートで独立実行して修復した。複数ディレクトリの編集とビルドを同じコマンドへ混ぜず、文書には絶対パスを使う。文書の更新成功を確認してから別コマンドでビルドする。
+
 - generator実行前に `Get-Location` でリポジトリルートを確認する。
 - 生成コマンドは `python robotrace_v2/tools/generate_debug_bench_fixture.py ...` の形でリポジトリルートから実行する。
 - generatorが非0終了した場合はビルドを続けず、生成ヘッダーが更新されていることを確認する。

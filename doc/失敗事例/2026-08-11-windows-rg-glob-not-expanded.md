@@ -54,3 +54,11 @@ PowerShell と Unix シェルでワイルドカード展開の挙動が異なる
 ## 2026-10-03 再発と追加確認
 
 yI検証で `rg ... robotrace_v2/Core/Inc/*h` を渡してos error 123が再発した。既存の対策がそのコマンドで適用されなかった。検索を `rg ... robotrace_v2/Core/Inc -g '*.h'` へ変更し、main.hとmarkerSensor.hのGPIO定義を取得できた。今後の検索はファイル列挙後に実在パスを使うか、ディレクトリ＋-gに限定する。存在を推測したlocalization.cも使わず、rg --filesで実装の所在を確認する。対処を検証したのでresolvedを維持する。
+
+## 2026-10-03 周回ドリフト調査での再発
+
+周回ドリフト調査でもSrc/*.cを検索パスに渡してos error 123が再発し、推測したsystem.cも存在しなかった。ディレクトリと-g '*.c'による検索でcalcXYcieの呼び出しがSDcard.cにあることを確認した。検索コマンドを組み立てる際は実在ファイルかディレクトリだけをパスとして渡す。対処を確認済み、resolved。
+
+## 2026-10-03 IMU・距離・時刻切り分けでの再発
+
+Src/log*をパスに渡した検索でos error 123、推測したtim.cで存在しないエラーが再発した。既存対策が適用されていなかった。ディレクトリ＋-gによる検索でwriteLogBufferPutsがSDcard.c、割り込み優先度がstm32f4xx_hal_msp.c、TIM6呼出しがmain.cにあることを確認。ファイル名を推測する前に`rg --files robotrace_v2/Core/Src`で一覧を取得し、検索呼出しのパス引数にワイルドカードを含めないことを再確認した。対処検証済み。
