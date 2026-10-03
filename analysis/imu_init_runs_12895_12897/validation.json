@@ -1,0 +1,35 @@
+{
+  "normal_runs": [
+    12885,
+    12886,
+    12887,
+    12888,
+    12890,
+    12869,
+    12870,
+    12871,
+    12891,
+    12892,
+    12893,
+    12894,
+    12895,
+    12896,
+    12897
+  ],
+  "new_logs": [
+    12895,
+    12896,
+    12897
+  ],
+  "raw_new_log_time_monotonic": false,
+  "raw_new_logs_valid_path_sources": false,
+  "exact_rows": true,
+  "monotonic_time_after_explicit_U16_unwrap": true,
+  "finite_values": true,
+  "independent_cross_events": 6,
+  "input_hashes_unchanged": true,
+  "run_membership": "12895-12897 newly saved after initialization fix; buildTime 21:59:39",
+  "runtime_SPI_read_errors_available": false,
+  "ISR_execution_time_available": false,
+  "register_readback_available": false
+}

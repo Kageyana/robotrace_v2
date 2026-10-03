@@ -1,0 +1,31 @@
+{
+  "normal_runs": [
+    12885,
+    12886,
+    12887,
+    12888,
+    12890,
+    12869,
+    12870,
+    12871,
+    12891,
+    12892,
+    12893,
+    12894
+  ],
+  "new_logs": [
+    12891,
+    12892,
+    12893,
+    12894
+  ],
+  "exact_rows": true,
+  "monotonic_time": true,
+  "finite_values": true,
+  "independent_cross_events": 6,
+  "input_hashes_unchanged": true,
+  "spi_changed_run_membership": "12891-12894 all, confirmed by user",
+  "runtime_SPI_read_errors_available": false,
+  "ISR_execution_time_available": false,
+  "register_readback_available": false
+}

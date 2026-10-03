@@ -1,0 +1,11 @@
+{
+  "logs": 17,
+  "missing": [
+    12853
+  ],
+  "independent_crosses": "six per log; five complete intervals",
+  "health": "PASS: finite raw values, exact row counts, monotonic time/distance, normal end",
+  "time_gaps": "6 ms at 1 m/s and 11 ms at 0.5 m/s are consistent with distance-based 5 mm logging",
+  "conditions": "12849 targetSpeed=58, 12850-52/54-56 targetSpeed=29; target = pulse/ms /58.019",
+  "no_slip_proof": "No external lateral velocity/ground truth. Shape onset is a repeatability threshold, not absolute error onset."
+}

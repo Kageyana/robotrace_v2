@@ -1,0 +1,9 @@
+﻿direction,method,threshold_mm,onset_pct,max_shape_mm
+CW,yaw_1ms,2,52.7,3.6316280843551123
+CW,yaw_1ms,5,,3.6316280843551123
+CW,sparse_trapezoid,2,46.6,4.361807152994559
+CW,sparse_trapezoid,5,,4.361807152994559
+CCW,yaw_1ms,2,40.6,7.949386338759585
+CCW,yaw_1ms,5,60.199999999999996,7.949386338759585
+CCW,sparse_trapezoid,2,34.1,6.3212346932965575
+CCW,sparse_trapezoid,5,61.4,6.3212346932965575

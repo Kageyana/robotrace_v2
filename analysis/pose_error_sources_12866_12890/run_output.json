@@ -1,0 +1,258 @@
+[
+  {
+    "batch": "12866-12871",
+    "direction": "CW",
+    "intervals": 15,
+    "X_mm": 16.618994743816316,
+    "Y_mm": -5.084803741171163,
+    "imu_turn_error_mean_deg": 0.08643457450661647,
+    "imu_minus_line_turn_error_mean_deg": 0.1523083723464555,
+    "imu_minus_line_turn_error_std_deg": 0.5698912596871237,
+    "effective_track_mean_mm": 112.47095504009475
+  },
+  {
+    "batch": "12866-12871",
+    "direction": "CCW",
+    "intervals": 15,
+    "X_mm": 14.32953797191163,
+    "Y_mm": -1.317685353015031,
+    "imu_turn_error_mean_deg": 0.07594092484703575,
+    "imu_minus_line_turn_error_mean_deg": 0.09966101201265501,
+    "imu_minus_line_turn_error_std_deg": 0.21319346796050448,
+    "effective_track_mean_mm": 112.24263207274974
+  },
+  {
+    "batch": "12885-12890",
+    "direction": "CW",
+    "intervals": 25,
+    "X_mm": 7.789153901547874,
+    "Y_mm": -2.181813367914533,
+    "imu_turn_error_mean_deg": -0.016091960712012677,
+    "imu_minus_line_turn_error_mean_deg": -0.011879388639307127,
+    "imu_minus_line_turn_error_std_deg": 0.37701004692998064,
+    "effective_track_mean_mm": 113.53365931809886
+  }
+]
+Independent CROSS constrained yaw hypotheses:
+[
+  {
+    "log": 12866,
+    "direction": "CW",
+    "parameter": "gyro_bias_dps",
+    "value": -0.07317154450843141,
+    "baseline_X_mm": 10.136439551999365,
+    "corrected_X_mm": 12.4124421351333,
+    "baseline_closure_rms_mm": 15.313674149478512,
+    "corrected_closure_rms_mm": 14.84034841051547
+  },
+  {
+    "log": 12866,
+    "direction": "CW",
+    "parameter": "gyro_gain_pct",
+    "value": -0.1765067543263623,
+    "baseline_X_mm": 10.136439551999365,
+    "corrected_X_mm": 11.743845646836826,
+    "baseline_closure_rms_mm": 15.313674149478512,
+    "corrected_closure_rms_mm": 15.004754057240598
+  },
+  {
+    "log": 12867,
+    "direction": "CW",
+    "parameter": "gyro_bias_dps",
+    "value": 0.04121961189706446,
+    "baseline_X_mm": 21.94635711658225,
+    "corrected_X_mm": 20.83385749454005,
+    "baseline_closure_rms_mm": 22.020843416161156,
+    "corrected_closure_rms_mm": 21.277423120664107
+  },
+  {
+    "log": 12867,
+    "direction": "CW",
+    "parameter": "gyro_gain_pct",
+    "value": 0.0994098468849092,
+    "baseline_X_mm": 21.94635711658225,
+    "corrected_X_mm": 21.205221766677916,
+    "baseline_closure_rms_mm": 22.020843416161156,
+    "corrected_closure_rms_mm": 21.475718831324006
+  },
+  {
+    "log": 12868,
+    "direction": "CW",
+    "parameter": "gyro_bias_dps",
+    "value": -0.020538471400536433,
+    "baseline_X_mm": 17.774187562867336,
+    "corrected_X_mm": 18.352914375163415,
+    "baseline_closure_rms_mm": 18.480634716873645,
+    "corrected_closure_rms_mm": 18.792597396974998
+  },
+  {
+    "log": 12868,
+    "direction": "CW",
+    "parameter": "gyro_gain_pct",
+    "value": -0.04939883560287923,
+    "baseline_X_mm": 17.774187562867336,
+    "corrected_X_mm": 18.167367829359637,
+    "baseline_closure_rms_mm": 18.480634716873645,
+    "corrected_closure_rms_mm": 18.6911555263713
+  },
+  {
+    "log": 12869,
+    "direction": "CCW",
+    "parameter": "gyro_bias_dps",
+    "value": -0.008105423761337154,
+    "baseline_X_mm": 13.896617519012306,
+    "corrected_X_mm": 13.670817164120582,
+    "baseline_closure_rms_mm": 14.540684994265089,
+    "corrected_closure_rms_mm": 14.390601251195314
+  },
+  {
+    "log": 12869,
+    "direction": "CCW",
+    "parameter": "gyro_gain_pct",
+    "value": 0.019753921394209596,
+    "baseline_X_mm": 13.896617519012306,
+    "corrected_X_mm": 13.750341030918957,
+    "baseline_closure_rms_mm": 14.540684994265089,
+    "corrected_closure_rms_mm": 14.432272473694045
+  },
+  {
+    "log": 12870,
+    "direction": "CCW",
+    "parameter": "gyro_bias_dps",
+    "value": -0.022131790867209764,
+    "baseline_X_mm": 15.368568093039903,
+    "corrected_X_mm": 14.732667144431707,
+    "baseline_closure_rms_mm": 15.775262722749716,
+    "corrected_closure_rms_mm": 15.26434010877211
+  },
+  {
+    "log": 12870,
+    "direction": "CCW",
+    "parameter": "gyro_gain_pct",
+    "value": 0.05393908005591237,
+    "baseline_X_mm": 15.368568093039903,
+    "corrected_X_mm": 14.95200810378842,
+    "baseline_closure_rms_mm": 15.775262722749716,
+    "corrected_closure_rms_mm": 15.414730551760233
+  },
+  {
+    "log": 12871,
+    "direction": "CCW",
+    "parameter": "gyro_bias_dps",
+    "value": -0.0038505232655606882,
+    "baseline_X_mm": 13.723428303682681,
+    "corrected_X_mm": 13.613153596420693,
+    "baseline_closure_rms_mm": 14.273960439590432,
+    "corrected_closure_rms_mm": 14.180856318061238
+  },
+  {
+    "log": 12871,
+    "direction": "CCW",
+    "parameter": "gyro_gain_pct",
+    "value": 0.009385825563358569,
+    "baseline_X_mm": 13.723428303682681,
+    "corrected_X_mm": 13.651228449153018,
+    "baseline_closure_rms_mm": 14.273960439590432,
+    "corrected_closure_rms_mm": 14.21100438837894
+  },
+  {
+    "log": 12885,
+    "direction": "CW",
+    "parameter": "gyro_bias_dps",
+    "value": -0.01071847155605266,
+    "baseline_X_mm": 7.82213024934872,
+    "corrected_X_mm": 8.12305298410854,
+    "baseline_closure_rms_mm": 9.552322812245954,
+    "corrected_closure_rms_mm": 9.695870025980994
+  },
+  {
+    "log": 12885,
+    "direction": "CW",
+    "parameter": "gyro_gain_pct",
+    "value": -0.02579830475910519,
+    "baseline_X_mm": 7.82213024934872,
+    "corrected_X_mm": 8.021732988113353,
+    "baseline_closure_rms_mm": 9.552322812245954,
+    "corrected_closure_rms_mm": 9.648019612358617
+  },
+  {
+    "log": 12886,
+    "direction": "CW",
+    "parameter": "gyro_bias_dps",
+    "value": -0.023105578294348512,
+    "baseline_X_mm": 8.778504726122696,
+    "corrected_X_mm": 9.451773115809669,
+    "baseline_closure_rms_mm": 10.2559182480179,
+    "corrected_closure_rms_mm": 10.373506465279275
+  },
+  {
+    "log": 12886,
+    "direction": "CW",
+    "parameter": "gyro_gain_pct",
+    "value": -0.05535102148210736,
+    "baseline_X_mm": 8.778504726122696,
+    "corrected_X_mm": 9.231788474517362,
+    "baseline_closure_rms_mm": 10.2559182480179,
+    "corrected_closure_rms_mm": 10.345049129772386
+  },
+  {
+    "log": 12887,
+    "direction": "CW",
+    "parameter": "gyro_bias_dps",
+    "value": -0.001985766159831826,
+    "baseline_X_mm": 6.509928282210422,
+    "corrected_X_mm": 6.565151000889341,
+    "baseline_closure_rms_mm": 7.421832106227653,
+    "corrected_closure_rms_mm": 7.435666879793495
+  },
+  {
+    "log": 12887,
+    "direction": "CW",
+    "parameter": "gyro_gain_pct",
+    "value": -0.004760602144406074,
+    "baseline_X_mm": 6.509928282210422,
+    "corrected_X_mm": 6.546690437613506,
+    "baseline_closure_rms_mm": 7.421832106227653,
+    "corrected_closure_rms_mm": 7.433348701413662
+  },
+  {
+    "log": 12888,
+    "direction": "CW",
+    "parameter": "gyro_bias_dps",
+    "value": 0.03685004103502136,
+    "baseline_X_mm": 6.322468258407843,
+    "corrected_X_mm": 5.323603319282188,
+    "baseline_closure_rms_mm": 6.827997366244642,
+    "corrected_closure_rms_mm": 6.2881353521003
+  },
+  {
+    "log": 12888,
+    "direction": "CW",
+    "parameter": "gyro_gain_pct",
+    "value": 0.08823832404480889,
+    "baseline_X_mm": 6.322468258407843,
+    "corrected_X_mm": 5.669144481854119,
+    "baseline_closure_rms_mm": 6.827997366244642,
+    "corrected_closure_rms_mm": 6.354064528125182
+  },
+  {
+    "log": 12890,
+    "direction": "CW",
+    "parameter": "gyro_bias_dps",
+    "value": 0.005871504809893857,
+    "baseline_X_mm": 9.512737991649692,
+    "corrected_X_mm": 9.348498392513557,
+    "baseline_closure_rms_mm": 10.189271532539335,
+    "corrected_closure_rms_mm": 10.132662226966826
+  },
+  {
+    "log": 12890,
+    "direction": "CW",
+    "parameter": "gyro_gain_pct",
+    "value": 0.014297627574680997,
+    "baseline_X_mm": 9.512737991649692,
+    "corrected_X_mm": 9.401666192267408,
+    "baseline_closure_rms_mm": 10.189271532539335,
+    "corrected_closure_rms_mm": 10.142872805395326
+  }
+]

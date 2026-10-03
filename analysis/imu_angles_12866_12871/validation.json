@@ -1,0 +1,13 @@
+{
+  "logs": 6,
+  "columns": 41,
+  "trailing_empty_column": true,
+  "expected_rows": "PASS",
+  "normal_end": "PASS",
+  "finite_values": "PASS",
+  "max_csv_row_bytes": 264,
+  "max_gap_ms": 11.0,
+  "imu_temperature": "PASS: no -999, changing values on exact 0.125 C lattice",
+  "yaw": "PASS: unwrapped +/-2160 degrees over six course laps, direction matches user",
+  "note": "Firmware yaw itself contains gyro errors. Endpoint yaw removes sparse gyro integration, not all localization error."
+}

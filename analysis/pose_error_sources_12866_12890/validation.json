@@ -1,0 +1,29 @@
+{
+  "logs": [
+    12866,
+    12867,
+    12868,
+    12869,
+    12870,
+    12871,
+    12885,
+    12886,
+    12887,
+    12888,
+    12890
+  ],
+  "excluded": [
+    {
+      "log": 12889,
+      "reason": "emergency stop",
+      "emcStop": "3.00"
+    }
+  ],
+  "original_csv_unchanged": true,
+  "firmware_changed": false,
+  "ground_truth_xy_available": false,
+  "heading_reference": "line-CROSS 8-channel geometry fit, threshold sensitivity included",
+  "time_shift_definition": "positive = use IMU heading from later logged time",
+  "relative_scale_definition": "value pct: left multiplier 1-value/200; right multiplier 1+value/200",
+  "warning": "closure-only optima are not calibration values; sources may be confounded"
+}

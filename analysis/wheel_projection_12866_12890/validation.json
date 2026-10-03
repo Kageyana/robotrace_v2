@@ -1,0 +1,32 @@
+{
+  "logs": [
+    12866,
+    12867,
+    12868,
+    12869,
+    12870,
+    12871,
+    12885,
+    12886,
+    12887,
+    12888,
+    12890
+  ],
+  "excluded": [
+    {
+      "log": 12889,
+      "reason": "emergency stop",
+      "emcStop": "3.00",
+      "rows": 1991
+    }
+  ],
+  "wheelbase_mm": 25.690465157330237,
+  "forward_reconstruction": "PASS: equals signed encoder mean within 1e-12 mm per interval",
+  "negative_encoder_sign": "PASS",
+  "raw_inputs_unchanged": true,
+  "firmware_changed": false,
+  "measured_chassis_lateral_velocity": false,
+  "extra_cosine_physical_basis": false,
+  "reference": "same physical CROSS inferred from eight line channels and CAD sensor offsets",
+  "integration": "stored 1-ms yaw, midpoint heading, cumulative individual wheel differences"
+}

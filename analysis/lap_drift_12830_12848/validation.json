@@ -1,0 +1,7 @@
+{
+  "health": "PASS: 18 logs, exact rows, monotonic timestamps and distance, <=6 ms gaps, emcStop=0, six CROSS events",
+  "firmware_xy_max_difference_mm": 0.08878258246746534,
+  "rotation_round_trip": "PASS",
+  "intervals_per_method": 90,
+  "warning": "A closed-loop trajectory and external orientation truth are unavailable; shape difference onset is not absolute error onset."
+}

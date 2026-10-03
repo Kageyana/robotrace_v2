@@ -1,0 +1,7 @@
+{
+  "logs": 12,
+  "health": "PASS: normal end, expected row counts, finite values, monotonic time/distance, <=11 ms gaps",
+  "target": "29 pulse/ms in every log",
+  "calibration": "100 valid gyro/accelerometer samples; 20 temperature samples",
+  "external_ground_truth": false
+}

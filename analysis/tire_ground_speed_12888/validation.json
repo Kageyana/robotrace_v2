@@ -1,0 +1,15 @@
+{
+  "input_sha256": "0c709c37b683dc7c102e001611d573d439397a06314604efae0b6ad5fda74bce",
+  "normal_end": true,
+  "six_corners": true,
+  "wheelbase_mm": 25.690465157330237,
+  "nominal_tire_center_track_mm": 109.1,
+  "track_source": "existing STEP analysis documented in analysis/video_12888/report.md",
+  "midpoint_lateral_speed_assumed_zero": true,
+  "ICR_fore_aft_at_midpoint": true,
+  "no_longitudinal_slip_required_for_encoder_inversion": true,
+  "inverse_cosine_guard": 0.05,
+  "firmware_changed": false,
+  "measured_ground_speed": false,
+  "note": "front/rear speed magnitudes equal under assumption; lateral directions opposite. Radius straight clamp not applied within selected corners."
+}

@@ -1,0 +1,6 @@
+﻿direction,threshold_mm,first_sustained_pct,first_sustained_mm,duration_requirement_pct
+CW,2,37.5,1773.2300692697459,2
+CW,5,78.9,3730.876065743545,2
+CCW,2,25.6,1215.2650552006853,2
+CCW,5,50.1,2378.311690060716,2
+CCW,10,69.80000000000001,3313.496127070619,2
