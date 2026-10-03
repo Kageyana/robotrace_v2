@@ -120,7 +120,7 @@ static int16_t calcSpeedFeedForward(float targetSpeed_mm_s, int16_t command_max,
 
 	/* Kv_ff(G) = G*60/(π D Kv) [V/(mm/s)] */
 	kv_ff = SPEED_FEEDFORWARD_GEAR_RATIO * 60.0f /
-		((float)M_PI * SPEED_FEEDFORWARD_WHEEL_DIAMETER_MM * SPEED_FEEDFORWARD_KV_RPM_PER_V);
+		(IMU_PI_F * SPEED_FEEDFORWARD_WHEEL_DIAMETER_MM * SPEED_FEEDFORWARD_KV_RPM_PER_V);
 	/* τ_wheel_per[mNm] = (Crr*m*g*(D/2)/2)*1000 */
 	wheelDiameter_m = SPEED_FEEDFORWARD_WHEEL_DIAMETER_MM * 0.001f;
 	tau_wheel_per_mNm = (crr * SPEED_FEEDFORWARD_MASS_KG * SPEED_FEEDFORWARD_GRAVITY * (wheelDiameter_m / 2.0f) / 2.0f) * 1000.0f;

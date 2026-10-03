@@ -688,8 +688,8 @@ void loopSystem(void)
 
 			// 変数初期化
 			encRightMarker = 0;
-			veloCtrl.Int = 0.0;
-			yawRateCtrl.Int = 0.0;
+			veloCtrl.Int = 0.0f;
+			yawRateCtrl.Int = 0.0f;
 
 			if (modeDSP)
 			{
@@ -746,8 +746,8 @@ void loopSystem(void)
 			optimalIndex = 0;
 			clearIMUval(); // IMU値初期化
 			optimalIndex = 0;
-			yawCtrl.Int = 0.0;
-			distCtrl.Int = 0.0;
+			yawCtrl.Int = 0.0f;
+			distCtrl.Int = 0.0f;
 
 			clearXYcie(); // 座標計算変数初期化
 			if (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT)
@@ -1999,25 +1999,25 @@ void writeTgtspeeds(void)
 			strcat(format, "%04d,");
 		}
 
-		f_printf(&fil, format, (int32_t)(round(tgtParam.search * 100)),
-										(int32_t)(round(tgtParam.stop * 100)),
-										(int32_t)(round(tgtParam.bstStraight * 100)),
-										(int32_t)(round(tgtParam.bst1500 * 100)),
-										(int32_t)(round(tgtParam.bst1300 * 100)),
-										(int32_t)(round(tgtParam.bst1000 * 100)),
-										(int32_t)(round(tgtParam.bst800 * 100)),
-										(int32_t)(round(tgtParam.bst700 * 100)),
-										(int32_t)(round(tgtParam.bst600 * 100)),		
-										(int32_t)(round(tgtParam.bst500 * 100)),
-										(int32_t)(round(tgtParam.bst400 * 100)),
-										(int32_t)(round(tgtParam.bst300 * 100)),
-										(int32_t)(round(tgtParam.bst200 * 100)),
-										(int32_t)(round(tgtParam.bst100 * 100)),
-										(int32_t)(round(tgtParam.acceleF * 100)),
-										(int32_t)(round(tgtParam.acceleD * 100)),
-										(int32_t)(round(tgtParam.shortCut * 100)),
-										(int32_t)(round(tgtParam.decelLeadMm * 100)),
-										(int32_t)(round(tgtParam.pathReplay * 100)));
+		f_printf(&fil, format, (int32_t)(roundf(tgtParam.search * 100)),
+										(int32_t)(roundf(tgtParam.stop * 100)),
+										(int32_t)(roundf(tgtParam.bstStraight * 100)),
+										(int32_t)(roundf(tgtParam.bst1500 * 100)),
+										(int32_t)(roundf(tgtParam.bst1300 * 100)),
+										(int32_t)(roundf(tgtParam.bst1000 * 100)),
+										(int32_t)(roundf(tgtParam.bst800 * 100)),
+										(int32_t)(roundf(tgtParam.bst700 * 100)),
+										(int32_t)(roundf(tgtParam.bst600 * 100)),
+										(int32_t)(roundf(tgtParam.bst500 * 100)),
+										(int32_t)(roundf(tgtParam.bst400 * 100)),
+										(int32_t)(roundf(tgtParam.bst300 * 100)),
+										(int32_t)(roundf(tgtParam.bst200 * 100)),
+										(int32_t)(roundf(tgtParam.bst100 * 100)),
+										(int32_t)(roundf(tgtParam.acceleF * 100)),
+										(int32_t)(roundf(tgtParam.acceleD * 100)),
+										(int32_t)(roundf(tgtParam.shortCut * 100)),
+										(int32_t)(roundf(tgtParam.decelLeadMm * 100)),
+										(int32_t)(roundf(tgtParam.pathReplay * 100)));
 		f_close(&fil);
 	}
 }

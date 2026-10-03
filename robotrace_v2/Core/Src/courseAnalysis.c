@@ -74,7 +74,7 @@ float calcROC(int16_t velo, float angvelo, float dt)
     // 隗貞ｺｦ螟牙喧驥・[rad] = ﾏ閏deg/s] 竊・rad/s ﾃ・dt[s]
     float drad = angvelo * DEG2RAD * dt;
 
-    // 邨ｶ蟇ｾ蛟､繧堤ｬｦ蜿ｷ縺ｧ蜿悶ｋ fabs() 繧医ｊ鬮倬・
+    // 絶対値を条件式で求める。
     float absDrad = (drad < 0.0f) ? -drad : drad;
     float absDl   = (dl   < 0.0f) ? -dl   : dl;
 
@@ -572,7 +572,7 @@ static int16_t readLogDistanceProgress(int logNumber,
 				{
 					continue;	// 騾溷ｺｦ蟾ｮ縺梧･ｵ蟆上↑繧芽｣懈ｭ｣荳崎ｦ・
 				}
-				elapsedTime = fabs(dl / dv);		// 蛹ｺ髢捺凾髢・
+				elapsedTime = fabsf(dl / dv);		// 区間時間[s]
 				acceleration = dv / elapsedTime;	// 螳滓ｸｬ蜉騾溷ｺｦ
 				if (acceleration > MACHINEACCELE)
 				{
@@ -588,7 +588,7 @@ static int16_t readLogDistanceProgress(int logNumber,
 				{
 					continue;	// 騾溷ｺｦ蟾ｮ縺梧･ｵ蟆上↑繧芽｣懈ｭ｣荳崎ｦ・
 				}
-				elapsedTime = fabs(dl / dv);
+				elapsedTime = fabsf(dl / dv);
 				acceleration = dv / elapsedTime;
 				if (acceleration > MACHINEDECREACE)
 				{

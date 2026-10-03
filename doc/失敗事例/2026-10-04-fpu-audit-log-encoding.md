@@ -15,3 +15,5 @@ status: resolved
 再発防止: 検証スクリプトでテキストの読み書きに文字コードを明示する。変更前/変更後とも最後まで再実行し、manifest.json生成、ELFハッシュ、通常warning一覧、全PC検証の成功を確認する。
 
 確認方法: 対処後、変更前版のDebug/Release、追加診断、PC経路/XY/スキーマテスト、計測集計テスト、一次ログ2本のリプレイが成功し、manifest.jsonとELFハッシュを生成できた。UTF-8読取の修正を確認済み。float化版でも同じ手順を使用する。
+
+2026-10-04 再発: 残りのfloat化の一時集計コマンドでcompiler-diagnostics.txtを文字コード指定なしで読み、cp932のUnicodeDecodeErrorが発生した。ファームウェア、ビルド、検証結果への影響はない。encoding='utf-8'を明示して同じ診断を読み直し、残る昇格箇所を確認した。追加対策として一時コマンドにも保存時と同じ文字コード指定を必須とし、永続スクリプトvalidate_fpu_float_completion.pyの全テキスト読書きを明示指定した。再読取と検証スクリプトの成功を確認済み、resolved。

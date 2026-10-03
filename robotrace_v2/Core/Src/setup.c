@@ -112,25 +112,25 @@ typedef struct
 
 // 速度パラメータの一覧テーブル
 static const SpeedParamInfo speedParamTable[] = {
-	{"STRAIGHT", &tgtParam.search, 0.1, 0.0, 10.0, "m/s"},
-	{"STOP", &tgtParam.stop, 0.1, 0.0, 10.0, "m/s"},
-	{"BST STRT", &tgtParam.bstStraight, 0.1, 0.0, 10.0, "m/s"},
-	{"BST 1500", &tgtParam.bst1500, 0.1, 0.0, 10.0, "m/s"},
-	{"BST 1300", &tgtParam.bst1300, 0.1, 0.0, 10.0, "m/s"},
-	{"BST 1000", &tgtParam.bst1000, 0.1, 0.0, 10.0, "m/s"},
-	{"BST 800", &tgtParam.bst800, 0.1, 0.0, 10.0, "m/s"},
-	{"BST 700", &tgtParam.bst700, 0.1, 0.0, 10.0, "m/s"},
-	{"BST 600", &tgtParam.bst600, 0.1, 0.0, 10.0, "m/s"},
-	{"BST 500", &tgtParam.bst500, 0.1, 0.0, 10.0, "m/s"},
-	{"BST 400", &tgtParam.bst400, 0.1, 0.0, 10.0, "m/s"},
-	{"BST 300", &tgtParam.bst300, 0.1, 0.0, 10.0, "m/s"},
-	{"BST 200", &tgtParam.bst200, 0.1, 0.0, 10.0, "m/s"},
-	{"BST 100", &tgtParam.bst100, 0.1, 0.0, 10.0, "m/s"},
-	{"BST acceleF", &tgtParam.acceleF, 0.1, 0.0, 20.0, "m/ss"},
-	{"BST acceleD", &tgtParam.acceleD, 0.1, 0.0, 20.0, "m/ss"},
-	{"BST shortCut", &tgtParam.shortCut, 0.1, 0.0, 10.0, "m/s"},
-	{"BST dLead", &tgtParam.decelLeadMm, 1.0, 0.0, 99.0, "mm"},
-	{"PATH L0", &tgtParam.pathReplay, 0.1, 0.0, 10.0, "m/s"}
+	{"STRAIGHT", &tgtParam.search, 0.1f, 0.0f, 10.0f, "m/s"},
+	{"STOP", &tgtParam.stop, 0.1f, 0.0f, 10.0f, "m/s"},
+	{"BST STRT", &tgtParam.bstStraight, 0.1f, 0.0f, 10.0f, "m/s"},
+	{"BST 1500", &tgtParam.bst1500, 0.1f, 0.0f, 10.0f, "m/s"},
+	{"BST 1300", &tgtParam.bst1300, 0.1f, 0.0f, 10.0f, "m/s"},
+	{"BST 1000", &tgtParam.bst1000, 0.1f, 0.0f, 10.0f, "m/s"},
+	{"BST 800", &tgtParam.bst800, 0.1f, 0.0f, 10.0f, "m/s"},
+	{"BST 700", &tgtParam.bst700, 0.1f, 0.0f, 10.0f, "m/s"},
+	{"BST 600", &tgtParam.bst600, 0.1f, 0.0f, 10.0f, "m/s"},
+	{"BST 500", &tgtParam.bst500, 0.1f, 0.0f, 10.0f, "m/s"},
+	{"BST 400", &tgtParam.bst400, 0.1f, 0.0f, 10.0f, "m/s"},
+	{"BST 300", &tgtParam.bst300, 0.1f, 0.0f, 10.0f, "m/s"},
+	{"BST 200", &tgtParam.bst200, 0.1f, 0.0f, 10.0f, "m/s"},
+	{"BST 100", &tgtParam.bst100, 0.1f, 0.0f, 10.0f, "m/s"},
+	{"BST acceleF", &tgtParam.acceleF, 0.1f, 0.0f, 20.0f, "m/ss"},
+	{"BST acceleD", &tgtParam.acceleD, 0.1f, 0.0f, 20.0f, "m/ss"},
+	{"BST shortCut", &tgtParam.shortCut, 0.1f, 0.0f, 10.0f, "m/s"},
+	{"BST dLead", &tgtParam.decelLeadMm, 1.0f, 0.0f, 99.0f, "mm"},
+	{"PATH L0", &tgtParam.pathReplay, 0.1f, 0.0f, 10.0f, "m/s"}
 }; // 速度パラメータの対応テーブル
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_speed_param
@@ -564,8 +564,8 @@ static void setup_pid_dist(void)
 		ssd1306_printf(Font_7x10, "pwm:");
 
 		// 距離制御テスト用初期値
-		setTargetDist(50.0);		// 目標距離を設定[mm]
-		setTargetSpeed(0.3);		// 目標速度を設定[m/s]
+		setTargetDist(50.0f);		// 目標距離を設定[mm]
+		setTargetSpeed(0.3f);		// 目標速度を設定[m/s]
 	}
 
 	// ゲイン表示
@@ -900,7 +900,7 @@ static void setup_pid_speed(void)
 	{
 		// トレースON時の制御
 		powerLineSensors(1); // ラインセンサを有効化
-		setTargetSpeed(0.0); // 目標速度をリセット
+		setTargetSpeed(0.0f); // 目標速度をリセット
 		motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.kp, 0, 0); // モータを指定PWMで駆動
 	}
 	else
@@ -1076,7 +1076,7 @@ static void setup_pid_angle(void)
 		ssd1306_printf(Font_7x10, "pwm:");
 
 		setTargetDist(50);      // PID調整用の走行距離
-		setTargetSpeed(0.3);    // PID調整用の走行速度
+		setTargetSpeed(0.3f);    // PID調整用の走行速度
 	}
 
 	data_select(&testFlags.trace_test, SW_PUSH);       // PUSHでトレースON/OFF
@@ -1348,8 +1348,8 @@ static void setup_start(void)
 		if (setupTimer.cntSetup1 > 1000)
 		{
 			veloCtrl.Int = 0;                // I成分リセット
-			imuVal.angle.z = 0.0; // 角度リセット
-			yawRateCtrl.Int = 0.0;   // I成分リセット
+			imuVal.angle.z = 0.0f; // 角度リセット
+			yawRateCtrl.Int = 0.0f;   // I成分リセット
 			setTargetSpeed(0);               // 目標速度0[m/s]
 			enc1 = 0;
 			modeCalLinesensors = 1; // キャリブレーション開始
@@ -1361,7 +1361,7 @@ static void setup_start(void)
 	{
 		setTargetAngularVelocity(CALIBRATIONSPEED);
 		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-		if (imuVal.angle.z < -340.0)
+		if (imuVal.angle.z < -340.0f)
 		{
 			pattern.calibration = 5;
 		}
@@ -1609,7 +1609,7 @@ void data_select(uint8_t *data, uint8_t button)
 // 引数         data: 調整対象の変数 add: 変化量 min: 最小値 max: 最大値 dir: 方向 UD/LR type: 型 int16_t/float
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////////////////
-void dataTuning(void *data, double add, double min, double max, uint8_t dir, uint8_t type)
+void dataTuning(void *data, float add, float min, float max, uint8_t dir, uint8_t type)
 {
 	int16_t sign;
 	uint16_t *cntSwitch;
@@ -1857,8 +1857,8 @@ void setupNonDisp(void)
 		if (setupTimer.cntSetup1 > 1000)
 		{
 			veloCtrl.Int = 0;		// I成分リセット
-			imuVal.angle.z = 0.0;	// 角度リセット
-			yawRateCtrl.Int = 0.0;	// I成分リセット
+			imuVal.angle.z = 0.0f;	// 角度リセット
+			yawRateCtrl.Int = 0.0f;	// I成分リセット
 			setTargetSpeed(0);		 // 目標速度0[m/s]
 			enc1 = 0;
 			modeCalLinesensors = 1; // キャリブレーション開始
@@ -1870,7 +1870,7 @@ void setupNonDisp(void)
 		// 左旋回
 		setTargetAngularVelocity(CALIBRATIONSPEED);
 		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-		if (imuVal.angle.z < -35.0)
+		if (imuVal.angle.z < -35.0f)
 		{
 			pattern.calibration = 4;
 		}
@@ -1890,7 +1890,7 @@ void setupNonDisp(void)
 		// 右旋回
 		setTargetAngularVelocity(-CALIBRATIONSPEED);
 		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-		if (imuVal.angle.z > 35.0)
+		if (imuVal.angle.z > 35.0f)
 		{
 			pattern.calibration = 6;
 		}

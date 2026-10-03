@@ -6,6 +6,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+// 整数列の32bit精度を保ち、小数列だけ単精度で保持する。
+typedef union
+{
+	int32_t integer;
+	float real;
+} CourseLogFieldValue;
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 csvFieldEquals
 // 処理概要     CSVヘッダのフィールド名が指定名と一致するか判定する
@@ -171,7 +178,7 @@ static int16_t maxColumn(const CourseLogColumnMap *map, bool slip)
 // 引数         start: 値の開始位置, end: 終端位置, asFloat: 浮動小数点指定, value: 変換結果
 // 戻り値       true: 変換成功 false: 空欄または不正値
 /////////////////////////////////////////////////////////////////////
-static bool parseField(const char *start, const char *end, bool asFloat, double *value)
+static bool parseField(const char *start, const char *end, bool asFloat, CourseLogFieldValue *value)
 {
 	char token[64];
 	while (start < end && (*start == ' ' || *start == '\t')) start++;
@@ -186,13 +193,13 @@ static bool parseField(const char *start, const char *end, bool asFloat, double 
 	{
 		float parsed = strtof(token, &parseEnd);
 		if (parseEnd == token || *parseEnd != '\0' || errno == ERANGE || !isfinite(parsed)) return false;
-		*value = parsed;
+		value->real = parsed;
 	}
 	else
 	{
 		long parsed = strtol(token, &parseEnd, 10);
 		if (parseEnd == token || *parseEnd != '\0' || errno == ERANGE || parsed < INT32_MIN || parsed > INT32_MAX) return false;
-		*value = (double)parsed;
+		value->integer = (int32_t)parsed;
 	}
 	return true;
 }
@@ -203,10 +210,10 @@ static bool parseField(const char *start, const char *end, bool asFloat, double 
 // 引数         line: CSV行, map: 列位置, slip: trueならスリップ解析, values: 値格納先, found: 読取状態
 // 戻り値       true: 必須値をすべて読取 false: 行または値が不正
 /////////////////////////////////////////////////////////////////////
-static bool parseMappedRow(const char *line, const CourseLogColumnMap *map, bool slip, double values[10], bool found[10])
+static bool parseMappedRow(const char *line, const CourseLogColumnMap *map, bool slip, CourseLogFieldValue values[10], bool found[10])
 {
 	if (line == NULL || map == NULL || (slip ? !courseLogHasSlipColumns(map) : !courseLogHasDistanceColumns(map))) return false;
-	memset(values, 0, sizeof(double) * 10U);
+	memset(values, 0, sizeof(CourseLogFieldValue) * 10U);
 	memset(found, 0, sizeof(bool) * 10U);
 	int16_t needed = maxColumn(map, slip);
 	int16_t column = 0;
@@ -268,15 +275,15 @@ static bool parseMappedRow(const char *line, const CourseLogColumnMap *map, bool
 /////////////////////////////////////////////////////////////////////
 bool courseLogParseDistanceRow(const char *line, const CourseLogColumnMap *map, CourseLogDistanceRow *row)
 {
-	double values[10];
+	CourseLogFieldValue values[10];
 	bool found[10];
 	if (row == NULL || !parseMappedRow(line, map, false, values, found)) return false;
-	row->cntlog = (int32_t)values[0];
-	row->encCurrentN = (int32_t)values[1];
-	row->gyroValZ = (float)values[2];
-	row->courseMarker = (int32_t)values[3];
-	row->encTotalOptimal = (int32_t)values[4];
-	row->ROC = (float)values[5];
+	row->cntlog = values[0].integer;
+	row->encCurrentN = values[1].integer;
+	row->gyroValZ = values[2].real;
+	row->courseMarker = values[3].integer;
+	row->encTotalOptimal = values[4].integer;
+	row->ROC = values[5].real;
 	return true;
 }
 
@@ -288,15 +295,15 @@ bool courseLogParseDistanceRow(const char *line, const CourseLogColumnMap *map, 
 /////////////////////////////////////////////////////////////////////
 bool courseLogParseSlipRow(const char *line, const CourseLogColumnMap *map, CourseLogSlipRow *row)
 {
-	double values[10];
+	CourseLogFieldValue values[10];
 	bool found[10];
 	if (row == NULL || !parseMappedRow(line, map, true, values, found)) return false;
-	row->courseMarker = (int32_t)values[3];
-	row->encTotalOptimal = (int32_t)values[4];
-	row->ROC = (float)values[5];
-	row->targetSpeed = (float)values[6];
-	row->optimalIndex = (int32_t)values[7];
-	row->slipFlag = (int32_t)values[8];
-	row->slipFlagLat = (int32_t)values[9];
+	row->courseMarker = values[3].integer;
+	row->encTotalOptimal = values[4].integer;
+	row->ROC = values[5].real;
+	row->targetSpeed = values[6].real;
+	row->optimalIndex = values[7].integer;
+	row->slipFlag = values[8].integer;
+	row->slipFlagLat = values[9].integer;
 	return true;
 }

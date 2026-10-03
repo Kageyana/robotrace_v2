@@ -378,9 +378,9 @@ bool initMicroSD(void)
 			printf("error in getting SD CARD free space...\r\n");
 			return false;
 		}
-		total = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5); // total capacity
+		total = (uint32_t)((uint64_t)(pfs->n_fatent - 2U) * pfs->csize / 2U); // total capacity
 		printf("SD_SIZE: \t%lu\r\n", total);
-		free_space = (uint32_t)(fre_clust * pfs->csize * 0.5); // empty capacity
+		free_space = (uint32_t)((uint64_t)fre_clust * pfs->csize / 2U); // empty capacity
 		printf("SD free space: \t%lu\r\n", free_space);
 
 		// ディレクトリを作成

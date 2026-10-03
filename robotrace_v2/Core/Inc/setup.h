@@ -101,7 +101,7 @@ extern TestFlags testFlags;
 //======================================//
 void setup(void);
 void data_select(uint8_t *data, uint8_t button);
-void dataTuning(void *data, double add, double min, double max, uint8_t dir, uint8_t type);
+void dataTuning(void *data, float add, float min, float max, uint8_t dir, uint8_t type);
 void dataTuningUD(int16_t *data, int16_t add, int16_t min, int16_t max);
 void dataTuningLR(int16_t *data, int16_t add, int16_t min, int16_t max);
 void dataTuningUDF(float *data, float add, float min, float max);

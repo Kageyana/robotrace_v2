@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "lineSensor.h"
+#include "IMU.h"
 #include "fatfs.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -238,24 +239,24 @@ void getAngleSensor(void)
 		nsen2 = (float)sen2 / (sen1 + sen2);
 		if (index >= NUM_SENSORS / 2)
 		{
-			phi = atan((nsen1 - nsen2) / 1); // 偏角φ計算
+			phi = atanf((nsen1 - nsen2) / 1); // 偏角φ計算
 		}
 		else
 		{
-			phi = atan((nsen2 - nsen1) / 1); // 偏角φ計算
+			phi = atanf((nsen2 - nsen1) / 1); // 偏角φ計算
 		}
-		dthita = (phi * THITA_SENSOR * (M_PI / 180.0) / 2) / (M_PI / 4); // 微小角度dθ計算
+		dthita = (phi * THITA_SENSOR * (IMU_PI_F / 180.0f) / 2) / (IMU_PI_F / 4); // 微小角度dθ計算
 
 		// センサ角度と微小角度を足す
 		if (index >= NUM_SENSORS / 2)
 		{
-			angleSensor = ((index - 5.5) * THITA_SENSOR * (M_PI / 180.0)) + dthita;
+			angleSensor = ((index - 5.5f) * THITA_SENSOR * (IMU_PI_F / 180.0f)) + dthita;
 		}
 		else
 		{
-			angleSensor = -(((5.5 - index) * THITA_SENSOR * (M_PI / 180.0)) + dthita);
+			angleSensor = -(((5.5f - index) * THITA_SENSOR * (IMU_PI_F / 180.0f)) + dthita);
 		}
-		angleSensor = angleSensor * (180.0 / M_PI); // 弧度法に変換
+		angleSensor = angleSensor * (180.0f / IMU_PI_F); // 弧度法に変換
 	}
 }
 /////////////////////////////////////////////////////////////////////
