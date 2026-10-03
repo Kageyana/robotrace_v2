@@ -76,12 +76,25 @@
 	STORED(F32, slipEncAyF, "%f", getSlipEncAyF()) \
 	STORED(F32, slipImuAyF, "%f", getSlipImuAyF())
 
+// 既存列の位置を維持し、通常・詳細とも末尾にIMU診断列を追加する。
+// 温度は最新取得値[°C]（5ms周期更新）、無効時は-999。角度[deg]はXYが加速度融合、Zがジャイロ積分。
+#define LOG_FIELD_LIST_IMU(STORED, DERIVED) \
+	STORED(F32, imuTemp_C, "%f", (imuVal.tempValid ? imuVal.temp : BMI088_TEMP_INVALID_C)) \
+	STORED(F32, gyroVal_X, "%f", imuVal.gyro.x) \
+	STORED(F32, gyroVal_Y, "%f", imuVal.gyro.y) \
+	STORED(F32, imuAngle_X, "%f", imuVal.angle.x) \
+	STORED(F32, imuAngle_Y, "%f", imuVal.angle.y) \
+	STORED(F32, imuAngle_Z, "%f", imuVal.angle.z)
+
 #if LOG_SCHEMA_PROFILE_LIGHT
-#define LOG_FIELD_LIST(STORED, DERIVED) LOG_FIELD_LIST_CORE(STORED, DERIVED)
+#define LOG_FIELD_LIST(STORED, DERIVED) \
+	LOG_FIELD_LIST_CORE(STORED, DERIVED) \
+	LOG_FIELD_LIST_IMU(STORED, DERIVED)
 #else
 #define LOG_FIELD_LIST(STORED, DERIVED) \
 	LOG_FIELD_LIST_CORE(STORED, DERIVED) \
-	LOG_FIELD_LIST_DEBUG(STORED, DERIVED)
+	LOG_FIELD_LIST_DEBUG(STORED, DERIVED) \
+	LOG_FIELD_LIST_IMU(STORED, DERIVED)
 #endif
 // 詳細デバッグ列の追加候補:
 // STORED(F32, slipDistScaleF, "%f", Control_GetSlipDistScale())
