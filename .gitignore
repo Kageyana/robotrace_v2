@@ -7,6 +7,9 @@ robotrace_v2/.settings/
 *launch
 robotrace_v2/build/
 
+# ローカル検証用テストは管理対象外とする
+tests/
+
 #cmake
 CMakeLists.txt.user
 CMakeCache.txt
