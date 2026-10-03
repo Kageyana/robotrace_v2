@@ -14,6 +14,17 @@ python analysis/script/fpu_float_validation.py --variant baseline --primary F:/D
 
 比較はDebug同士で行う。通常ビルドの`ROBOTRACE_ISR_TIMING`はOFF、比較スクリプトは専用ビルドディレクトリでONを指定する。`main`の通常ビルド成果物を比較版と取り違えない。
 
+**通常の`build/Debug`を指すFlashタスクでは計測OFF版が書き込まれることがある。** 書き込み前に選択したELFに`isrTimingStats`が存在することを確認し、比較用ELFをパスで直接指定する。リポジトリ直下からfloat化版を書き込む例:
+
+```powershell
+arm-none-eabi-nm.exe analysis/fpu-float-audit/float/Debug/robotrace_v2.elf | Select-String 'isrTimingStats'
+STM32_Programmer_CLI.exe -c port=SWD mode=UR reset=HWrst freq=100 -d analysis/fpu-float-audit/float/Debug/robotrace_v2.elf -v -rst -s
+```
+
+変更前は上記パスの`float`を`baseline`へ替える。書き込みは実機接続時だけ実施する。走行後の回収ではこのリセット付きコマンドを実行しない。
+
+実機とのELF照合でGDBの`compare-sections`だけに依存しない。このST-Link環境では、実FlashとELFのバイナリが一致するのに同コマンドが不一致を報告した。必要な場合はリセットなしでFlashを読み出し、`objcopy -O binary`で生成した比較対象とバイト比較する。変数は一致が確認できたELFで解釈する。GDB内PythonはこのCubeCLT版で使用できないため、コマンド列の生成・集計は外部Python/PowerShellで行う。
+
 ## DWT計測の読み出し
 
 - 対象は`Interrupt1ms()`の既存DWTリセット直後から集計直前まで。入口前の処理、集計自体、呼出し元の処理、割り込みの入退場コストは含まない。計測区間に割り込む他の割り込みの時間は含む。厳密なTIM6全体の最悪実行時間を保証する値ではない。
