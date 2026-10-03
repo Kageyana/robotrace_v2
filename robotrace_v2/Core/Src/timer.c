@@ -21,6 +21,29 @@ int32_t cnt10 = 0;
 int32_t encPulse5ms = 0; // 5ms間のエンコーダパルスを累積
 float bootTime;
 static volatile bool logWriteReq = false;
+#if defined(ROBOTRACE_ISR_TIMING) && ROBOTRACE_ISR_TIMING
+volatile IsrTimingStats isrTimingStats[ISR_TIMING_MODE_COUNT] = {0};
+_Static_assert(BOOST_NONE == 0 && BOOST_MARKER == 1 && BOOST_DISTANCE == 2 &&
+	BOOST_SHORTCUT == 3 && BOOST_PATH_REPLAY == 4, "ISR timing mode order changed");
+/////////////////////////////////////////////////////////////////////
+// モジュール名 recordIsrTiming
+// 処理概要     走行モード別に割り込み処理のサイクル数を整数で集計する
+// 引数         mode: BOOST走行モード, cycles: 計測区間のサイクル数
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void recordIsrTiming(uint32_t mode, uint32_t cycles)
+{
+	if (mode >= ISR_TIMING_MODE_COUNT) return;
+	volatile IsrTimingStats *stats = &isrTimingStats[mode];
+	// サンプル数上限では集計を止め、合計と平均の整合を維持する。
+	if (stats->samples == UINT32_MAX) return;
+	if (stats->samples == 0U || cycles < stats->minCycles) stats->minCycles = cycles;
+	if (cycles > stats->maxCycles) stats->maxCycles = cycles;
+	stats->totalCycles += cycles;
+	stats->samples++;
+	if (cycles >= SystemCoreClock / 1000U) stats->over1ms++;
+}
+#endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 Interrupt1ms
 // 処理概要     タイマー割り込み(1ms)
@@ -44,6 +67,12 @@ void Interrupt1ms(void)
 	// 割り込み時間計測
 	uint32_t freqCount = getCycleCounter();
 	resetCycleCounter();
+#if defined(ROBOTRACE_ISR_TIMING) && ROBOTRACE_ISR_TIMING
+	uint32_t isrTimingStart = getCycleCounter();
+	// 途中でゴール・停止状態へ遷移しても、入口のモードへ最後の周期を記録する。
+	bool isrTimingRunning = (patternTrace >= 12 && patternTrace < 100);
+	uint32_t isrTimingMode = optimalTrace;
+#endif
 	bootTime = getTimeMs(freqCount);
 	updateBatteryVoltage();
 
@@ -245,6 +274,10 @@ void Interrupt1ms(void)
 		cnt10 = 0;
 		break;
 	}
+#if defined(ROBOTRACE_ISR_TIMING) && ROBOTRACE_ISR_TIMING
+	uint32_t isrTimingEnd = getCycleCounter();
+	if (isrTimingRunning) recordIsrTiming(isrTimingMode, isrTimingEnd - isrTimingStart);
+#endif
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 Interrupt500us

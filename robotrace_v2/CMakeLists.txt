@@ -37,6 +37,7 @@ add_executable(${CMAKE_PROJECT_NAME})
 # ログスキーマのプロファイル。1:通常の軽量ログ、0:詳細デバッグ列を含むログ。
 # マーカー誤検出の調査時は -DROBOTRACE_LOG_SCHEMA_PROFILE_LIGHT=0 を指定する。
 set(ROBOTRACE_LOG_SCHEMA_PROFILE_LIGHT "1" CACHE STRING "1=light log schema, 0=debug log schema")
+option(ROBOTRACE_ISR_TIMING "Collect running TIM6 cycle statistics for validation" OFF)
 
 execute_process(
     COMMAND git rev-parse --short HEAD
@@ -112,6 +113,7 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     GIT_COMMIT="${GIT_COMMIT_SHORT}"
     GIT_BRANCH="${GIT_BRANCH_NAME}"
     LOG_SCHEMA_PROFILE_LIGHT=${ROBOTRACE_LOG_SCHEMA_PROFILE_LIGHT}
+    ROBOTRACE_ISR_TIMING=$<BOOL:${ROBOTRACE_ISR_TIMING}>
 )
 
 # Remove wrong libob.a library dependency when using cpp files
