@@ -1047,8 +1047,9 @@ void loopSystem(void)
 		}
 		else
 		{
-			// 手動走行のときは停止
-			if (modeDSP)
+			// 手動走行はCSV変換完了後にタイムを表示し、変換失敗時は失敗画面を保持する。
+			bool converted = finishLogConversions();
+			if (modeDSP && converted)
 			{
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				if (logOverflow || markerOverflow)
@@ -1069,7 +1070,6 @@ void loopSystem(void)
 			}
 		}
 
-		(void)finishLogConversions();
 		patternTrace = 103;
 		break;
 
