@@ -29,13 +29,7 @@ build.ninja
 fp-info-cache
 *lck
 
-# analiysis
-analysis/
-!analysis/
-analysis/*
-!analysis/debug-bench-results-2026-09-29.md
-!analysis/script/
-analysis/script/*
-!analysis/script/*.py
+# analysis
+/analysis/
 # obsidian
 docs/.obsidian/**

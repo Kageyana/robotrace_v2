@@ -27,3 +27,7 @@ task: PATH REPLAYのゲイン変更前後ログ解析
 グラフ生成前に、ワークスペース依存ランタイムでmatplotlibのimport確認を行い、不足時はテキスト集計へ切り替える。
 
 `python`コマンドが見つからない場合はMicrosoft Storeの導入案内に進まず、先にワークスペース依存ランタイムのPython実体を確認する。
+
+## 2026-10-04 解析環境の再確認
+
+13005高音解析でバンドルPythonにはSciPy・Matplotlibがなくimport失敗が再発した。今回は通常Pythonの実体がPython310でありNumPy・Matplotlibのimportが成功、同環境で音声FFTとグラフを生成できた。追加対策: バンドルに描画ライブラリがない場合、既存の通常Pythonも必要importで検証し、使える環境を選ぶ。SciPyが必要な処理はNumPy FFTへ置換できるか確認する。
