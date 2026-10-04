@@ -34,3 +34,8 @@ tags:
 4. Matplotlibキャッシュは書込可能なworkspace内へ明示する。
 
 analyze_yi_step.py、plot_yi_12838_12848.py、validate_yi_12838_12848.pyへ対策を実装し、再実行・描画確認済み。status: resolved。
+
+
+## 2026-10-04 再発: 校正ログ解析のフォントキャッシュ権限
+
+check_line_calibration_12987.pyの描画は成功したが、既定のユーザー.matplotlibキャッシュ書込でPermission denied警告が発生。既存対策MPLCONFIGDIRを新スクリプトへ適用していなかった。matplotlibのimport前に解析出力内のmplconfigを指定し、再実行で警告なし・図2枚の生成と表示を確認した。今後の新しい描画スクリプトにもimport前の出力先指定を適用する。この再発の対処は検証済み。

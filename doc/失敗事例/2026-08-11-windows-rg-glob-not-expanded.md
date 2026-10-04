@@ -12,6 +12,12 @@ tags:
 
 # PowerShellでUnix風globを前提にしたrg確認が失敗した
 
+## 2026-10-04 自動開始前校正調査での再発
+
+同日の復帰再調査でCore/Inc/BMI088*を検索パスへ渡してos error 123が再発した。再発防止策が適用されていなかった。Core/Incをパスとし-g 'BMI088*.h'へ切り替えてジャイロ定義の検索成功を確認した。今後、検索パスは実在ディレクトリまたは実在ファイルのみとし、パターンは必ず-gへ渡す。
+
+`Src/{setup,control,lineSensor,interrupt}.c` のBash形式の波括弧展開をPowerShellへ渡してParserErrorとなった。また、推測したinterrupt.cは存在しなかった。Srcディレクトリを検索してInterrupt1msの実装がtimer.cにあることを確認した。既存対策の適用漏れであり、今後はrgの検索パスを実在ディレクトリ＋-gへ限定し、対象ファイル名を推測しない。ディレクトリ検索で対処確認済み、resolvedを維持する。
+
 ## 要約
 
 Skill frontmatter を確認するために `rg -n "^name:|^description:" .agents/skills/*/SKILL.md` のような Unix シェル前提の glob 指定を使い、Windows PowerShell では期待通り展開されず確認コマンドが失敗した。後続で検索対象をディレクトリにする方法へ切り替えて確認した。
