@@ -3,6 +3,7 @@
 //====================================//
 // インクルード
 //====================================//
+#include "runMemory.h"
 #include "main.h"
 #include "encoder.h"
 #include "stdlib.h"
@@ -10,7 +11,6 @@
 //====================================//
 // シンボル定義
 //====================================//
-#define OPT_BUFF_SIZE 1000
 #define CALCDISTANCE 50				// 距離解析ステップ[mm]
 #define MACHINEACCELE 3.4F			// 加速度[m/s^2]
 #define MACHINEDECREACE 3.0F		// 減速度[m/s^2]
@@ -66,18 +66,6 @@
 
 typedef struct
 {
-	int16_t ROC;
-	float boostSpeed;
-} AnalysisData;
-
-typedef struct
-{
-	int32_t distance;
-	int32_t indexPPAD;
-} EventPos;
-
-typedef struct
-{
 	float x;
 	float y;
 	float w;
@@ -102,8 +90,8 @@ extern bool straightMarkerPending;
 extern uint8_t straightMarkerPendingLog;
 
 // 解析関係
-extern AnalysisData PPAD[OPT_BUFF_SIZE];
-extern EventPos markerPos[OPT_BUFF_SIZE];
+#define PPAD (runMemory.distance.ppad)
+#define markerPos (runMemory.distance.markers)
 extern Courseplot xycie;
 //====================================//
 // プロトタイプ宣言

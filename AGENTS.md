@@ -179,6 +179,8 @@ Codex は主にファームウェア開発に使用します。必要に応じ�
 
 使用中のリンカスクリプトは `robotrace_v2/STM32F446XX_FLASH.ld`。CSV一括変換の下位処理と割り込みの余裕のため、`_Min_Stack_Size=0x2000`（8 KiB）を予約し、`_sbrk()`のヒープ上限にも使用する。RAM・スタックの変更時は全ビルド構成を確認し、実機の最大使用量は別途検証する。
 
+DISTANCEの速度計画・マーカー配列とSLIP解析作業配列は同時使用するため、`runMemory.h`の`distance`側へまとめる。PATH/SHORTCUTのライン経路・走行経路・弧長・フラグは`path`側とし、両側を静的unionで共有する。切替は停止中・ログ非記録中・FatFsロック下で行い、旧計画を無効化してから書き換える。各走行のログ用メタデータは共有領域外に保持する。ログ読込行は6144 Bを共用する。
+
 主な開発環境は VS Code、STM32CubeIDE for Visual Studio Code 拡張機能、STM32CubeCLT、STM32CubeMX です。`.vscode/` には CMake、Flash、ST-Link デバッグ用の設定があります。
 
 想定ツールは CMake 3.22 以上、Ninja、ARM GCC、STM32CubeCLT、`STM32_Programmer_CLI` です。

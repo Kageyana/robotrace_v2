@@ -31,7 +31,7 @@
 #define PATH_LINE_ALPHA_MAX_X1000             100U
 #define PATH_LINE_THETA_GAIN_MAX_X1E9         1000U
 
-#define PATH_CSV_LINE_SIZE                    6144U
+#define PATH_CSV_LINE_SIZE                    RUN_ANALYSIS_LINE_SIZE
 #define PATH_CORRIDOR_MIN_SPAN_POINTS         15U   // 600mm
 #define PATH_CORRIDOR_MAX_SPAN_POINTS         40U   // 1600mm
 #define PATH_CORRIDOR_TRANSITION_POINTS       3U    // 120mm
@@ -108,11 +108,11 @@ typedef struct
 	float residual_mm;
 } PathLineMatch;
 
-static RoutePoint lineRoute[PATH_ROUTE_MAX_POINTS];
-static RoutePoint driveRoute[PATH_ROUTE_MAX_POINTS];
-static uint16_t driveRouteArcMm[PATH_ROUTE_MAX_POINTS];
-static uint8_t routeFlags[PATH_ROUTE_MAX_POINTS];
-static char routeCsvLine[PATH_CSV_LINE_SIZE];
+#define lineRoute (runMemory.path.line)
+#define driveRoute (runMemory.path.drive)
+#define driveRouteArcMm (runMemory.path.arcMm)
+#define routeFlags (runMemory.path.flags)
+#define routeCsvLine runAnalysisLine
 static uint16_t routeCount = 0U;
 static int16_t routeSourceLog = 0;
 static uint8_t routeShortcutRequestedLevel = 0U;
@@ -915,6 +915,11 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	float lastPulse = 0.0f;
 	bool lockAcquired = sd_fatfs_lock(500U);
 	if (!lockAcquired) return -9;
+	if (!runMemoryPrepare(RUN_MEMORY_PATH))
+	{
+		sd_fatfs_unlock();
+		return -9;
+	}
 
 	snprintf(fileName, sizeof(fileName), "%d.csv", logNumber);
 	result = logSourceOpen(&file, fileName, FA_OPEN_EXISTING | FA_READ);
@@ -1051,11 +1056,6 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	if (!shortcutOk)
 	{
 		pathBuildSpeedProfile(driveRoute, routeCount, 0U);
-		optimalTrace = BOOST_PATH_REPLAY;
-	}
-	else
-	{
-		optimalTrace = BOOST_SHORTCUT;
 	}
 	if (!pathExtendDriveRouteTowardOrigin(routeShortcutLevel)) return -15;
 	pathBuildDriveRouteArcLength();
@@ -1063,6 +1063,7 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	routeShortcutRequestedLevel = requestedShortcutLevel;
 	routeGenerationSettings = generationSettings;
 	routeGeometryCrc32 = pathComputeRouteGeometryCrc32();
+	optimalTrace = shortcutOk ? BOOST_SHORTCUT : BOOST_PATH_REPLAY;
 	indexSC = (int16_t)routeCount;
 	optimalIndex = 0U;
 	saveLogNumber((int16_t)logNumber);
@@ -1162,6 +1163,22 @@ static bool pathFindLineMatch(float sensorX_mm, float sensorY_mm, uint16_t neare
 }
 
 /////////////////////////////////////////////////////////////////////
+// モジュール名 pathFollowerInvalidateRoute
+// 処理概要     共有RAM切替前に経路と追従状態を無効化する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void pathFollowerInvalidateRoute(void)
+{
+	routeCount = 0U;
+	routeSourceLog = 0;
+	pathGoalValid = false;
+	followerState = PATH_STATE_INACTIVE;
+	targetSpeedMps = 0.0f;
+	pathLogState = PATH_STATE_INACTIVE;
+}
+
+/////////////////////////////////////////////////////////////////////
 // モジュール名 pathFollowerReset
 // 処理概要     スタートマーカー基準で経路追従状態を初期化する
 // 引数         なし
@@ -1169,6 +1186,11 @@ static bool pathFindLineMatch(float sensorX_mm, float sensorY_mm, uint16_t neare
 /////////////////////////////////////////////////////////////////////
 void pathFollowerReset(void)
 {
+	if (runMemoryOwner != RUN_MEMORY_PATH)
+	{
+		pathFollowerInvalidateRoute();
+		return;
+	}
 	memset(&pathPose, 0, sizeof(pathPose));
 	routeIndex = 0U;
 	lostCount = 0U;

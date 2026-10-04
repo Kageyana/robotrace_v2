@@ -57,8 +57,6 @@ static bool parseSecondLogHeader(const char *line, SecondLogColumnMap *map)
 	return courseLogParseHeaderLine(line, map) && courseLogHasSlipColumns(map);
 }
 
-AnalysisData PPAD[OPT_BUFF_SIZE];
-EventPos markerPos[OPT_BUFF_SIZE];
 Courseplot xycie;							   // XY座標値（走行中に計算し、ログ保存に使用する）
 
 /////////////////////////////////////////////////////////////////////
@@ -351,6 +349,11 @@ static int16_t readLogDistanceProgress(int logNumber,
 	{
 		return -9;
 	}
+	if (!runMemoryPrepare(RUN_MEMORY_DISTANCE))
+	{
+		sd_fatfs_unlock();
+		return -9;
+	}
 	// 解析中はログ書き込みを抑制する
 	sd_set_analysis_active(true); // SD/FatFs使用中
 	snprintf(fileName, sizeof(fileName), "%d", logNumber); // ログ番号をファイル名に変換する
@@ -372,13 +375,13 @@ static int16_t readLogDistanceProgress(int logNumber,
 	{
 		fileOpened = true; // 正常に開けたファイルだけを後で閉じる
 		// ログデータを取得する
-	static TCHAR log[4096];
-		const int log_len = (int)(sizeof(log) / sizeof(log[0]));
+		TCHAR *log = runAnalysisLine;
+		const int log_len = CA_SECOND_LOG_LINE_BUFSIZE;
 		int32_t marker, distance, roc;
 		int32_t numD = 0, numM = 0, cntCurR = 0, numStraight = 0;
 		int32_t previousDistance = 0, analysisBaseDistance = 0;
 		bool havePreviousDistance = false;
-		static int16_t ROCbuff[600] = {0};
+		int16_t ROCbuff[(CALCDISTANCE / LOG_DISTANCE_MM) + 2U];
 		int16_t sortROC[(CALCDISTANCE / LOG_DISTANCE_MM) + 2U];
 		int32_t straightMeter = 0;
 		bool straightState = false;
@@ -740,13 +743,14 @@ static void logReadSlipIoError(int logNumber, UINT lineNo, FIL *fil, const char 
 int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
 	void (*progress)(const char *stage, uint32_t lineNo))
 {
+	if ((patternTrace > 10U && patternTrace < 100U) || modeLOG) return -9;
 	if (baseLogNumber <= 0 || slipLogNumber <= 0)
 	{
 		return -4;
 	}
 	// 直前DISTANCE走行の計画が同じ一次ログを元にしていれば再利用する。
 	// 計画が無い場合だけ一次ログを読み直す。
-	if (optimalTrace == BOOST_DISTANCE && analyzedNumber == baseLogNumber &&
+	if (runMemoryOwner == RUN_MEMORY_DISTANCE && optimalTrace == BOOST_DISTANCE && analyzedNumber == baseLogNumber &&
 		numPPADarry > 0 && numPPADarry <= OPT_BUFF_SIZE)
 	{
 		if (progress) progress("Base cached", (uint32_t)numPPADarry);
@@ -783,15 +787,15 @@ int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
 	sd_set_analysis_active(true);
 
 	// 解析用配列を静的領域に確保し、スタック使用量を抑える
-	static uint16_t sampleCnt[OPT_BUFF_SIZE];
-	static float v2Max[OPT_BUFF_SIZE];
-	static float rocAbsSum[OPT_BUFF_SIZE];
-	static uint16_t rocCnt[OPT_BUFF_SIZE];
-	static uint16_t slipLongCnt[OPT_BUFF_SIZE];
-	static uint16_t slipLatCnt[OPT_BUFF_SIZE];
-	static float risk[OPT_BUFF_SIZE];
-	static float riskExpanded[OPT_BUFF_SIZE];
-	static float v3[OPT_BUFF_SIZE];
+	uint16_t *sampleCnt = runMemory.distance.slip.sampleCnt;
+	float *v2Max = runMemory.distance.slip.v2Max;
+	float *rocAbsSum = runMemory.distance.slip.rocAbsSum;
+	uint16_t *rocCnt = runMemory.distance.slip.rocCnt;
+	uint16_t *slipLongCnt = runMemory.distance.slip.slipLongCnt;
+	uint16_t *slipLatCnt = runMemory.distance.slip.slipLatCnt;
+	float *risk = runMemory.distance.slip.risk;
+	float *riskExpanded = runMemory.distance.slip.riskExpanded;
+	float *v3 = runMemory.distance.slip.v3;
 
 	snprintf(fileName, sizeof(fileName), "%d", slipLogNumber);			   // ログ番号を文字列へ変換する
 	strcat(fileName, ".csv");										   // CSV拡張子を追加する
@@ -815,22 +819,22 @@ int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
 	}
 	fileOpened = true;
 
-	memset(sampleCnt, 0, sizeof(sampleCnt));
-	memset(v2Max, 0, sizeof(v2Max));
-	memset(rocAbsSum, 0, sizeof(rocAbsSum));
-	memset(rocCnt, 0, sizeof(rocCnt));
-	memset(slipLongCnt, 0, sizeof(slipLongCnt));
-	memset(slipLatCnt, 0, sizeof(slipLatCnt));
-	memset(risk, 0, sizeof(risk));
-	memset(riskExpanded, 0, sizeof(riskExpanded));
-	memset(v3, 0, sizeof(v3));
+	memset(sampleCnt, 0, sizeof(runMemory.distance.slip.sampleCnt));
+	memset(v2Max, 0, sizeof(runMemory.distance.slip.v2Max));
+	memset(rocAbsSum, 0, sizeof(runMemory.distance.slip.rocAbsSum));
+	memset(rocCnt, 0, sizeof(runMemory.distance.slip.rocCnt));
+	memset(slipLongCnt, 0, sizeof(runMemory.distance.slip.slipLongCnt));
+	memset(slipLatCnt, 0, sizeof(runMemory.distance.slip.slipLatCnt));
+	memset(risk, 0, sizeof(runMemory.distance.slip.risk));
+	memset(riskExpanded, 0, sizeof(runMemory.distance.slip.riskExpanded));
+	memset(v3, 0, sizeof(runMemory.distance.slip.v3));
 	for (int16_t i = 0; i < baseCount && i < OPT_BUFF_SIZE; i++)
 	{
 		v2Max[i] = PPAD[i].boostSpeed;
 	}
 
-	static TCHAR log[CA_SECOND_LOG_LINE_BUFSIZE];
-	const int log_len = (int)(sizeof(log) / sizeof(log[0]));
+	TCHAR *log = runAnalysisLine;
+	const int log_len = CA_SECOND_LOG_LINE_BUFSIZE;
 	int16_t maxOptimalIndex = -1;
 	SecondLogColumnMap secondLogColumns;
 
@@ -1213,14 +1217,20 @@ int16_t readLogTest(int logNumber)
 		return -9; // SD/FatFs使用中
 	}
 
+	if (!runMemoryPrepare(RUN_MEMORY_DISTANCE))
+	{
+		sd_fatfs_unlock();
+		return -9;
+	}
+
 	snprintf(fileName, sizeof(fileName), "%d", logNumber);			   // ログ番号を文字列へ変換する
 	strcat(fileName, ".csv");										   // CSV拡張子を追加する
 	fresult = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // バイナリ優先、欠落時のみCSVを読む
 
 	if (fresult == FR_OK)
 	{
-		static TCHAR log[4096];
-		const int log_len = (int)(sizeof(log) / sizeof(log[0]));
+		TCHAR *log = runAnalysisLine;
+		const int log_len = CA_SECOND_LOG_LINE_BUFSIZE;
 		int32_t time, marker, velo, distance;
 		float angVelo;
 		int32_t startEnc = 0, numD = 0, numM = 0, beforeMarker = 0;

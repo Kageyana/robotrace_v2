@@ -1,28 +1,18 @@
 #ifndef PATH_FOLLOWER_H_
 #define PATH_FOLLOWER_H_
 
+#include "runMemory.h"
 #include "main.h"
 #include <stdbool.h>
 #include <stdint.h>
 
 // 60mコースと終端から原点方向への延長点を40mm間隔で保持する。
 #define PATH_ROUTE_SPACING_MM              40.0f
-#define PATH_ROUTE_MAX_POINTS              1514U
 #define PATH_ROUTE_CONTROLLER_VERSION      17U
 #define PATH_SOURCE_FORMAT_VERSION          1U
 
 // 実測した機体投影寸法と合法余裕を確認済みのため、形状変更を許可する。
 #define PATH_SHORTCUT_GEOMETRY_ENABLE      1
-
-typedef struct
-{
-	int16_t x_mm;
-	int16_t y_mm;
-	int16_t heading_cdeg;
-	uint16_t speed_cms;
-} RoutePoint;
-
-_Static_assert(sizeof(RoutePoint) == 8U, "RoutePoint must remain 8 bytes");
 
 typedef struct
 {
@@ -89,6 +79,7 @@ uint8_t pathRunRouteShortcutCorridorCount(void);
 float pathRunRouteShortcutReductionMm(void);
 uint16_t pathRunRouteCount(void);
 uint32_t pathRunRouteGeometryCrc32(void);
+void pathFollowerInvalidateRoute(void);
 void pathFollowerReset(void);
 void pathFollowerUpdatePose1ms(int32_t encoderPulse, float gyroDegPerSec);
 void pathFollowerUpdateTarget5ms(void);
