@@ -2,6 +2,8 @@
 status: resolved
 ---
 
+2026-10-04 再発（Coreコメント調査）: ファイル読取にはUTF-8を指定したが、Python標準出力が既定CP932のままで、BOM文字の表示時にUnicodeEncodeErrorが発生し、一覧出力が途中で停止した。標準出力の文字コードも別途指定する必要がある。PowerShellで `$env:PYTHONIOENCODING='utf-8'` を設定して再実行し、Core以下67ファイルのUTF-8読取と調査完了を確認した。今後の日本語ソース調査では、読取のencoding指定に加え、Python起動前にPYTHONIOENCODINGを設定し、終了コード0と対象ファイル総数を確認する。ソース変更はなし。resolved。
+
 # FPU比較スクリプトの保存ログ読取文字コード
 
 対象: 計測付き変更前/float化版のビルドと成果物保存。

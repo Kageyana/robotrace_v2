@@ -1,5 +1,5 @@
 //====================================//
-// 繧､繝ｳ繧ｯ繝ｫ繝ｼ繝・
+// インクルード
 //====================================//
 #include "courseAnalysis.h"
 #include "courseLogCsv.h"
@@ -21,7 +21,7 @@ static bool sd_remount_for_analysis(void)
 	return (sd_remount() == FR_OK);
 }
 //====================================//
-// 繧ｰ繝ｭ繝ｼ繝舌Ν螟画焚縺ｮ螳｣
+// グローバル変数の宣言
 //====================================//
 uint8_t optimalTrace = 0;
 uint16_t optimalIndex;
@@ -30,10 +30,10 @@ int16_t numPPAMarry; // path palanning analysis marker (PPAM1)
 int16_t indexSC;
 int16_t pathedMarker = 0;
 float boostSpeed;
-int32_t DistanceOptimal = 0; // 2谺｡襍ｰ陦檎畑襍ｰ陦瑚ｷ晞屬螟画焚
-int16_t analyzedNumber = 0;	 // 蜑榊屓隗｣譫舌＠縺溘Ο繧ｰ逡ｪ蜿ｷ
-int32_t encTotalOptimal = 0; // 2谺｡襍ｰ陦檎畑縺ｮ霍晞屬螟画焚(霍晞屬陬懈ｭ｣繧偵☆繧・
-int32_t encPID = 0;			 // 霍晞屬蛻ｶ蠕｡逕ｨ縺ｮ霍晞屬螟画焚
+int32_t DistanceOptimal = 0; // 2次走行用の目標走行距離[pulse]
+int16_t analyzedNumber = 0;	 // 前回解析したログ番号
+int32_t encTotalOptimal = 0; // 2次走行用の補正済み走行距離[pulse]
+int32_t encPID = 0;			 // 距離制御用の距離[pulse]
 float xydegz = 0;
 static int32_t xyPreviousTotalPulse = 0;
 int32_t straightMeter;
@@ -41,9 +41,9 @@ bool straightState;
 bool straightMarkerPending;
 uint8_t straightMarkerPendingLog;
 
-static uint8_t missedCorrections = 0;	// 騾｣邯夊｣懈ｭ｣螟ｱ謨怜屓謨ｰ
-static bool failSafeActive = false;	// 繝輔ぉ繧､繝ｫ繧ｻ繝ｼ繝募虚菴應ｸｭ繝輔Λ繧ｰ
-static int16_t lastCorrectedMarker = 0;	// 逶ｴ霑代〒陬懈ｭ｣縺励◆繝槭・繧ｫ繝ｼ繧､繝ｳ繝・ャ繧ｯ繧ｹ
+static uint8_t missedCorrections = 0;	// 連続補正失敗回数
+static bool failSafeActive = false;	// フェイルセーフ動作中フラグ
+static int16_t lastCorrectedMarker = 0;	// 直前に補正したマーカーインデックス
 
 static void logReadSlipIoError(int logNumber, UINT lineNo, FIL *fil, const char *tag);
 static float calcDecelLeadMmByRoc(int16_t rocPrev, int16_t rocNow);
@@ -59,32 +59,32 @@ static bool parseSecondLogHeader(const char *line, SecondLogColumnMap *map)
 
 AnalysisData PPAD[OPT_BUFF_SIZE];
 EventPos markerPos[OPT_BUFF_SIZE];
-Courseplot xycie;							   // xy蠎ｧ讓吝､(襍ｰ陦御ｸｭ險育ｮ励√Ο繧ｰ菫晏ｭ倡畑)
+Courseplot xycie;							   // XY座標値（走行中に計算し、ログ保存に使用する）
 
 /////////////////////////////////////////////////////////////////////
-// 繝｢繧ｸ繝･繝ｼ繝ｫ蜷・calcROC
-// 蜃ｦ逅・ｦりｦ・    譖ｲ邇・濠蠕・・險育ｮ・
-// 蠑墓焚         velo: 繧ｨ繝ｳ繧ｳ繝ｼ繝繧ｫ繧ｦ繝ｳ繝・angvelo: 隗帝溷ｺｦ[rad/s]
-// 謌ｻ繧雁､       譖ｲ邇・濠蠕Ъmm]
+// モジュール名 calcROC
+// 処理概要     速度と角速度から曲率半径を計算する
+// 引数         velo: エンコーダ速度[pulse/ms], angvelo: 角速度[deg/s], dt: 積分時間[s]
+// 戻り値       曲率半径[mm]
 /////////////////////////////////////////////////////////////////////
 float calcROC(int16_t velo, float angvelo, float dt)
 {
-	// 遘ｻ蜍戊ｷ晞屬 [pulse] 竊・[mm]
+	// エンコーダ速度と積分時間から移動距離[mm]を計算する
     float dl = calcDlMm(velo, dt);  // [mm]
-    // 隗貞ｺｦ螟牙喧驥・[rad] = ﾏ閏deg/s] 竊・rad/s ﾃ・dt[s]
+    // 角速度[deg/s]をrad/sへ変換し、dt[s]を掛けて角度変化量[rad]を求める
     float drad = angvelo * DEG2RAD * dt;
 
     // 絶対値を条件式で求める。
     float absDrad = (drad < 0.0f) ? -drad : drad;
     float absDl   = (dl   < 0.0f) ? -dl   : dl;
 
-    // 逶ｴ邱壼愛螳夲ｼ嘶dl/drad| > ROC_STRAIGHT_TH 竍・ROC_STRAIGHT_TH * |drad| < |dl|
-    // 竊・髯､邂励○縺壹↓豈碑ｼ・〒縺阪ｋ
+    // 直線判定: |dl/drad| > ROC_STRAIGHT_TH を乗算による比較に置き換える
+    // 除算せずに曲率半径の閾値と比較する
     if (absDrad < 1e-6f || ROC_STRAIGHT_TH * absDrad < absDl) {
-        return ROC_STRAIGHT_MAX; // 逶ｴ邱壹→縺ｿ縺ｪ縺・
+        return ROC_STRAIGHT_MAX; // 直線とみなす
     }
 
-    // 繧ｫ繝ｼ繝悶・蝣ｴ蜷医・縺ｿ髯､邂怜ｮ溯｡・
+    // カーブの場合のみ除算する
     float R = absDl / absDrad;
     // float absR = (R < 0.0f) ? -R : R;
     // return (absR > ROC_STRAIGHT_TH) ? 2000.0f : R;
@@ -92,10 +92,10 @@ float calcROC(int16_t velo, float angvelo, float dt)
 	return R;
 }
 /////////////////////////////////////////////////////////////////////
-// 繝｢繧ｸ繝･繝ｼ繝ｫ蜷・saveLogNumber
-// 蜃ｦ逅・ｦりｦ・    隗｣譫舌＠縺溘Ο繧ｰ繝輔ぃ繧､繝ｫ縺ｮ逡ｪ蜿ｷ繧偵ヵ繧｡繧､繝ｫ縺ｫ菫晏ｭ倥☆繧・
-// 蠑墓焚         縺ｪ縺・
-// 謌ｻ繧雁､       縺ｪ縺・
+// モジュール名 saveLogNumber
+// 処理概要     解析したログファイルの番号を設定ファイルに保存する
+// 引数         fileNumber: 保存するログ番号
+// 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void saveLogNumber(int16_t fileNumber)
 {
@@ -103,8 +103,8 @@ void saveLogNumber(int16_t fileNumber)
 	FIL fil;
 	char fileName[32] = PATH_SETTING;
 
-	strcat(fileName, FILENAME_ANALYSIS_NUMBER);					 // 繝輔ぃ繧､繝ｫ蜷崎ｿｽ蜉
-	strcat(fileName, ".txt");									 // 諡｡蠑ｵ蟄占ｿｽ蜉
+	strcat(fileName, FILENAME_ANALYSIS_NUMBER);					 // ファイル名を追加する
+	strcat(fileName, ".txt");									 // 拡張子を追加する
 	fresult = f_open(&fil, fileName, FA_OPEN_ALWAYS | FA_WRITE); // create file
 	if (fresult == FR_OK)
 	{
@@ -115,10 +115,10 @@ void saveLogNumber(int16_t fileNumber)
 	}
 }
 /////////////////////////////////////////////////////////////////////
-// 繝｢繧ｸ繝･繝ｼ繝ｫ蜷・getLogNumber
-// 蜃ｦ逅・ｦりｦ・    隗｣譫舌＠縺溘Ο繧ｰ繝輔ぃ繧､繝ｫ縺ｮ逡ｪ蜿ｷ繧貞叙蠕励☆繧・
-// 蠑墓焚         縺ｪ縺・
-// 謌ｻ繧雁､       縺ｪ縺・
+// モジュール名 getLogNumber
+// 処理概要     設定ファイルから解析済みログ番号を取得する
+// 引数         なし
+// 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void getLogNumber(void)
 {
@@ -129,12 +129,12 @@ void getLogNumber(void)
 	int parsedNumber = analyzedNumber;
 	bool repair = false;
 
-	strcat(fileName, FILENAME_ANALYSIS_NUMBER);					// 繝輔ぃ繧､繝ｫ蜷崎ｿｽ蜉
-	strcat(fileName, ".txt");									// 諡｡蠑ｵ蟄占ｿｽ蜉
-	fresult = f_open(&fil, fileName, FA_OPEN_EXISTING | FA_READ); // csv繝輔ぃ繧､繝ｫ繧帝幕縺・
+	strcat(fileName, FILENAME_ANALYSIS_NUMBER);					// ファイル名を追加する
+	strcat(fileName, ".txt");									// 拡張子を追加する
+	fresult = f_open(&fil, fileName, FA_OPEN_EXISTING | FA_READ); // 解析済みログ番号の設定ファイルを開く
 	if (fresult == FR_OK)
 	{
-		// 隗｣譫先ｸ医∩縺ｮ繝ｭ繧ｰ逡ｪ蜿ｷ繧貞叙蠕・
+		// 解析済みログ番号を取得する
 		if (f_gets(log, (int)(sizeof(log) / sizeof(log[0])), &fil) != NULL &&
 			sscanf(log, "%5d", &parsedNumber) == 1 &&
 			parsedNumber >= 0 && parsedNumber <= INT16_MAX)
@@ -159,7 +159,7 @@ void getLogNumber(void)
 
 	for (int16_t i = 0; i <= endFileIndex; i++)
 	{
-		// 隗｣譫先ｸ医∩縺ｮ繝ｭ繧ｰ逡ｪ蜿ｷ縺ｫ荳閾ｴ縺吶ｋ繧､繝ｳ繝・ャ繧ｯ繧ｹ繧剃ｿ晏ｭ・
+		// 解析済みログ番号に一致するファイル一覧のインデックスを保存する
 		if (analyzedNumber == fileNumbers[i])
 		{
 			fileIndexLog = i;
@@ -168,16 +168,16 @@ void getLogNumber(void)
 	}
 }
 /////////////////////////////////////////////////////////////////////
-// 繝ｭ繝ｼ繧ｫ繝ｫ髢｢謨ｰ sortInt16Ascending
-// 蜃ｦ逅・ｦりｦ・    譛螟ｧ5隕∫ｴ縺ｮint16_t驟榊・繧呈諺蜈･繧ｽ繝ｼ繝医☆繧九％縺ｨ縺ｧqsort蜻ｼ縺ｳ蜃ｺ縺励ｒ蜑頑ｸ・
-// 蠑墓焚         values: 繧ｽ繝ｼ繝亥ｯｾ雎｡縺ｮ驟榊・, length: 隕∫ｴ謨ｰ
-// 謌ｻ繧雁､       縺ｪ縺・
+// ローカル関数 sortInt16Ascending
+// 処理概要     int16_t配列を挿入ソートし、少数要素のqsort呼び出しを省く
+// 引数         values: ソート対象の配列, length: 要素数
+// 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 static void sortInt16Ascending(int16_t *values, uint16_t length)
 {
 	if (length <= 1)
 	{
-		return; // 隕∫ｴ謨ｰ1莉･荳九・荳ｦ縺ｹ譖ｿ縺井ｸ崎ｦ・
+		return; // 要素数が1以下なら並べ替え不要
 	}
 
 	for (uint16_t index = 1; index < length; index++)
@@ -193,10 +193,10 @@ static void sortInt16Ascending(int16_t *values, uint16_t length)
 	}
 }
 /////////////////////////////////////////////////////////////////////
-// 繝｢繧ｸ繝･繝ｼ繝ｫ蜷・calcDecelLeadMmByRoc
-// 蜃ｦ逅・ｦりｦ・    譖ｲ邇・濠蠕・・螟牙喧驥上°繧牙・陦梧ｸ幃溯ｷ晞屬[mm]繧堤ｮ怜・縺吶ｋ
-// 蠑墓焚         rocPrev:逶ｴ蜑阪・譖ｲ邇・濠蠕Ъmm], rocNow:迴ｾ蝨ｨ縺ｮ譖ｲ邇・濠蠕Ъmm]
-// 謌ｻ繧雁､       蜈郁｡梧ｸ幃溯ｷ晞屬[mm]
+// モジュール名 calcDecelLeadMmByRoc
+// 処理概要     曲率半径の変化率から先行減速距離を計算する
+// 引数         rocPrev: 直前の曲率半径[mm], rocNow: 現在の曲率半径[mm]
+// 戻り値       先行減速距離[mm]
 /////////////////////////////////////////////////////////////////////
 static float calcDecelLeadMmByRoc(int16_t rocPrev, int16_t rocNow)
 {
@@ -210,14 +210,14 @@ static float calcDecelLeadMmByRoc(int16_t rocPrev, int16_t rocNow)
 	}
 	if (absPrev <= absNow)
 	{
-		return 0.0f; // 譖ｲ邇・′邱ｩ縺上↑繧区婿蜷代・蜈郁｡梧ｸ幃溘＠縺ｪ縺・
+		return 0.0f; // 曲率半径が大きくなる方向では先行減速しない
 	}
 	if (absPrev <= 0)
 	{
 		absPrev = 1;
 	}
 
-	float changeRatio = (float)(absPrev - absNow) / (float)absPrev; // 螟牙喧邇・0.0縲・.0)
+	float changeRatio = (float)(absPrev - absNow) / (float)absPrev; // 曲率半径の減少率（0.0～1.0）
 	if (changeRatio < 0.0f)
 	{
 		changeRatio = 0.0f;
@@ -230,10 +230,10 @@ static float calcDecelLeadMmByRoc(int16_t rocPrev, int16_t rocNow)
 	return baseLeadMm * changeRatio;
 }
 /////////////////////////////////////////////////////////////////////
-// 繝｢繧ｸ繝･繝ｼ繝ｫ蜷・applyDecelLeadToPpad
-// 蜃ｦ逅・ｦりｦ・    PPAD騾溷ｺｦ驟榊・縺ｮ貂幃溷玄髢薙↓蜈郁｡梧ｸ幃溘ｒ驕ｩ逕ｨ縺吶ｋ
-// 蠑墓焚         count:PPAD驟榊・縺ｮ譛牙柑隕∫ｴ謨ｰ
-// 謌ｻ繧雁､       縺ｪ縺・
+// モジュール名 applyDecelLeadToPpad
+// 処理概要     PPAD速度配列の減速区間に先行減速を適用する
+// 引数         count: PPAD配列の有効要素数
+// 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 static void applyDecelLeadToPpad(int16_t count)
 {
@@ -257,7 +257,7 @@ static void applyDecelLeadToPpad(int16_t count)
 			continue;
 		}
 
-		int16_t leadStep = (int16_t)ceilf(leadMm / (float)CALCDISTANCE); // mm繧帝・蛻励せ繝・ャ繝玲焚縺ｸ謠帷ｮ・
+		int16_t leadStep = (int16_t)ceilf(leadMm / (float)CALCDISTANCE); // 先行減速距離[mm]を切り上げて配列ステップ数へ換算する
 		if (leadStep <= 0)
 		{
 			continue;
@@ -270,7 +270,7 @@ static void applyDecelLeadToPpad(int16_t count)
 		}
 		for (int16_t j = start; j < i; j++)
 		{
-			// 貂幃溷ｾ碁溷ｺｦ縺後☆縺ｧ縺ｫ豎ｺ縺ｾ繧倶ｽ咲ｽｮ繧呈焔蜑榊・縺ｸ諡｡蠑ｵ
+			// 減速後の速度を手前の区間にも適用する
 			if (PPAD[j].boostSpeed > nowSpeed)
 			{
 				PPAD[j].boostSpeed = nowSpeed;
@@ -280,10 +280,10 @@ static void applyDecelLeadToPpad(int16_t count)
 }
 
 /////////////////////////////////////////////////////////////////////
-// 繝｢繧ｸ繝･繝ｼ繝ｫ蜷・applyDecelLeadToArray
-// 蜃ｦ逅・ｦりｦ・    莉ｻ諢上・騾溷ｺｦ驟榊・縺ｮ貂幃溷玄髢薙↓蜈郁｡梧ｸ幃溘ｒ驕ｩ逕ｨ縺吶ｋ
-// 蠑墓焚         speed:騾溷ｺｦ驟榊・, count:譛牙柑隕∫ｴ謨ｰ
-// 謌ｻ繧雁､       縺ｪ縺・
+// モジュール名 applyDecelLeadToArray
+// 処理概要     指定した速度配列の減速区間に先行減速を適用する
+// 引数         speed: 速度配列[m/s], count: 有効要素数
+// 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 static void applyDecelLeadToArray(float *speed, int16_t count)
 {
@@ -307,7 +307,7 @@ static void applyDecelLeadToArray(float *speed, int16_t count)
 			continue;
 		}
 
-		int16_t leadStep = (int16_t)ceilf(leadMm / (float)CALCDISTANCE); // mm繧帝・蛻励せ繝・ャ繝玲焚縺ｸ謠帷ｮ・
+		int16_t leadStep = (int16_t)ceilf(leadMm / (float)CALCDISTANCE); // 先行減速距離[mm]を切り上げて配列ステップ数へ換算する
 		if (leadStep <= 0)
 		{
 			continue;
@@ -320,7 +320,7 @@ static void applyDecelLeadToArray(float *speed, int16_t count)
 		}
 		for (int16_t j = start; j < i; j++)
 		{
-			// 貂幃溷ｾ碁溷ｺｦ縺後☆縺ｧ縺ｫ豎ｺ縺ｾ繧倶ｽ咲ｽｮ繧呈焔蜑榊・縺ｸ諡｡蠑ｵ
+			// 減速後の速度を手前の区間にも適用する
 			if (speed[j] > nowSpeed)
 			{
 				speed[j] = nowSpeed;
@@ -337,22 +337,22 @@ static void applyDecelLeadToArray(float *speed, int16_t count)
 static int16_t readLogDistanceProgress(int logNumber,
 	void (*progress)(const char *stage, uint32_t lineNo))
 {
-	// 繝輔ぃ繧､繝ｫ隱ｭ縺ｿ霎ｼ縺ｿ
+	// ログファイルを読み込むための変数
 	FIL fil_Read;
 	FRESULT fresult;
 	char fileName[10];
 	int16_t ret = 0;
 	bool fileOpened = false; // f_close
 	bool retried = false;
-	bool errorDetected = false; // 隗｣譫宣比ｸｭ縺ｮ繧ｨ繝ｩ繝ｼ逋ｺ逕溘ｒ讀懃衍縺吶ｋ繝輔Λ繧ｰ
+	bool errorDetected = false; // 解析途中のエラー発生を示すフラグ
 	bool lock_acquired = sd_fatfs_lock(200);
 
 	if (!lock_acquired)
 	{
 		return -9;
 	}
-	// 隗｣譫蝉ｸｭ縺ｯ繝ｭ繧ｰ譖ｸ縺崎ｾｼ縺ｿ繧呈椛蛻ｶ縺吶ｋ
-	sd_set_analysis_active(true); // SD/FatFs菴ｿ逕ｨ荳ｭ
+	// 解析中はログ書き込みを抑制する
+	sd_set_analysis_active(true); // SD/FatFs使用中
 	snprintf(fileName, sizeof(fileName), "%d", logNumber); // ログ番号をファイル名に変換する
 	strcat(fileName, ".csv"); // CSV拡張子を追加する
 	retry_open:
@@ -538,55 +538,55 @@ static int16_t readLogDistanceProgress(int logNumber,
 		if (!errorDetected)
 		{
 			if (progress) progress("Base plan", lineNo);
-			// 繧､繝ｳ繝・ャ繧ｯ繧ｹ縺・螟壹￥縺ｪ繧九・縺ｧ隱ｿ謨ｴ
+			// 要素数を末尾インデックスへ調整する
 			if (numM > 0)
 			{
-				numM--;        // 0莉ｶ譎ゅ・繝槭・繧ｫ繝ｼ謨ｰ繧定ｲ縺ｫ縺励↑縺・
+				numM--;        // マーカーがある場合だけ減算し、負値を防ぐ
 			}
 			int32_t numDCount = 0;
 			if (numD > 0)
 			{
-				numD--;        // 0莉ｶ譎ゅ・霍晞屬隕∫ｴ謨ｰ繧定ｲ縺ｫ縺励↑縺・
-				numDCount = numD + 1;        // 隕∫ｴ謨ｰ縺ｫ謌ｻ縺励※蜉貂幃溯ｪｿ謨ｴ縺ｧ菴ｿ逕ｨ
+				numD--;        // 距離要素がある場合だけ減算し、負値を防ぐ
+				numDCount = numD + 1;        // 要素数に戻して加減速調整で使用する
 			}
 			else
 			{
-				numDCount = numD;        // 隕∫ｴ謨ｰ0縺ｮ蝣ｴ蜷医・縺昴・縺ｾ縺ｾ蛻ｩ逕ｨ
+				numDCount = numD;        // 要素数が0ならそのまま使用する
 			}
 			numD = numDCount;
-			applyDecelLeadToPpad((int16_t)numD); // 譖ｲ邇・､牙喧縺ｫ蠢懊§縺ｦ縲∵ｸ幃溷芦驕比ｽ咲ｽｮ繧呈焔蜑阪∈蟇・○繧・
+			applyDecelLeadToPpad((int16_t)numD); // 曲率半径の変化に応じて減速開始位置を手前へ移す
 
-			// 逶ｮ讓咎溷ｺｦ驟榊・縺ｮ謨ｴ蠖｢ 蜉貂幃溘′髢薙↓蜷医≧繧医≧縺ｫ霍晞屬繧定ｪｿ謨ｴ縺吶ｋ
+			// 目標速度配列を整形し、加減速を制限する
 			float acceleration, elapsedTime, dv, dl;
 
-			// 譛蛻昴・隕∫ｴ縺ｯ隱ｿ謨ｴ縺励↑縺・
+			// 解析区間長をmmからmへ変換する
 			dl = (float)CALCDISTANCE / 1000;
 
-			// numD繧剃ｻｶ謨ｰ縺ｨ縺励※謇ｱ縺・◆繧√∽ｻ･荳九・繝ｫ繝ｼ繝励〒繧ょ｢・阜螟悶い繧ｯ繧ｻ繧ｹ縺ｯ逋ｺ逕溘＠縺ｪ縺・
+			// numDを要素数として扱い、以下のループを有効範囲内に限定する
 
-			// 蜉騾溘う繝ｳ繝・ャ繧ｯ繧ｹ1縺九ｉ譛ｫ蟆ｾ縺ｾ縺ｧ蟷ｳ貊大喧
+			// インデックス1から末尾へ進み、加速側の速度変化を制限する
 			for (int32_t idx = 1; idx < numD; idx++)
 			{
-				dv = (PPAD[idx].boostSpeed - PPAD[idx - 1].boostSpeed);	// 蛹ｺ髢馴溷ｺｦ蟾ｮ
+				dv = (PPAD[idx].boostSpeed - PPAD[idx - 1].boostSpeed);	// 区間速度差[m/s]
 				if (fabsf(dv) < 1e-6f)
 				{
-					continue;	// 騾溷ｺｦ蟾ｮ縺梧･ｵ蟆上↑繧芽｣懈ｭ｣荳崎ｦ・
+					continue;	// 速度差が極小なら補正不要
 				}
 				elapsedTime = fabsf(dl / dv);		// 区間時間[s]
-				acceleration = dv / elapsedTime;	// 螳滓ｸｬ蜉騾溷ｺｦ
+				acceleration = dv / elapsedTime;	// 区間の速度差から計算した加速度[m/s^2]
 				if (acceleration > MACHINEACCELE)
 				{
 					PPAD[idx].boostSpeed = PPAD[idx - 1].boostSpeed + (MACHINEACCELE * dl);
 				}
 			}
 
-			// 貂幃溘う繝ｳ繝・ャ繧ｯ繧ｹ譛ｫ蟆ｾ縺九ｉ蜈磯ｭ縺ｾ縺ｧ蟷ｳ貊大喧
+			// 末尾から先頭へ戻り、減速側の速度変化を制限する
 			for (int32_t idx = numD - 2; idx >= 0; idx--)
 			{
-				dv = (PPAD[idx].boostSpeed - PPAD[idx + 1].boostSpeed);	// 蛹ｺ髢馴溷ｺｦ蟾ｮ
+				dv = (PPAD[idx].boostSpeed - PPAD[idx + 1].boostSpeed);	// 区間速度差[m/s]
 				if (fabsf(dv) < 1e-6f)
 				{
-					continue;	// 騾溷ｺｦ蟾ｮ縺梧･ｵ蟆上↑繧芽｣懈ｭ｣荳崎ｦ・
+					continue;	// 速度差が極小なら補正不要
 				}
 				elapsedTime = fabsf(dl / dv);
 				acceleration = dv / elapsedTime;
@@ -597,7 +597,7 @@ static int16_t readLogDistanceProgress(int logNumber,
 			}
 
 #ifdef WRITE_BOOSTSPEED_LOG
-			// 蟷ｳ貊大喧蠕後・逶ｮ讓咎溷ｺｦ驟榊・繧担D繧ｫ繝ｼ繝峨∈險倬鹸縺吶ｋ
+			// 整形後の目標速度配列をSDカードへ記録する
 			FIL fil_Boost;
 			FRESULT fresult_Boost;
 			char boostFileName[32];
@@ -605,14 +605,14 @@ static int16_t readLogDistanceProgress(int logNumber,
 			fresult_Boost = f_open(&fil_Boost, boostFileName, FA_CREATE_ALWAYS | FA_WRITE);
 			if (fresult_Boost == FR_OK)
 			{
-				// CSV繝倥ャ繝繧呈嶌縺崎ｾｼ縺ｿ縲∝ｹｳ貊大喧貂医∩縺ｮboostSpeed繧帝・分縺ｫ菫晏ｭ倥☆繧・
+				// CSVヘッダを書き込み、整形済みのboostSpeedを順番に保存する
 				UINT bytesWritten;
 				f_printf(&fil_Boost, "index,boost_speed\n");
 				for (int32_t idx = 0; idx < numD; idx++)
 				{
 					char boostLine[48];
 
-					// f_printf縺ｯ%f髱槫ｯｾ蠢懊・縺溘ａ縲・陦悟・繧呈枚蟄怜・縺ｫ謨ｴ蠖｢縺励※縺九ｉ譖ｸ縺崎ｾｼ繧
+					// f_printfは%f非対応のため、1行分を文字列に整形してから書き込む
 					snprintf(boostLine, sizeof(boostLine), "%ld,%.3f\n", (long)idx, PPAD[idx].boostSpeed);
 					f_write(&fil_Boost, boostLine, strlen(boostLine), &bytesWritten);
 				}
@@ -626,18 +626,18 @@ static int16_t readLogDistanceProgress(int logNumber,
 		}
 		else
 		{
-			// 繧ｨ繝ｩ繝ｼ逋ｺ逕滓凾縺ｯ謨ｴ蠖｢蜃ｦ逅・ｒ陦後ｏ縺夊ｧ｣譫千ｵ先棡繧堤ｴ譽・
+			// エラー発生時は整形処理を行わず、解析結果を採用しない
 		}
 	}
 	else
 	{
 		ret = -4;
-		errorDetected = true; // 繝輔ぃ繧､繝ｫ繧ｪ繝ｼ繝励Φ螟ｱ謨玲凾繧ゅお繝ｩ繝ｼ迥ｶ諷九→縺励※謇ｱ縺・
+		errorDetected = true; // ファイルを開けなかった場合もエラーとして扱う
 	}
 
 	if (ret == -5 && !retried)
 	{
-		// I/O繧ｨ繝ｩ繝ｼ譎ゅ・荳蠎ｦ縺縺大・繝槭え繝ｳ繝茨ｼ・・繧ｪ繝ｼ繝励Φ繧定ｩｦ縺・
+		// I/Oエラー時は一度だけ再マウントしてファイルを開き直す
 		if (fileOpened)
 		{
 			f_close(&fil_Read);
@@ -652,11 +652,11 @@ static int16_t readLogDistanceProgress(int logNumber,
 cleanup_read:
 	if (fileOpened)
 	{
-		f_close(&fil_Read); // 繧ｪ繝ｼ繝励Φ謌仙粥譎ゅ・縺ｿ繧ｯ繝ｭ繝ｼ繧ｺ繧貞ｮ滓命
+		f_close(&fil_Read); // 正常に開けたファイルだけを閉じる
 	}
 	if (lock_acquired)
 	{
-		// 隗｣譫千ｵゆｺ・ｼ域嶌縺崎ｾｼ縺ｿ謚大宛隗｣髯､・・
+		// 解析終了時に書き込み抑制とロックを解除する
 		sd_set_analysis_active(false);
 		sd_fatfs_unlock();
 	}
@@ -665,16 +665,16 @@ cleanup_read:
 
 	if (ret >= 0)
 	{
-		// 豁｣蟶ｸ邨ゆｺ・凾縺ｮ縺ｿ隗｣譫先ｸ医∩諠・ｱ繧呈峩譁ｰ
+		// 正常終了時だけ解析済み情報を更新する
 		saveLogNumber(logNumber);
 		analyzedNumber = logNumber;
 
-		// 2谺｡襍ｰ陦後ヵ繝ｩ繧ｰ 霍晞屬蝓ｺ貅・谺｡襍ｰ陦・
+		// 距離基準2次走行モードを設定する
 		optimalTrace = BOOST_DISTANCE;
 	}
 	else
 	{
-		// 繧ｨ繝ｩ繝ｼ逋ｺ逕滓凾縺ｯ迥ｶ諷区峩譁ｰ繧定｡後ｏ縺壼他縺ｳ蜃ｺ縺怜・縺ｫ霑泌唆
+		// エラー発生時は状態を更新せず、呼び出し元へエラーを返す
 	}
 
 	return ret;
@@ -690,10 +690,10 @@ int16_t readLogDistance(int logNumber)
 	return readLogDistanceProgress(logNumber, NULL);
 }
 /////////////////////////////////////////////////////////////////////
-// 繝ｭ繝ｼ繧ｫ繝ｫ髢｢謨ｰ parseSecondLogLine
-// 蜃ｦ逅・ｦりｦ・ 2谺｡襍ｰ陦後Ο繧ｰ縺ｮ蠢・ｦ∝・縺ｮ縺ｿ繧呈歓蜃ｺ縺吶ｋ
-// 蠑墓焚	 line: 1陦梧枚蟄怜・, 蜷・・蜉帛・繝昴う繝ｳ繧ｿ
-// 謌ｻ繧雁､	 隗｣譫先・蜉溘↑繧液rue
+// ローカル関数 parseSecondLogLine
+// 処理概要     2次走行ログからスリップ解析に必要な列を抽出する
+// 引数         line: CSV行, map: 列対応表, 各出力ポインタ: 抽出結果の格納先
+// 戻り値       true: 解析成功, false: 解析失敗または値が範囲外
 /////////////////////////////////////////////////////////////////////
 static bool parseSecondLogLine(const char *line, const SecondLogColumnMap *map,
 		uint8_t *courseMarker, int32_t *encTotal, int16_t *roc,
@@ -763,7 +763,7 @@ int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
 	int16_t baseCount = numPPADarry;
 	if (baseCount <= 0)
 	{
-		return -2; // 隗｣譫仙ｯｾ雎｡縺檎┌縺・
+		return -2; // 解析対象がない
 	}
 	if (progress) progress("Slip open", 0U);
 
@@ -777,12 +777,12 @@ int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
 
 	if (!lock_acquired)
 	{
-		return -9; // SD/FatFs菴ｿ逕ｨ荳ｭ
+		return -9; // SD/FatFs使用中
 	}
-	// 隗｣譫蝉ｸｭ縺ｯ繝ｭ繧ｰ譖ｸ縺崎ｾｼ縺ｿ繧呈椛蛻ｶ縺吶ｋ
+	// 解析中はログ書き込みを抑制する
 	sd_set_analysis_active(true);
 
-	// 霑ｽ蜉: 隗｣譫千畑繝舌ャ繝輔ぃ繝ｻ驟榊・縺ｯ髱咏噪鬆伜沺縺ｧ遒ｺ菫昴＠縺ｦ繧ｹ繧ｿ繝・け繧堤ｯ邏・
+	// 解析用配列を静的領域に確保し、スタック使用量を抑える
 	static uint16_t sampleCnt[OPT_BUFF_SIZE];
 	static float v2Max[OPT_BUFF_SIZE];
 	static float rocAbsSum[OPT_BUFF_SIZE];
@@ -793,8 +793,8 @@ int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
 	static float riskExpanded[OPT_BUFF_SIZE];
 	static float v3[OPT_BUFF_SIZE];
 
-	snprintf(fileName, sizeof(fileName), "%d", slipLogNumber);			   // 謨ｰ蛟､繧呈枚蟄怜・縺ｫ螟画鋤
-	strcat(fileName, ".csv");										   // 諡｡蠑ｵ蟄舌ｒ霑ｽ蜉
+	snprintf(fileName, sizeof(fileName), "%d", slipLogNumber);			   // ログ番号を文字列へ変換する
+	strcat(fileName, ".csv");										   // CSV拡張子を追加する
 	retry_open_slip:
 	if (retried && progress) progress("Slip retry", 0U);
 	// 一次ログ解析後も同じマウントを使い、I/Oエラー後だけ再マウントする。
@@ -802,7 +802,7 @@ int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
 		ret = -6;
 		goto cleanup;
 	}
-	fresult = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // csv繝輔ぃ繧､繝ｫ繧帝幕縺・
+	fresult = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // CSVファイルを読み取り専用で開く
 	if (!retried && (fresult == FR_DISK_ERR || fresult == FR_INT_ERR || fresult == FR_NOT_READY))
 	{
 		retried = true;
@@ -810,7 +810,7 @@ int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
 	}
 	if (fresult != FR_OK)
 	{
-		ret = -4; // 繝ｭ繧ｰ繝輔ぃ繧､繝ｫ縺ｮ繧ｪ繝ｼ繝励Φ螟ｱ謨・
+		ret = -4; // ログファイルを開けなかった
 		goto cleanup;
 	}
 	fileOpened = true;
@@ -834,7 +834,7 @@ int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
 	int16_t maxOptimalIndex = -1;
 	SecondLogColumnMap secondLogColumns;
 
-	// 1陦檎岼縺ｯ繝倥ャ繝縺ｪ縺ｮ縺ｧ隱ｭ縺ｿ鬟帙・縺・
+	// 先頭行を読み、列名行またはメタデータ行として扱う
 	TCHAR *header = f_gets(log, log_len, &fil_Read);
 	if (!header)
 	{
@@ -847,7 +847,7 @@ int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
 		}
 		else
 		{
-			ret = -2; // 隗｣譫仙ｯｾ雎｡縺檎┌縺・
+			ret = -2; // 解析対象がない
 		}
 		goto cleanup;
 	}
@@ -892,15 +892,15 @@ int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
 				&courseMarker, &encTotal, &roc,
 				&targetSpeedLog, &optimalIdx, &slipLong, &slipLat))
 		{
-			continue;	// 霑ｽ蜉: 繝倥ャ繝/遨ｺ陦後・隗｣譫舌＠縺ｪ縺・
+			continue;	// 解析できない行を読み飛ばす
 		}
 		if (optimalIdx < 0 || optimalIdx >= baseCount)
 		{
-			ret = -1;	// 霑ｽ蜉: 隗｣譫千畑驟榊・縺ｮ荳企剞雜・℃
+			ret = -1;	// 解析用配列の有効範囲外
 			break;
 		}
 
-		// 霑ｽ蜉: 髮・ｨ・繧ｵ繝ｳ繝励Ν謨ｰ/譛螟ｧ騾溷ｺｦ/ROC蟷ｳ蝮・繧ｹ繝ｪ繝・・蝗樊焚)
+		// 区間ごとのサンプル数、曲率半径の絶対値、スリップ回数を集計する
 		(void)courseMarker;
 		(void)targetSpeedLog;
 		(void)encTotal;
@@ -922,7 +922,7 @@ int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
 			maxOptimalIndex = optimalIdx;
 		}
 
-		// 霑ｽ蜉: 2谺｡繝ｭ繧ｰ縺九ｉ繝槭・繧ｫ繝ｼ菴咲ｽｮ繧貞・讒狗ｯ峨☆繧・
+		// 読み取った区間までの集計を継続する
 	}
 	if (ret == 0 && fgets_null)
 	{
@@ -937,7 +937,7 @@ int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
 
 	if (ret == -5 && !retried)
 	{
-		// I/O繧ｨ繝ｩ繝ｼ譎ゅ・荳蠎ｦ縺縺大・繝槭え繝ｳ繝茨ｼ・・繧ｪ繝ｼ繝励Φ繧定ｩｦ縺・
+		// I/Oエラー時は一度だけ再マウントしてファイルを開き直す
 		if (fileOpened)
 		{
 			f_close(&fil_Read);
@@ -956,7 +956,7 @@ cleanup:
 	}
 	if (lock_acquired)
 	{
-		// 隗｣譫千ｵゆｺ・ｼ域嶌縺崎ｾｼ縺ｿ謚大宛隗｣髯､・・
+		// 解析終了時に書き込み抑制とロックを解除する
 		sd_set_analysis_active(false);
 		sd_fatfs_unlock();
 	}
@@ -967,20 +967,20 @@ cleanup:
 	}
 	if (maxOptimalIndex < 0)
 	{
-		return -2;	// 霑ｽ蜉: 隗｣譫仙ｯｾ雎｡縺檎┌縺・
+		return -2;	// 解析対象がない
 	}
 
-	// 霑ｽ蜉: 谺逡ｪoptimalIndex縺ｯ蜑榊､縺ｧ蝓九ａ繧・蜑肴婿蝓九ａ)
+	// サンプルのない区間の曲率半径集計を直前の値で補う
 	for (int16_t i = 0; i <= maxOptimalIndex; i++)
 	{
 		if (sampleCnt[i] == 0 && i > 0)
 		{
-			rocAbsSum[i] = rocAbsSum[i - 1];	// 霑ｽ蜉: ROC蟷ｳ蝮・畑縺ｮ蜑肴婿蝓九ａ
-			rocCnt[i] = rocCnt[i - 1];			// 霑ｽ蜉: ROC蟷ｳ蝮・畑縺ｮ蜑肴婿蝓九ａ
+			rocAbsSum[i] = rocAbsSum[i - 1];	// 平均曲率半径の計算用に直前の合計値を引き継ぐ
+			rocCnt[i] = rocCnt[i - 1];			// 平均曲率半径の計算用に直前の件数を引き継ぐ
 		}
 	}
 
-	// 霑ｽ蜉: risk(0..1)繧剃ｽ懊ｋ
+	// スリップ割合からリスク値（0.0～1.0）を求める
 	for (int16_t i = 0; i <= maxOptimalIndex; i++)
 	{
 		if (sampleCnt[i] == 0)
@@ -1005,7 +1005,7 @@ cleanup:
 		risk[i] = (riskLong > riskLat) ? riskLong : riskLat;
 	}
 
-	// 霑ｽ蜉: 霑大ｍ縺ｸ繝ｪ繧ｹ繧ｯ諡｡蠑ｵ
+	// 近傍区間へスリップリスクを拡張する
 	for (int16_t i = 0; i <= maxOptimalIndex; i++)
 	{
 		float expanded = risk[i];
@@ -1044,7 +1044,7 @@ cleanup:
 		riskExpanded[i] = expanded;
 	}
 
-	// 霑ｽ蜉: v3繧呈峩譁ｰ(貂幃・蠅鈴・
+	// スリップリスクに応じて速度計画v3を減速または増速する
 	for (int16_t i = 0; i <= maxOptimalIndex; i++)
 	{
 		float v = v2Max[i];
@@ -1073,8 +1073,8 @@ cleanup:
 		}
 	}
 
-	// 霑ｽ蜉: 2谺｡縺ｮ騾溷ｺｦ螟牙喧驥丈ｻ･蜀・↓蜿弱ａ繧・蜑榊ｾ後ヱ繧ｹ)
-	applyDecelLeadToArray(v3, (int16_t)(maxOptimalIndex + 1)); // 譖ｲ邇・､牙喧縺ｫ蠢懊§縺ｦ縲∵ｸ幃溷芦驕比ｽ咲ｽｮ繧呈焔蜑阪∈蟇・○繧・
+	// 前後方向の走査で、元の速度計画の速度変化量以内に制限する
+	applyDecelLeadToArray(v3, (int16_t)(maxOptimalIndex + 1)); // 曲率半径の変化に応じて減速開始位置を手前へ移す
 	for (int16_t i = 0; i < maxOptimalIndex; i++)
 	{
 		float dvUp = v2Max[i + 1] - v2Max[i];
@@ -1102,7 +1102,7 @@ cleanup:
 		}
 	}
 
-	// 霑ｽ蜉: PPAD縺ｸ蜿肴丐
+	// 更新した速度計画をPPADへ反映する
 	for (int16_t i = 0; i <= maxOptimalIndex; i++)
 	{
 		PPAD[i].boostSpeed = v3[i];
@@ -1111,7 +1111,7 @@ cleanup:
 	ret = numPPADarry;
 
 #ifdef WRITE_BOOSTSPEED_LOG
-	// 蟷ｳ貊大喧蠕後・逶ｮ讓咎溷ｺｦ驟榊・繧担D繧ｫ繝ｼ繝峨∈險倬鹸縺吶ｋ
+	// 整形後の目標速度配列をSDカードへ記録する
 	FIL fil_Boost;
 	FRESULT fresult_Boost;
 	char boostFileName[32];
@@ -1119,14 +1119,14 @@ cleanup:
 	fresult_Boost = f_open(&fil_Boost, boostFileName, FA_CREATE_ALWAYS | FA_WRITE);
 	if (fresult_Boost == FR_OK)
 	{
-		// CSV繝倥ャ繝繧呈嶌縺崎ｾｼ縺ｿ縲∝ｹｳ貊大喧貂医∩縺ｮboostSpeed繧帝・分縺ｫ菫晏ｭ倥☆繧・
+		// CSVヘッダを書き込み、整形済みのboostSpeedを順番に保存する
 		UINT bytesWritten;
 	f_printf(&fil_Boost, "index,boost_speed\n");
 	for (int32_t idx = 0; idx < maxOptimalIndex; idx++)
 	{
 		char boostLine[48];
 
-			// f_printf縺ｯ%f髱槫ｯｾ蠢懊・縺溘ａ縲・陦悟・繧呈枚蟄怜・縺ｫ謨ｴ蠖｢縺励※縺九ｉ譖ｸ縺崎ｾｼ繧
+			// f_printfは%f非対応のため、1行分を文字列に整形してから書き込む
 			snprintf(boostLine, sizeof(boostLine), "%ld,%.3f\n", (long)idx, PPAD[idx].boostSpeed);
 			f_write(&fil_Boost, boostLine, strlen(boostLine), &bytesWritten);
 		}
@@ -1134,16 +1134,16 @@ cleanup:
 	}
 #endif
 
-	// 霑ｽ蜉: 隗｣譫先ｸ医∩諠・ｱ繧呈峩譁ｰ
+	// 距離基準2次走行モードを設定する
 	optimalTrace = BOOST_DISTANCE;
 
 	return ret;
 }
 /////////////////////////////////////////////////////////////////////
-// 繝｢繧ｸ繝･繝ｼ繝ｫ蜷・asignVelocity
-// 蜃ｦ逅・ｦりｦ・    譖ｲ邇・濠蠕・＃縺ｨ縺ｮ譛驕ｩ騾溷ｺｦ繧貞牡繧雁ｽ薙※繧・
-// 蠑墓焚
-// 謌ｻ繧雁､       縺ｪ縺・
+// モジュール名 asignVelocity
+// 処理概要     曲率半径に応じた目標速度を割り当てる
+// 引数         ROC: 曲率半径[mm]
+// 戻り値       目標速度[m/s]
 /////////////////////////////////////////////////////////////////////
 float asignVelocity(int16_t ROC)
 {
@@ -1179,10 +1179,10 @@ float asignVelocity(int16_t ROC)
 	return ret;
 }
 /////////////////////////////////////////////////////////////////////
-// 繝｢繧ｸ繝･繝ｼ繝ｫ蜷・cmpfloat
-// 蜃ｦ逅・ｦりｦ・    float蝙九・豈碑ｼ・
-// 蠑墓焚
-// 謌ｻ繧雁､       縺ｪ縺・
+// モジュール名 cmpfloat
+// 処理概要     float値を比較する
+// 引数         n1: 比較する第1の値へのポインタ, n2: 第2の値へのポインタ
+// 戻り値       n1が大きければ1、小さければ-1、同値なら0
 /////////////////////////////////////////////////////////////////////
 int cmpfloat(const void *n1, const void *n2)
 {
@@ -1194,14 +1194,14 @@ int cmpfloat(const void *n1, const void *n2)
 		return 0;
 }
 /////////////////////////////////////////////////////////////////////
-// 繝｢繧ｸ繝･繝ｼ繝ｫ蜷・readLogDistance
-// 蜃ｦ逅・ｦりｦ・    霍晞屬蝓ｺ貅・谺｡襍ｰ陦後・隗｣譫・
-// 蠑墓焚         繝ｭ繧ｰ逡ｪ蜿ｷ(繝輔ぃ繧､繝ｫ蜷・
-// 謌ｻ繧雁､       譛驕ｩ騾溷ｺｦ驟榊・縺ｮ譛螟ｧ隕∫ｴ謨ｰ
+// モジュール名 readLogTest
+// 処理概要     試験用ログを読み込み、マーカー位置と読込件数を求める
+// 引数         logNumber: 読み込むログ番号
+// 戻り値       読込データ件数、失敗時は負のエラーコード
 /////////////////////////////////////////////////////////////////////
 int16_t readLogTest(int logNumber)
 {
-	// 繝輔ぃ繧､繝ｫ隱ｭ縺ｿ霎ｼ縺ｿ
+	// ログファイルを読み込むための変数
 	FIL fil_Read;
 	FRESULT fresult;
 	char fileName[10];
@@ -1210,12 +1210,12 @@ int16_t readLogTest(int logNumber)
 
 	if (!lock_acquired)
 	{
-		return -9; // SD/FatFs菴ｿ逕ｨ荳ｭ
+		return -9; // SD/FatFs使用中
 	}
 
-	snprintf(fileName, sizeof(fileName), "%d", logNumber);			   // 謨ｰ蛟､繧呈枚蟄怜・縺ｫ螟画鋤
-	strcat(fileName, ".csv");										   // 諡｡蠑ｵ蟄舌ｒ霑ｽ蜉
-	fresult = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // csv繝輔ぃ繧､繝ｫ繧帝幕縺・
+	snprintf(fileName, sizeof(fileName), "%d", logNumber);			   // ログ番号を文字列へ変換する
+	strcat(fileName, ".csv");										   // CSV拡張子を追加する
+	fresult = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // CSVファイルを読み取り専用で開く
 
 	if (fresult == FR_OK)
 	{
@@ -1226,11 +1226,11 @@ int16_t readLogTest(int logNumber)
 		int32_t startEnc = 0, numD = 0, numM = 0, beforeMarker = 0;
 		bool analysis = false;
 
-		// 蜑榊・逅・
-		// 讒矩菴馴・蛻励・蛻晄悄蛹・
+		// 解析の前処理
+		// 解析データ配列を初期化する
 		memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
 
-		// 繝ｭ繧ｰ繝・・繧ｿ蜿門ｾ鈴幕蟋・
+		// ログデータの読み込みを開始する
 		while (f_gets(log, log_len, &fil_Read))
 		{
 			if (sscanf(log, "%ld,%ld,%f,%ld,%ld", &time, &velo, &angVelo, &marker, &distance) != 5)
@@ -1238,19 +1238,19 @@ int16_t readLogTest(int logNumber)
 				continue; // メタデータ行と列名行を除外
 			}
 
-			// 隗｣譫仙・逅・
+			// マーカー状態を解析する
 			if (marker == 1 && beforeMarker == 0)
 			{
-				// 繧ｴ繝ｼ繝ｫ繝槭・繧ｫ繝ｼ繧帝夐℃縺励◆縺ｨ縺阪↓繝輔Λ繧ｰ蜿崎ｻ｢
+				// ゴールマーカー検出時に解析フラグを反転する
 				analysis = !analysis;
 				startEnc = distance;
 			}
 			else if (marker == 0 && beforeMarker == 2)
 			{
-				// 繧ｫ繝ｼ繝悶・繝ｼ繧ｫ繝ｼ繧帝夐℃縺励◆縺ｨ縺阪↓繝槭・繧ｫ繝ｼ菴咲ｽｮ繧定ｨ倬鹸
+				// カーブマーカー通過時にマーカー位置を記録する
 				markerPos[numM].distance = distance;
 				markerPos[numM].indexPPAD = numD;
-				numM++; // 繝槭・繧ｫ繝ｼ隗｣譫舌う繝ｳ繝・ャ繧ｯ繧ｹ譖ｴ譁ｰ
+				numM++; // マーカー解析インデックスを更新する
 			}
 			if (!analysis && startEnc > 0)
 				break;
@@ -1268,7 +1268,7 @@ int16_t readLogTest(int logNumber)
 		sd_fatfs_unlock();
 	}
 
-	// 隗｣譫先ｸ医∩縺ｮ繝ｭ繧ｰ逡ｪ蜿ｷ繧剃ｿ晏ｭ・
+	// 解析済みログ番号を更新する
 	// saveLogNumber(logNumber);
 	analyzedNumber = logNumber;
 
@@ -1334,66 +1334,66 @@ static int16_t clampMarkerIndex(int16_t idx)
 	return idx;
 }
 /////////////////////////////////////////////////////////////////////
-// 繝ｭ繝ｼ繧ｫ繝ｫ髢｢謨ｰ isStraightBeforeMarker
-// 蜃ｦ逅・ｦりｦ・ 逶ｴ蜑榊玄髢薙・逶ｴ邱夂紫繧貞愛螳壹☆繧・
-// 蠑墓焚	 encNow: 迴ｾ蝨ｨ繧ｨ繝ｳ繧ｳ繝ｼ繝蛟､, window_mm: 隧穂ｾ｡遯甜mm], ratio_threshold: 逶ｴ邱夂紫髢ｾ蛟､
-// 謌ｻ繧雁､	 髢ｾ蛟､莉･荳翫↑繧液rue
+// ローカル関数 isStraightBeforeMarker
+// 処理概要     直前の直線走行距離が評価窓の所定割合以上か判定する
+// 引数         encNow: 現在距離[pulse]（未使用）, window_mm: 評価窓[mm], ratio_threshold: 直線率閾値
+// 戻り値       true: 直線率が閾値以上, false: 閾値未満
 /////////////////////////////////////////////////////////////////////
 static bool isStraightBeforeMarker(int32_t encNow, int16_t window_mm, float ratio_threshold)
 {
 	(void)encNow;
-	int32_t straightDistance = straightMeter;	// 逶ｴ霑代〒逶ｴ邱壹→蛻､螳壹〒縺阪◆霍晞屬[mm]
-	int32_t ratioScaled = (int32_t)(ratio_threshold * 1000.0f); // 髢ｾ蛟､繧貞崋螳壼ｰ乗焚轤ｹ(ﾃ・000)縺ｸ螟画鋤
-	int32_t lhs = straightDistance * 1000;	// 隧穂ｾ｡遯薙↓蟇ｾ縺吶ｋ螳滄圀縺ｮ逶ｴ邱夂紫・亥・蟄仙・・・
-	int32_t rhs = (int32_t)window_mm * ratioScaled;	// 髢ｾ蛟､ ﾃ・遯灘ｹ・ｼ亥・豈榊・繧貞酔蛟咲紫縺ｧ謠帷ｮ暦ｼ・
-	return lhs >= rhs;	// 逶ｴ邱夂紫縺碁明蛟､莉･荳翫°縺ｩ縺・°蛻､螳・
+	int32_t straightDistance = straightMeter;	// 直前に直線と判定した走行距離[mm]
+	int32_t ratioScaled = (int32_t)(ratio_threshold * 1000.0f); // 直線率閾値を1000倍の整数へ変換する
+	int32_t lhs = straightDistance * 1000;	// 直線走行距離を1000倍して比較する
+	int32_t rhs = (int32_t)window_mm * ratioScaled;	// 評価窓幅に1000倍の直線率閾値を掛ける
+	return lhs >= rhs;	// 直線率が閾値以上か判定する
 }
 /////////////////////////////////////////////////////////////////////
-// 繝ｭ繝ｼ繧ｫ繝ｫ髢｢謨ｰ calcDynamicThresholdPulse
-// 蜃ｦ逅・ｦりｦ・ 陬懈ｭ｣險ｱ螳ｹ蛟､繧帝溷ｺｦ繝ｻ隗帝溷ｺｦ縺九ｉ蜍慕噪縺ｫ邂怜・縺吶ｋ
-// 蠑墓焚	 縺ｪ縺・
-// 謌ｻ繧雁､	 險ｱ螳ｹ霍晞屬[繝代Ν繧ｹ]
+// ローカル関数 calcDynamicThresholdPulse
+// 処理概要     速度と角速度から距離補正の許容誤差を計算する
+// 引数         なし
+// 戻り値       許容距離誤差[pulse]
 /////////////////////////////////////////////////////////////////////
 static int32_t calcDynamicThresholdPulse(void)
 {
-	float speed_mm = encPulse(targetSpeed) * 1000;	// 騾溷ｺｦ[pulse]繧知m/s縺ｸ螟画鋤
-	float mm = 100.0f + (CORR_DYN_COEFF_SPEED * speed_mm) + (CORR_DYN_COEFF_ANG * fabsf(imuVal.gyro.z));	// 蝓ｺ譛ｬ蛟､100mm縺ｫ騾溷ｺｦ繝ｻ隗帝溷ｺｦ縺ｮ陬懈ｭ｣繧貞刈邂・
+	float speed_mm = encPulse(targetSpeed) * 1000;	// 目標速度[pulse/ms]をmm/sへ変換する
+	float mm = 100.0f + (CORR_DYN_COEFF_SPEED * speed_mm) + (CORR_DYN_COEFF_ANG * fabsf(imuVal.gyro.z));	// 基本値100mmに速度と角速度に応じた補正量を加算する
 	if (mm < (float)CORR_THRESH_MIN_MM)
 	{
-		mm = (float)CORR_THRESH_MIN_MM;	// 荳矩剞繧剃ｸ句屓繧峨↑縺・ｈ縺・け繝ｩ繝ｳ繝・
+		mm = (float)CORR_THRESH_MIN_MM;	// 許容誤差の下限へ制限する
 	}
 	if (mm > (float)CORR_THRESH_MAX_MM)
 	{
-		mm = (float)CORR_THRESH_MAX_MM;	// 荳企剞繧定ｶ・∴縺溷ｴ蜷医・荳企剞縺ｧ蝗ｺ螳・
+		mm = (float)CORR_THRESH_MAX_MM;	// 許容誤差の上限へ制限する
 	}
-	int16_t mmInt = (int16_t)(mm + 0.5f);	// 蝗帶昏莠泌・縺励※謨ｴ謨ｰmm縺ｸ
-	return encMM(mmInt);	// mm竊偵ヱ繝ｫ繧ｹ縺ｸ謠帷ｮ励＠縺ｦ霑泌唆
+	int16_t mmInt = (int16_t)(mm + 0.5f);	// 四捨五入して整数の距離[mm]にする
+	return encMM(mmInt);	// 距離[mm]をパルス数へ換算して返す
 }
 /////////////////////////////////////////////////////////////////////
-// 繝ｭ繝ｼ繧ｫ繝ｫ髢｢謨ｰ findNearestMarkerIndex
-// 蜃ｦ逅・ｦりｦ・ 霑大ｍ縺ｮ繝槭・繧ｫ繝ｼ縺九ｉ譛繧りｿ代＞繧､繝ｳ繝・ャ繧ｯ繧ｹ繧呈爾邏｢縺吶ｋ
-// 蠑墓焚	 encNow: 迴ｾ蝨ｨ繧ｨ繝ｳ繧ｳ繝ｼ繝蛟､
-// 謌ｻ繧雁､	 譛蟇・ｊ繝槭・繧ｫ繝ｼ縺ｮ繧､繝ｳ繝・ャ繧ｯ繧ｹ
+// ローカル関数 findNearestMarkerIndex
+// 処理概要     近傍マーカーから現在距離に最も近いインデックスを探す
+// 引数         encNow: 現在距離[pulse], isCross: クロスライン検出時はtrue
+// 戻り値       最寄りマーカーのインデックス、マーカー情報がなければ0
 /////////////////////////////////////////////////////////////////////
 static int16_t findNearestMarkerIndex(int32_t encNow, bool isCross)
 {
 	if (numPPAMarry <= 0)
 	{
-		return 0;	// 繝槭・繧ｫ繝ｼ諠・ｱ縺檎┌縺・ｴ蜷医・蜈磯ｭ繧定ｿ斐☆
+		return 0;	// マーカー情報がなければ0を返す
 	}
-	int16_t hint = clampMarkerIndex(pathedMarker);	// 謗ｨ螳夊ｵｰ陦御ｽ咲ｽｮ縺九ｉ縺ｮ繝偵Φ繝・
-	int16_t center = clampMarkerIndex(lastCorrectedMarker);	// 逶ｴ霑代〒陬懈ｭ｣縺励◆繝槭・繧ｫ繝ｼ繧剃ｸｭ蠢・↓縺吶ｋ
+	int16_t hint = clampMarkerIndex(pathedMarker);	// 推定走行位置を探索のヒントにする
+	int16_t center = clampMarkerIndex(lastCorrectedMarker);	// 直前に補正したマーカーを探索の中心にする
 	int16_t searchBack = isCross ? MARKER_SEARCH_CROSS_BACK : MARKER_SEARCH_BACK;
 	int16_t searchForward = isCross ? MARKER_SEARCH_CROSS_FORWARD : MARKER_SEARCH_FORWARD;
-	int16_t lower = center - searchBack;	// 蠕梧婿謗｢邏｢髢句ｧ倶ｽ咲ｽｮ
-	int16_t upper = center + searchForward;	// 蜑肴婿謗｢邏｢邨ゆｺ・ｽ咲ｽｮ
+	int16_t lower = center - searchBack;	// 後方探索の開始位置
+	int16_t upper = center + searchForward;	// 前方探索の終了位置
 	if (hint < lower)
 	{
-		lower = hint;	// 繝偵Φ繝医′繧医ｊ謇句燕縺ｪ繧牙ｾ梧婿遽・峇繧呈僑蠑ｵ
+		lower = hint;	// ヒントが手前なら後方探索範囲を広げる
 	}
 	if (hint > upper)
 	{
-		upper = hint;	// 繝偵Φ繝医′蜈医↑繧牙燕譁ｹ遽・峇繧呈僑蠑ｵ
+		upper = hint;	// ヒントが先なら前方探索範囲を広げる
 	}
 	lower = clampMarkerIndex(lower);
 	upper = clampMarkerIndex(upper);
@@ -1401,9 +1401,9 @@ static int16_t findNearestMarkerIndex(int32_t encNow, bool isCross)
 	{
 		int16_t tmp = upper;
 		upper = lower;
-		lower = tmp;	// 荳贋ｸ九′騾・ｻ｢縺励◆蝣ｴ蜷医・蜈･繧梧崛縺・
+		lower = tmp;	// 探索範囲の上下限が逆なら入れ替える
 	}
-	int16_t bestIdx = lower;	// 證ｫ螳壼呵｣懊ｒ荳矩剞縺ｫ險ｭ螳・
+	int16_t bestIdx = lower;	// 暫定候補を探索範囲の下限に設定する
 	int32_t bestDiff = encNow - markerPos[lower].distance;
 	bestDiff = (bestDiff < 0) ? -bestDiff : bestDiff;
 	for (int16_t idx = lower + 1; idx <= upper; idx++)
@@ -1413,74 +1413,74 @@ static int16_t findNearestMarkerIndex(int32_t encNow, bool isCross)
 		if (diff < bestDiff)
 		{
 			bestDiff = diff;
-			bestIdx = idx;	// 繧医ｊ霑代＞繝槭・繧ｫ繝ｼ繧呈治逕ｨ
+			bestIdx = idx;	// 現在距離により近いマーカーを採用する
 		}
 	}
 	return bestIdx;
 }
 /////////////////////////////////////////////////////////////////////
-// 繝ｭ繝ｼ繧ｫ繝ｫ髢｢謨ｰ activateFailSafe
-// 蜃ｦ逅・ｦりｦ・ 陬懈ｭ｣螟ｱ謨玲凾縺ｮ繝輔ぉ繧､繝ｫ繧ｻ繝ｼ繝暮溷ｺｦ蛻ｶ髯舌ｒ驕ｩ逕ｨ縺吶ｋ
-// 蠑墓焚	 縺ｪ縺・
-// 謌ｻ繧雁､	 縺ｪ縺・
+// ローカル関数 activateFailSafe
+// 処理概要     距離補正失敗時にフェイルセーフの速度制限を適用する
+// 引数         なし
+// 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 static void activateFailSafe(void)
 {
 	if (failSafeActive)
 	{
-		return;	// 譌｢縺ｫ逋ｺ蜍墓ｸ医∩縺ｪ繧我ｽ輔ｂ縺励↑縺・
+		return;	// 既に動作中なら再適用しない
 	}
-	float currentSpeed = (float)targetSpeed / PULSE_MILLIMETER;	// 迴ｾ蝨ｨ縺ｮ逶ｮ讓咎溷ｺｦ[m/s]
-	float limitedSpeed = currentSpeed * FAILSAFE_SPEED_SCALE;	// 謖・ｮ壼咲紫縺ｧ螳牙・蛛ｴ縺ｫ貂幃・
-	setTargetSpeed(limitedSpeed);	// 騾溷ｺｦ謖・ｻ､繧呈峩譁ｰ
-	boostSpeed = limitedSpeed;	// 蜿ら・騾溷ｺｦ繧ょ酔譛・
+	float currentSpeed = (float)targetSpeed / PULSE_MILLIMETER;	// 現在の目標速度[m/s]
+	float limitedSpeed = currentSpeed * FAILSAFE_SPEED_SCALE;	// 指定倍率で目標速度を下げる
+	setTargetSpeed(limitedSpeed);	// 速度指令を更新する
+	boostSpeed = limitedSpeed;	// 参照速度も同期する
 	failSafeActive = true;
 }
 /////////////////////////////////////////////////////////////////////
-// 繝｢繧ｸ繝･繝ｼ繝ｫ蜷・processMarkerEvent
-// 蜃ｦ逅・ｦりｦ・    繝槭・繧ｫ繝ｼ騾夐℃譎ゅ・蜃ｦ逅・ｒ縺ｾ縺ｨ繧√ｋ
-// 蠑墓焚         縺ｪ縺・
-// 謌ｻ繧雁､       縺ｪ縺・
+// モジュール名 processMarkerEvent
+// 処理概要     マーカー検出時の距離補正と速度更新を行う
+// 引数         なし
+// 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void processMarkerEvent(void) {
-	// 繧ｫ繝ｼ繝悶・繝ｼ繧ｫ繝ｼ,繧ｯ繝ｭ繧ｹ繝ｩ繧､繝ｳ繧呈､懷・縺励◆譎ゅ・蜃ｦ逅・
+	// マーカーまたはクロスラインを新たに検出したときの処理
 	if (courseMarker > 0 && beforeCourseMarker == 0) {
-		cntMarker++; // 繝槭・繧ｫ繝ｼ繧ｫ繧ｦ繝ｳ繝・
+		cntMarker++; // マーカー検出回数を加算する
 		if (optimalTrace == BOOST_DISTANCE) {
 			if (numPPAMarry > 0) {
-				bool isCross = (courseMarker == CROSSLINE);	// 繧ｯ繝ｭ繧ｹ繝ｩ繧､繝ｳ縺ｪ繧臥┌譚｡莉ｶ陬懈ｭ｣
-				bool straightLike = isStraightBeforeMarker(encTotalOptimal, STRAIGHT_WINDOW_MM, STRAIGHT_RATIO_THRESHOLD);	// 逶ｴ邱夂紫蛻､螳・
+				bool isCross = (courseMarker == CROSSLINE);	// クロスラインなら距離誤差の閾値判定を省く
+				bool straightLike = isStraightBeforeMarker(encTotalOptimal, STRAIGHT_WINDOW_MM, STRAIGHT_RATIO_THRESHOLD);	// 直前区間の直線率を判定する
 				bool straightPending = straightMarkerPending;	// first marker after straight detection
 				bool usedStraightPending = straightPending;
 				if (straightLike || isCross || straightPending) {
 					if (straightPending) {
 						straightMarkerPending = false;
 					}
-					int16_t nearestIdx = findNearestMarkerIndex(encTotalOptimal, isCross);	// 霑大ｍ縺九ｉ譛驕ｩ繝槭・繧ｫ繝ｼ繧貞叙蠕・
-					int32_t rawDiff = encTotalOptimal - markerPos[nearestIdx].distance;	// 迴ｾ蝨ｨ霍晞屬縺ｨ縺ｮ蟾ｮ蛻・繝代Ν繧ｹ]
+					int16_t nearestIdx = findNearestMarkerIndex(encTotalOptimal, isCross);	// 近傍から現在距離に最も近いマーカーを取得する
+					int32_t rawDiff = encTotalOptimal - markerPos[nearestIdx].distance;	// 現在距離とマーカー位置の差[pulse]
 					int32_t absDiff = (rawDiff < 0) ? -rawDiff : rawDiff;
-					int32_t allowDiff = calcDynamicThresholdPulse();	// 蜍慕噪縺ｫ邂怜・縺励◆險ｱ螳ｹ隱､蟾ｮ
-					bool canCorrect = isCross || (absDiff <= allowDiff);	// 繧ｯ繝ｭ繧ｹ縺ｯ蜊ｳ陬懈ｭ｣縲√◎繧御ｻ･螟悶・髢ｾ蛟､蛻､螳・
-					pathedMarker = clampMarkerIndex(nearestIdx);	// 繝偵Φ繝井ｽ咲ｽｮ繧呈峩譁ｰ
+					int32_t allowDiff = calcDynamicThresholdPulse();	// 速度と角速度から計算した許容誤差[pulse]
+					bool canCorrect = isCross || (absDiff <= allowDiff);	// クロスラインは補正を許可し、それ以外は距離誤差を判定する
+					pathedMarker = clampMarkerIndex(nearestIdx);	// 次の探索で使うヒント位置を更新する
 					if (canCorrect) {
 						if (usedStraightPending) {
 							straightMarkerPendingLog = 1;
 						}
-						int32_t stepLimit = encMM(CORR_STEP_MAX_MM);	// 谿ｵ髫手｣懈ｭ｣縺ｮ荳企剞驥充繝代Ν繧ｹ]
+						int32_t stepLimit = encMM(CORR_STEP_MAX_MM);	// 1回の距離補正量の上限[pulse]
 						int32_t diff = rawDiff;
 						if (diff > stepLimit) {
-							diff = stepLimit;	// 谿ｵ髫手｣懈ｭ｣縺ｧ蛻・ｊ隧ｰ繧・
+							diff = stepLimit;	// 正方向の補正量を上限で制限する
 						}
 						if (diff < -stepLimit) {
 							diff = -stepLimit;
 						}
-						int32_t errorDistance = encTotalOptimal - DistanceOptimal;	// 陬懈ｭ｣蜑阪・霍晞屬隱､蟾ｮ繧剃ｿ晄戟
-						Control_ApplyMarkerCorrection_p(diff);	// 繝槭・繧ｫ繝ｼ陬懈ｭ｣繧偵せ繝ｪ繝・・陬懈ｭ｣蠕後ヱ繝ｫ繧ｹ縺ｸ蜿肴丐
-						DistanceOptimal = encTotalOptimal - errorDistance;	// 隱､蟾ｮ繧堤ｶｭ謖√＠縺溘∪縺ｾ逶ｮ讓呵ｷ晞屬繧呈峩譁ｰ
-						int32_t markerIndex = markerPos[nearestIdx].indexPPAD;	// PPAD蛛ｴ縺ｮ蟇ｾ蠢懊う繝ｳ繝・ャ繧ｯ繧ｹ
+						int32_t errorDistance = encTotalOptimal - DistanceOptimal;	// 補正前の現在距離と目標距離の誤差を保持する
+						Control_ApplyMarkerCorrection_p(diff);	// マーカー補正をスリップ補正後の距離パルスへ反映する
+						DistanceOptimal = encTotalOptimal - errorDistance;	// 距離誤差を維持したまま目標距離を更新する
+						int32_t markerIndex = markerPos[nearestIdx].indexPPAD;	// マーカーに対応するPPADインデックス
 						int32_t currentIndex = (int32_t)optimalIndex;
 						int32_t nearDev = isCross ? MARKER_INDEX_DEV_CROSS : MARKER_INDEX_DEV_NORMAL;
-						// marker index繧堤樟蝨ｨ縺ｮoptimalIndex霑大ｍ縺ｫ諡俶據縺吶ｋ
+						// マーカーインデックスを現在のoptimalIndex近傍へ制限する
 						if (markerIndex > currentIndex + nearDev)
 						{
 							markerIndex = currentIndex + nearDev;
@@ -1489,7 +1489,7 @@ void processMarkerEvent(void) {
 						{
 							markerIndex = currentIndex - nearDev;
 						}
-						// 繧ｯ繝ｭ繧ｹ繝ｩ繧､繝ｳ陬懈ｭ｣譎ゅ・1蝗槭〒縺ｮ繧ｸ繝｣繝ｳ繝鈴㍼繧偵＆繧峨↓蛻ｶ髯舌☆繧・
+						// クロスライン補正時のインデックス移動量をさらに制限する
 						if (isCross)
 						{
 							if (markerIndex > currentIndex + MARKER_INDEX_JUMP_CROSS_MAX)
@@ -1508,43 +1508,43 @@ void processMarkerEvent(void) {
 						} else {
 							optimalIndex = 0;
 						}
-						boostSpeed = PPAD[optimalIndex].boostSpeed;	// 蛹ｺ髢馴溷ｺｦ繧貞叙蠕・
-						setTargetSpeed(boostSpeed);	// 逶ｮ讓咎溷ｺｦ縺ｸ蜊ｳ蜿肴丐
-						resetSpeedPID();	// PID蜀・Κ迥ｶ諷九ｒ蜷梧悄
-						int16_t newPathed = nearestIdx - 2;	// 谺｡蝗樊爾邏｢縺ｯ蟆代＠謇句燕縺九ｉ
+						boostSpeed = PPAD[optimalIndex].boostSpeed;	// 補正後の区間の目標速度を取得する
+						setTargetSpeed(boostSpeed);	// 速度指令へ直ちに反映する
+						resetSpeedPID();	// 速度PIDの内部状態をリセットする
+						int16_t newPathed = nearestIdx - 2;	// 次回の探索ヒントを少し手前に戻す
 						pathedMarker = clampMarkerIndex(newPathed);
-						lastCorrectedMarker = nearestIdx;	// 逶ｴ霑題｣懈ｭ｣菴咲ｽｮ繧定ｨ倬鹸
-						missedCorrections = 0;	// 螟ｱ謨励き繧ｦ繝ｳ繧ｿ繧偵Μ繧ｻ繝・ヨ
-						failSafeActive = false;	// 繝輔ぉ繧､繝ｫ繧ｻ繝ｼ繝戊ｧ｣髯､
+						lastCorrectedMarker = nearestIdx;	// 直前の補正マーカー位置を記録する
+						missedCorrections = 0;	// 連続補正失敗回数をリセットする
+						failSafeActive = false;	// フェイルセーフを解除する
 					} else {
-						missedCorrections++;	// 陬懈ｭ｣螟ｱ謨励ｒ繧ｫ繧ｦ繝ｳ繝・
+						missedCorrections++;	// 補正失敗回数を加算する
 						if (missedCorrections >= FAILSAFE_MISS_MAX) {
 							activateFailSafe();
 						}
 					}
 				} else {
-					missedCorrections++;	// 逶ｴ邱壽擅莉ｶ荳肴・遶九〒繧ょ､ｱ謨玲桶縺・
+					missedCorrections++;	// 直線条件を満たさない場合も補正失敗として数える
 					if (missedCorrections >= FAILSAFE_MISS_MAX) {
 						activateFailSafe();
 					}
 				}
 			}
 		} else if(optimalTrace == BOOST_SHORTCUT) {
-			// 繧ｷ繝ｧ繝ｼ繝医き繝・ヨ蝓ｺ貅・谺｡襍ｰ陦後・縺ｨ縺・
+			// ショートカット走行ではここで距離補正を行わない
 		}
 	}
-	beforeCourseMarker = courseMarker; // 蜑榊屓縺ｮ繝槭・繧ｫ繝ｼ迥ｶ諷九ｒ譖ｴ譁ｰ
+	beforeCourseMarker = courseMarker; // 前回のマーカー状態を更新する
 }
 /////////////////////////////////////////////////////////////////////
-// 繝｢繧ｸ繝･繝ｼ繝ｫ蜷・cleaerMarkerProcessState
-// 蜃ｦ逅・ｦりｦ・    繝槭・繧ｫ繝ｼ騾夐℃蜃ｦ逅・憾諷九・蛻晄悄蛹・
-// 蠑墓焚         縺ｪ縺・
-// 謌ｻ繧雁､       縺ｪ縺・
+// モジュール名 clearMarkerProcessState
+// 処理概要     マーカー検出処理の状態を初期化する
+// 引数         なし
+// 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void clearMarkerProcessState(void) {
 	beforeCourseMarker = 0;
 	cntMarker = 0;
-	straightMeter = 0;	// 霑ｽ蜉: 逶ｴ邱壼愛螳夊ｷ晞屬繧貞・譛溷喧
+	straightMeter = 0;	// 直線判定用の走行距離を初期化する
 	straightState = false;
 	straightMarkerPending = false;
 	straightMarkerPendingLog = 0;
