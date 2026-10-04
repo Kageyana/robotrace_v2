@@ -163,6 +163,81 @@ static void showSlipAnalysisProgress(const char *stage, uint32_t lineNo)
 		(void)updateDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS);
 	}
 }
+/////////////////////////////////////////////////////////////////////
+// モジュール名 stopLogDisplayDmaAndWait
+// 処理概要     連続DMAを止め、送信中ページのI2C完了を待つ
+// 引数         timeout_ms: 待機上限[ms]
+// 戻り値       true: バス待機完了 false: タイムアウト
+/////////////////////////////////////////////////////////////////////
+static bool stopLogDisplayDmaAndWait(uint32_t timeout_ms)
+{
+	ssd1306_StopDMA();
+	uint32_t start = HAL_GetTick();
+	while (HAL_I2C_GetState(&SSD1306_I2C_PORT) != HAL_I2C_STATE_READY) {
+		if (HAL_GetTick() - start >= timeout_ms) return false;
+	}
+	return true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 showLogConversionProgress
+// 処理概要     停止中のCSV変換本数・段階・行数進捗を最大5Hzで表示する
+// 引数         progress: 変換状態
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void showLogConversionProgress(const LogConversionProgress *progress)
+{
+	static uint32_t lastTick;
+	static bool displayFailed;
+	static uint16_t lastNumber;
+	static LogConversionStage lastStage = LOG_CONVERT_FAILED;
+	if (!modeDSP) return;
+	if (progress->fileIndex == 1U && progress->stage == LOG_CONVERT_SCAN && progress->processedRows == 0U)
+		displayFailed = false;
+	if (displayFailed) return;
+	uint32_t tick = HAL_GetTick();
+	bool changed = lastNumber != progress->logNumber || lastStage != progress->stage;
+	if (!changed && tick - lastTick < 200U) return;
+	lastTick = tick; lastNumber = progress->logNumber; lastStage = progress->stage;
+	static const char *const stages[] = {"Analyze", "Write", "Commit", "Done", "Failed"};
+	uint32_t percent = progress->expectedRows ? progress->processedRows * 100U / progress->expectedRows : 0U;
+	if (percent > 100U) percent = 100U;
+	if (!stopLogDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS)) { displayFailed = true; return; }
+	ssd1306_FillRectangle(0, 15, 127, 63, Black);
+	ssd1306_SetCursor(0, 16);
+	ssd1306_printf(Font_6x8, "CSV %u/%u", progress->fileIndex, progress->fileCount);
+	ssd1306_SetCursor(0, 28);
+	ssd1306_printf(Font_6x8, "Log %u", progress->logNumber);
+	ssd1306_SetCursor(0, 40);
+	ssd1306_printf(Font_6x8, "%s %lu%%", stages[progress->stage], (unsigned long)percent);
+	ssd1306_SetCursor(0, 52);
+	ssd1306_printf(Font_6x8, "Total %u%%", progress->totalPercent);
+	if (!updateDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS)) displayFailed = true;
+	if (!stopLogDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS)) displayFailed = true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 finishLogConversions
+// 処理概要     モーター停止状態で未変換ログをCSVへ確定する
+// 引数         なし
+// 戻り値       true: 完了またはSDなし false: 復旧失敗
+/////////////////////////////////////////////////////////////////////
+static bool finishLogConversions(void)
+{
+	motorCommandOut(0, 0);
+	if (!initMSD) return logRecoveryIsReady();
+	bool result = logConvertPending(showLogConversionProgress);
+	if (modeDSP && logHasIncompleteTemp() && result &&
+		stopLogDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS)) {
+		ssd1306_SetCursor(0, 52);
+		ssd1306_printf(Font_6x8, "Incomplete BIN kept");
+	}
+	// 終了後のゴール表示・緊急停止理由も、従来の連続DMAで反映する。
+	if (modeDSP && !ssd1306_IsDMARunning() && stopLogDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS))
+		(void)updateDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS);
+	return result;
+}
+
 // タイマ関連
 uint32_t cntRun = 0;
 int16_t countdown;
@@ -251,13 +326,14 @@ void initSystem(void)
 	ssd1306_SetCursor(0, 28);
 	if (insertSD())
 	{
-		if(!softreset)
+		if(!softreset || !initMSD)
 		{
 			initMSD = initMicroSD();
 		}
 
 		if(initMSD || softreset)
 		{
+			(void)finishLogConversions(); // 設定取得・ログ整理前に未変換ログを復旧
 			cntFiles = getFileNumbers();	// 走行ログのファイル番号を取得
 			getLogNumber();		// 前回の解析ログナンバーを取得
 
@@ -411,6 +487,7 @@ void initSystem(void)
 ///////////////////////////////////////////////////////////////////////////
 static const char *getRunStartBlockReason(void)
 {
+	if (insertSD() && !logRecoveryIsReady()) return "CSV recovery failed";
 	if (!initIMU)
 	{
 		return "IMU failed";
@@ -463,6 +540,7 @@ static void showRunStartBlocked(const char *reason)
 ///////////////////////////////////////////////////////////////////////////
 static bool blockRunStartIfNeeded(void)
 {
+	bool abortedAuto = autoStart > 0U;
 	if (autoStart > 0U && !autoRunState.configReady)
 	{
 		const char *reason = (autoRunConfigLoadResult == AUTO_RUN_CONFIG_LOAD_IO_ERROR) ?
@@ -473,6 +551,7 @@ static bool blockRunStartIfNeeded(void)
 		autoStart = 0;
 		autoStartAnalyze = 0;
 		autoRunAbortSeries(&autoRunState);
+		(void)finishLogConversions();
 		showRunStartBlocked(reason);
 		return true;
 	}
@@ -487,6 +566,7 @@ static bool blockRunStartIfNeeded(void)
 	autoStart = 0;
 	autoStartAnalyze = 0;
 	autoRunAbortSeries(&autoRunState);
+	if (abortedAuto) (void)finishLogConversions();
 	pattern.calibration = 1;
 	showRunStartBlocked(getRunStartBlockReason());
 	return true;
@@ -524,6 +604,7 @@ void loopSystem(void)
 				autoStart = 0U;
 				autoStartAnalyze = 0;
 				autoRunAbortSeries(&autoRunState);
+				(void)finishLogConversions();
 				showRunStartBlocked("auto_run source missing");
 				break;
 			}
@@ -539,7 +620,7 @@ void loopSystem(void)
 			ssd1306_printf(Font_6x8, "%s %d", autoRunModeName(autoRunCurrentPlan.requestedMode),
 				autoRunCurrentPlan.requestedMode == AUTO_RUN_MODE_SLIP ? autoRunCurrentPlan.slipSourceLogNumber :
 				autoRunCurrentPlan.primaryLogNumber);
-			// endLog() はログを同期・クローズ済み。閉じたログの追加同期は不要。
+			// endLog() で確定済みのバイナリを直接解析する。
 
 			switch (autoRunCurrentPlan.requestedMode)
 			{
@@ -587,6 +668,7 @@ void loopSystem(void)
 				autoStart = 0;
 				autoStartAnalyze = 0;
 				autoRunAbortSeries(&autoRunState);
+				(void)finishLogConversions();
 			}
 		}
 		else
@@ -679,7 +761,14 @@ void loopSystem(void)
 
 			if (initMSD)
 			{
-				initLog(); // ログ一時ファイル作成
+				initLog(); // 番号付きバイナリの作業ファイル作成
+				if (!initMSD || !logRecoveryIsReady()) {
+					motorCommandOut(0, 0); autoStart = 0; setupFlags.start = 0;
+					autoRunAbortSeries(&autoRunState);
+					(void)finishLogConversions();
+					showRunStartBlocked("BIN open failed");
+					patternTrace = 103; break;
+				}
 			}
 
 			// 変数初期化
@@ -750,6 +839,13 @@ void loopSystem(void)
 
 			if (initMSD)
 			{
+				if (!initMSD || !logRecoveryIsReady()) {
+					autoStart = 0; setupFlags.start = 0;
+					autoRunAbortSeries(&autoRunState);
+					(void)finishLogConversions();
+					showRunStartBlocked("BIN open failed");
+					patternTrace = 103; break;
+				}
 				modeLOG = true; // log start
 			}
 			
@@ -861,7 +957,7 @@ void loopSystem(void)
 		int16_t savedLogNo = 0;
 		bool logSaved = false;
 		// 追加: 表示用の予測ログ番号はSD空でも落ちないようガード
-		int16_t predictedLogNo = getNextLogNumber();
+		int16_t predictedLogNo = getLastLogNumber();
 		if (modeLOG)
 		{
 			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
@@ -907,6 +1003,7 @@ void loopSystem(void)
 
 			if (autoStart == 0U)
 			{
+				(void)finishLogConversions();
 				patternTrace = 103;
 				break;
 			}
@@ -915,12 +1012,15 @@ void loopSystem(void)
 				autoStart = 0U;
 				autoStartAnalyze = 0;
 				autoRunAbortSeries(&autoRunState);
-				// 5走終了
+				bool converted = finishLogConversions();
+				// 5走終了。変換失敗時は対象ログ番号を表示した画面を保持する。
+				if (converted) {
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(0, 15);
 				ssd1306_printf(Font_11x18, "Auto run");
 				ssd1306_SetCursor(0, 35);
 				ssd1306_printf(Font_11x18, "Finish!");
+				}
 
 				patternTrace = 103;
 				break;
@@ -969,6 +1069,7 @@ void loopSystem(void)
 			}
 		}
 
+		(void)finishLogConversions();
 		patternTrace = 103;
 		break;
 
@@ -1052,6 +1153,7 @@ void emergencyStop(void)
 		
 	}
 
+	bool csvConverted = finishLogConversions();
 	if (modeDSP)
 	{
 		ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
@@ -1083,6 +1185,10 @@ void emergencyStop(void)
 		}
 	}
 
+	if (modeDSP && !csvConverted) {
+		ssd1306_SetCursor(0, 53);
+		ssd1306_printf(Font_6x8, "CSV failed: BIN kept");
+	}
 	autoStart = 0U;
 	autoStartAnalyze = 0;
 	autoRunAbortSeries(&autoRunState);

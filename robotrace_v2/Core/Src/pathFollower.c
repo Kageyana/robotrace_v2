@@ -1,4 +1,5 @@
 #include "pathFollower.h"
+#include "logSource.h"
 #include "pathPolicy.h"
 #include "PIDcontrol.h"
 #include "SDcard.h"
@@ -350,7 +351,7 @@ static bool pathParseHeader(const char *line, RouteCsvColumns *columns)
 /////////////////////////////////////////////////////////////////////
 static bool pathReadColumnHeader(FIL *file, RouteCsvColumns *columns)
 {
-	if (f_gets(routeCsvLine, sizeof(routeCsvLine), file) == NULL ||
+	if (logSourceGets(routeCsvLine, sizeof(routeCsvLine), file) == NULL ||
 		(strchr(routeCsvLine, '\n') == NULL && strchr(routeCsvLine, '\r') == NULL))
 	{
 		return false;
@@ -379,7 +380,7 @@ static bool pathReadColumnHeader(FIL *file, RouteCsvColumns *columns)
 		(calibrationErrors != NULL) ? 0U : 1U, distanceVerified != NULL,
 		columns->expectedRows);
 	if (!columns->closureValid) return false;
-	if (f_gets(routeCsvLine, sizeof(routeCsvLine), file) == NULL ||
+	if (logSourceGets(routeCsvLine, sizeof(routeCsvLine), file) == NULL ||
 		(strchr(routeCsvLine, '\n') == NULL && strchr(routeCsvLine, '\r') == NULL))
 	{
 		return false;
@@ -916,7 +917,7 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	if (!lockAcquired) return -9;
 
 	snprintf(fileName, sizeof(fileName), "%d.csv", logNumber);
-	result = f_open(&file, fileName, FA_OPEN_EXISTING | FA_READ);
+	result = logSourceOpen(&file, fileName, FA_OPEN_EXISTING | FA_READ);
 	if (result != FR_OK)
 	{
 		sd_fatfs_unlock();
@@ -924,15 +925,15 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	}
 	if (!pathReadColumnHeader(&file, &columns))
 	{
-		f_close(&file);
+		logSourceClose(&file);
 		sd_fatfs_unlock();
 		return -10;
 	}
-	while (f_gets(routeCsvLine, sizeof(routeCsvLine), &file) != NULL)
+	while (logSourceGets(routeCsvLine, sizeof(routeCsvLine), &file) != NULL)
 	{
 		float x, y;
-		if (!pathCsvRowComplete(routeCsvLine) ||
-			!pathReadCsvPoint(routeCsvLine, &columns, &x, &y, &pulse))
+		if ((logSourceIsBinary(&file) ? !logSourceBinaryPoint(&file, &x, &y, &pulse) :
+			(!pathCsvRowComplete(routeCsvLine) || !pathReadCsvPoint(routeCsvLine, &columns, &x, &y, &pulse))))
 		{
 			parseError = true;
 			break;
@@ -955,11 +956,11 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 		previousPulse = pulse;
 		lastPulse = pulse;
 	}
-	if (parseError || !havePoint || totalLength < PATH_ROUTE_SPACING_MM ||
+	if (logSourceError(&file) || parseError || !havePoint || totalLength < PATH_ROUTE_SPACING_MM ||
 		columns.expectedRows != parsedRows || lastPulse <= 0.0f ||
 		fabsf(totalLength - (lastPulse / PULSE_MILLIMETER)) > fmaxf(50.0f, totalLength * 0.05f))
 	{
-		f_close(&file);
+		logSourceClose(&file);
 		sd_fatfs_unlock();
 		return -11;
 	}
@@ -969,8 +970,8 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	 * なることがある。いったん閉じて同じCSVを再オープンし、
 	 * 2パス目の読込状態を確実に初期化する。
 	 */
-	f_close(&file);
-	result = f_open(&file, fileName, FA_OPEN_EXISTING | FA_READ);
+	if (logSourceClose(&file) != FR_OK) { sd_fatfs_unlock(); return -13; }
+	result = logSourceOpen(&file, fileName, FA_OPEN_EXISTING | FA_READ);
 	if (result != FR_OK)
 	{
 		sd_fatfs_unlock();
@@ -978,7 +979,7 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	}
 	if (!pathReadColumnHeader(&file, &columns))
 	{
-		f_close(&file);
+		logSourceClose(&file);
 		sd_fatfs_unlock();
 		return -14;
 	}
@@ -995,11 +996,11 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	bool routeOverflow = false;
 	float secondPassPreviousPulse = 0.0f;
 	uint32_t secondPassRows = 0U;
-	while (f_gets(routeCsvLine, sizeof(routeCsvLine), &file) != NULL)
+	while (logSourceGets(routeCsvLine, sizeof(routeCsvLine), &file) != NULL)
 	{
 		float rawX, rawY;
-		if (!pathCsvRowComplete(routeCsvLine) ||
-			!pathReadCsvPoint(routeCsvLine, &columns, &rawX, &rawY, &pulse))
+		if ((logSourceIsBinary(&file) ? !logSourceBinaryPoint(&file, &rawX, &rawY, &pulse) :
+			(!pathCsvRowComplete(routeCsvLine) || !pathReadCsvPoint(routeCsvLine, &columns, &rawX, &rawY, &pulse))))
 		{
 			routeOverflow = true;
 			break;
@@ -1018,7 +1019,8 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 		}
 		secondPassPreviousPulse = pulse;
 	}
-	f_close(&file);
+	if (logSourceError(&file)) routeOverflow = true;
+	if (logSourceClose(&file) != FR_OK) routeOverflow = true;
 	sd_fatfs_unlock();
 	if (routeOverflow || secondPassRows != parsedRows) return -7;
 	if (pathPointDistance((float)lineRoute[routeCount - 1U].x_mm,

@@ -106,6 +106,17 @@ File: `lsval.txt`
 - Order: `lSensorMax[0]` to `lSensorMax[9]`, then `lSensorMin[0]` to `lSensorMin[9]`.
 - If corrupt, running is prohibited by policy.
 
+### Deferred binary run logs
+
+- See `doc/deferred-log-storage.md` for the container layout and recovery checks.
+- Runs write numbered `.tmp` files; `endLog()` seals binary records and immutable end-of-run metadata, then renames to `.bin`. It no longer creates a CSV.
+- Auto-start intermediate runs read `.bin` directly. CSV conversion happens at series completion, manual completion, emergency stop, or series abort.
+- `logConvertPending()` writes `.part`, syncs/closes it, commits `.csv`, then deletes `.bin`. Failed conversion keeps the binary; reboot retries sealed logs before CSV listing/pruning.
+- Unsealed `.tmp` files are kept with a warning. Never promote them automatically. Incompatible schema/profile or CRC/length errors block recovery and new starts.
+- Allocation considers numeric `.csv`, `.bin`, `.tmp`, and `.part` names. Never overwrite a reserved log number or prune pending binary logs.
+- New CSV metadata includes `binaryLogNumber`, `binaryDataCrc`, and `binarySchema`; CRC values use signed 32-bit text but represent CRC bit patterns. CSV data columns and the existing big-endian record encoding are unchanged.
+- Run `robotrace_v2/tests/run_log_deferred_tests.ps1` for both profiles and the existing PC/schema/XY tests. Check actual on-device stop/save/recovery/progress behavior before claiming hardware validation.
+
 ### Analysis and Log Numbers
 
 File: `analysis.txt`

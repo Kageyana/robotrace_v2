@@ -8,6 +8,22 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include "courseLogCsv.h"
+
+typedef enum { LOG_CONVERT_SCAN, LOG_CONVERT_WRITE, LOG_CONVERT_COMMIT,
+    LOG_CONVERT_DONE, LOG_CONVERT_FAILED } LogConversionStage;
+typedef struct {
+    uint16_t logNumber, fileIndex, fileCount;
+    LogConversionStage stage;
+    uint32_t processedRows, expectedRows;
+    uint8_t totalPercent;
+} LogConversionProgress;
+typedef void (*LogProgressCallback)(const LogConversionProgress *progress);
+
+// 停止中のメイン処理でのみ使用。共通読込は1ファイルずつ、呼出側でFatFsロックを保持する。
+bool logConvertPending(LogProgressCallback progress);
+bool logRecoveryIsReady(void);
+bool logHasIncompleteTemp(void);
 //====================================//
 // シンボル定義
 //====================================//
@@ -42,7 +58,6 @@ extern volatile uint32_t dbg_overflow;
 // MicroSD
 bool insertSD(void);
 bool initMicroSD(void);
-void createLog(void);
 void readImuTempCompensation(void);
 AutoRunConfigLoadResult readAutoRunSettings(void);
 void endTempFile(void);

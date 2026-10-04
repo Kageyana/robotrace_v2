@@ -13,6 +13,9 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 
 - Logs live under `F:\Dropbox\Document\robotrace\Log\v2` when accessible.
 - Logs are CSV, UTF-8, comma-separated. New logs have `key=value` metadata on line 1, column names on line 2, and data from line 3. Older logs may combine column names and metadata on line 1; resolve columns by name.
+- During auto-start, completed intermediate runs remain numbered `.bin` logs on the robot. All sealed runs are converted after series completion/abort or emergency stop; manual runs convert at completion. CSVs become available only after this conversion finishes.
+- CSV metadata adds `binaryLogNumber`, `binaryDataCrc`, and `binarySchema` as conversion identity. CRC text is signed 32-bit; compare bit patterns when needed. Data columns and units are unchanged.
+- Binary recovery/format is documented in `doc/deferred-log-storage.md`. Do not parse `.tmp`, `.part`, or `.bin` as CSV. Recovery failures preserve the binary and block new starts; changing firmware profiles with pending logs can make recovery unsupported.
 - The schema source is `robotrace_v2/Core/Inc/log_schema.h`.
 - The log header contains data names and `parameter=value` entries.
 - `logDistanceTargetMm` records the target row spacing; use `encTotalOptimal` deltas to evaluate actual spacing because sensor values update at 1 ms and may exceed the target at high speed.

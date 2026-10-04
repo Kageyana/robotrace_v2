@@ -63,7 +63,8 @@ FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 512K
 _estack = ORIGIN(RAM) + LENGTH(RAM);    /* end of RAM */
 /* Generate a link error if heap and stack don't fit into RAM */
 _Min_Heap_Size = 0x200;      /* required amount of heap  */
-_Min_Stack_Size = 0x400; /* required amount of stack */
+/* CSV一括変換の約2.6 KiBフレームと下位I/O・書式化・割り込みの余裕を確保する。 */
+_Min_Stack_Size = 0x2000; /* 8 KiB: _sbrkからのヒープ侵入も制限する */
 
 /* Define output sections */
 SECTIONS

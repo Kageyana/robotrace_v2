@@ -177,6 +177,8 @@ Codex は主にファームウェア開発に使用します。必要に応じ�
 
 このファームウェアは、ARM GCC を使う STM32F446 向けの C11 プロジェクトです。
 
+使用中のリンカスクリプトは `robotrace_v2/STM32F446XX_FLASH.ld`。CSV一括変換の下位処理と割り込みの余裕のため、`_Min_Stack_Size=0x2000`（8 KiB）を予約し、`_sbrk()`のヒープ上限にも使用する。RAM・スタックの変更時は全ビルド構成を確認し、実機の最大使用量は別途検証する。
+
 主な開発環境は VS Code、STM32CubeIDE for Visual Studio Code 拡張機能、STM32CubeCLT、STM32CubeMX です。`.vscode/` には CMake、Flash、ST-Link デバッグ用の設定があります。
 
 想定ツールは CMake 3.22 以上、Ninja、ARM GCC、STM32CubeCLT、`STM32_Programmer_CLI` です。
@@ -407,6 +409,8 @@ cmake --build --preset Release
 - PATH系の経路元は `pathSourceFormatVersion=1`、正常終了、閉路有効、期待行数一致、IMU校正成功、距離換算検証成功の一次ログに限る。旧形式・不正ログ・経路生成エラーでは走行を開始せず、自動走行中に一次ログの検証が失敗した場合も次走へ進まない。
 - 一次ログの閉路検証では、ゴールマーカー通過位置の推定X座標を原点から±60 mm以内とする。超過または非有限値は `closureReason=8` として経路元を無効にする。
 - 正常終了時、緊急停止時ともに、ログ保存タイミングは機体停止時とする。緊急停止ログでは `emcStop` に停止要因を記録する。
+- 停止時は番号付きバイナリを確定保存する。オートスタート1～4走目ではCSV化せず、次走はバイナリから解析する。全5走終了、手動終了、緊急停止、連続走行の途中打切り時に未変換ログを番号順でCSV化する。
+- CSV変換中は本数・対象番号・解析/書込/確定段階・全体進捗を表示する。正式CSVの確定成功後にだけ元バイナリを削除する。起動時はログ整理前に未変換ログを復旧し、復旧失敗時は走行禁止とする。SD未挿入時の既存運用は維持する。
 - 走行開始、ゴール判定、ログ終了処理を変更する場合は、正常終了と緊急停止のログ保存タイミングが変わらないか確認する。
 
 ### UI 操作とパラメータ保存タイミング
@@ -469,6 +473,10 @@ cmake --build --preset Release
 実機走行ログは `F:\Dropbox\Document\robotrace\Log\v2` に保存されています。
 
 - ログファイルは CSV 形式、文字コード UTF-8、区切り文字はカンマ。1行目が `key=value` の走行パラメータ、2行目が列名、3行目以降が走行データ。旧ログの混在1行ヘッダも列名で判定する。
+- 走行中は `<番号>.tmp` へ512 Bのコンテナヘッダと従来のバイナリレコードを保存する。停止後に余剰領域を切り詰め、停止時の走行メタデータとCRCを保存・同期・クローズして `<番号>.bin` へ変更する。コンテナ形式・復旧手順は `doc/deferred-log-storage.md` を参照する。
+- バイナリの形式バージョン、プロファイル、スキーマCRC、レコードサイズ、行数、データ/メタデータ/ヘッダCRC、実ファイル長を検証する。バイナリが存在するのに不正・未対応の場合はCSVへフォールバックせず解析/復旧を失敗とする。未確定 `.tmp` は保持して警告し、自動昇格しない。
+- CSV変換は `<番号>.part` へ出力し、全行書込・同期・クローズ後に `<番号>.csv` として確定する。再変換時の既存同番号CSVはメタデータCRCが一致する場合だけ置換する。採番は `.csv` / `.bin` / `.tmp` / `.part` の予約番号を考慮する。
+- CSVメタデータの `binaryLogNumber` は予約番号、`binaryDataCrc` は記録部CRC32/IEEE、`binarySchema` はスキーマ識別CRC32/IEEEを表す。CRCは既存整数書式に合わせた符号付き32bit表示で、ビット列として扱う。CSVデータ列・単位・100/145 Bの記録部は変更しない。
 - ログファイル名は通し番号を使う。
 - ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。旧形式ログも列名で解決する。
 - 1行目のパラメータは `パラメータ名=value` 形式で記載される。IMU温度校正・補正状態、温度係数、エンコーダ換算値も残す。
@@ -477,6 +485,7 @@ cmake --build --preset Release
 - ログ取得の目標距離間隔は `robotrace_v2/Core/Inc/SDcard.h` の `LOG_DISTANCE_MM=5` を正とする。センサー値は1 ms周期で更新するため、高速時は実際のログ行間隔が5 mmを超えることがある。実間隔は `encTotalOptimal` の差で評価する。
 - `goalMarkerOnset_p` は幅を確認したゴールマーカーの検出開始位置とする。`distanceScaleError_p` はログ行間の経過msを掛けて積算した `encCurrentCorr_p` と最終 `encTotalOptimal` の差とする。オートスタートが一次走行後に止まったら、まず `closureReason` とログ最終行の距離を確認する。
 - `courseAnalysis.c` の2次ログ再解析は、`courseMarker`, `encTotalOptimal`, `ROC`, `targetSpeed`, `optimalIndex`, `slipFlag`, `slipFlagLat` をCSVヘッダ名から解決する。ログ列追加時に固定列番号へ依存しない。
+- 共通ログ読込は `.bin` 優先、欠落時だけ従来CSVを使用する。バイナリでは値を直接復元し、曲率・クロス前後100 mm直線化・XY計算をCSV出力と共用する。CSV経由では引き続き列名を解決する。共通読込は停止中・FatFsロック下で1ファイルずつ実行する。
 - 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_MARKER`, `BOOST_DISTANCE`, `BOOST_SHORTCUT`, `BOOST_PATH_REPLAY` を正とする。
 - 新しい走行モードを追加する場合は、`robotrace_v2/Core/Inc/courseAnalysis.h` に定義を追加する。
 - `emcStop` が 0 以外の場合は緊急停止しており、ゴールしていない走行として扱う。
