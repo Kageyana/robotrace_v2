@@ -145,6 +145,8 @@ void ssd1306_Init(void);
 void ssd1306_Fill(SSD1306_COLOR color);
 void ssd1306_UpdateScreen(void);
 void ssd1306_UpdateScreen_DMA(void); // DMA版画面更新を開始
+uint8_t ssd1306_IsReadyForSingleUpdate(void); // 単発DMA送信を開始できるか確認
+uint8_t ssd1306_UpdateScreenOnce_DMA(void); // 画面コピーをDMAで一度だけ送信
 uint8_t ssd1306_IsTransferCompleted(void); // 全ページ送信完了フラグ参照
 void ssd1306_StopDMA(void); // DMA版画面更新を停止
 uint8_t ssd1306_IsDMARunning(void); // DMA継続状態参照

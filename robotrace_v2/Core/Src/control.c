@@ -179,30 +179,20 @@ static bool stopLogDisplayDmaAndWait(uint32_t timeout_ms)
 	return true;
 }
 
+static LogConversionProgress logDisplayProgress;
+static bool logDisplayProgressValid;
+
 /////////////////////////////////////////////////////////////////////
-// モジュール名 showLogConversionProgress
-// 処理概要     停止中のCSV変換本数・段階・行数進捗を最大5Hzで表示する
+// モジュール名 drawLogConversionProgress
+// 処理概要     CSV変換の最新進捗を画面バッファへ描画する
 // 引数         progress: 変換状態
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-static void showLogConversionProgress(const LogConversionProgress *progress)
+static void drawLogConversionProgress(const LogConversionProgress *progress)
 {
-	static uint32_t lastTick;
-	static bool displayFailed;
-	static uint16_t lastNumber;
-	static LogConversionStage lastStage = LOG_CONVERT_FAILED;
-	if (!modeDSP) return;
-	if (progress->fileIndex == 1U && progress->stage == LOG_CONVERT_SCAN && progress->processedRows == 0U)
-		displayFailed = false;
-	if (displayFailed) return;
-	uint32_t tick = HAL_GetTick();
-	bool changed = lastNumber != progress->logNumber || lastStage != progress->stage;
-	if (!changed && tick - lastTick < 200U) return;
-	lastTick = tick; lastNumber = progress->logNumber; lastStage = progress->stage;
 	static const char *const stages[] = {"Analyze", "Write", "Commit", "Done", "Failed"};
 	uint32_t percent = progress->expectedRows ? progress->processedRows * 100U / progress->expectedRows : 0U;
 	if (percent > 100U) percent = 100U;
-	if (!stopLogDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS)) { displayFailed = true; return; }
 	ssd1306_FillRectangle(0, 15, 127, 63, Black);
 	ssd1306_SetCursor(0, 16);
 	ssd1306_printf(Font_6x8, "CSV %u/%u", progress->fileIndex, progress->fileCount);
@@ -212,8 +202,33 @@ static void showLogConversionProgress(const LogConversionProgress *progress)
 	ssd1306_printf(Font_6x8, "%s %lu%%", stages[progress->stage], (unsigned long)percent);
 	ssd1306_SetCursor(0, 52);
 	ssd1306_printf(Font_6x8, "Total %u%%", progress->totalPercent);
-	if (!updateDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS)) displayFailed = true;
-	if (!stopLogDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS)) displayFailed = true;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 showLogConversionProgress
+// 処理概要     CSV変換を止めず、本数・段階・行数進捗をDMAで表示する
+// 引数         progress: 変換状態
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void showLogConversionProgress(const LogConversionProgress *progress)
+{
+	static uint32_t lastTick;
+	static uint16_t lastNumber;
+	static LogConversionStage lastStage = LOG_CONVERT_FAILED;
+	if (!modeDSP) return;
+	// 送信を見送った最終結果も、変換終了後に確実に表示する。
+	logDisplayProgress = *progress;
+	logDisplayProgressValid = true;
+	// 連続更新の停止要求だけを出し、送信中なら変換処理へ即座に戻る。
+	ssd1306_StopDMA();
+	if (!ssd1306_IsReadyForSingleUpdate()) return;
+	uint32_t tick = HAL_GetTick();
+	bool changed = lastNumber != progress->logNumber || lastStage != progress->stage;
+	if (!changed && tick - lastTick < 200U) return;
+	drawLogConversionProgress(progress);
+	// DMAは専用コピーを読むため、転送中もCSVの解析・書込みを継続できる。
+	if (ssd1306_UpdateScreenOnce_DMA()) {
+		lastTick = tick; lastNumber = progress->logNumber; lastStage = progress->stage;
+	}
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -226,15 +241,17 @@ static bool finishLogConversions(void)
 {
 	motorCommandOut(0, 0);
 	if (!initMSD) return logRecoveryIsReady();
+	logDisplayProgressValid = false;
 	bool result = logConvertPending(showLogConversionProgress);
-	if (modeDSP && logHasIncompleteTemp() && result &&
-		stopLogDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS)) {
-		ssd1306_SetCursor(0, 52);
-		ssd1306_printf(Font_6x8, "Incomplete BIN kept");
-	}
-	// 終了後のゴール表示・緊急停止理由も、従来の連続DMAで反映する。
-	if (modeDSP && !ssd1306_IsDMARunning() && stopLogDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS))
+	// CSV変換完了後だけ転送を待ち、最終結果と従来の連続表示へ切り替える。
+	if (modeDSP && stopLogDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS)) {
+		if (logDisplayProgressValid) drawLogConversionProgress(&logDisplayProgress);
+		if (logHasIncompleteTemp() && result) {
+			ssd1306_SetCursor(0, 52);
+			ssd1306_printf(Font_6x8, "Incomplete BIN kept");
+		}
 		(void)updateDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS);
+	}
 	return result;
 }
 
