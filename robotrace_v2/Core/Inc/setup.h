@@ -26,8 +26,6 @@
 #define HEX_PID_TRACE_OMEGA 0x6
 #define HEX_PID_SPEED 0x7
 #define HEX_PID_ANGULAR 0x8
-#define HEX_PID_ANGLE 0x9
-#define HEX_PID_DIST 0xa
 
 // センサテストを表す列挙体
 typedef enum

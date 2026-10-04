@@ -266,8 +266,6 @@ void initSystem(void)
 			readPIDparameters(&veloCtrl);
 			readSpeedFeedForwardGain(&speedFeedForwardGain);	// 速度フィードフォワード係数も読み出す
 			readPIDparameters(&yawRateCtrl);
-			readPIDparameters(&yawCtrl);
-			readPIDparameters(&distCtrl);
 			readPIDparameters(&lineTraceOmegaFBCtrl);
 
 			readLinesenval(); // ラインセンサの最大値と最小値を取得
@@ -675,8 +673,6 @@ void loopSystem(void)
 				writePIDparameters(&veloCtrl);
 				writeSpeedFeedForwardGain(speedFeedForwardGain);
 				writePIDparameters(&yawRateCtrl);
-				writePIDparameters(&yawCtrl);
-				writePIDparameters(&distCtrl);
 
 				writeTgtspeeds();  // 目標速度を保存
 			}
@@ -733,7 +729,6 @@ void loopSystem(void)
 			encTotalR = 0;
 			encTotalOptimal = 0;
 			encLog = 0;
-			encPID = 0;
 			enc1 = 0;
 			encCurve = 0;
 			encChangeGain = 0;
@@ -746,8 +741,6 @@ void loopSystem(void)
 			optimalIndex = 0;
 			clearIMUval(); // IMU値初期化
 			optimalIndex = 0;
-			yawCtrl.Int = 0.0f;
-			distCtrl.Int = 0.0f;
 
 			clearXYcie(); // 座標計算変数初期化
 			if (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT)
@@ -1971,7 +1964,6 @@ void setEncoderVal(void)
 	encChangeGain += dEncUse_p;		// ゲイン変更用
 	encTotalOptimal += dEncUse_p; 	// 2次走行用
 	encLog += dEncUse_p;			// 一定距離ごとにログを保存する用
-	encPID += dEncUse_p;			// 距離制御用
 	encClick += encCurrentL;		// ホイールクリック用
 }
 ///////////////////////////////////////////////////////////////////////////

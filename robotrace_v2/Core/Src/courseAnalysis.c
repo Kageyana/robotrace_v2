@@ -33,7 +33,6 @@ float boostSpeed;
 int32_t DistanceOptimal = 0; // 2次走行用の目標走行距離[pulse]
 int16_t analyzedNumber = 0;	 // 前回解析したログ番号
 int32_t encTotalOptimal = 0; // 2次走行用の補正済み走行距離[pulse]
-int32_t encPID = 0;			 // 距離制御用の距離[pulse]
 float xydegz = 0;
 static int32_t xyPreviousTotalPulse = 0;
 int32_t straightMeter;

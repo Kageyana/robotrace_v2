@@ -60,8 +60,6 @@ int32_t encClick = 0;
 static void setup_sensors(void); 		// センサ表示とテストメニューを制御する処理
 static void setup_pid_trace(void);		// ゲイン調整(直線トレース)
 static void setup_pid_traceOmegaFB(void); // ゲイン調整(直線トレース 角速度フィードバック)
-static void setup_pid_dist(void);		// ゲイン調整(距離)
-static void setup_pid_angle(void);		// ゲイン調整(角度)
 static void setup_pid_angular(void);	// ゲイン調整(角速度)
 static void setup_pid_speed(void);		// ゲイン調整(速度)
 static void setup_start(void);			// スタート待ち画面とキャリブレーションを制御する処理
@@ -541,74 +539,6 @@ static void setup_sensors(void)
         }
 	pattern.beforeSensors = pattern.sensors;        // 選択状態の更新
 }
-/////////////////////////////////////////////////////////////////////////////////////
-// モジュール名 setup_pid_dist
-// 処理概要     ゲイン調整(距離)
-// 引数         なし
-// 戻り値       なし
-/////////////////////////////////////////////////////////////////////////////////////
-static void setup_pid_dist(void)
-{
-	if (pattern.display != pattern.beforeHex)
-	{
-		// 切替時に実行
-		ssd1306_printf(Font_6x8, "Dist PID");
-
-		ssd1306_SetCursor(0, 18);
-		ssd1306_printf(Font_7x10, "kp:");
-		ssd1306_SetCursor(0, 32);
-		ssd1306_printf(Font_7x10, "ki:");
-		ssd1306_SetCursor(0, 44);
-		ssd1306_printf(Font_7x10, "kd:");
-		ssd1306_SetCursor(60, 30);
-		ssd1306_printf(Font_7x10, "pwm:");
-
-		// 距離制御テスト用初期値
-		setTargetDist(50.0f);		// 目標距離を設定[mm]
-		setTargetSpeed(0.3f);		// 目標速度を設定[m/s]
-	}
-
-	// ゲイン表示
-	dataTuningUD(&pattern.gain, 1, 3, 1);	// 上下ボタンで調整対象を選択
-	if (testFlags.trace_test == 0)	// 動作開始前のみ調整を許可
-	{
-		ssd1306_SetCursor(21, 18);
-		if (pattern.gain == 1)
-			ssd1306_printfB(Font_7x10, "%3d", distCtrl.kp);
-		else
-			ssd1306_printf(Font_7x10, "%3d", distCtrl.kp);
-		ssd1306_SetCursor(21, 32);
-		if (pattern.gain == 2)
-			ssd1306_printfB(Font_7x10, "%3d", distCtrl.ki);
-		else
-			ssd1306_printf(Font_7x10, "%3d", distCtrl.ki);
-		ssd1306_SetCursor(21, 44);
-		if (pattern.gain == 3)
-			ssd1306_printfB(Font_7x10, "%3d", distCtrl.kd);
-		else
-			ssd1306_printf(Font_7x10, "%3d", distCtrl.kd);
-
-		// 制御量表示
-		ssd1306_SetCursor(88, 30);
-		ssd1306_printf(Font_7x10, "%4d", distCtrl.pwm);	// 出力PWM値
-
-		switch (pattern.gain)	// 選択したゲインを変更
-		{
-		case 1:
-			// kp
-			dataTuningLR(&distCtrl.kp, 1, 0, 255);
-			break;
-		case 2:
-			// ki
-			dataTuningLR(&distCtrl.ki, 1, 0, 255);
-			break;
-		case 3:
-			// kd
-			dataTuningLR(&distCtrl.kd, 1, 0, 255);
-			break;
-		}
-	}
-}
 
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_pid_trace
@@ -1054,81 +984,6 @@ static void setup_calibration(void)
 	}
 }
 ///////////////////////////////////////////////////////////////////////////////////////
-// モジュール名 setup_pid_angle
-// 処理概要     ゲイン調整(角度)
-// 引数         なし
-// 戻り値       なし
-///////////////////////////////////////////////////////////////////////////////////////
-static void setup_pid_angle(void)
-{
-	if (pattern.display != pattern.beforeHex)
-	{
-		// 切替時に実行
-		ssd1306_printf(Font_6x8, "Yaw PID");
-
-		ssd1306_SetCursor(0, 18);
-		ssd1306_printf(Font_7x10, "kp:");
-		ssd1306_SetCursor(0, 32);
-		ssd1306_printf(Font_7x10, "ki:");
-		ssd1306_SetCursor(0, 44);
-		ssd1306_printf(Font_7x10, "kd:");
-		ssd1306_SetCursor(60, 30);
-		ssd1306_printf(Font_7x10, "pwm:");
-
-		setTargetDist(50);      // PID調整用の走行距離
-		setTargetSpeed(0.3f);    // PID調整用の走行速度
-	}
-
-	data_select(&testFlags.trace_test, SW_PUSH);       // PUSHでトレースON/OFF
-	// if ( testFlags.trace_test == 1 ) {
-	//      motorCommandOutSynth( 0, veloCtrl.pwm, distCtrl.pwm, 0 );
-	// } else {
-	//      motorCommandOutSynth( 0, 0, 0, 0 );
-	// }
-
-	// 上下スイッチで調整対象のゲインを選択
-	dataTuningUD(&pattern.gain, 1, 3, 1);
-	if (testFlags.trace_test == 0)
-	{
-		// 選択したゲインを表示
-		ssd1306_SetCursor(21, 18);
-		if (pattern.gain == 1)
-			ssd1306_printfB(Font_7x10, "%3d", yawCtrl.kp);
-		else
-			ssd1306_printf(Font_7x10, "%3d", yawCtrl.kp);
-		ssd1306_SetCursor(21, 32);
-		if (pattern.gain == 2)
-			ssd1306_printfB(Font_7x10, "%3d", yawCtrl.ki);
-		else
-			ssd1306_printf(Font_7x10, "%3d", yawCtrl.ki);
-		ssd1306_SetCursor(21, 44);
-		if (pattern.gain == 3)
-			ssd1306_printfB(Font_7x10, "%3d", yawCtrl.kd);
-		else
-			ssd1306_printf(Font_7x10, "%3d", yawCtrl.kd);
-
-		// 制御量表示
-		ssd1306_SetCursor(88, 30);
-		ssd1306_printf(Font_7x10, "%4d", yawCtrl.pwm);
-
-		switch (pattern.gain)
-		{
-		case 1:
-			// kpを左右スイッチで調整
-			dataTuningLR(&yawCtrl.kp, 1, 0, 255);
-			break;
-		case 2:
-			// kiを左右スイッチで調整
-			dataTuningLR(&yawCtrl.ki, 1, 0, 255);
-			break;
-		case 3:
-			// kdを左右スイッチで調整
-			dataTuningLR(&yawCtrl.kd, 1, 0, 255);
-			break;
-		}
-    }
-}
-///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_log
 // 処理概要     ログ解析表示と操作を制御
 // 引数         なし
@@ -1532,22 +1387,6 @@ void setup(void)
 	// case HEX_PID_ANGULAR:
 	// {
 	// 	setup_pid_angular(); // 角速度PIDの設定処理を呼び出し
-	// 	break;
-	// }
-	// //------------------------------------------------------------------
-	// // ゲイン調整(角度)
-	// //------------------------------------------------------------------
-	// case HEX_PID_ANGLE:
-	// {
-	// 	setup_pid_angle(); // ゲイン調整(角度)
-	// 	break;
-	// }
-	// //------------------------------------------------------------------
-	// // ゲイン調整(距離)
-	// //------------------------------------------------------------------
-	// case HEX_PID_DIST:
-	// {
-	// 	setup_pid_dist(); // 距離PID調整処理を実行
 	// 	break;
 	// }
 

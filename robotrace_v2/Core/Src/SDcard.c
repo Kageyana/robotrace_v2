@@ -685,12 +685,6 @@ void createLog(void)
 	setLogHeaderStrF("yawRateCtrl.kp", yawRateCtrl.kp);
 	setLogHeaderStrF("yawRateCtrl.ki", yawRateCtrl.ki);
 	setLogHeaderStrF("yawRateCtrl.kd", yawRateCtrl.kd);
-	setLogHeaderStrF("yawCtrl.kp", yawCtrl.kp);
-	setLogHeaderStrF("yawCtrl.ki", yawCtrl.ki);
-	setLogHeaderStrF("yawCtrl.kd", yawCtrl.kd);
-	setLogHeaderStrF("distCtrl.kp", distCtrl.kp);
-	setLogHeaderStrF("distCtrl.ki", distCtrl.ki);
-	setLogHeaderStrF("distCtrl.kd", distCtrl.kd);
     strncat((char *)columnTitle, "\n", sizeof(columnTitle) - strlen((char *)columnTitle) - 1); // バッファサイズを指定して安全に改行を追加
 	total = (UINT)strlen(columnTitle);
 	fresult = f_write(&fil_W, columnTitle, total, &written);

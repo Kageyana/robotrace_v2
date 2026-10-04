@@ -96,7 +96,6 @@ void Interrupt1ms(void)
 				updateSlipDetection(); // スリップ検出（Δv比率とフラグ更新を1msで実行）
 			}
 			// motorControlYawRate();	// 角速度制御
-			// motorControlYaw();		// 角度制御
 		}
 		else
 		{

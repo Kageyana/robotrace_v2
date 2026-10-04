@@ -96,7 +96,6 @@ extern float boostSpeed;
 extern int32_t DistanceOptimal;
 extern int16_t analyzedNumber;
 extern int32_t encTotalOptimal;
-extern int32_t encPID;
 extern int32_t straightMeter;
 extern bool straightState;
 extern bool straightMarkerPending;

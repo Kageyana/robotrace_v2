@@ -20,17 +20,13 @@ pidParam veloCtrl = {"speed", KP2, KI2, KD2, 0, 0};
 pidParam veloCtrlL = {"speed", KP2, KI2, KD2, 0, 0};
 pidParam veloCtrlR = {"speed", KP2, KI2, KD2, 0, 0};
 pidParam yawRateCtrl = {"yawRate", KP3, KI3, KD3, 0, 0};
-pidParam yawCtrl = {"yaw", KP4, KI4, KD4, 0, 0};
-pidParam distCtrl = {"dist", KP5, KI5, KD5, 0, 0};
 
 // 速度フィードフォワード係数(セットアップ画面から変更可能: Crr×1000)
 int16_t speedFeedForwardGain = SPEED_FEEDFORWARD_GAIN_DEFAULT;
 
 uint8_t targetSpeed = 0;		 // 目標速度（初期値0）
 float targetSpeedCommand_m_s;	// setTargetSpeedで指定した速度指令値[m/s]
-float targetAngle;			 // 目標角速度
-float targetAngularVelocity; // 目標角度
-int16_t targetDist;			 // 目標X座標
+float targetAngularVelocity; // 目標角速度
 static int16_t speedTargetBefore = 0;	// 速度PID用の前回目標値
 static int16_t speedTargetBeforeL = 0, speedTargetBeforeR = 0;
 static int16_t speedEncoderBeforeL = 0, speedEncoderBeforeR = 0;
@@ -160,37 +156,15 @@ void setTargetAngularVelocity(float angularVelocity)
 	targetAngularVelocity = angularVelocity;
 }
 ///////////////////////////////////////////////////////////////////////////
-// モジュール名 setTargetAngle
-// 処理概要     目標角度の設定
-// 引数         目標角度[deg]
-// 戻り値       なし
-///////////////////////////////////////////////////////////////////////////
-void setTargetAngle(float angle)
-{
-	targetAngle = angle;
-}
-///////////////////////////////////////////////////////////////////////////
-// モジュール名 setTargetX
-// 処理概要     目標x座標の設定
-// 引数         目標x座標[mm]
-// 戻り値       なし
-///////////////////////////////////////////////////////////////////////////
-void setTargetDist(float dist)
-{
-	targetDist = (int16_t)(dist * PULSE_MILLIMETER);
-	encPID = 0;
-}
-///////////////////////////////////////////////////////////////////////////
 // モジュール名 resetSpeedPID
-// 処理概要	 速度・距離PIDの内部状態をリセットする
+// 処理概要	 速度PIDの内部状態をリセットする
 // 引数	 なし
 // 戻り値	 なし
 ///////////////////////////////////////////////////////////////////////////
 void resetSpeedPID(void)
 {
-	// 速度・距離PIDの積分項と差分項をクリア
+	// 速度PIDの積分項と差分項をクリア
 	veloCtrl.Int = 0.0f;
-	distCtrl.Int = 0.0f;
 	speedTargetBefore = targetSpeed;	// 現在の目標値を基準として保持
 	speedEncoderBefore = 0;	// 偏差履歴をリセット
 }
@@ -499,7 +473,7 @@ void motorControlSpeedLR(int16_t targetEncL, int16_t targetEncR)
 	speedTargetBeforeR  = targetEncR;
 }
 ///////////////////////////////////////////////////////////////////////////
-// モジュール名 motorControlYaw
+// モジュール名 motorControlYawRate
 // 処理概要     角速度制御時の制御量の計算
 // 引数         なし
 // 戻り値       なし
@@ -534,76 +508,6 @@ void motorControlYawRate(void)
 	yawRateCtrl.pwm = iRet;
 	angularVelocityBefore = Dev;						 // 次回はこの値が1ms前の値となる
 	targetAngularVelocityBefore = targetAngularVelocity; // 前回の目標値を記録
-}
-///////////////////////////////////////////////////////////////////////////
-// モジュール名 motorControlYaw
-// 処理概要     角速度制御時の制御量の計算
-// 引数         なし
-// 戻り値       なし
-///////////////////////////////////////////////////////////////////////////
-void motorControlYaw(void)
-{
-	float iP, iI, iD, Dev, Dif;
-	static float angleBefore;
-	static float targetAngleBefore;
-	int32_t iRet;
-
-	Dev = (targetAngle - imuVal.angle.z) * 20; // 目標値-現在値
-	// I成分積算
-	yawCtrl.Int += Dev * 0.005f;
-	// 目標値を変更したらI成分リセット
-	// if ( targetAngle != targetAngleBefore ) yawCtrl.Int = 0;
-	Dif = (Dev - angleBefore) * 1; // dゲイン1/1000倍
-
-	iP = yawCtrl.kp * Dev;		   // 比例
-	iI = yawCtrl.ki * yawCtrl.Int; // 積分
-	iD = yawCtrl.kd * Dif;		   // 微分
-	iRet = (int32_t)iP + iI + iD;
-	iRet = iRet >> 2; // PWMを0～1000近傍に収める
-
-	// PWMの上限の設定
-	if (iRet > 900)
-		iRet = 900;
-	if (iRet < -900)
-		iRet = -900;
-
-	yawCtrl.pwm = iRet;
-	angleBefore = Dev;				 // 次回はこの値が1ms前の値となる
-	targetAngleBefore = targetAngle; // 前回の目標値を記録
-}
-///////////////////////////////////////////////////////////////////////////
-// モジュール名 motorControldist
-// 処理概要     距離制御時の制御量の計算
-// 引数         なし
-// 戻り値       なし
-///////////////////////////////////////////////////////////////////////////
-void motorControldist(void)
-{
-	int32_t iP, iI, iD, Dev, Dif, iRet;
-	static int32_t distBefore, targetDistBefore;
-
-	Dev = (targetDist - encPID) * 1; // 目標値-現在値
-	// I成分積算
-	distCtrl.Int += Dev * 0.001f;
-	// 目標値を変更したらI成分リセット
-	// if ( targetDist != targetDistBefore ) distCtrl.Int = 0;
-	Dif = (Dev - distBefore) * 1; // dゲイン1/1000倍
-
-	iP = distCtrl.kp * Dev;			 // 比例
-	iI = distCtrl.ki * distCtrl.Int; // 積分
-	iD = distCtrl.kd * Dif;			 // 微分
-	iRet = (int32_t)iP + iI + iD;
-	iRet = iRet >> 1; // PWMを0～1000近傍に収める
-
-	// PWMの上限の設定
-	if (iRet > 900)
-		iRet = 900;
-	if (iRet < -900)
-		iRet = -900;
-
-	distCtrl.pwm = iRet;
-	distBefore = Dev;			   // 次回はこの値が1ms前の値となる
-	targetDistBefore = targetDist; // 前回の目標値を記録
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 writePIDparameters

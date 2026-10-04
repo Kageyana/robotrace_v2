@@ -34,16 +34,6 @@
 #define KI3		1
 #define KD3		15
 
-// PID制御用ゲイン定義(角度制御)
-#define KP4		6
-#define KI4		0
-#define KD4		10
-
-// PID制御用ゲイン定義(距離制御)
-#define KP5		100
-#define KI5		1
-#define KD5		5
-
 // PID制御用ゲイン定義(ライントレース 角速度FBあり)
 #define KP6		7
 #define KI6		0
@@ -87,9 +77,7 @@ typedef struct {
 //====================================//
 extern uint8_t	targetSpeed;	// 目標速度
 extern float	targetSpeedCommand_m_s;	// setTargetSpeedで指定した速度指令値[m/s]
-extern float 	targetAngle;    // 目標角度
 extern float    targetAngularVelocity;  // 目標角速度
-extern int16_t  targetDist;		        // 目標X座標
 
 extern pidParam lineTraceCtrl;
 extern pidParam lineTraceOmegaFBCtrl;
@@ -97,8 +85,6 @@ extern pidParam veloCtrl;
 extern pidParam veloCtrlL;
 extern pidParam veloCtrlR;
 extern pidParam yawRateCtrl;
-extern pidParam yawCtrl;
-extern pidParam distCtrl;
 extern int16_t speedFeedForwardGain;
 
 extern int32_t log_targetAngularVelocity; // ログ用目標角速度
@@ -108,8 +94,6 @@ extern int32_t log_targetAngularVelocity; // ログ用目標角速度
 //====================================//
 void setTargetSpeed (float speed);
 void setTargetAngularVelocity (float angularVelocity);
-void setTargetAngle (float angle);
-void setTargetDist (float dist);
 void resetSpeedPID (void);
 void writePIDparameters(pidParam *pid);
 void readPIDparameters(pidParam *pid);
@@ -120,7 +104,5 @@ void motorControlTraceOmegaFB(void);
 void motorControlSpeed(void);
 void motorControlSpeedLR(int16_t targetEncL, int16_t targetEncR);
 void motorControlYawRate(void);
-void motorControlYaw(void);
-void motorControldist(void);
 
 #endif // LINETRACE_H_

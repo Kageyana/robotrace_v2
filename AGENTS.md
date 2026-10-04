@@ -334,7 +334,7 @@ cmake --build --preset Release
 速度、制御、センサー、緊急停止に関わる変更では、まず以下を確認します。
 
 - 速度・加速度: `robotrace_v2/Core/Inc/control.h`, `robotrace_v2/Core/Src/control.c`, `robotrace_v2/Core/Src/setup.c` の `speedParamTable`, `./setting/targetSpeeds.txt`
-- PID ゲイン、速度フィードフォワード: `robotrace_v2/Core/Inc/PIDcontrol.h`, `robotrace_v2/Core/Src/PIDcontrol.c`, `robotrace_v2/Core/Src/setup.c`, `./setting/line.txt`, `lineomega.txt`, `speed.txt`, `yawRate.txt`, `yaw.txt`, `dist.txt`, `speed_ff.txt`
+- PID ゲイン、速度フィードフォワード: `robotrace_v2/Core/Inc/PIDcontrol.h`, `robotrace_v2/Core/Src/PIDcontrol.c`, `robotrace_v2/Core/Src/setup.c`, `./setting/line.txt`, `lineomega.txt`, `speed.txt`, `yawRate.txt`, `speed_ff.txt`
 - ラインセンサー校正・閾値: `robotrace_v2/Core/Inc/lineSensor.h`, `robotrace_v2/Core/Src/lineSensor.c`, `./setting/lsval.txt`
 - スリップ判定、クロスライン検出、走行中ゲイン変更: `robotrace_v2/Core/Inc/control.h`, `robotrace_v2/Core/Src/control.c`
 - 緊急停止条件: `robotrace_v2/Core/Inc/emergencyStop.h`, `robotrace_v2/Core/Src/emergencyStop.c`
@@ -349,7 +349,7 @@ cmake --build --preset Release
 - `encCurrentN` は左右エンコーダの平均で、1 ms あたりのパルス数とする。距離、速度、XY 座標、速度計画で距離換算を使う場合はこの換算値を基準にする。
 - BMI088のジャイロZ温度補正係数はSDの `./setting/imu_temp.txt` に `deg/s/°C × 1000000` の整数で保存する。範囲は -100000〜100000、欠落・破損時は0で作成・修復する。温度読取異常時はその走行の温度補正を停止する。
 
-`setup.c` には `yawRate`, `yaw`, `dist` の PID 調整画面実装がありますが、現在の表示切替では一部ケースがコメントアウトされており、通常メニューから到達しない可能性があります。
+`setup.c` の `yawRate` PID 調整画面は表示切替ケースがコメントアウトされており、通常メニューから到達しません。角度・距離PIDは未使用のため削除済みで、`yaw.txt` と `dist.txt` は読み書きしません。
 
 ### チューニングパラメータ方針
 
@@ -463,6 +463,8 @@ cmake --build --preset Release
 - PID、速度フィードフォワード、スリップ判定、速度・加速度の調整手順は `.agents/skills/robotrace-tuning/SKILL.md` を使う。
 
 ## 13. ログ、ファームウェアバージョン、解析
+
+- 未使用の角度・距離PID削除に伴い、ログ1行目の `yawCtrl.kp/ki/kd` と `distCtrl.kp/ki/kd` は出力しない。CSVデータ列とバイナリレコード構成は維持する。変更後最初の実機ログでヘッダとデータ列を確認する。
 
 実機走行ログは `F:\Dropbox\Document\robotrace\Log\v2` に保存されています。
 
