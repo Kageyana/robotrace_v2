@@ -108,6 +108,19 @@ bool isLineSensorCalibrationValid(void)
 }
 
 /////////////////////////////////////////////////////////////////////
+// モジュール名 finishLineSensorCalibration
+// 処理概要     校正を終了し、SD保存とは独立して全センサの校正値を検証する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void finishLineSensorCalibration(void)
+{
+	modeCalLinesensors = 0;
+	lineSensorCalibrationValid = validateLineSensorCalibrationValues();
+	lineSensorSettingCorrupt = !lineSensorCalibrationValid;
+}
+
+/////////////////////////////////////////////////////////////////////
 // モジュール名 isLineSensorSettingCorrupt
 // 処理概要     ラインセンサ設定ファイルの破損検出状態を取得する
 // 引数         なし

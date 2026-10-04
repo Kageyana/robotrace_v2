@@ -965,7 +965,7 @@ static void setup_calibration(void)
 		data_select(&testFlags.trace_test, SW_PUSH); // SW_PUSH入力を監視
 		if (!testFlags.trace_test) // スイッチが離されたら
 		{
-			modeCalLinesensors = 0;                                           // キャリブレーション終了
+			finishLineSensorCalibration();                                    // SD保存前に校正値を検証
 			powerLineSensors(0);                                              // ラインセンサ消灯
 			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 			ssd1306_UpdateScreen();                                           // グラフィック液晶更新
@@ -1228,7 +1228,7 @@ static void setup_start(void)
 		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 		if (lSensor[5] < 1000)
 		{
-			modeCalLinesensors = 0;
+			finishLineSensorCalibration();
 			countdown = 500;
 			pattern.calibration = 6;
 		}
@@ -1751,7 +1751,7 @@ void setupNonDisp(void)
 		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 		if (lSensor[5] < 1000)
 		{
-			modeCalLinesensors = 0;
+			finishLineSensorCalibration();
 			pattern.calibration = 8;
 		}
 		break;

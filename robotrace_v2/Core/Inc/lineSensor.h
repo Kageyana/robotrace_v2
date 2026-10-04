@@ -42,6 +42,7 @@ void delayLineSensorConversionStart(uint32_t us);
 void getLineSensor(void);
 void getAngleSensor(void);
 void calibrationLinesensor(void);
+void finishLineSensorCalibration(void);
 void writeLinesenval(void);
 void readLinesenval(void);
 bool isLineSensorCalibrationValid(void);
