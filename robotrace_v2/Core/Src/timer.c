@@ -1,4 +1,4 @@
-﻿//====================================//
+//====================================//
 // インクルード
 //====================================//
 #include "timer.h"
@@ -10,6 +10,7 @@
 #include "pathFollower.h"
 #include "SDcard.h"
 #include "encoder.h"
+#include "setup.h"
 #include <math.h>
 #include <stdint.h>
 #define STRAIGHT_STATE_THRESHOLD_MM	70	// 直線判定の距離閾値[mm]
@@ -116,8 +117,15 @@ void Interrupt1ms(void)
 	else if(patternTrace < 12 || patternTrace > 100)
 	{
 		// スタート直後とゴール後は通常のライン制御
-		motorControlTrace();
 		motorControlSpeed();
+		if (patternTrace == 0 && autoStartCalibrationTurning && initIMU && !calibratIMU)
+		{
+			setupCalibrationTurn1ms(); // 校正旋回・復帰追従・停止出力を1ms周期で切り替える
+		}
+		else
+		{
+			motorControlTrace();
+		}
 	}
 	else
 	{

@@ -1,4 +1,4 @@
-﻿#ifndef SETUP_H_
+#ifndef SETUP_H_
 #define SETUP_H_
 //======================================//
 // インクルード
@@ -15,7 +15,16 @@
 #define PUSHTIME 5 // 長押し判定時間[x50ms]
 #define WHEEL_CLICK 800 // ホイールクリックのパルス数
 
-#define CALIBRATIONSPEED -1500.0F // ラインセンサのキャリブレーション時の角速度[rad/s]
+// 校正の調整項目。復帰は既存ラインPIDを使用し、探索速度・制動解除幅は算出する。
+#define CALIBRATIONSPEED -800.0F // 校正旋回の角速度[deg/s]
+#define AUTO_CALIBRATION_RETURN_SPEED -300.0F // 白線捕捉前の復帰最大角速度[deg/s]、負値で指定
+#define AUTO_CALIBRATION_SEARCH_WINDOW_DEG 30.0F // 元姿勢付近の探索幅[deg]、捕捉後は2倍
+#define AUTO_CALIBRATION_LINE_THRESHOLD 2000U // 中央左センサー4の白線捕捉閾値[正規化AD値]
+#define AUTO_CALIBRATION_MIN_CONTRAST 500U // 追従に必要な最大・最小値の差[正規化AD値]
+#define AUTO_CALIBRATION_LINE_MAX_WIDTH 4U // 白線候補の最大センサー数[個]
+#define AUTO_CALIBRATION_POSITION_TOLERANCE 0.35F // 制動を開始する中央からの偏差[センサー間隔]、0以上0.5未満
+#define AUTO_CALIBRATION_STOP_RATE_DPS 250.0F // 復帰判定の角速度上限[deg/s]、250では静止を保証しない
+#define AUTO_CALIBRATION_SETTLE_MS 50U // 復帰条件の連続成立時間[ms]
 
 #define HEX_START 0x0
 #define HEX_SPEED_PARAM 0x1
@@ -92,6 +101,7 @@ extern int32_t encClick;
 
 // フラグ関連
 extern TestFlags testFlags;
+extern volatile bool autoStartCalibrationTurning; // 自動開始前の旋回校正中だけ角速度PIDを更新
 
 
 //======================================//
@@ -106,5 +116,6 @@ void dataTuningUDF(float *data, float add, float min, float max);
 void setupNonDisp(void);
 void wheelClick(void);
 void setupCount(void);
+void setupCalibrationTurn1ms(void);
 
 #endif /* SETUP_H_ */

@@ -1,4 +1,4 @@
-﻿//====================================//
+//====================================//
 // インクルード
 //====================================//
 #include "setup.h"
@@ -50,6 +50,15 @@ Pattern pattern = {
 }; // パターンの状態を保持
 // フラグ関連
 TestFlags testFlags = {0};
+volatile bool autoStartCalibrationTurning = false;
+static volatile bool autoStartCalibrationReturning = false;
+static volatile bool autoStartCalibrationReturned = false;
+static uint16_t autoStartCalibrationSettledMs = 0; // 1ms処理内の復帰静止確認
+static bool autoStartCalibrationAligning = false; // 元の向き付近での白線位置合わせ
+static int8_t autoStartCalibrationSearchDirection = -1;
+static bool autoStartCalibrationLineCaptured = false;
+static float autoStartCalibrationLineAnchorDeg = 0.0F;
+static bool autoStartCalibrationStopping = false; // 中央捕捉後は許容範囲内で制動を維持する
 
 // パラメータ関連
 int16_t motorTestPwm = 200;
@@ -63,6 +72,7 @@ static void setup_pid_traceOmegaFB(void); // ゲイン調整(直線トレース 
 static void setup_pid_angular(void);	// ゲイン調整(角速度)
 static void setup_pid_speed(void);		// ゲイン調整(速度)
 static void setup_start(void);			// スタート待ち画面とキャリブレーションを制御する処理
+static bool calibrationLinePosition(float *position);
 static void setup_log(void);			// ログ解析と表示を制御
 static void setup_calibration(void);	// キャリブレーション(ラインセンサ)
 static void setup_speed_param(void);	// 速度パラメータ調整
@@ -1103,6 +1113,8 @@ static void setup_log(void)
 ///////////////////////////////////////////////////////////////////////////////////////
 static void setup_start(void)
 {
+	static bool autoStartAfterCalibration = false;
+
 	if (pattern.display != pattern.beforeHex)
 	{
 		// 切替時にスタート画面とブースト設定を表示
@@ -1129,6 +1141,33 @@ static void setup_start(void)
 			break;
 		}
 		pattern.calibration = 1;
+		autoStartAfterCalibration = false;
+	}
+
+	// 自動開始の旋回が完了しない場合は、走行へ進まず停止する。
+	if (autoStartAfterCalibration && pattern.calibration >= 4 &&
+		pattern.calibration <= 5 && setupTimer.cntSetup1 > 5000)
+	{
+		finishLineSensorCalibration();
+		autoStartCalibrationTurning = false;
+		setTargetAngularVelocity(0);
+		motorCommandOut(0, 0);
+		powerLineSensors(0);
+		testFlags.trace_test = false;
+		autoStartAfterCalibration = false;
+		pattern.calibration = 1;
+		ssd1306_FillRectangle(0, 15, 127, 63, Black);
+		ssd1306_SetCursor(0, 16);
+		ssd1306_printf(Font_11x18, "Calib T/O");
+		ssd1306_SetCursor(0, 36);
+		ssd1306_printf(Font_6x8, "C:%u/%u", (unsigned int)lSensorCari[4], (unsigned int)lSensorCari[5]);
+		ssd1306_SetCursor(0, 46);
+		ssd1306_printf(Font_6x8, "A:%.0f G:%.0f", imuVal.angle.z, imuVal.gyro.z);
+		ssd1306_SetCursor(0, 56);
+		ssd1306_printf(Font_6x8, "S:%u",
+			(unsigned int)(autoStartCalibrationStopping ? 2 : autoStartCalibrationLineCaptured ? 1 : 0));
+		ssd1306_UpdateScreen();
+		return;
 	}
 
 	// キャリブレーションの進行状況に応じて処理を分岐
@@ -1167,20 +1206,13 @@ static void setup_start(void)
 		}
 		else if (swValTact == SW_RIGHT)
 		{
-			// オートスタート
-			if (isLineSensorCalibrationValid())
-			{
-				// キャリブレーション実施済み
-				autoStart = 1;
-			}
-			else
-			{
-				pattern.calibration = 2;
-			}
+			// オートスタートの1走目前は、保存済み校正値が有効でも再校正する。
+			autoStartAfterCalibration = true;
+			pattern.calibration = 2;
 		}
 		break;
 	}
-	case 2: // キャリブレーション未実施
+	case 2: // キャリブレーション準備
 	{
 		veloCtrl.Int = 0;                                                         // I成分リセット
 		ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
@@ -1207,13 +1239,43 @@ static void setup_start(void)
 			yawRateCtrl.Int = 0.0f;   // I成分リセット
 			setTargetSpeed(0);               // 目標速度0[m/s]
 			enc1 = 0;
+			if (autoStartAfterCalibration)
+			{
+				// 過去の最大・最小値を引き継がず、今回の旋回だけで校正する。
+				for (uint8_t i = 0; i < NUM_SENSORS; i++)
+				{
+					lSensorMax[i] = 0;
+					lSensorMin[i] = UINT16_MAX;
+				}
+			}
 			modeCalLinesensors = 1; // キャリブレーション開始
+			if (autoStartAfterCalibration)
+			{
+				autoStartCalibrationReturning = false;
+				autoStartCalibrationReturned = false;
+				autoStartCalibrationSettledMs = 0;
+				autoStartCalibrationAligning = false;
+				autoStartCalibrationSearchDirection = -1;
+				autoStartCalibrationLineCaptured = false;
+				autoStartCalibrationLineAnchorDeg = 0.0F;
+				autoStartCalibrationStopping = false;
+				setTargetAngularVelocity(CALIBRATIONSPEED);
+			}
+			autoStartCalibrationTurning = autoStartAfterCalibration;
 			pattern.calibration = 4;
 		}
 		break;
 	}
 	case 4: // 左旋回
 	{
+		if (autoStartAfterCalibration)
+		{
+			if (autoStartCalibrationReturning)
+			{
+				pattern.calibration = 5;
+			}
+			break; // 自動校正の目標更新と出力は1ms処理に任せる
+		}
 		setTargetAngularVelocity(CALIBRATIONSPEED);
 		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 		if (imuVal.angle.z < -340.0f)
@@ -1224,11 +1286,19 @@ static void setup_start(void)
 	}
 	case 5: // 初期位置に戻る
 	{
-		setTargetAngularVelocity(-400.0F);
-		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
-		if (lSensor[5] < 1000)
+		if (!autoStartAfterCalibration)
 		{
-			finishLineSensorCalibration();
+			setTargetAngularVelocity(-400.0F);
+			motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+		}
+		if (autoStartAfterCalibration ? autoStartCalibrationReturned : lSensor[5] < 1000)
+		{
+			if (autoStartAfterCalibration)
+			{
+				motorCommandOut(0, 0); // 復帰検出と同じ周期で停止済み。メイン側でも維持する
+			}
+			if (!autoStartAfterCalibration) finishLineSensorCalibration();
+			autoStartCalibrationTurning = false;
 			countdown = 500;
 			pattern.calibration = 6;
 		}
@@ -1236,17 +1306,192 @@ static void setup_start(void)
 	}
 	case 6: // 停止
 	{
-		motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+		if (autoStartAfterCalibration)
+		{
+			motorCommandOut(0, 0); // 校正値の有効性にかかわらず停止待ち中は出力しない
+		}
+		else
+		{
+			motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+		}
 		if (countdown <= 0)
 		{
 			powerLineSensors(0); // ラインセンサ消灯
-			setupFlags.start = 1;
+			if (autoStartAfterCalibration)
+			{
+				setTargetAngularVelocity(0);
+				motorCommandOut(0, 0);
+				testFlags.trace_test = false;
+				float position = 0.0F;
+				if (isLineSensorCalibrationValid() && calibrationLinePosition(&position) &&
+					fabsf(position) <= (1.0F - AUTO_CALIBRATION_POSITION_TOLERANCE))
+				{
+					autoStart = 1;
+				}
+				else
+				{
+					ssd1306_FillRectangle(0, 15, 127, 63, Black);
+					ssd1306_SetCursor(15, 25);
+					ssd1306_printf(Font_11x18, "%s",
+						isLineSensorCalibrationValid() ? "No line" : "LS invalid");
+					ssd1306_UpdateScreen();
+				}
+				autoStartAfterCalibration = false;
+				pattern.calibration = 1;
+			}
+			else
+			{
+				setupFlags.start = 1;
+			}
 		}
 		break;
 	}
 	default:
 		break;
 	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 calibrationLinePosition
+// 処理概要     周囲との明暗差から細い白線の重心を求める
+// 引数         position: 中央からの位置偏差の出力[センサー間隔]
+// 戻り値       細い白線として有効ならtrue
+/////////////////////////////////////////////////////////////////////
+static bool calibrationLinePosition(float *position)
+{
+	// ADC割り込みで値が更新されるため、この判定で使う10個を一度だけ読む。
+	uint16_t values[NUM_SENSORS];
+	uint16_t minimum = UINT16_MAX;
+	uint16_t maximum = 0;
+	for (uint8_t i = 0; i < NUM_SENSORS; i++)
+	{
+		values[i] = lSensorCari[i];
+		if (values[i] < minimum) minimum = values[i];
+		if (values[i] > maximum) maximum = values[i];
+	}
+	const uint16_t contrast = maximum - minimum;
+	if (contrast < AUTO_CALIBRATION_MIN_CONTRAST) return false;
+	const uint16_t background = minimum + contrast / 2U;
+	uint32_t sum = 0;
+	int32_t moment = 0;
+	uint8_t width = 0;
+	int8_t previous = -1;
+	for (uint8_t i = 0; i < NUM_SENSORS; i++)
+	{
+		if (values[i] <= background) continue;
+		// 離れた複数の明部や広いコース縁は白線候補にしない。
+		if (previous >= 0 && i != previous + 1) return false;
+		previous = i;
+		width++;
+		const uint32_t weight = values[i] - background;
+		sum += weight;
+		moment += ((int32_t)i * 2 - (NUM_SENSORS - 1)) * (int32_t)weight;
+	}
+	if (width == 0 || width > AUTO_CALIBRATION_LINE_MAX_WIDTH) return false;
+	*position = (float)moment / (2.0F * (float)sum);
+	return true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 setupCalibrationTurn1ms
+// 処理概要     3/4回転で校正を確定し、中央左の白検出からラインPIDで復帰する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void setupCalibrationTurn1ms(void)
+{
+	if (!autoStartCalibrationTurning) return;
+	if (!isfinite(imuVal.angle.z) || !isfinite(imuVal.gyro.z))
+	{
+		autoStartCalibrationSettledMs = 0;
+		setTargetAngularVelocity(0);
+		motorCommandOut(0, 0);
+		return;
+	}
+	const float returnAngle = -360.0F;
+	const float maxAngularVelocity = fabsf(AUTO_CALIBRATION_RETURN_SPEED);
+	const float searchSpeed = maxAngularVelocity * 0.5F;
+	if (!autoStartCalibrationReturning && imuVal.angle.z <= returnAngle * 0.75F)
+	{
+		// 3/4回転で校正値を確定する。復帰中は最大・最小値を更新しない。
+		finishLineSensorCalibration();
+		autoStartCalibrationReturning = true;
+	}
+	if (autoStartCalibrationReturning)
+	{
+		if (!isLineSensorCalibrationValid())
+		{
+			setTargetAngularVelocity(0);
+			motorCommandOut(0, 0); // 校正無効では旋回・追従を行わない。
+			return;
+		}
+		const float angleError = returnAngle - imuVal.angle.z;
+		float position = 0.0F;
+		const bool lineVisible = calibrationLinePosition(&position);
+		if (!autoStartCalibrationLineCaptured &&
+			fabsf(angleError) <= AUTO_CALIBRATION_SEARCH_WINDOW_DEG &&
+			lSensorCari[4] >= AUTO_CALIBRATION_LINE_THRESHOLD && lineVisible)
+		{
+			// 中央左の白検出から、確定した校正値を使う既存ラインPIDへ切り替える。
+			autoStartCalibrationLineCaptured = true;
+			autoStartCalibrationLineAnchorDeg = imuVal.angle.z;
+			lineTraceCtrl.Int = 0.0F;
+		}
+		if (autoStartCalibrationLineCaptured)
+		{
+			setTargetAngularVelocity(0);
+			const bool inWindow = fabsf(autoStartCalibrationLineAnchorDeg - imuVal.angle.z) <=
+				2.0F * AUTO_CALIBRATION_SEARCH_WINDOW_DEG;
+			if (!lineVisible || !inWindow)
+			{
+				autoStartCalibrationStopping = false;
+				autoStartCalibrationSettledMs = 0;
+				motorCommandOut(0, 0); // ロスト・角度逸脱時は停止し、タイムアウトで中止する。
+				return;
+			}
+			if (fabsf(position) > 1.0F - AUTO_CALIBRATION_POSITION_TOLERANCE)
+				autoStartCalibrationStopping = false;
+			if (fabsf(position) <= AUTO_CALIBRATION_POSITION_TOLERANCE)
+				autoStartCalibrationStopping = true;
+			if (!autoStartCalibrationStopping)
+			{
+				autoStartCalibrationSettledMs = 0;
+				motorControlTrace();
+				// 平均速度0のまま、通常ラインPIDの左右差で白線中央へ向ける。
+				motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+				return;
+			}
+			if (fabsf(imuVal.gyro.z) <= AUTO_CALIBRATION_STOP_RATE_DPS)
+				autoStartCalibrationSettledMs++;
+			else
+				autoStartCalibrationSettledMs = 0;
+			if (autoStartCalibrationSettledMs >= AUTO_CALIBRATION_SETTLE_MS)
+			{
+				autoStartCalibrationTurning = false;
+				motorCommandOut(0, 0);
+				autoStartCalibrationReturned = true;
+				return;
+			}
+			// 中央へ入った後はラインPIDを外し、角速度0のPIDで制動する。
+		}
+		else
+		{
+			float angularVelocity = searchSpeed / AUTO_CALIBRATION_SEARCH_WINDOW_DEG * angleError;
+			if (angularVelocity > maxAngularVelocity) angularVelocity = maxAngularVelocity;
+			if (angularVelocity < -maxAngularVelocity) angularVelocity = -maxAngularVelocity;
+			if (fabsf(angleError) <= AUTO_CALIBRATION_SEARCH_WINDOW_DEG)
+				autoStartCalibrationAligning = true;
+			if (autoStartCalibrationAligning)
+			{
+				if (angleError >= AUTO_CALIBRATION_SEARCH_WINDOW_DEG) autoStartCalibrationSearchDirection = 1;
+				if (angleError <= -AUTO_CALIBRATION_SEARCH_WINDOW_DEG) autoStartCalibrationSearchDirection = -1;
+				angularVelocity = autoStartCalibrationSearchDirection * searchSpeed;
+			}
+			setTargetAngularVelocity(angularVelocity);
+		}
+	}
+	motorControlYawRate();
+	motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////

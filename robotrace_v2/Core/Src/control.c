@@ -767,6 +767,10 @@ void loopSystem(void)
 			// PIDゲインを記録
 			if(autoStart <= 1)
 			{
+				if (autoStart == 1 && initMSD)
+				{
+					writeLinesenval(); // 1走目前に実施したラインセンサ校正値を保存
+				}
 				writePIDparameters(&lineTraceCtrl);
 				writePIDparameters(&lineTraceOmegaFBCtrl);
 				writePIDparameters(&veloCtrl);
