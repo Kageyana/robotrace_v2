@@ -1,0 +1,13 @@
+{
+  "status": "passed",
+  "log_count": 31,
+  "windows": 6186,
+  "frozen_sha256": "c8a477908efbf6534137b384ba7d498fcb3e81fffc2c4f38b39be269e2cc40a5",
+  "input_hashes_unchanged": true,
+  "firmware_modified": false,
+  "cross_pose_used": false,
+  "sparse_gyro_reintegrated": false,
+  "raw_encoder_mean": true,
+  "train_test_series_disjoint": true,
+  "script_sha256": "865ea79fa9d7a2a9a4705476d9f615b63e80b2945ff962cb0de98f4dd625c6c5"
+}

@@ -1,0 +1,48 @@
+{
+  "status": "passed",
+  "logs": 31,
+  "raw_rows": 146263,
+  "windows": 6186,
+  "metric_rows": 124,
+  "prediction_rows": 24744,
+  "input_difference_max_error": 8.884626367944293e-11,
+  "angular_metric_max_error_dps": 2.7000623958883807e-12,
+  "source_hashes_unchanged": true,
+  "frozen_parameters_unchanged": true,
+  "train_test_series_disjoint": true,
+  "CROSS_pose_used": false,
+  "raw_LR_mean": true,
+  "nonoverlap_checked": true,
+  "synthetic_IIR_check": true,
+  "firmware_modified": false,
+  "sources": [
+    {
+      "path": "D:\\robotrace\\robotrace_v2\\analysis\\script\\analyze_multispeed_width_13006_13044.py",
+      "sha256": "865ea79fa9d7a2a9a4705476d9f615b63e80b2945ff962cb0de98f4dd625c6c5"
+    },
+    {
+      "path": "D:\\robotrace\\robotrace_v2\\analysis\\script\\diagnose_multispeed_width_13006_13044.py",
+      "sha256": "5df6271cd48243a178f70710b0347ad11b9b9f46c63862ea84a8ebb8a6a26a04"
+    },
+    {
+      "path": "D:\\robotrace\\robotrace_v2\\analysis\\script\\validate_multispeed_width_13006_13044.py",
+      "sha256": "43a4bcf618aadedd4f07f52dd2bc7304b821b784dc167165aef5bbbb12ddba3a"
+    },
+    {
+      "path": "D:\\robotrace\\robotrace_v2\\robotrace_v2\\Core\\Src\\IMU.c",
+      "sha256": "03c9f82b91e454e91c3711f682e56fe7b386e484e2acf5ab3a945588d0ed1a8c"
+    },
+    {
+      "path": "D:\\robotrace\\robotrace_v2\\robotrace_v2\\Core\\Src\\timer.c",
+      "sha256": "637147b55b562630a0581883be670f27cad76cd430ba463387eaf7df32ad3b73"
+    },
+    {
+      "path": "D:\\robotrace\\robotrace_v2\\robotrace_v2\\Core\\Src\\encoder.c",
+      "sha256": "8e8ded7eb4547c7c2f86d766c882df90bd4b7f4f8c6b19f9b7b3d055370cddc6"
+    },
+    {
+      "path": "D:\\robotrace\\robotrace_v2\\robotrace_v2\\Core\\Src\\BMI088.c",
+      "sha256": "c20ae41a691d4b3cd213750c6082f68df9d4a133286f2713e3eac32cc44ee26d"
+    }
+  ]
+}

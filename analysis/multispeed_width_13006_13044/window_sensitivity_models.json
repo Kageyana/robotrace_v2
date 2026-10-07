@@ -1,0 +1,402 @@
+[
+  {
+    "window_ms": 40,
+    "model": "constant",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 112.43091491228374
+    },
+    "mode": "PRIMARY"
+  },
+  {
+    "window_ms": 40,
+    "model": "speed",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 106.59300685025674,
+      "Bv_mm_per_mps": -11.747304555857434
+    },
+    "mode": "PRIMARY"
+  },
+  {
+    "window_ms": 40,
+    "model": "curvature",
+    "ridge": 0.01,
+    "coefficients": {
+      "B0_mm": 111.90573839161365,
+      "Bk_mm_per_5radpm": 0.3506970185336899
+    },
+    "mode": "PRIMARY"
+  },
+  {
+    "window_ms": 40,
+    "model": "speed_curvature",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 103.42817289061873,
+      "Bv_mm_per_mps": -19.9584261495317,
+      "Bk_mm_per_5radpm": -0.6195899930041991
+    },
+    "mode": "PRIMARY"
+  },
+  {
+    "window_ms": 40,
+    "model": "constant",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 112.60551802550333
+    },
+    "mode": "PATH"
+  },
+  {
+    "window_ms": 40,
+    "model": "speed",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 102.25709346565796,
+      "Bv_mm_per_mps": -21.07804450442228
+    },
+    "mode": "PATH"
+  },
+  {
+    "window_ms": 40,
+    "model": "curvature",
+    "ridge": 0.01,
+    "coefficients": {
+      "B0_mm": 111.58906006550349,
+      "Bk_mm_per_5radpm": 0.8087514983797257
+    },
+    "mode": "PATH"
+  },
+  {
+    "window_ms": 40,
+    "model": "speed_curvature",
+    "ridge": 0.01,
+    "coefficients": {
+      "B0_mm": 111.34534466869056,
+      "Bv_mm_per_mps": -0.5364869515411672,
+      "Bk_mm_per_5radpm": 0.7930417442446717
+    },
+    "mode": "PATH"
+  },
+  {
+    "window_ms": 40,
+    "model": "constant",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 112.7492640351768
+    },
+    "mode": "SHORTCUT"
+  },
+  {
+    "window_ms": 40,
+    "model": "speed",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 101.738218796712,
+      "Bv_mm_per_mps": -22.455550920391214
+    },
+    "mode": "SHORTCUT"
+  },
+  {
+    "window_ms": 40,
+    "model": "curvature",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 111.55361865822358,
+      "Bk_mm_per_5radpm": 0.9583791287622677
+    },
+    "mode": "SHORTCUT"
+  },
+  {
+    "window_ms": 40,
+    "model": "speed_curvature",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 109.43599514158457,
+      "Bv_mm_per_mps": -4.691207236138212,
+      "Bk_mm_per_5radpm": 0.809042565557153
+    },
+    "mode": "SHORTCUT"
+  },
+  {
+    "window_ms": 40,
+    "model": "constant",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 112.10954750185579
+    },
+    "mode": "DISTANCE"
+  },
+  {
+    "window_ms": 40,
+    "model": "speed",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 112.46724235333006,
+      "Bv_mm_per_mps": 1.8235685129500436
+    },
+    "mode": "DISTANCE"
+  },
+  {
+    "window_ms": 40,
+    "model": "curvature",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 113.01990932162204,
+      "Bk_mm_per_5radpm": -0.6127414191748144
+    },
+    "mode": "DISTANCE"
+  },
+  {
+    "window_ms": 40,
+    "model": "speed_curvature",
+    "ridge": 0.01,
+    "coefficients": {
+      "B0_mm": 112.72632079182036,
+      "Bv_mm_per_mps": 1.1498382000660599,
+      "Bk_mm_per_5radpm": -0.26321820653267936
+    },
+    "mode": "DISTANCE"
+  },
+  {
+    "window_ms": 40,
+    "model": "constant",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 112.100463115189
+    },
+    "mode": "SLIP"
+  },
+  {
+    "window_ms": 40,
+    "model": "speed",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 112.35042642361597,
+      "Bv_mm_per_mps": 1.0586463237574462
+    },
+    "mode": "SLIP"
+  },
+  {
+    "window_ms": 40,
+    "model": "curvature",
+    "ridge": 1.0,
+    "coefficients": {
+      "B0_mm": 112.09868018208914,
+      "Bk_mm_per_5radpm": 0.0012073224211505728
+    },
+    "mode": "SLIP"
+  },
+  {
+    "window_ms": 40,
+    "model": "speed_curvature",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 111.71679721139948,
+      "Bv_mm_per_mps": 2.8962304621748918,
+      "Bk_mm_per_5radpm": 0.7222002427541016
+    },
+    "mode": "SLIP"
+  },
+  {
+    "window_ms": 200,
+    "model": "constant",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 112.52122693784008
+    },
+    "mode": "PRIMARY"
+  },
+  {
+    "window_ms": 200,
+    "model": "speed",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 105.33329060615777,
+      "Bv_mm_per_mps": -14.513098982361713
+    },
+    "mode": "PRIMARY"
+  },
+  {
+    "window_ms": 200,
+    "model": "curvature",
+    "ridge": 0.01,
+    "coefficients": {
+      "B0_mm": 111.93665391216095,
+      "Bk_mm_per_5radpm": 0.45517358049985523
+    },
+    "mode": "PRIMARY"
+  },
+  {
+    "window_ms": 200,
+    "model": "speed_curvature",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 103.80771016727074,
+      "Bv_mm_per_mps": -18.467712069924648,
+      "Bk_mm_per_5radpm": -0.33707860013774743
+    },
+    "mode": "PRIMARY"
+  },
+  {
+    "window_ms": 200,
+    "model": "constant",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 112.7643764556133
+    },
+    "mode": "PATH"
+  },
+  {
+    "window_ms": 200,
+    "model": "speed",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 93.7524044000648,
+      "Bv_mm_per_mps": -38.977942254128635
+    },
+    "mode": "PATH"
+  },
+  {
+    "window_ms": 200,
+    "model": "curvature",
+    "ridge": 0.01,
+    "coefficients": {
+      "B0_mm": 111.62983398589603,
+      "Bk_mm_per_5radpm": 0.9445433330270716
+    },
+    "mode": "PATH"
+  },
+  {
+    "window_ms": 200,
+    "model": "speed_curvature",
+    "ridge": 0.01,
+    "coefficients": {
+      "B0_mm": 111.27229287560148,
+      "Bv_mm_per_mps": -0.7832843241572122,
+      "Bk_mm_per_5radpm": 0.9233882772249218
+    },
+    "mode": "PATH"
+  },
+  {
+    "window_ms": 200,
+    "model": "constant",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 112.9905561367213
+    },
+    "mode": "SHORTCUT"
+  },
+  {
+    "window_ms": 200,
+    "model": "speed",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 95.62125254330395,
+      "Bv_mm_per_mps": -35.55109899080233
+    },
+    "mode": "SHORTCUT"
+  },
+  {
+    "window_ms": 200,
+    "model": "curvature",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 111.61670848043558,
+      "Bk_mm_per_5radpm": 1.171384655616282
+    },
+    "mode": "SHORTCUT"
+  },
+  {
+    "window_ms": 200,
+    "model": "speed_curvature",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 100.37439266908594,
+      "Bv_mm_per_mps": -24.30106274870729,
+      "Bk_mm_per_5radpm": 0.6527975948730648
+    },
+    "mode": "SHORTCUT"
+  },
+  {
+    "window_ms": 200,
+    "model": "constant",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 112.2497465536941
+    },
+    "mode": "DISTANCE"
+  },
+  {
+    "window_ms": 200,
+    "model": "speed",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 112.61678298763599,
+      "Bv_mm_per_mps": 2.298594899315451
+    },
+    "mode": "DISTANCE"
+  },
+  {
+    "window_ms": 200,
+    "model": "curvature",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 112.99357443614376,
+      "Bk_mm_per_5radpm": -0.6182549387622656
+    },
+    "mode": "DISTANCE"
+  },
+  {
+    "window_ms": 200,
+    "model": "speed_curvature",
+    "ridge": 0.01,
+    "coefficients": {
+      "B0_mm": 112.165876486151,
+      "Bv_mm_per_mps": 3.349912027769833,
+      "Bk_mm_per_5radpm": 0.5130840514183896
+    },
+    "mode": "DISTANCE"
+  },
+  {
+    "window_ms": 200,
+    "model": "constant",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 112.06965902661766
+    },
+    "mode": "SLIP"
+  },
+  {
+    "window_ms": 200,
+    "model": "speed",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 112.46302607300876,
+      "Bv_mm_per_mps": 2.0198200803606
+    },
+    "mode": "SLIP"
+  },
+  {
+    "window_ms": 200,
+    "model": "curvature",
+    "ridge": 1.0,
+    "coefficients": {
+      "B0_mm": 112.12211657501237,
+      "Bk_mm_per_5radpm": -0.04297125587167589
+    },
+    "mode": "SLIP"
+  },
+  {
+    "window_ms": 200,
+    "model": "speed_curvature",
+    "ridge": 0.0,
+    "coefficients": {
+      "B0_mm": 112.06832610836005,
+      "Bv_mm_per_mps": 2.9353195003151646,
+      "Bk_mm_per_5radpm": 0.4913556641723811
+    },
+    "mode": "SLIP"
+  }
+]

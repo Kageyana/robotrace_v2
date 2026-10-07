@@ -1,0 +1,264 @@
+{
+  "train_groups": [
+    13006,
+    13007,
+    13012,
+    13017
+  ],
+  "test_groups": [
+    13022,
+    13030,
+    13035,
+    13040
+  ],
+  "train_logs": [
+    13006,
+    13007,
+    13008,
+    13009,
+    13012,
+    13013,
+    13014,
+    13015,
+    13016,
+    13017,
+    13018,
+    13019,
+    13020,
+    13021
+  ],
+  "response": {
+    "delay_ms": 8,
+    "tc_ms": 0,
+    "series_LOO_rms_dps": 3.7692041989638563,
+    "B_PRIMARY_mm": 112.52906743830816,
+    "B_PATH_mm": 112.68184291243743,
+    "B_SHORTCUT_mm": 112.84302927620202,
+    "B_DISTANCE_mm": 112.02182559127758,
+    "B_SLIP_mm": 112.00672679711889,
+    "c_velocity_mm_per_m": 12.25693855055295,
+    "c0_mmps": -5.592590028382887
+  },
+  "asymmetry": {
+    "c_velocity_mm_per_m": 8.929796584782276,
+    "c0_mmps": -2.2610839544869212,
+    "B_steady_mode": {
+      "PRIMARY": 112.25028803253092,
+      "PATH": 112.26663710253828,
+      "SHORTCUT": 112.49555790241473,
+      "DISTANCE": 111.76289007458476,
+      "SLIP": 111.85864755623972
+    },
+    "straight_windows": 370,
+    "steady_turn_windows": 288,
+    "straight_speed_min": 1.012823385442689,
+    "straight_speed_max": 2.8599251969182298
+  },
+  "width_models": [
+    {
+      "model": "constant",
+      "ridge": 0.0,
+      "coefficients": {
+        "B0_mm": 112.52363800440527
+      },
+      "mode": "PRIMARY"
+    },
+    {
+      "model": "speed",
+      "ridge": 0.0,
+      "coefficients": {
+        "B0_mm": 105.60055019641693,
+        "Bv_mm_per_mps": -13.9819521637635
+      },
+      "mode": "PRIMARY"
+    },
+    {
+      "model": "curvature",
+      "ridge": 0.01,
+      "coefficients": {
+        "B0_mm": 111.91077998960402,
+        "Bk_mm_per_5radpm": 0.41191903048279604
+      },
+      "mode": "PRIMARY"
+    },
+    {
+      "model": "speed_curvature",
+      "ridge": 0.0,
+      "coefficients": {
+        "B0_mm": 103.90376756259894,
+        "Bv_mm_per_mps": -18.462574596911153,
+        "Bk_mm_per_5radpm": -0.37615684970295227
+      },
+      "mode": "PRIMARY"
+    },
+    {
+      "model": "constant",
+      "ridge": 0.0,
+      "coefficients": {
+        "B0_mm": 112.66127053143988
+      },
+      "mode": "PATH"
+    },
+    {
+      "model": "speed",
+      "ridge": 0.0,
+      "coefficients": {
+        "B0_mm": 102.7979296717654,
+        "Bv_mm_per_mps": -20.037200730674346
+      },
+      "mode": "PATH"
+    },
+    {
+      "model": "curvature",
+      "ridge": 0.01,
+      "coefficients": {
+        "B0_mm": 111.60210265575897,
+        "Bk_mm_per_5radpm": 0.8334446660785265
+      },
+      "mode": "PATH"
+    },
+    {
+      "model": "speed_curvature",
+      "ridge": 0.01,
+      "coefficients": {
+        "B0_mm": 111.4347671245552,
+        "Bv_mm_per_mps": -0.37130446879344337,
+        "Bk_mm_per_5radpm": 0.821066499687471
+      },
+      "mode": "PATH"
+    },
+    {
+      "model": "constant",
+      "ridge": 0.0,
+      "coefficients": {
+        "B0_mm": 112.81525537818794
+      },
+      "mode": "SHORTCUT"
+    },
+    {
+      "model": "speed",
+      "ridge": 0.0,
+      "coefficients": {
+        "B0_mm": 100.16122167055285,
+        "Bv_mm_per_mps": -25.867170925649855
+      },
+      "mode": "SHORTCUT"
+    },
+    {
+      "model": "curvature",
+      "ridge": 0.0,
+      "coefficients": {
+        "B0_mm": 111.35137932652833,
+        "Bk_mm_per_5radpm": 1.2128764595719033
+      },
+      "mode": "SHORTCUT"
+    },
+    {
+      "model": "speed_curvature",
+      "ridge": 0.0,
+      "coefficients": {
+        "B0_mm": 111.51383565243424,
+        "Bv_mm_per_mps": 0.3638237215691518,
+        "Bk_mm_per_5radpm": 1.2260390995003105
+      },
+      "mode": "SHORTCUT"
+    },
+    {
+      "model": "constant",
+      "ridge": 0.0,
+      "coefficients": {
+        "B0_mm": 112.07318220392281
+      },
+      "mode": "DISTANCE"
+    },
+    {
+      "model": "speed",
+      "ridge": 0.0,
+      "coefficients": {
+        "B0_mm": 112.36825368447454,
+        "Bv_mm_per_mps": 1.4981557967390886
+      },
+      "mode": "DISTANCE"
+    },
+    {
+      "model": "curvature",
+      "ridge": 0.0,
+      "coefficients": {
+        "B0_mm": 112.9716624649824,
+        "Bk_mm_per_5radpm": -0.6462901338663029
+      },
+      "mode": "DISTANCE"
+    },
+    {
+      "model": "speed_curvature",
+      "ridge": 0.01,
+      "coefficients": {
+        "B0_mm": 112.92613137110874,
+        "Bv_mm_per_mps": -0.08676429259081334,
+        "Bk_mm_per_5radpm": -0.6256444804431038
+      },
+      "mode": "DISTANCE"
+    },
+    {
+      "model": "constant",
+      "ridge": 0.0,
+      "coefficients": {
+        "B0_mm": 112.09926198422451
+      },
+      "mode": "SLIP"
+    },
+    {
+      "model": "speed",
+      "ridge": 0.0,
+      "coefficients": {
+        "B0_mm": 112.39078367879227,
+        "Bv_mm_per_mps": 1.332103017426005
+      },
+      "mode": "SLIP"
+    },
+    {
+      "model": "curvature",
+      "ridge": 1.0,
+      "coefficients": {
+        "B0_mm": 112.09733552896944,
+        "Bk_mm_per_5radpm": 0.0014073243489172158
+      },
+      "mode": "SLIP"
+    },
+    {
+      "model": "speed_curvature",
+      "ridge": 0.0,
+      "coefficients": {
+        "B0_mm": 111.61102749579291,
+        "Bv_mm_per_mps": 3.4628101150530712,
+        "Bk_mm_per_5radpm": 0.9219842399316955
+      },
+      "mode": "SLIP"
+    }
+  ],
+  "V0_mps": 1.5,
+  "VS_mps": 1.0,
+  "KS_radpm": 5.0,
+  "window_s": 0.1,
+  "encoder_mean_uses_raw_LR": true,
+  "CROSS_pose_used": false,
+  "positive_delay_filters_past_encoder": true,
+  "input_train_hashes": {
+    "13006": "eb208e5e4a90c1cd4891a6d03ff46c6c7766844a5bc6f7568da71ac9b6137dfc",
+    "13007": "dc3e13331ddad4c38b0d616d7bb95532f6abeec0b3af9103db0121cb940a7a36",
+    "13008": "720c7ecfb015562ea941ed4d4f468b39d761c2f573e0477a0b343268f08e41a7",
+    "13009": "9156198085fc449f97cae936cd9584c367b9897c9f0fe08d67f70ed77a4a2737",
+    "13012": "789017003e51db18f3cba697bef35174b1009d2402a0297090bba0f84f852ead",
+    "13013": "859b0bab5f570b4db2a7f34845c5b6cf99877ccb84f35e3c1fe24441667f2c3c",
+    "13014": "dfb6264df2952343d46ba7bdbc5aea6003faaf9aa08c20716ccf9169e86d3615",
+    "13015": "7c60feeaf98ff1baecfff14e41569c9c89dbae049365a5cc8e723af7e0eb29fc",
+    "13016": "c290ef6a023061494bc3cad3a1a11382f7116f80a6f1a81b9f3cff6515dde2ca",
+    "13017": "cec36427c3e53b120e3735aece3b0d391ce4bfbc321355230bea6b8cd79bcebb",
+    "13018": "aaa0b77e91f87f3efab6972f6cfa41bf5dab4d3991e8bdf8cdfc9c22c04437c5",
+    "13019": "80e1e09e97b6540085558bbc829d19e629d8c1efd8388a5196620a5bb1674282",
+    "13020": "8a7601310d39b424da8e2564f12ccdcacfe18cc0a53e3314cdbe8517447112f6",
+    "13021": "300d9c9cad148b987ac149e280bb9cf45d16229e9ec6ce25feb7b0f2d78a30eb"
+  },
+  "common_calibration_fixed_during_width_LOO": true,
+  "test_previously_seen": true
+}

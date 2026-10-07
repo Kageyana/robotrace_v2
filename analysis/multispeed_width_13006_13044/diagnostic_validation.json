@@ -1,0 +1,14 @@
+{
+  "status": "passed",
+  "frozen_parameters_unchanged": true,
+  "source_hashes_unchanged": true,
+  "diagnostics_do_not_retune_test": true,
+  "jackknife_groups": 4,
+  "gate_variants": 6,
+  "window_sizes_ms": [
+    40,
+    100,
+    200
+  ],
+  "script_sha256": "5df6271cd48243a178f70710b0347ad11b9b9f46c63862ea84a8ebb8a6a26a04"
+}
