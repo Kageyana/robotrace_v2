@@ -1,0 +1,77 @@
+{
+  "source": "STEP AP214 2026-10-03, KiCad PCB current",
+  "origin_CAD_mm": [
+    0,
+    8.25,
+    8.00000004676
+  ],
+  "front_rear_axle_mm": 25.6904651573,
+  "lateral_tire_centers_mm": [
+    -54.55,
+    54.55
+  ],
+  "body_axes": [
+    "forward",
+    "right",
+    "up"
+  ],
+  "imu_package_center_body_mm": [
+    -31.67523,
+    -0.09917,
+    -5.205
+  ],
+  "cad_to_body": [
+    [
+      0,
+      0,
+      1,
+      -8.00000004676
+    ],
+    [
+      -1,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      1,
+      0,
+      -8.25
+    ],
+    [
+      0,
+      0,
+      0,
+      1
+    ]
+  ],
+  "kicad_line_to_body": [
+    [
+      0,
+      -1,
+      0,
+      40.151700071
+    ],
+    [
+      1,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      1,
+      -6.16
+    ],
+    [
+      0,
+      0,
+      0,
+      1
+    ]
+  ],
+  "optical_center_unmeasured": true,
+  "effective_tread_unmeasured": true
+}
