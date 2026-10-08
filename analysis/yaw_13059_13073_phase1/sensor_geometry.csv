@@ -1,0 +1,11 @@
+ch,receiver,emitter,X_forward_mm,Y_right_mm,LED_X_forward_mm,LED_Y_right_mm,Z_footprint_above_axle_mm,source
+0,Q10,D10,74.2217,-41.7,77.3417,-45.52,-6.160,Machine/robotrace_v3.STEP and Circuit/robotrace_v2_Linesensor/robotrace_v2_Linesensor.kicad_pcb
+1,Q8,D8,81.0317,-35.04,84.7817,-38.25,-6.160,Machine/robotrace_v3.STEP and Circuit/robotrace_v2_Linesensor/robotrace_v2_Linesensor.kicad_pcb
+2,Q6,D6,86.5717,-27.29,90.8217,-29.79,-6.160,Machine/robotrace_v3.STEP and Circuit/robotrace_v2_Linesensor/robotrace_v2_Linesensor.kicad_pcb
+3,Q4,D4,90.6517,-18.68,95.2817,-20.39,-6.160,Machine/robotrace_v3.STEP and Circuit/robotrace_v2_Linesensor/robotrace_v2_Linesensor.kicad_pcb
+4,Q2,D2,93.1517,-9.49,98.0117,-10.36,-6.160,Machine/robotrace_v3.STEP and Circuit/robotrace_v2_Linesensor/robotrace_v2_Linesensor.kicad_pcb
+5,Q1,D1,93.1517,9.5,98.0117,10.36,-6.160,Machine/robotrace_v3.STEP and Circuit/robotrace_v2_Linesensor/robotrace_v2_Linesensor.kicad_pcb
+6,Q3,D3,90.6517,18.68,95.2817,20.39,-6.160,Machine/robotrace_v3.STEP and Circuit/robotrace_v2_Linesensor/robotrace_v2_Linesensor.kicad_pcb
+7,Q5,D5,86.5717,27.29,90.8217,29.79,-6.160,Machine/robotrace_v3.STEP and Circuit/robotrace_v2_Linesensor/robotrace_v2_Linesensor.kicad_pcb
+8,Q7,D7,81.0317,35.05,84.7817,38.25,-6.160,Machine/robotrace_v3.STEP and Circuit/robotrace_v2_Linesensor/robotrace_v2_Linesensor.kicad_pcb
+9,Q9,D9,74.2217,41.7,77.3417,45.52,-6.160,Machine/robotrace_v3.STEP and Circuit/robotrace_v2_Linesensor/robotrace_v2_Linesensor.kicad_pcb
