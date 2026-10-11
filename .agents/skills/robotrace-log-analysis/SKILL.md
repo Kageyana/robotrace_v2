@@ -47,7 +47,7 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 
 ## Light and debug profiles
 
-- The default light profile has 41 CSV columns and a 100-byte stored record, including individual encoders, line sensors, acceleration and six IMU diagnostic columns. The trailing empty CSV cell is excluded from this count.
+- The default light profile has 43 CSV columns and a 108-byte stored record, including individual encoders, line sensors, acceleration, six IMU diagnostic columns and both motor currents. The trailing empty CSV cell is excluded from this count.
 - Logs 12872–12878 used the temporary minimal 13-column/22-byte profile. Raw-wheel, independent line-CROSS, temperature-series and XYZ-angle analyses cannot use those logs; check required column names before analysis.
 - The debug profile retains 58 columns and 145 bytes, including all diagnostic fields. Metadata validation and firmware secondary-run required fields remain available in both profiles.
 
@@ -70,6 +70,7 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - `slipFlag`: longitudinal slip flag.
 - `slipFlagLat`: lateral slip flag.
 - `lineTraceCtrl`: current log column name; value is `lineTraceOmegaFBCtrl.pwm`.
+- `motorCurrentL`, `motorCurrentR`: latest left/right motor current `[A]`, updated every 10 ms after 32-sample ADC averaging and zero-offset calibration. Included in both profiles; appended after IMU fields in the light profile since 2026-10-07. Earlier light logs omit them.
 - `targetAngularvelo`: log target angular velocity, `[deg/s]`.
 - 2026-09-30以降の通常・詳細ログは `motorpwmL`, `motorpwmR` と経路追従専用7列（`linePointX_mm`, `linePointY_mm`, `lineValid`, `pathErrorY_mm`, `pathErrorHeading_cdeg`, `pathState`, `pathLegalMargin_mm`）を出力しない。以下の経路追従専用列の意味は過去ログ向け。専用列必須の解析スクリプトは新ログに使用しない。
 - `x`, `y`: estimated position from the start marker origin, `[mm]`. After the 12879–12884 recovery, firmware CSV generation uses `encTotalOptimal` differences and midpoint heading from stored 1-ms `imuAngle_Z`; the closure X check uses the same integration. Earlier firmware reintegrated sparse `gyroVal_Z` and held the latest corrected speed across each logging interval. Sparse integration can alias and must be compared with stored yaw before interpreting large course distortions.

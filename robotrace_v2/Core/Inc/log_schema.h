@@ -76,6 +76,12 @@
 	STORED(F32, slipEncAyF, "%f", getSlipEncAyF()) \
 	STORED(F32, slipImuAyF, "%f", getSlipImuAyF())
 
+// 通常ログの既存列順を保つため末尾へ追加する。詳細ログでは既存の電流列を使用する。
+// 電流[A]はADC移動平均・ゼロ点校正後の最新値を保存する。
+#define LOG_FIELD_LIST_CURRENT(STORED, DERIVED) \
+	STORED(F32, motorCurrentL, "%f", motorCurrentL) \
+	STORED(F32, motorCurrentR, "%f", motorCurrentR)
+
 // 既存列の位置を維持し、通常・詳細とも末尾にIMU診断列を追加する。
 // 温度は最新取得値[°C]（5ms周期更新）、無効時は-999。角度[deg]はXYが加速度融合、Zがジャイロ積分。
 #define LOG_FIELD_LIST_IMU(STORED, DERIVED) \
@@ -89,7 +95,8 @@
 #if LOG_SCHEMA_PROFILE_LIGHT
 #define LOG_FIELD_LIST(STORED, DERIVED) \
 	LOG_FIELD_LIST_CORE(STORED, DERIVED) \
-	LOG_FIELD_LIST_IMU(STORED, DERIVED)
+	LOG_FIELD_LIST_IMU(STORED, DERIVED) \
+	LOG_FIELD_LIST_CURRENT(STORED, DERIVED)
 #else
 #define LOG_FIELD_LIST(STORED, DERIVED) \
 	LOG_FIELD_LIST_CORE(STORED, DERIVED) \
