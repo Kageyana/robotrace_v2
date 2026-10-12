@@ -68,6 +68,8 @@ CSVには変換元の `binaryLogNumber`、`binaryDataCrc`、`binarySchema` を�
 
 ## 検証
 
+2026-10-12、exFATの起動時復旧でFatFs R0.12cの`f_open()`通常成功経路に`obj.n_frag`の初期化がないことを実機で確認した。スタック上の未初期化値を`f_lseek()`の`fill_last_frag()`が参照し、メタデータ位置へのseekが`FR_INT_ERR`になったため、`Middlewares/Third_Party/FatFs/src/ff.c`のexFAT割当情報設定後に`fp->obj.n_frag = 0`を追加した。CubeMX/FatFs更新後もこの修正の保持を確認する。Debug/Releaseビルド、既存通常/詳細ホストテストが成功し、実機で13100～13103の4本をCSV確定（DONE 100%）、再起動後の未変換bin 0本・復旧完了を確認した。未確定tmpは仕様どおり保持する。ホストテストは模擬FatFsのため、この初期化不良の検証には実FatFsを通るexFATのseek・CSV確定確認が必要となる。
+
 ローカル検証用テストは既存方針どおり `robotrace_v2/tests/` に置き、Git管理対象外とする。
 
 ```powershell
