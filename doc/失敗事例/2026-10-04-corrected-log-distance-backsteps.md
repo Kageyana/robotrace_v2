@@ -32,3 +32,13 @@ sgMarkerAtLogEndへ固定の3回条件を適用しない。2未満は過去ゴ�
 `python analysis/script/test_classify_logs.py`
 
 全12555本の再走査後、11373、12363、12378のNORMAL_CANDIDATEを確認した。course_005の既存824本はすべて正常候補、分類照合も824/824一致。修正の回帰テストも通過した。
+
+## 再発：2026-10-12の13089～13093確認
+
+新規check_primary_05_13089_13093.pyで一次・二次へ一律にencTotalOptimalの単調性assertを適用し、13092のマーカー距離補正で停止した。既存対策は分類スクリプト内に留まり、新しい解析コードへ引き継がれなかった。
+
+13092/13093は各5段、最大83.54/72.29mm戻るが、全てcourseMarker=3の行でありraw左右積算平均は単調。control.cのControl_ApplyMarkerCorrection_p()とcourseAnalysis.cの呼出しで、二次走行の補正距離が戻り得ることを再確認した。単調性・5mm記録間隔の健全性はraw左右積算平均へ切り替え、encTotalOptimalの単調性assertは一次に限定した。二次補正の戻り回数・最大量をmetrics.csvへ明示し、Yaw/XY比較にもraw距離を使用する。
+
+再発防止を追加：新規解析のload境界で、列名だけでなく「raw積算／補正座標」「適用走行モード」を明示する。一次とDISTANCEを含む代表セットでloadを確認してから図を作成する。固定時間上限も流用しない。今回のスクリプトでは全8本（旧一次3本＋新5本）の読込・距離検証・全図生成・入力ハッシュ不変が完了し、validation.jsonのpassed=trueを確認したため、この再発への対処はresolved。
+
+再実行：python analysis/script/check_primary_05_13089_13093.py。成果物：analysis/primary_05_13089_13093/。
