@@ -49,3 +49,5 @@ gcc -std=c11 -Wall -Wextra -I tests/accel_y_sign -I robotrace_v2/Core/Inc tests/
 13077の横フラグON率9.80%は別の残課題。X/Z方向、真のYaw精度、旋回中Y補正量の独立検証、実測割り込み時間、コンパイラ起動時のDLL問題の根本原因は解決した扱いにしない。解析原本・ファームウェアに今回の追加変更は行っていない。
 
 詳細：analysis/accel_y_13074_13088/report.md、metrics.csv、validation.json、independent_validation.json。再実行はanalysis/script/analyze_accel_y_13074_13088.pyとvalidate_accel_y_13074_13088.py。30本の原本SHA256を解析後と独立検査で再照合済み。
+
+2026-10-13、ADC位相修正の逆アセンブル確認で`arm-none-eabi-objdump`にも同じDLL再配置エラーが発生した。コンパイラ以外のGNUツールにも同じ実行環境制約がある。制限外の同一コマンドでDebug/ReleaseのPRIMASK・固定サイズ公開処理を確認できた。今後はobjdump/nm/sizeも起動環境の事前確認対象へ含める。環境問題の根本原因はopen。
