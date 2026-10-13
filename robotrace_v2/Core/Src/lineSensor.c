@@ -14,8 +14,71 @@
 uint32_t lSensorInt[NUM_SENSORS] = {0};	 // ラインセンサの立ち上がりエッジAD値積算用
 uint16_t lSensor[NUM_SENSORS] = {0};	 // ラインセンサの平均AD値
 uint16_t lSensorCari[NUM_SENSORS] = {0}; // 正規化したラインセンサのAD値
-bool lineSensorState = false;			 // true:ラインセンサ点灯 false:ラインセンサ消灯
-bool lineSensorPower = false;			 // ラインセンサ電源状態
+volatile bool lineSensorState = false; // 現在のPWM位相。取得済みデータの位相には使わない。
+volatile bool lineSensorPower = false;
+volatile bool adcAcquisitionBusy = false; // DMA開始前から結果処理完了まで占有する。
+volatile bool adcAcquisitionFault = false; // HAL異常時は再起動まで再取得を禁止する。
+volatile uint32_t adcSkippedCount = 0;
+volatile uint32_t adcStartErrorCount = 0;
+volatile uint32_t adcLastStartStatus = HAL_OK;
+volatile uint32_t adcLastErrorCode = 0;
+volatile uint32_t adcTransferErrorCount = 0;
+volatile uint32_t lineSensorUpdateCount = 0;
+volatile uint32_t lineSensorUpdateAgeMs = 0;
+volatile uint32_t lineSensorMaxUpdateAgeMs = 0;
+volatile bool lineSensorUpdateStale = false;
+volatile uint32_t lineSensorStaleCount = 0;
+volatile uint16_t lineSensorVrefSample = 0;
+static volatile uint32_t acquisitionEpoch = 0;
+static volatile uint32_t sensorPowerEpoch = 0;
+static volatile bool sampleAvailable = false;
+static bool conversionPending = false;
+static bool requestedPhase = false;
+static uint32_t requestedTick = 0;
+static struct {
+	bool phase;
+	uint16_t *buffer;
+	uint8_t markerLeft, markerRight;
+	uint32_t epoch;
+} adcSample;
+static uint32_t accum[2][NUM_SENSORS];
+static uint16_t pairSample[2][NUM_SENSORS];
+static uint8_t completedPairCount;
+static uint32_t oldestPairTimeMs;
+static uint8_t readyMask;
+static void normalizeLineSensor(const uint16_t *raw, uint16_t *normalized);
+
+_Static_assert(LS_AVERAGE_SAMPLES == 2U, "Line sensor averaging must retain two samples");
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 skipLineSensorAcquisition
+// 処理概要     欠測を記録し、処理中データを含む未完成の組合せを無効化する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void skipLineSensorAcquisition(void)
+{
+	++adcSkippedCount;
+	++acquisitionEpoch;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 lineSensorWindowValid
+// 処理概要     CC1要求が同一PWM位相内にあり、全走査の余裕が残っているか確認する
+// 引数         なし
+// 戻り値       true:取得窓内 false:失効
+/////////////////////////////////////////////////////////////////////
+static bool lineSensorWindowValid(void)
+{
+	const uint32_t now = __HAL_TIM_GET_COUNTER(&htim3);
+	const uint32_t compare = __HAL_TIM_GET_COMPARE(&htim3, LS_CHANNEL);
+	const uint32_t end = requestedPhase ? compare : __HAL_TIM_GET_AUTORELOAD(&htim3) + 1U;
+	const uint32_t margin = LS_ADC_SCAN_MARGIN_US * TIMER_TICK / (PSC + 1U);
+	// 境界フラグで一周遅れの要求も棄却する。HALはCC1を更新イベントより先に処理する。
+	return lineSensorPower && ((htim3.Instance->SR & (TIM_FLAG_UPDATE | TIM_FLAG_CC3)) == 0U)
+		&& ((now < compare) == requestedPhase) && now >= requestedTick
+		&& now + margin < end;
+}
 // 仮想センサステア関連
 uint16_t lineIndex = 0;
 float angleSensor;
@@ -138,88 +201,257 @@ bool isLineSensorSettingCorrupt(void)
 /////////////////////////////////////////////////////////////////////
 void powerLineSensors(uint8_t onoff)
 {
-	if (onoff == 0)
+	if (onoff > 1U) return;
+	const uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	// UIのテスト画面は毎ループONを要求する。同じON要求で平均化を破棄しない。
+	if (onoff == 1U && lineSensorPower)
 	{
-		lineSensorPower = false;
-		__HAL_TIM_SET_COMPARE(&LS_TIMER, LS_CHANNEL, 0);
+		__set_PRIMASK(primask);
+		return;
 	}
-	else if (onoff == 1)
-	{
-		lineSensorPower = true;
-		__HAL_TIM_SET_COMPARE(&LS_TIMER, LS_CHANNEL, LS_COUNTERPERIOD);
-	}
+	__HAL_TIM_DISABLE_IT(&htim3, TIM_IT_CC1);
+	__HAL_TIM_CLEAR_IT(&htim3, TIM_IT_CC1);
+	conversionPending = false;
+	++acquisitionEpoch;
+	++sensorPowerEpoch;
+	sampleAvailable = false;
+	lineSensorUpdateAgeMs = 0;
+	lineSensorUpdateStale = false;
+	lineSensorVrefSample = 0;
+	lineSensorPower = onoff != 0U;
+	lineSensorState = false;
+	__HAL_TIM_SET_COMPARE(&LS_TIMER, LS_CHANNEL, onoff ? LS_COUNTERPERIOD : 0U);
+	powerMarkerSensors(0);
+	// 転送中なら占有を保持し、旧世代の完了を棄却してから新規取得を許可する。
+	__set_PRIMASK(primask);
 }
 //////////////////////////////////////////////////////////////////////
-// モジュール名 arm_cc1_after_us
-// 処理概要  	TIM3のCC1割り込みを指定したus後に発生させる（ワンショット）
-// 引数     	us: 割り込み発生までの時間[us]
-// 戻り値    	なし
+// モジュール名 lineSensorPhaseChanged
+// 処理概要     ADC状態とは独立してLED位相を更新し、同位相内のCC1要求を作成する
+// 引数         phase:更新イベントならtrue、PWM比較イベントならfalse
+// 戻り値       なし
 //////////////////////////////////////////////////////////////////////
-void delayLineSensorConversionStart(uint32_t us)
+void lineSensorPhaseChanged(bool phase)
 {
-	uint32_t ticks;
-	// 指定したus後にTIM3のCC1割り込みが発生するようにセット（ワンショット）
-    // 安全マージン（レース回避で最低+10tick）
-    if(us < 10) us = 10; // レース回避
-	ticks = us * TIMER_TICK/(PSC+1);
-    uint32_t arr = __HAL_TIM_GET_AUTORELOAD(&htim3);
-    uint32_t now = __HAL_TIM_GET_COUNTER(&htim3);
-    // uint32_t tgt = now + ticks; if(tgt > arr) tgt -= (arr+1);
-	uint32_t tgt = (now + ticks) % (arr+1);
+	__HAL_TIM_DISABLE_IT(&htim3, TIM_IT_CC1);
+	__HAL_TIM_CLEAR_IT(&htim3, TIM_IT_CC1);
+	if (conversionPending) skipLineSensorAcquisition();
+	conversionPending = false;
+	const uint32_t now = __HAL_TIM_GET_COUNTER(&htim3);
+	const uint32_t compare = __HAL_TIM_GET_COMPARE(&htim3, LS_CHANNEL);
+	lineSensorState = lineSensorPower && now < compare;
+	powerMarkerSensors(lineSensorState);
+	if (!lineSensorPower) return;
+	const uint32_t end = phase ? compare : __HAL_TIM_GET_AUTORELOAD(&htim3) + 1U;
+	const uint32_t target = now + LS_ADC_SETTLE_US * TIMER_TICK / (PSC + 1U);
+	const uint32_t margin = LS_ADC_SCAN_MARGIN_US * TIMER_TICK / (PSC + 1U);
+	if (lineSensorState != phase || target + margin >= end)
+	{
+		skipLineSensorAcquisition();
+		return;
+	}
+	requestedPhase = phase;
+	requestedTick = target;
+	conversionPending = true;
+	__HAL_TIM_DISABLE_OCxPRELOAD(&htim3, TIM_CHANNEL_1);
+	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, target);
+	__HAL_TIM_CLEAR_IT(&htim3, TIM_IT_CC1);
+	__HAL_TIM_ENABLE_IT(&htim3, TIM_IT_CC1);
+}
 
-    __HAL_TIM_DISABLE_IT(&htim3, TIM_IT_CC1);				// 念のため無効化
-    __HAL_TIM_DISABLE_OCxPRELOAD(&htim3, TIM_CHANNEL_1);	// OC1PE=0を保証
-    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, tgt);		// 即反映
-    __HAL_TIM_CLEAR_IT(&htim3, TIM_IT_CC1);					// 念のためクリア	
-    __HAL_TIM_ENABLE_IT(&htim3, TIM_IT_CC1);				// 有効化
+/////////////////////////////////////////////////////////////////////
+// モジュール名 startLineSensorAcquisition
+// 処理概要     有効なCC1要求だけを消費し、位相・転送先・マーカーGPIOを固定する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void startLineSensorAcquisition(void)
+{
+	__HAL_TIM_DISABLE_IT(&htim3, TIM_IT_CC1);
+	if (!conversionPending) return;
+	conversionPending = false;
+	if (!lineSensorWindowValid() || adcAcquisitionBusy || adcAcquisitionFault ||
+		(hadc1.State & HAL_ADC_STATE_BUSY_REG) != 0U ||
+		hadc1.Lock == HAL_LOCKED || HAL_DMA_GetState(hadc1.DMA_Handle) != HAL_DMA_STATE_READY)
+	{
+		skipLineSensorAcquisition();
+		return;
+	}
+	adcAcquisitionBusy = true;
+	adcSample.phase = requestedPhase;
+	adcSample.buffer = requestedPhase ? analogValLSon : analogValLSoff;
+	adcSample.epoch = acquisitionEpoch;
+	adcSample.markerLeft = HAL_GPIO_ReadPin(SidesensorL_GPIO_Port, SidesensorL_Pin);
+	adcSample.markerRight = HAL_GPIO_ReadPin(SidesensorR_GPIO_Port, SidesensorR_Pin);
+	const HAL_StatusTypeDef status = HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adcSample.buffer, NUM_SENSORS + 1U);
+	if (status != HAL_OK)
+	{
+		++adcStartErrorCount;
+		adcLastStartStatus = status;
+		adcLastErrorCode = HAL_ADC_GetError(&hadc1);
+		adcAcquisitionFault = true; // HALは失敗時もADCを開始し得るので再使用しない。
+		++acquisitionEpoch;
+		__DMB();
+		adcAcquisitionBusy = false;
+	}
+	else if (!lineSensorWindowValid() || adcSample.epoch != acquisitionEpoch)
+	{
+		// HAL開始中のTIM6割込みで取得窓を越えた場合も結果を破棄する。
+		skipLineSensorAcquisition();
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 completeLineSensorAcquisition
+// 処理概要     固定した取得情報だけで処理し、全処理終了後に占有を解放する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void completeLineSensorAcquisition(void)
+{
+	if (!adcAcquisitionBusy || adcAcquisitionFault) return;
+	if (lineSensorPower && adcSample.epoch == acquisitionEpoch)
+	{
+		const uint16_t vref = adcSample.buffer[NUM_SENSORS];
+		getLineSensor(adcSample.phase, adcSample.buffer, adcSample.epoch);
+		const uint32_t primask = __get_PRIMASK();
+		__disable_irq();
+		if (lineSensorPower && adcSample.epoch == acquisitionEpoch)
+		{
+			if (vref > 0U && vref <= 4095U) lineSensorVrefSample = vref;
+			getMarkerSensor(adcSample.phase, adcSample.markerLeft, adcSample.markerRight, adcSample.epoch);
+		}
+		__set_PRIMASK(primask);
+	}
+	__DMB(); // バッファ参照・作業配列更新を完了してから次のTIM3取得へ渡す。
+	adcAcquisitionBusy = false;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 failLineSensorAcquisition
+// 処理概要     非同期HAL異常を記録し、取得状態を解放して再使用を禁止する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void failLineSensorAcquisition(void)
+{
+	adcAcquisitionFault = true;
+	adcLastErrorCode = HAL_ADC_GetError(&hadc1);
+	++adcTransferErrorCount;
+	++acquisitionEpoch;
+	__DMB();
+	adcAcquisitionBusy = false;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 monitorLineSensorUpdate1ms
+// 処理概要     有効更新番号から更新間隔を診断する。緊急停止条件には接続しない。
+// 引数         steeringUsesLine:現在の操舵がラインセンサを使用するか
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void monitorLineSensorUpdate1ms(bool steeringUsesLine)
+{
+	static uint32_t previousCount = 0;
+	static bool monitoring = false;
+	const uint32_t count = lineSensorUpdateCount;
+	if (!lineSensorPower || !sampleAvailable)
+	{
+		previousCount = count;
+		monitoring = false;
+		lineSensorUpdateAgeMs = 0;
+		lineSensorUpdateStale = false;
+		return;
+	}
+	if (!monitoring)
+	{
+		monitoring = true;
+		lineSensorUpdateAgeMs = 0;
+	}
+	else
+	{
+		if (lineSensorUpdateAgeMs < UINT32_MAX) ++lineSensorUpdateAgeMs;
+		if (lineSensorUpdateAgeMs > lineSensorMaxUpdateAgeMs)
+			lineSensorMaxUpdateAgeMs = lineSensorUpdateAgeMs;
+		if (count != previousCount) lineSensorUpdateAgeMs = 0;
+	}
+	previousCount = count;
+	const bool stale = steeringUsesLine && lineSensorUpdateAgeMs >= LS_UPDATE_STALE_MS;
+	if (stale && !lineSensorUpdateStale) ++lineSensorStaleCount;
+	lineSensorUpdateStale = stale;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getLineSensor
 // 処理概要  	ラインセンサのAD値を取得し、平均値を計算する
-// 引数     	なし
+// 引数         phase:取得時LED位相, sample:完了済みDMA値, epoch:連続取得世代
 // 戻り値    	なし
 /////////////////////////////////////////////////////////////////////
-void getLineSensor(void)
+void getLineSensor(bool phase, const uint16_t *sample, uint32_t epoch)
 {
-	// LED点灯／消灯それぞれの平均を取るためのワークバッファ
-	static uint32_t accum[2][NUM_SENSORS] = {{0}};
-	static uint32_t average[2][NUM_SENSORS] = {{0}};
-	static uint16_t sampleCount[2] = {0};
-	static uint8_t readyMask = 0;
-	const uint8_t phase = lineSensorState ? 1U : 0U; // 1: LED on, 0: LED off
-	const uint8_t div = LS_AVERAGE_SAMPLES / 2;
-	uint32_t *acc = accum[phase];
-	const uint16_t *sample = (phase == 1U) ? analogValLSon : analogValLSoff;
+	static uint32_t previousEpoch = UINT32_MAX;
+	static uint32_t previousPowerEpoch = UINT32_MAX;
+	const uint32_t powerEpoch = sensorPowerEpoch;
+	const uint32_t nowMs = HAL_GetTick();
+	if (previousPowerEpoch != powerEpoch ||
+		(completedPairCount != 0U && nowMs - oldestPairTimeMs > LS_AVERAGE_MAX_PAIR_AGE_MS))
+	{
+		completedPairCount = 0;
+		readyMask = 0;
+		previousPowerEpoch = powerEpoch;
+	}
+	if (previousEpoch != epoch)
+	{
+		// 欠測前の未完成ペアだけを破棄する。完成済みのペアは上限時間内で保持する。
+		readyMask = 0;
+		previousEpoch = epoch;
+	}
+	memcpy(pairSample[phase], sample, sizeof(pairSample[phase]));
+	readyMask |= (1U << phase);
+	if (readyMask != 0x03U) return;
+	readyMask = 0;
 
-	// 取得したADC値を位相ごとに積算
+	// 同じ欠測世代で取得できたON/OFFだけを一つの完成ペアとして積算する。
+	uint32_t candidate[2][NUM_SENSORS];
+	for (uint8_t p = 0; p < 2U; ++p)
+		for (uint8_t i = 0; i < NUM_SENSORS; ++i)
+			candidate[p][i] = (completedPairCount ? accum[p][i] : 0U) + pairSample[p][i];
+
+	const uint32_t pairPrimask = __get_PRIMASK();
+	__disable_irq();
+	if (!lineSensorPower || powerEpoch != sensorPowerEpoch)
+	{
+		__set_PRIMASK(pairPrimask);
+		return;
+	}
+	if (++completedPairCount < LS_AVERAGE_SAMPLES)
+	{
+		memcpy(accum, candidate, sizeof(candidate));
+		oldestPairTimeMs = nowMs;
+		__set_PRIMASK(pairPrimask);
+		return;
+	}
+	completedPairCount = 0;
+	__set_PRIMASK(pairPrimask);
+
+	uint16_t raw[NUM_SENSORS], normalized[NUM_SENSORS];
 	for (uint8_t i = 0; i < NUM_SENSORS; i++)
 	{
-		acc[i] += sample[i];
+		const int32_t diff = (int32_t)(candidate[0][i] / LS_AVERAGE_SAMPLES) -
+			(int32_t)(candidate[1][i] / LS_AVERAGE_SAMPLES);
+		raw[i] = (diff > 0) ? (uint16_t)diff : 0U;
 	}
-
-	// 所定回数サンプリングしたら平均値に反映
-	if (++sampleCount[phase] >= LS_AVERAGE_SAMPLES)
+	normalizeLineSensor(raw, normalized);
+	// 後続要求の欠測は完成済みペアを無効化しない。電源世代だけを再確認する。
+	const uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	if (lineSensorPower && powerEpoch == sensorPowerEpoch)
 	{
-		for (uint8_t i = 0; i < NUM_SENSORS; i++)
-		{
-			average[phase][i] = acc[i] >> div;
-			acc[i] = 0;
-		}
-		sampleCount[phase] = 0;
-		readyMask |= (1U << phase);
+		memcpy(lSensor, raw, sizeof(raw));
+		memcpy(lSensorCari, normalized, sizeof(normalized));
+		++lineSensorUpdateCount;
+		sampleAvailable = true;
 	}
-
-	// LED点灯／消灯の両方が揃ったら差分を計算
-	if (readyMask == 0x03U)
-	{
-		for (uint8_t i = 0; i < NUM_SENSORS; i++)
-		{
-			int32_t diff = (int32_t)average[0][i] - (int32_t)average[1][i];
-			lSensor[i] = (diff > 0) ? (int16_t)diff : 0;
-		}
-		readyMask = 0;
-		calibrationLinesensor(); // 最新のライン値でキャリブレーション／正規化を更新
-	}
+	__set_PRIMASK(primask);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getAngleSensor
@@ -273,18 +505,18 @@ void getAngleSensor(void)
 	}
 }
 /////////////////////////////////////////////////////////////////////
-// モジュール名 calibrationLinesensor
+// モジュール名 normalizeLineSensor
 // 処理概要  	ラインセンサのAD値を正規化する
-// 引数     	なし
+// 引数         raw:差分AD値, normalized:正規化値の格納先
 // 戻り値    	なし
 /////////////////////////////////////////////////////////////////////
-void calibrationLinesensor(void)
+static void normalizeLineSensor(const uint16_t *raw, uint16_t *normalized)
 {
 	const uint32_t baseVal = (uint32_t)BASEVAL;
 
 	for (uint8_t i = 0; i < NUM_SENSORS; i++)
 	{
-		uint16_t current = (lSensor[i] > 0) ? (uint16_t)lSensor[i] : 0U;
+		uint16_t current = raw[i];
 
 		if (modeCalLinesensors)
 		{
@@ -308,16 +540,16 @@ void calibrationLinesensor(void)
 
 			if (offset >= span)
 			{
-				lSensorCari[i] = (uint16_t)baseVal;
+				normalized[i] = (uint16_t)baseVal;
 			}
 			else
 			{
-				lSensorCari[i] = (uint16_t)((offset * baseVal + (span / 2U)) / span);
+				normalized[i] = (uint16_t)((offset * baseVal + (span / 2U)) / span);
 			}
 		}
 		else
 		{
-			lSensorCari[i] = current;
+			normalized[i] = current;
 		}
 	}
 }

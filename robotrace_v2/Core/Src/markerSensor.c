@@ -20,33 +20,38 @@ static int32_t encMarkerL = PULSE_METER/10, encMarkerR = (PULSE_METER/10) + 1;
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getMarksensor
 // 処理概要     マーカーセンサの値を取得
-// 引数         なし
-// 戻り値       0x1:右センサ反応 0x2:左センサ反応
+// 引数         phase:取得時LED位相, left/right:取得時GPIO値, epoch:連続取得世代
+// 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void getMarkerSensor(void)
+void getMarkerSensor(bool phase, uint8_t left, uint8_t right, uint32_t epoch)
 {
 	uint8_t ret = 0;
 	static uint8_t ron = 1, roff = 1, lon = 1, loff = 1;
 	static uint8_t readyMask = 0;
-	const uint8_t phase = lineSensorState ? 1U : 0U; // 1: LED on, 0: LED off
+	static uint32_t previousEpoch = UINT32_MAX;
+	if (previousEpoch != epoch)
+	{
+		readyMask = 0;
+		previousEpoch = epoch;
+	}
 
 	// マーカーセンサ値取得(白:0 黒:1)
 	if(phase){
-		lon = HAL_GPIO_ReadPin(SidesensorL_GPIO_Port, SidesensorL_Pin);
-		ron = HAL_GPIO_ReadPin(SidesensorR_GPIO_Port, SidesensorR_Pin);
+		lon = left;
+		ron = right;
 	}
 	else
 	{
-		loff = HAL_GPIO_ReadPin(SidesensorL_GPIO_Port, SidesensorL_Pin);
-		roff = HAL_GPIO_ReadPin(SidesensorR_GPIO_Port, SidesensorR_Pin);
+		loff = left;
+		roff = right;
 	}
 	readyMask |= (1U << phase);
 
 	if (readyMask == 0x03U)
 	{
 		uint8_t diffR=0, diffL=0;
-		diffR = (roff > ron) ? (roff - ron) : 0U;
-		diffL = (loff > lon) ? (loff - lon) : 0U;
+		diffR = (roff > ron) ? (uint32_t)(roff - ron) : 0U;
+		diffL = (loff > lon) ? (uint32_t)(loff - lon) : 0U;
 		if (diffR == 1)
 			ret += RIGHTMARKER;
 		if (diffL == 1)

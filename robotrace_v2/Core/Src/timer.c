@@ -106,6 +106,9 @@ void Interrupt1ms(void)
 
 	// 経路モードは平均速度PIDとヨーレートPIDを使用する。
 	bool pathModeActive = (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT);
+	const bool pathSteeringActive = pathModeActive && patternTrace >= 12 && patternTrace < 100;
+	const PathFollowerState pathState = pathFollowerGetStatus();
+	monitorLineSensorUpdate1ms(!pathSteeringActive || pathState == PATH_STATE_LINE_FALLBACK || pathState == PATH_STATE_REJOIN);
 	if (pathModeActive && patternTrace >= 12 && patternTrace < 100)
 	{
 		pathFollowerUpdatePose1ms(Control_GetEncCurrentCorr_p(), imuVal.gyro.z);

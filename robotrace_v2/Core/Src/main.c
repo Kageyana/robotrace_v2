@@ -1067,8 +1067,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *AdcHandle)
 {
 	if (AdcHandle->Instance == ADC1)
 	{
-		getMarkerSensor();
-		getLineSensor();
+		completeLineSensorAcquisition();
 	}
 	if (AdcHandle->Instance == ADC2)
 	{
@@ -1084,13 +1083,7 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 		datasentflag = false;
 	}
 	if(htim->Instance==TIM3 && htim->Channel==HAL_TIM_ACTIVE_CHANNEL_3){
-		// LED消灯
-		if ((hadc1.State & HAL_ADC_STATE_BUSY_REG) == 0U && lineSensorPower)
-		{
-			lineSensorState = false;
-			powerMarkerSensors(lineSensorState);
-			delayLineSensorConversionStart(120);
-		}
+		lineSensorPhaseChanged(false);
 
 	}
 }
@@ -1101,13 +1094,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 	if(htim->Instance==TIM3)
 	{
-		// LED点灯
-		if ((hadc1.State & HAL_ADC_STATE_BUSY_REG) == 0U && lineSensorPower)
-		{
-			lineSensorState = true;
-			powerMarkerSensors(lineSensorState);
-			delayLineSensorConversionStart(120);
-		}
+		lineSensorPhaseChanged(true);
   	}
 	if (htim->Instance == TIM6)
 	{
@@ -1123,22 +1110,18 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim){
 	// タイマ割り込み処理 比較一致イベント
     if(htim->Instance==TIM3 && htim->Channel==HAL_TIM_ACTIVE_CHANNEL_1){
-		__HAL_TIM_DISABLE_IT(&htim3, TIM_IT_CC1);  // ワンショット完了
-		// ラインセンサのADC変換開始
-		if(lineSensorState){
-			// LED ON時：反射光の取得
-			if (HAL_ADC_Start_DMA(&hadc1, (uint32_t*)analogValLSon, NUM_SENSORS+1) != HAL_OK)
-			{
-				Error_Handler();
-			}
-		}else{
-			// LED OFF時：環境光の取得
-			if (HAL_ADC_Start_DMA(&hadc1, (uint32_t*)analogValLSoff, NUM_SENSORS+1) != HAL_OK)
-			{
-				Error_Handler();
-			}
-		}
+		startLineSensorAcquisition();
     }
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 HAL_ADC_ErrorCallback
+// 処理概要     ADC1の転送異常を記録し、古い取得結果の処理を禁止する
+// 引数         hadc:異常が発生したADC
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc)
+{
+	if (hadc->Instance == ADC1) failLineSensorAcquisition();
 }
 /* I2Cメモリ転送完了割り込み */
 void HAL_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c)

@@ -166,11 +166,10 @@ void showBatMark(void)
 /////////////////////////////////////////////////////////////////////
 void getVref(void)
 {
-	const uint8_t phase = lineSensorState ? 1U : 0U; // 1: LED on, 0: LED off
-	const uint16_t *sample = (phase == 1U) ? analogValLSon : analogValLSoff;
-	uint16_t VrefValue;
+	const uint16_t VrefValue = lineSensorVrefSample;
 	__IO uint16_t *VrefCal = (__IO uint16_t*)0x1FFF7A2A; // VREFINT_CALアドレス
 
-	VrefValue = sample[NUM_SENSORS];
+	// 完了済みの有効値がない場合は直前値（起動時3.3V）を維持する。
+	if (VrefValue == 0U || VrefValue > 4095U) return;
 	adcVref = MCU_VOLTAGE * ((float)*VrefCal / (float)VrefValue);
 }

@@ -30,7 +30,7 @@ extern volatile int32_t goalMarkerOnset_p;
 //====================================//
 // プロトタイプ宣言
 //====================================//
-void getMarkerSensor (void);
+void getMarkerSensor(bool phase, uint8_t left, uint8_t right, uint32_t epoch);
 void initMarkerSensor(void);
 uint8_t checkMarker(void);
 void checkStartGoalMarker(void);
