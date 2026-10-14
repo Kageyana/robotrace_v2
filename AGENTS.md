@@ -60,6 +60,8 @@ Codex は主にファームウェア開発に使用します。必要に応じ�
 - SD カード設定ファイル: `.agents/skills/robotrace-sd-settings/SKILL.md`
 
 該当作業では、AGENTS.md のプロジェクト方針を前提にしつつ、上記 Skill の手順を使用します。
+- Skillの最初のコマンドを実行する前に、[共通事前確認](doc/skill-execution-preflight.md) と各Skillの再発防止参照を読む。既知の正規パス・明示workdir・必要権限を初回操作から使用し、失敗してから同じ条件で再試行しない。
+- Skill実行に起因する再利用可能な失敗では、記録だけで終えず該当Skillの実行前手順も同じ作業で更新する。
 
 ### 失敗事例の記録と再発防止
 

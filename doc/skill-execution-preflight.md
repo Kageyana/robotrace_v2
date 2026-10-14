@@ -21,7 +21,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'D:\robotrace\robotrace_
 
 - 現在のセッションのpermission profileを確認する。作業ツリーのwrite許可は、`.git`、`.agents`、個人Skill、リムーバブルSDへのwrite許可を意味しない。
 - 対象がreadのみと分かっている場合、承認済み作業は**最初の書込みから** `exec_command(sandbox_permissions="require_escalated")` へ送る。`git add/commit/restore/switch/branch/merge/rm --cached` 等のindex・refs更新を通常権限で試さない。対象パスと操作を限定する。昇格はCodexのサンドボックス権限要求であり、OS管理者実行やACL変更とは別。
-- `git status/diff/log` の読取は通常権限を使う。Git更新前は既存差分・対象・ロックの有無を確認し、ステージ成功後に `git diff --cached --check` と対象差分を確認してからコミットする。失敗後に後続commitへ進まない。
+- workspace内の`git status/diff/log`の読取は通常権限を使う。管理worktreeがworkspace外に作られた場合は、Gitのread操作もサンドボックスの対象パス制限を受ける。作成先をpermission profileと照合し、対象外なら初回のGit読取から必要権限で実行する。Git更新前は既存差分・対象・ロックの有無を確認し、ステージ成功後に `git diff --cached --check` と対象差分を確認してからコミットする。失敗後に後続commitへ進まない。
 - ロック作成のPermission deniedを、残留ロックと決めつけて削除しない。Git内部ファイル、ACL、グローバル設定を変更して権限制限を迂回しない。
 - 権限要求が拒否されたら同じ変更を別ツールから強行しない。安全に進められる作業を完了し、拒否された操作と理由をユーザーへ報告する。
 - `helper_unknown_error: setup refresh had errors` はソースの診断と分ける。同じ失敗をパス表記やシェルだけ変えて反復せず、必要最小限の同一処理を許可された環境で実行する。編集の代替には一時コピーのunified diffを使い、`git apply --check`、適用後diffを確認する。
@@ -51,3 +51,5 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'D:\robotrace\robotrace_
 - pushが依頼されたときはstatus/branch/remoteと送信差分を確認する。既知のsandbox HTTPS制限下では初回から必要なネットワーク権限で実行する。port 443接続失敗と認証拒否を分ける。workflow更新を含む場合は使用認証の権限を確認し、without workflow scope拒否はサンドボックス昇格で直ると仮定しない。認可変更や秘密の提示を自動実行せず、必要な認証の更新を案内する。
 - 制御API・ログ・設定を統合するときはmotor/PID/FF/保存形式の境界を照合する。競合で片側を丸ごと採用せず、旧PWM出力APIの残存、ログ既存列の意味・順序、両構成ビルドと初回実ログを確認する。
 - 文書・候補調査の依頼を無関係な命名正規化や制御実装へ広げない。ユーザーが別タスクと指定した変更は現在の作業へ含めない。
+
+- 特定コミットだけをmainへ取り込む場合は、対象コミットの親とmainの差を先に確認する。Skill競合で周辺節に未導入機能の説明が含まれても、その節全体を持ち込まない。指定コミットの変更意図だけを反映し、ファームウェアソースの差分がないことを確認する。事例対応表にmain未収録の原本がある場合は、調査元のコミットを明示して参照を保つ。
