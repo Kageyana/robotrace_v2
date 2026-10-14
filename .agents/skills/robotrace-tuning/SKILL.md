@@ -5,6 +5,10 @@ description: ロボトレースのPID、速度フィードフォワード、ス�
 
 # Robotrace Tuning
 
+## 実行前の再発防止
+
+最初のコマンドの前に [共通事前確認](../../../doc/skill-execution-preflight.md) を読み、パス・workdir・権限・実行環境を確定する。制御やパラメータの試行を設計するときは [分野別の再発防止](references/failure-prevention.md) も読む。関連する失敗記録は最新追記まで確認し、既知の失敗条件を初回操作から回避する。
+
 ## Overview
 
 Use this skill for parameter tuning and control-improvement decisions. Keep project-wide limits, units, parameter locations, and safety constraints in `AGENTS.md` as the source of truth.
@@ -72,7 +76,7 @@ Regenerate the primary DISTANCE plan before every trial; do not reuse a previous
 
 ## Slip detector SHADOW evaluation
 
-For the 2026-10-12 v2 parallel evaluation, keep the legacy detector connected to control, next-run speed planning and PATH distance correction. Inspect the new validity, interval peaks, ON time and invalid reasons before interpreting flag frequency. The user restored the 72-column normal profile on 2026-10-14, so both normal72 and detailed87 record the diagnostics. Temporary normal43 logs retain legacy flags but do not record new detector output. Do not interpret missing diagnostics as zero. Use doc/slip-detector-v2.md and the log-analysis skill for units and schema compatibility. Do not tune the detector and speed profile in the same comparison. DWT measurements are explicitly excluded from this implementation request. Real-machine adoption still requires the first new-format log and at least 10 compatible runs; host tests or sparse-log replay do not establish physical slip accuracy.
+For the 2026-10-12 v2 parallel evaluation, keep the legacy detector connected to control, next-run speed planning and PATH distance correction. Inspect the new validity, interval peaks, ON time and invalid reasons before interpreting flag frequency. The user restored the 72-column normal profile on 2026-10-14, so both normal72 and detailed87 record the diagnostics. Temporary normal43 logs retain legacy flags but do not record new detector output. Do not interpret missing diagnostics as zero. Use doc/slip-detector-v2.md and the log-analysis skill for units and schema compatibility. Do not tune the detector and speed profile in the same comparison. DWT timing work, when requested, requires a matching instrumented ELF and separate verification; sparse logs do not prove ISR timing. Real-machine adoption still requires the first new-format log and at least 10 compatible runs; host tests or sparse-log replay do not establish physical slip accuracy.
 
 For the 2026-10-14 longitudinal comparison, use `doc/slip-long-fast-only.md`: version 3 removes Slow from both ON/OFF conditions, keeping 10/8 m/s², 3/5ms and all windows fixed. LongSlow remains diagnostic and legacy control is unchanged. Identify version 2/3 from metadata; do not adjust thresholds, durations or speed plans while isolating this effect.
 
