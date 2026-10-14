@@ -5,6 +5,10 @@ description: robotrace_v2のSDカード内設定ファイルを読む、書く�
 
 # Robotrace SD Settings
 
+## 実行前の再発防止
+
+最初のコマンドの前に [共通事前確認](../../../doc/skill-execution-preflight.md) を読み、パス・workdir・権限・実行環境を確定する。SD設定・保存・復旧・CSV形式を扱うときは [分野別の再発防止](references/failure-prevention.md) も読む。関連する失敗記録は最新追記まで確認し、既知の失敗条件を初回操作から回避する。
+
 ## Overview
 
 Use this skill when editing or reviewing SD-card setting file behavior. Treat `AGENTS.md` as the source for high-level precedence and safety policy.
@@ -30,7 +34,7 @@ File: `imu_temp.txt`
 
 ### PID Gains
 
-Files: `line.txt`, `lineomega.txt`, `speed.txt`, `yawRate.txt`, `yaw.txt`, `dist.txt`
+Files: `line.txt`, `lineomega.txt`, `speed.txt`, `yawRate.txt`
 
 - Implementation: `PIDcontrol.c`, `writePIDparameters()`, `readPIDparameters()`
 - Format: `kp,ki,kd`
@@ -38,6 +42,7 @@ Files: `line.txt`, `lineomega.txt`, `speed.txt`, `yawRate.txt`, `yaw.txt`, `dist
 - Read format: `%d,%d,%d`
 - No newline.
 - Values are `int16_t` control gains.
+- `yaw.txt` and `dist.txt` belonged to removed unused PIDs; do not read or write them.
 
 ### Speed Feedforward
 

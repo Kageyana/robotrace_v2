@@ -5,6 +5,10 @@ description: robotrace_v2をSTM32CubeCLT、STM32_Programmer_CLI、ST-Link/GDBで
 
 # robotrace_v2 書き込み・ST-Linkデバッグ
 
+## 実行前の再発防止
+
+最初のコマンドの前に [共通事前確認](../../../doc/skill-execution-preflight.md) を読み、パス・workdir・権限・実行環境を確定する。ビルド・PCハーネス・ST-Linkを操作するときは [分野別の再発防止](references/failure-prevention.md) も読む。関連する失敗記録は最新追記まで確認し、既知の失敗条件を初回操作から回避する。
+
 ## 基本方針
 
 - 接続・安全条件はリポジトリの `AGENTS.md` を正とする。書き込みは機体とST-Linkが接続されているときだけ実行する。
