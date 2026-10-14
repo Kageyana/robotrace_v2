@@ -16,7 +16,7 @@
 #define WHEEL_CLICK 800 // ホイールクリックのパルス数
 
 // 校正の調整項目。復帰は既存ラインPIDを使用し、探索速度・制動解除幅は算出する。
-#define CALIBRATIONSPEED -800.0F // 校正旋回の角速度[deg/s]
+#define CALIBRATIONSPEED -500.0F // 校正旋回の角速度[deg/s]
 #define AUTO_CALIBRATION_RETURN_SPEED -300.0F // 白線捕捉前の復帰最大角速度[deg/s]、負値で指定
 #define AUTO_CALIBRATION_SEARCH_WINDOW_DEG 30.0F // 元姿勢付近の探索幅[deg]、捕捉後は2倍
 #define AUTO_CALIBRATION_LINE_THRESHOLD 2000U // 中央左センサー4の白線捕捉閾値[正規化AD値]
