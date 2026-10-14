@@ -307,8 +307,9 @@ void SlipDetection_Update(SlipDetectionState *state, const SlipDetectionInput *i
     r->valid = 1U;
     r->reason = 0U;
     finishCandidate(state);
-    updateFlag(state, 0U, fabsf(r->longFast) > SLIP_V2_LONG_ON && fabsf(r->longSlow) > SLIP_V2_LONG_ON,
-        fabsf(r->longFast) < SLIP_V2_LONG_OFF && fabsf(r->longSlow) < SLIP_V2_LONG_OFF);
+    // 縦判定は10ms窓だけで継続判定し、30ms窓は比較診断として計算・記録を続ける。
+    updateFlag(state, 0U, fabsf(r->longFast) > SLIP_V2_LONG_ON,
+        fabsf(r->longFast) < SLIP_V2_LONG_OFF);
     updateFlag(state, 1U, fabsf(r->lateral) > SLIP_V2_LAT_ON, fabsf(r->lateral) < SLIP_V2_LAT_OFF);
     updateFlag(state, 2U, fabsf(r->yawDps) > SLIP_V2_YAW_ON_DPS, fabsf(r->yawDps) < SLIP_V2_YAW_OFF_DPS);
     state->interval.peakLong = fmaxf(state->interval.peakLong, fmaxf(fabsf(r->longFast), fabsf(r->longSlow)));

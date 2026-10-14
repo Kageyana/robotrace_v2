@@ -601,6 +601,7 @@ static void logBuildMetadata(void)
 	setLogHeaderStrS("branch", GIT_BRANCH);
 	// SHADOWの設定を保存し、従来判定のフラグと区別する。
 	setLogHeaderStr("slipDetectorVersion", SLIP_V2_VERSION);
+    setLogHeaderStrS("slipLongPolicy", SLIP_V2_LONG_POLICY);
 	setLogHeaderStr("slipDetectorMode", ROBOTRACE_SLIP_DETECTOR);
 	setLogHeaderStr("slipLatCandidateVersion", SLIP_LAT_CANDIDATE_VERSION);
 	setLogHeaderStrS("slipLatCandidateFormula", "current_minus_2_applied_tangent_X");
