@@ -4,23 +4,23 @@
 
 ## 1. 作業前に確認する
 
-1. `rg -n "stlink|gdb|SD" doc/失敗事例` で関連する失敗と未解決事項を確認する。
+1. SKILL.mdから共通事前確認と追加再発防止を読み、存在確認済みの失敗事例フォルダで関連記録の最新追記を確認する。
 2. ST-Linkと対象電源を確認する。モーターを回す静止試験なら機体固定・車輪浮かせ・モーター電源も確認する。電源なしで得たエンコーダ値を負荷測定結果に使わない。
-3. 使用する構成を決め、`robotrace_v2/`で `cmake --preset Debug` と `cmake --build --preset Debug` を実行する。製品用なら両コマンドのpresetを`Release`に替える。ELFは`build/<preset>/robotrace_v2.elf`を使う。
+3. 書込み時は使用する構成を決め、`robotrace_v2/`で `cmake --preset Debug` と `cmake --build --preset Debug` を実行する。製品用なら両コマンドのpresetを`Release`に替える。ELFは`D:\robotrace\robotrace_v2\robotrace_v2\build\<preset>\robotrace_v2.elf`を使う。走行後RAMの読取では再ビルド・リセットを前提にせず、実Flashと一致する保存済みELFを選ぶ。
 4. `Get-Command STM32_Programmer_CLI.exe,ST-LINK_gdbserver.exe,arm-none-eabi-gdb.exe` で実際のツールパスを確認する。CubeCLTの版やPATHを決め打ちしない。
 
 ## 2. MCU接続と書き込み
 
-GDBとGDBサーバーを終了した状態で、Programmer CLIからMCUへ接続する。プローブ一覧やターゲット電圧だけでは接続成功とは判定しない。STM32F446のDevice ID `0x421`とCore IDの取得を確認する。通常SWD接続が失敗したときはHot Plugで消去を続けず、次の接続条件を使う。
+GDBとGDBサーバーを終了した状態で、Programmer CLIからMCUへ接続する。プローブ一覧やターゲット電圧だけでは接続成功とは判定しない。STM32F446のDevice ID `0x421`とCore IDの取得を確認する。この機体への書込み接続は、既知の失敗を避けるため初回から次の接続条件を使う。走行後RAM回収は別手順のリセットなしattachを使う。
 
 ```powershell
 STM32_Programmer_CLI.exe -c port=SWD mode=UR reset=HWrst freq=100
 ```
 
-書き込みが必要なら、ビルドした**対象構成のELF**を選び、同じUnder Reset条件でダウンロード・照合・起動結果を確認する。例は`robotrace_v2/`からのDebug書き込み。VS Codeの定義は`robotrace_v2/.vscode/tasks.json`にある。
+Programmer CLIの実体パスはGet-Command等で確認済みのものを使う。書き込みが必要なら、ビルドした**対象構成のELF**を選び、同じUnder Reset条件でダウンロード・照合・起動結果を確認する。例は`robotrace_v2/`からのDebug書き込み。VS Codeの定義は`robotrace_v2/.vscode/tasks.json`にある。
 
 ```powershell
-STM32_Programmer_CLI.exe -c port=SWD mode=UR reset=HWrst freq=100 -d .\build\Debug\robotrace_v2.elf -v -rst -s
+STM32_Programmer_CLI.exe -c port=SWD mode=UR reset=HWrst freq=100 -d "D:\robotrace\robotrace_v2\robotrace_v2\build\Debug\robotrace_v2.elf" -v -rst -s
 ```
 
 Device IDを取得できない状態が続く場合は書き込みとデバッグを中止し、SWDIO/SWCLK/GND/NRSTとターゲット電源の実接続を調べる。ST-LinkのUSB通信エラー時も盲目的に再書き込みせず、GDB/サーバーを解放し、必要ならUSB接続を復旧して100 kHz Under Resetで再確認する。
