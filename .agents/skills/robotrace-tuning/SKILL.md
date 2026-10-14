@@ -5,6 +5,10 @@ description: ロボトレースのPID、速度フィードフォワード、ス�
 
 # Robotrace Tuning
 
+## 実行前の再発防止
+
+最初のコマンドの前に [共通事前確認](../../../doc/skill-execution-preflight.md) を読み、パス・workdir・権限・実行環境を確定する。制御やパラメータの試行を設計するときは [分野別の再発防止](references/failure-prevention.md) も読む。関連する失敗記録は最新追記まで確認し、既知の失敗条件を初回操作から回避する。
+
 ## Overview
 
 Use this skill for parameter tuning and control-improvement decisions. Keep project-wide limits, units, parameter locations, and safety constraints in `AGENTS.md` as the source of truth.
