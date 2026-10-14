@@ -30,6 +30,8 @@ cmake --build --preset Release
 
 ツール不足やコマンド失敗をビルド成功として扱わない。
 
+ARM/ホストGCC起動前に`doc/失敗事例/2026-10-11-bmi088-forward-y-sign.md`のDLL再配置エラー事例を確認する。この環境で同じIllegal System DLL Relocationが出たらソース不良と判断せず、同一コマンドを承認された制限外環境で検証する。コンパイラ起動失敗とコンパイル診断を区別し、根本原因は未解決として扱う。
+
 ## 書き込み
 
 1. 機体とST-Linkの接続、対象MCUのDevice ID、ビルド成果物を確認する。ST-Linkの列挙とターゲット電圧だけではMCU接続成功と判定しない。

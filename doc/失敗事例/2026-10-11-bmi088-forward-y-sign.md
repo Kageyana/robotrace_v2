@@ -50,4 +50,14 @@ gcc -std=c11 -Wall -Wextra -I tests/accel_y_sign -I robotrace_v2/Core/Inc tests/
 
 詳細：analysis/accel_y_13074_13088/report.md、metrics.csv、validation.json、independent_validation.json。再実行はanalysis/script/analyze_accel_y_13074_13088.pyとvalidate_accel_y_13074_13088.py。30本の原本SHA256を解析後と独立検査で再照合済み。
 
+## 2026-10-12のコンパイラ起動制限の再発
+
+スリップ並行評価版のDebugビルドで、通常権限のNinjaによるARM GCC起動が同じIllegal System DLL Relocationで失敗した。同一構成をrequire_escalatedでビルドすると成功し、その後のDebug/Release・通常/詳細とホストテストも同じ環境で実行できた。コードエラーとしてソースを変更しない回避策を再確認した。サンドボックス内のDLL配置問題の根本原因は未調査のままであり、この記録のY符号修正resolvedと混同しない。
+
 2026-10-13、ADC位相修正の逆アセンブル確認で`arm-none-eabi-objdump`にも同じDLL再配置エラーが発生した。コンパイラ以外のGNUツールにも同じ実行環境制約がある。制限外の同一コマンドでDebug/ReleaseのPRIMASK・固定サイズ公開処理を確認できた。今後はobjdump/nm/sizeも起動環境の事前確認対象へ含める。環境問題の根本原因はopen。
+
+校正値メタデータ追加時にも、制限環境の`gcc.exe`による保存テストとNinjaのARM GCC起動で同じエラーが再発した。制限外の同一テストは通常・詳細とも成功し、Debug/Release ELFに校正値保持領域が含まれることをnmで確認、DebugMarkerビルドも成功した。対策はコンパイラ起動環境を分けることで引き続き有効。次回は関連ビルドの前にこの事例を確認し、同じDLLエラーならソース変更で回避せず、許可された制限外環境で同一コマンドを検証する。DLL配置の根本原因は未確定のため、この環境問題はopenを維持する。
+
+2026-10-13、通常43列化のschema/互換ホストテストで通常権限のMinGW起動が同じDLL再配置エラーとなった。制限外の同一テストで43/87列、3世代6形式の読込・保存復旧・次走解析一致が成功し、4構成ARMビルドも成功した。実行環境を分ける既存対策は有効だが、最初のホストコンパイル前にこの事例を確認できていなかった。書込み・デバッグSkillへ、ホスト/ARMコンパイル前の起動環境確認を追加する。根本原因の未確定は継続する。
+
+2026-10-14、直線加減速の残差解析では既に生成済みのGCCホスト`planner.exe`を通常環境から起動してもWinError 623（Illegal System DLL Relocation）が発生した。コンパイラやGNUツールだけでなく、それらで生成したホストexeも事前確認対象となる。同じ読取専用解析を許可された制限外環境で実行し、一次基準4計画・DISTANCE/SLIP各4本の集計と図生成に成功した。一次4＋二次8本の原本ハッシュは前回検証とも一致。ログ解析Skillにもホスト実行環境確認を追記し、ファームウェアをこの起動失敗の回避目的で変更しない手順を残した。回避策の検証は成功、DLL配置の根本原因はopenのまま。
