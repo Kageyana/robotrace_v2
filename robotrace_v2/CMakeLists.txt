@@ -37,6 +37,15 @@ add_executable(${CMAKE_PROJECT_NAME})
 # ログスキーマのプロファイル。1:通常の軽量ログ、0:詳細デバッグ列を含むログ。
 # マーカー誤検出の調査時は -DROBOTRACE_LOG_SCHEMA_PROFILE_LIGHT=0 を指定する。
 set(ROBOTRACE_LOG_SCHEMA_PROFILE_LIGHT "1" CACHE STRING "1=light log schema, 0=debug log schema")
+set(ROBOTRACE_SLIP_DETECTOR "SHADOW" CACHE STRING "LEGACY or SHADOW slip diagnostics")
+set_property(CACHE ROBOTRACE_SLIP_DETECTOR PROPERTY STRINGS LEGACY SHADOW)
+if(ROBOTRACE_SLIP_DETECTOR STREQUAL "SHADOW")
+    set(SLIP_DETECTOR_VALUE 1)
+elseif(ROBOTRACE_SLIP_DETECTOR STREQUAL "LEGACY")
+    set(SLIP_DETECTOR_VALUE 0)
+else()
+    message(FATAL_ERROR "ROBOTRACE_SLIP_DETECTOR must be LEGACY or SHADOW")
+endif()
 option(ROBOTRACE_ISR_TIMING "Collect running TIM6 cycle statistics for validation" OFF)
 
 execute_process(
@@ -75,6 +84,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 	${CMAKE_SOURCE_DIR}/Core/Src/battery.c
 	${CMAKE_SOURCE_DIR}/Core/Src/BMI088.c
 	${CMAKE_SOURCE_DIR}/Core/Src/IMU.c
+	${CMAKE_SOURCE_DIR}/Core/Src/slipDetection.c
 	${CMAKE_SOURCE_DIR}/Core/Src/control.c
 	${CMAKE_SOURCE_DIR}/Core/Src/autoRun.c
 	${CMAKE_SOURCE_DIR}/Core/Src/runMemory.c
@@ -113,6 +123,7 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined symbols
     GIT_COMMIT="${GIT_COMMIT_SHORT}"
     GIT_BRANCH="${GIT_BRANCH_NAME}"
+    ROBOTRACE_SLIP_DETECTOR=${SLIP_DETECTOR_VALUE}
     LOG_SCHEMA_PROFILE_LIGHT=${ROBOTRACE_LOG_SCHEMA_PROFILE_LIGHT}
     ROBOTRACE_ISR_TIMING=$<BOOL:${ROBOTRACE_ISR_TIMING}>
 )

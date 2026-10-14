@@ -67,7 +67,7 @@ uint8_t logLastPrimaryRouteReason(void);
 void writeMarkerPos(uint32_t distance, uint8_t marker);
 void initLog(void);
 // スキーマ順で1レコードを書き込む。
-void writeLogBufferPuts(void);
+bool writeLogBufferPuts(void);
 void writeLogPuts(void);
 void send8bit(uint8_t data);
 void send16bit(uint16_t data);

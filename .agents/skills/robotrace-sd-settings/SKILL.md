@@ -117,6 +117,12 @@ File: `lsval.txt`
 - New CSV metadata includes `binaryLogNumber`, `binaryDataCrc`, and `binarySchema`; CRC values use signed 32-bit text but represent CRC bit patterns. CSV data columns and the existing big-endian record encoding are unchanged.
 - Run `robotrace_v2/tests/run_log_deferred_tests.ps1` for both profiles and the existing PC/schema/XY tests. Check actual on-device stop/save/recovery/progress behavior before claiming hardware validation.
 
+### Slip diagnostic schema compatibility
+
+- On 2026-10-14 the user requested restoring light to 72 columns/183 B; debug retains 87 columns/220 B. SHADOW and lateral-candidate diagnostics are again recorded in both profiles. The temporary light43/108 B logs remain readable without adding missing diagnostics. Keep old field lists immutable: pre-SHADOW light108/debug145 B in `log_schema_legacy.h`; initial SHADOW light157/debug194 B in `log_schema_shadow_v2.h`; lateral candidate light183/debug220 B in `log_schema_candidate_v1.h`.
+- Identify profile, schema CRC and record size as one tuple; never infer a format from record size alone. All six supported formats are readable by either current build profile. Current light72/debug87 reuse the corresponding frozen lateral-candidate schemas because their names, types, order and meaning match. Allocate read buffers for at least 220 B even in the 183 B light build.
+- Converting old logs preserves their original columns. Missing diagnostics mean unrecorded. Reject unknown schema, CRC/size/profile errors and retain originals until CSV commit succeeds. Run `tests/run_slip_log_compat_tests.ps1` in addition to existing storage tests; it exercises both reader profiles and all three historical generations, plans, recovery and failure retention.
+
 ### Analysis and Log Numbers
 
 File: `analysis.txt`
@@ -153,3 +159,7 @@ File: `boost_%05d.csv`
 - Repair corrupted files by overwriting with defaults or valid values.
 - Prohibit running if `lsval.txt` is corrupt.
 - Parser changes must preserve partial reflection, out-of-range defaulting, repair behavior, and `lsval.txt` run prohibition.
+
+## CSV header generation validation
+
+When adding a column, test the actual `logBuildColumns()`/`setLogStr()` path in both profiles. Compare all column names and separators with the schema and check the numeric row count; macro-only schema counts or substring checks are insufficient. The former 30-byte name buffer truncated the 33-character candidate interval-reason name and removed its separator in logs 13130–13144. Append full names and separators directly to the sufficiently sized aggregate buffer. This fix preserves binary schema/record length. Keep affected originals and restore only explicitly validated known-schema copies as described by the log-analysis skill; confirm the first real log after any future format fix. For this fix, all 11 physical CSVs 13145–13155 have the complete 72-column header and matching data rows; detailed physical CSV and boot recovery were not independently revalidated in this batch.

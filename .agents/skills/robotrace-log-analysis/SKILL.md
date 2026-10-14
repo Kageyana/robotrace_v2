@@ -15,7 +15,7 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - Logs are CSV, UTF-8, comma-separated. New logs have `key=value` metadata on line 1, column names on line 2, and data from line 3. Older logs may combine column names and metadata on line 1; resolve columns by name.
 - During auto-start, completed intermediate runs remain numbered `.bin` logs on the robot. All sealed runs are converted after series completion/abort or emergency stop; manual runs convert at completion. CSVs become available only after this conversion finishes.
 - CSV metadata adds `binaryLogNumber`, `binaryDataCrc`, and `binarySchema` as conversion identity. CRC text is signed 32-bit; compare bit patterns when needed. Data columns and units are unchanged.
-- Binary recovery/format is documented in `doc/deferred-log-storage.md`. Do not parse `.tmp`, `.part`, or `.bin` as CSV. Recovery failures preserve the binary and block new starts; changing firmware profiles with pending logs can make recovery unsupported.
+- Binary recovery/format is documented in `doc/deferred-log-storage.md`. Do not parse `.tmp`, `.part`, or `.bin` as CSV. Recovery failures preserve the binary and block new starts. The six frozen pre-SHADOW/initial-SHADOW/lateral-candidate formats support either current profile; current light72/debug87 match the frozen lateral-candidate schemas, and light43 logs remain readable as the frozen pre-SHADOW schema.
 - The schema source is `robotrace_v2/Core/Inc/log_schema.h`.
 - The log header contains data names and `parameter=value` entries.
 - `logDistanceTargetMm` records the target row spacing; use `encTotalOptimal` deltas to evaluate actual spacing because sensor values update at 1 ms and may exceed the target at high speed.
@@ -47,9 +47,9 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 
 ## Light and debug profiles
 
-- The default light profile has 43 CSV columns and a 108-byte stored record, including individual encoders, line sensors, acceleration, six IMU diagnostic columns and both motor currents. The trailing empty CSV cell is excluded from this count.
+- On 2026-10-14 the user requested restoration of the light profile to 72 CSV columns / 183 bytes, including the 19 SHADOW and 10 lateral-candidate diagnostics. Detailed remains 87 columns / 220 bytes; detector calculations and legacy control/plans are unchanged. The temporary light43 / 108-byte period from 2026-10-13, including 13212–13227, does not contain these diagnostics. Other historical generations have 62 columns / 157 bytes (initial SHADOW) and 43 columns / 108 bytes (pre-SHADOW). Individual encoders, line sensors, acceleration, six IMU diagnostic columns and both motor currents remain in their existing positions. The trailing empty CSV cell is excluded from this count.
 - Logs 12872–12878 used the temporary minimal 13-column/22-byte profile. Raw-wheel, independent line-CROSS, temperature-series and XYZ-angle analyses cannot use those logs; check required column names before analysis.
-- The debug profile retains 58 columns and 145 bytes, including all diagnostic fields. Metadata validation and firmware secondary-run required fields remain available in both profiles.
+- The debug profile has 87 columns and 220 bytes. The unchanged 87-column/220-byte lateral-candidate schema is frozen in `log_schema_candidate_v1.h`; other frozen predecessors have 77 columns / 194 bytes (initial SHADOW) and 58 columns / 145 bytes (pre-SHADOW). All six supported binary formats can be recovered by either current build profile using strict profile/schema CRC/record-length identification; predecessor CSV keeps its original columns. Metadata validation and firmware secondary-run required fields remain available in both profiles.
 
 ## Column Meanings
 
@@ -62,7 +62,7 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - `gyroVal_X`, `gyroVal_Y`: offset/direction-corrected X/Y angular velocity, `[deg/s]`. `imuTemp_C`: latest IMU temperature, `[°C]`, acquired every 5 ms; `-999` means invalid.
 - `imuAngle_X`, `imuAngle_Y`, `imuAngle_Z`: existing `imuVal.angle.x/y/z`, `[deg]`, reset to zero at the start marker. X/Y are accelerometer-fused attitude; Z is the unwrapped integral of corrected gyro values at 1 ms, including the existing temperature correction. Use Z for yaw drift analysis instead of reintegrating sparsely logged gyro values. These six diagnostic columns are appended in both light and debug profiles; temporary minimal logs lack them.
 - `acceleVal_X`, `acceleVal_Y`, `acceleVal_Z`: IMU acceleration after offset calibration, `[g]`, including gravity; X/Y also include the existing rotation-center correction. Multiply by `GRAVITY_MPS2` for `[m/s^2]`. All three axes are included in both light and debug profiles.
-- `courseMarker`: confirmed marker state while running.
+- `courseMarker`: confirmed marker state while running: 1=RIGHTMARKER, 2=LEFTMARKER, 3=CROSSLINE. A right-marker row is not equivalent to an SG increment; `checkStartGoalMarker()` also requires distance/qualification conditions. Do not infer missing SG counts from right-marker row counts. Match verified cross events for closure alignment and use saved `goalMarkerOnset_p` for the final onset.
 - `encTotalOptimal`: corrected distance count for secondary runs.
 - `ROC`: curvature radius, `[mm]`.
 - `targetSpeed`: target speed in encoder converted units, `[pulse/ms]`.
@@ -79,6 +79,31 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - `pathErrorHeading_cdeg`: heading error, `[0.01 deg]`.
 - `pathState`: 1 tracking, 2 line fallback, 3 rejoin blend, 4 localization lost.
 - `pathLegalMargin_mm`: remaining line-overlap margin after the tracking-error budget, `[mm]`.
+
+## SHADOW slip diagnostics (2026-10-12)
+
+These 29 diagnostics are restored to both the 72-column light and 87-column detailed profiles on 2026-10-14. Logs from the temporary 43-column period contain no `slipV2*`, `imuYawAlphaFiltered` or `imuLatTangentialApplied` samples; report them as unrecorded, never healthy zero. Detector metadata alone does not establish recorded diagnostics. Check actual columns, schema and build information before running candidate-analysis scripts.
+
+- `ROBOTRACE_SLIP_DETECTOR=SHADOW` is the default. `LEGACY` disables the new detector. Existing `slipFlag` / `slipFlagLat`, next-run plans and distance correction still use the legacy detector.
+- New residuals: `slipV2LongFast`, `slipV2LongSlow`, `slipV2Lat` [m/s²], `slipV2YawDps` [deg/s]. Flags are a bit mask: longitudinal=1, lateral=2, yaw mismatch=4. These are model inconsistencies, not measured physical slip amounts.
+- Only interpret new residuals/flags when `slipV2Valid=1`. `slipV2Reason` records current invalidity; `slipV2IntervalReason` ORs invalid reasons across the whole recording interval. See AGENTS.md and doc/slip-detector-v2.md for bit values.
+- `slipV2PeakLong/PeakLat/PeakYawDps` preserve interval absolute maxima. `slipV2OnLongMs/OnLatMs/OnYawMs/ValidMs/TotalMs` accumulate observed 1ms calls, saturating at 65535. Use valid observed time as the denominator; exclude saturated intervals and report missing/invalid time. The unrecorded tail after the final row is not included.
+- `slipV2CurrentValid` requires calibration and a fresh finite read; `slipV2CurrentHighSamples` counts distinct 10ms acquisitions, not held 1ms samples. `slipV2PwmSum` is the saturated absolute PWM sum (0..2000). Current/PWM do not gate new slip flags.
+- Missing new columns in old CSV mean unrecorded, never healthy zero. Do not compare old/new flags as ground truth. Existing 13074..13088 interpolation replay lacks the stored static-gravity reference and acquisition-success history and is only a diagnostic approximation.
+
+## Lateral tangential candidate diagnostics
+
+- See `doc/slip-lateral-candidate.md`. The candidate is diagnostic only; common IMU values and initial SHADOW residuals are unchanged. It replaces only the already-applied X tangential term with its opposite sign: `currentLinearX - 2*appliedTangentialX`. The right-X assumption remains physically unverified. Do not fit the observed regression coefficient into the correction.
+- `slipV2LatCandidate` and `slipV2LatCandidatePeak` are the signed residual and interval absolute peak [m/s²]; `slipV2LatCandidateFlag` is ON=1, not a bitmask. `slipV2LatCandidateValid/Reason` are independent of the initial SHADOW validity. Reason 256 means tangential sample unavailable and applies only to the candidate; other reason bits match v2.
+- `slipV2LatCandidateOnMs/ValidMs` and `slipV2LatCandidateIntervalReason` preserve interval ON/valid time and invalidity OR. Counters saturate at 65535. Use candidate ValidMs for candidate rates and initial SHADOW ValidMs for baseline rates. Exclude saturated intervals and report unmatched validity. Never compare intervals with candidate-only missing data as equal conditions.
+- `imuYawAlphaFiltered` [rad/s²] and `imuLatTangentialApplied` [m/s²] are instantaneous snapshots from the existing correction. They are not 30ms-averaged residuals. Align smoothing and intervals before studying angular-acceleration dependence; sparse CSV cannot reproduce the actual 1ms filter history.
+- Check candidate version/formula/axes/offset/LPF metadata and 72/87 columns in the first real log after restoration. The temporary 43-column light logs cannot support candidate diagnostics. Initial SHADOW logs 13094..13124 lack these 10 columns: report candidate diagnostics as unrecorded, not zero. Their sparse reconstruction cannot prove candidate performance.
+
+## Straight-road wobble and acceleration residuals
+
+- For straight-road braking wobble, define road geometry from the validated primary route/plan and match secondary `optimalIndex` to that plan. Do not select straight road by small measured gyro/alpha: that excludes the wobble being investigated. Keep geometry, commanded acceleration/braking, and measured yaw activity as separate labels. Check source plan parameters and source identity before reusing a host planner. Inspect a straight-interior boundary sensitivity and label the primary geometry as estimated, not physical ground truth.
+- Evaluate the user's two hypotheses separately: braking-time Yaw inconsistency with actual gyro/heading/steering reversals, and acceleration-time positive LongFast with wheel-speed growth exceeding IMU acceleration. Negative LongFast is not the same acceleration-spin evidence. Fast/Slow have different windows; check whether the current both-window condition suppresses a short candidate. Do not adopt new thresholds from these descriptive statistics. See `doc/slip-turn-residuals.md` and `analysis/script/analyze_straight_accel_brake_13228_13247.py`.
+- Windows Illegal System DLL Relocation / WinError 623 may affect existing GCC-built host executables as well as compilers. Use the same authorized read-only host analysis in the permitted execution environment; do not change firmware to work around that launch failure. See `doc/失敗事例/2026-10-11-bmi088-forward-y-sign.md`.
 
 ## Run Mode Checks
 
@@ -99,3 +124,7 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - Name outputs so the target log number and analysis type are clear.
 - Examples: `log_00012_summary.csv`, `log_00012_xy.png`.
 - If the input contract is not yet implemented, decide it before adding a script: single log, multi-log comparison, and autoStart 5-run comparison are separate modes.
+
+## Known malformed candidate CSV headers (13130–13144)
+
+These 15 originals have 72 numeric values but only 71 header names: the 30-byte temporary column buffer truncated `slipV2LatCandidateIntervalReason` and lost its comma, joining the next name. Never pass the original directly to a name-based numeric analysis. Use the derived copies under `analysis/slip_candidate_13125_13144/header_repaired/`, created by `analysis/script/check_slip_candidate_13125_13144.py`. Restoration requires the known schema CRC -1299980178, exact expected malformed header reproduced from the source, all 72 data values per row and expected row count. Keep and hash originals; reject unknown corruption. The source fix removes the short temporary buffer and has host/build validation. All 11 post-fix physical CSVs 13145–13155 (22:28:09 build) have the complete 72-column header and matching data rows without repair. Logs 13145–13150 are user-confirmed hand-held/free-spin checks; exclude them from normal-course completion and lap comparisons. The detailed 87-column physical CSV was not captured in this batch. See `doc/失敗事例/2026-10-12-csv-long-column-name-truncation.md`.

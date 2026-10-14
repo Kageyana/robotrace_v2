@@ -4,6 +4,7 @@
 // インクルード
 //====================================//
 #include <stdint.h>
+#include "slipDetection.h"
 #include "SDcard.h"
 #include "battery.h"
 #include "motor.h"
@@ -93,16 +94,57 @@
 	STORED(F32, imuAngle_Z, "%f", imuVal.angle.z)
 
 #if LOG_SCHEMA_PROFILE_LIGHT
-#define LOG_FIELD_LIST(STORED, DERIVED) \
+#define LOG_BASE_FIELD_LIST(STORED, DERIVED) \
 	LOG_FIELD_LIST_CORE(STORED, DERIVED) \
 	LOG_FIELD_LIST_IMU(STORED, DERIVED) \
 	LOG_FIELD_LIST_CURRENT(STORED, DERIVED)
 #else
-#define LOG_FIELD_LIST(STORED, DERIVED) \
+#define LOG_BASE_FIELD_LIST(STORED, DERIVED) \
 	LOG_FIELD_LIST_CORE(STORED, DERIVED) \
 	LOG_FIELD_LIST_DEBUG(STORED, DERIVED) \
 	LOG_FIELD_LIST_IMU(STORED, DERIVED)
 #endif
+// 新旧判定を混同しないため、通常・詳細ログの末尾にSHADOW診断列を追加する。
+#define LOG_FIELD_LIST_SHADOW(STORED, DERIVED) \
+    STORED(F32, slipV2LongFast, "%f", slipShadow.result.longFast) \
+    STORED(F32, slipV2LongSlow, "%f", slipShadow.result.longSlow) \
+    STORED(F32, slipV2Lat, "%f", slipShadow.result.lateral) \
+    STORED(F32, slipV2YawDps, "%f", slipShadow.result.yawDps) \
+    STORED(U8, slipV2Flags, "%d", slipShadow.result.flags) \
+    STORED(U8, slipV2Valid, "%d", slipShadow.result.valid) \
+    STORED(U16, slipV2Reason, "%d", slipShadow.result.reason) \
+    STORED(U8, slipV2CurrentValid, "%d", slipShadow.result.currentValid) \
+    STORED(U16, slipV2CurrentHighSamples, "%d", slipShadow.result.currentHighSamples) \
+    STORED(U16, slipV2PwmSum, "%d", slipShadow.result.pwmSum) \
+    STORED(F32, slipV2PeakLong, "%f", slipShadow.interval.peakLong) \
+    STORED(F32, slipV2PeakLat, "%f", slipShadow.interval.peakLat) \
+    STORED(F32, slipV2PeakYawDps, "%f", slipShadow.interval.peakYawDps) \
+    STORED(U16, slipV2OnLongMs, "%d", slipShadow.interval.onLongMs) \
+    STORED(U16, slipV2OnLatMs, "%d", slipShadow.interval.onLatMs) \
+    STORED(U16, slipV2OnYawMs, "%d", slipShadow.interval.onYawMs) \
+    STORED(U16, slipV2ValidMs, "%d", slipShadow.interval.validMs) \
+    STORED(U16, slipV2TotalMs, "%d", slipShadow.interval.totalMs) \
+    STORED(U16, slipV2IntervalReason, "%d", slipShadow.interval.invalidReason)
+
+// 接線補正候補は既存19列の後へ追加し、基準側の意味を変えない。
+#define LOG_FIELD_LIST_LAT_CANDIDATE(STORED, DERIVED) \
+    STORED(F32, slipV2LatCandidate, "%f", slipShadow.lateralCandidate.result.residual) \
+    STORED(U8, slipV2LatCandidateFlag, "%d", slipShadow.lateralCandidate.result.flag) \
+    STORED(U8, slipV2LatCandidateValid, "%d", slipShadow.lateralCandidate.result.valid) \
+    STORED(U16, slipV2LatCandidateReason, "%d", slipShadow.lateralCandidate.result.reason) \
+    STORED(F32, slipV2LatCandidatePeak, "%f", slipShadow.lateralCandidate.interval.peak) \
+    STORED(U16, slipV2LatCandidateOnMs, "%d", slipShadow.lateralCandidate.interval.onMs) \
+    STORED(U16, slipV2LatCandidateValidMs, "%d", slipShadow.lateralCandidate.interval.validMs) \
+    STORED(U16, slipV2LatCandidateIntervalReason, "%d", slipShadow.lateralCandidate.interval.invalidReason) \
+    STORED(F32, imuYawAlphaFiltered, "%f", slipShadow.lateralCandidate.result.alphaRadps2) \
+    STORED(F32, imuLatTangentialApplied, "%f", slipShadow.lateralCandidate.result.tangentialAppliedXMps2)
+
+// 通常72列・183 B、詳細87列・220 B。診断29列を両プロファイルへ記録する。
+#define LOG_FIELD_LIST(STORED, DERIVED) \
+    LOG_BASE_FIELD_LIST(STORED, DERIVED) \
+    LOG_FIELD_LIST_SHADOW(STORED, DERIVED) \
+    LOG_FIELD_LIST_LAT_CANDIDATE(STORED, DERIVED)
+
 // 詳細デバッグ列の追加候補:
 // STORED(F32, slipDistScaleF, "%f", Control_GetSlipDistScale())
 // STORED(U32, distEncRaw_p, "%d", (uint32_t)Control_GetDistEncRaw_p())
