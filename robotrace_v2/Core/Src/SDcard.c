@@ -60,6 +60,7 @@ volatile LogPerformanceStats logPerformanceStats;
 #endif
 
 static struct { FIL *file; FSIZE_t end, physical; UINT position, length; } logReadAhead;
+static UINT logCsvOutputLength;
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logReadAheadReset
@@ -107,6 +108,45 @@ static FRESULT logReadBuffered(FIL *file, uint8_t *bytes, UINT length, FSIZE_t e
     return FR_OK;
 }
 
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logCsvFlush
+// 処理概要     蓄積CSVをまとめて書き、短い書込を検出する
+// 引数         file: 出力ファイル
+// 戻り値       true: 成功 false: 書込失敗
+/////////////////////////////////////////////////////////////////////
+static bool logCsvFlush(FIL *file)
+{
+    if (logCsvOutputLength == 0U) return true;
+    UINT written = 0U;
+    LOG_PERF_BEGIN(tick);
+    FRESULT result = f_write(file, logIoMemory.stopped.output, logCsvOutputLength, &written);
+    LOG_PERF_END(writeMs, tick); LOG_PERF_ADD(writeCalls, 1U); LOG_PERF_ADD(writeBytes, written);
+    if (result != FR_OK || written != logCsvOutputLength) return false;
+    logCsvOutputLength = 0U;
+    return true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logCsvAppend
+// 処理概要     f_putsと同じCRLF変換を行い2KiB単位でCSVを書き込む
+// 引数         file: 出力ファイル, text: 追記文字列
+// 戻り値       true: 成功 false: 書込失敗
+/////////////////////////////////////////////////////////////////////
+static bool logCsvAppend(FIL *file, const char *text)
+{
+    while (*text != '\0') {
+        char c = *text++;
+#if _USE_STRFUNC == 2
+        if (c == '\n') {
+            logIoMemory.stopped.output[logCsvOutputLength++] = '\r';
+            if (logCsvOutputLength == sizeof(logIoMemory.stopped.output) && !logCsvFlush(file)) return false;
+        }
+#endif
+        logIoMemory.stopped.output[logCsvOutputLength++] = (uint8_t)c;
+        if (logCsvOutputLength == sizeof(logIoMemory.stopped.output) && !logCsvFlush(file)) return false;
+    }
+    return true;
+}
 static float cross_start_mm[CROSSSEG_MAX];
 static float cross_end_mm[CROSSSEG_MAX];
 uint16_t cntSend = 0;
@@ -1635,16 +1675,20 @@ static bool logExistingCsvMatches(const char *name, const LogBinaryHeader *heade
     FRESULT result = f_open(&file, name, FA_READ | FA_OPEN_EXISTING);
     if (result == FR_NO_FILE) return true;
     if (result != FR_OK) return false;
-    uint32_t crc = UINT32_MAX;
-    bool matches = true;
-    for (uint32_t i = 0; i < header->metadataBytes; i++) {
-        uint8_t byte;
-        UINT read;
-        if (f_read(&file, &byte, 1U, &read) != FR_OK || read != 1U) { matches = false; break; }
-        crc = logBinaryCrcUpdate(crc, &byte, 1U);
+    logReadAheadReset();
+    UINT read = 0U;
+    bool matches = f_read(&file, logIoMemory.stopped.input, header->metadataBytes + 1U, &read) == FR_OK;
+    uint8_t *text = logIoMemory.stopped.input;
+    UINT n = header->metadataBytes;
+    matches = matches && read >= n;
+    if (matches && text[n - 1U] == '\r') {
+        matches = read > n && text[n] == '\n';
+        text[n - 1U] = '\n';
     }
+    matches = matches && text[n - 1U] == '\n' &&
+        ~logBinaryCrcUpdate(UINT32_MAX, text, n) == header->metadataCrc;
     if (f_close(&file) != FR_OK) matches = false;
-    return matches && ~crc == header->metadataCrc;
+    return matches;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -1667,17 +1711,28 @@ static bool logConvertOne(uint16_t number)
     if (!logSourceIsBinary(&input) || !logExistingCsvMatches(csv, &binarySource.header) ||
         f_open(&output, part, FA_WRITE | FA_CREATE_ALWAYS) != FR_OK) goto cleanup;
     outputOpen = true;
-    if (!logSourceGets(columnTitle, sizeof(columnTitle), &input) || f_puts(columnTitle, &output) < 0 ||
-        !logSourceGets(columnTitle, sizeof(columnTitle), &input) || f_puts(columnTitle, &output) < 0) goto cleanup;
+    logCsvOutputLength = 0U;
+#if _USE_EXPAND
+    FSIZE_t reserve = (FSIZE_t)binarySource.header.rows * LOG_CSV_LINE_BUFFER_SIZE +
+        2U * LOG_COLUMN_TITLE_BUFFER_SIZE;
+    FRESULT allocation = f_expand(&output, reserve, 1U);
+    if (allocation != FR_OK && allocation != FR_DENIED) goto cleanup;
+#endif
+    if (!logSourceGets(columnTitle, sizeof(columnTitle), &input) || !logCsvAppend(&output, columnTitle) ||
+        !logSourceGets(columnTitle, sizeof(columnTitle), &input) || !logCsvAppend(&output, columnTitle)) goto cleanup;
     logConversionNotify(LOG_CONVERT_WRITE, 0U);
     while (logSourceGets(line, sizeof(line), &input)) {
-        if (!logFormatSourceRow(line, sizeof(line)) || f_puts(line, &output) < 0) goto cleanup;
+        LOG_PERF_BEGIN(formatTick);
+        bool formatted = logFormatSourceRow(line, sizeof(line));
+        LOG_PERF_END(formatMs, formatTick);
+        if (!formatted || !logCsvAppend(&output, line)) goto cleanup;
         conversionWorkDone++;
         logConversionNotify(LOG_CONVERT_WRITE, binarySource.row);
     }
     if (logSourceError(&input) || !logSourceEof(&input)) goto cleanup;
     logConversionNotify(LOG_CONVERT_COMMIT, binarySource.header.rows);
-    if (f_sync(&output) != FR_OK) goto cleanup;
+    LOG_PERF_BEGIN(commitTick);
+    if (!logCsvFlush(&output) || f_truncate(&output) != FR_OK || f_sync(&output) != FR_OK) goto cleanup;
     FRESULT closeResult = f_close(&output);
     outputOpen = false;
     if (closeResult != FR_OK) goto cleanup;
@@ -1690,6 +1745,7 @@ static bool logConvertOne(uint16_t number)
     // 元バイナリは残っているため、置換途中の電源断でも再変換できる。
     if (exists == FR_OK && f_unlink(csv) != FR_OK) goto cleanup;
     if (f_rename(part, csv) != FR_OK || f_unlink(bin) != FR_OK) goto cleanup;
+    LOG_PERF_END(commitMs, commitTick);
     conversionWorkDone++;
     if (conversionProgress.fileIndex < conversionProgress.fileCount) logConversionNotify(LOG_CONVERT_DONE, conversionProgress.expectedRows);
     success = true;
