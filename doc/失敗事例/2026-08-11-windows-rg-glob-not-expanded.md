@@ -12,6 +12,12 @@ tags:
 
 # PowerShellでUnix風globを前提にしたrg確認が失敗した
 
+## 2026-10-15 CSV変換中のモーター指令調査での再発
+
+`Core/Src/interrupt*`をrgのパスに渡してos error 123、存在未確認の`buzzer.c/.h`を指定してos error 2が発生した。既存の事前列挙対策を適用できていなかった。実在する`Core/Src`全体を検索し、1ms処理が`timer.c`、ホイールクリック出力が`setup.c`にあることを確認した。追加の予防手順として、モジュール名が不明な初回検索は必ず`rg -n '検索語' robotrace_v2/Core/Src -g '*.c'`とし、個別ファイルへ絞るのはその結果に実在パスが出た後だけとする。同形式で`void wheelClick`の検索と終了成功を確認したためresolvedを維持する。ファームウェアの変更・実機操作は行っていない。
+
+同日のSD高速化案調査でも、存在を確認せず`FATFS/App/ffconf.h`、`Core/Src/log.c`、`Core/Inc/log_buffer_writer.h`、直下`.vscode/tasks.json`を指定して読込・検索が失敗した。初回の事前列挙が徹底できていなかった。`rg --files`で実在する`FATFS/Target/ffconf.h`、`Core/Inc/logBufferWriter.h`を確認し、ログ実装は実在ディレクトリの検索から`SDcard.c`と特定、タスクは存在するファームウェア側`.vscode/tasks.json`を確認した。次回はツール呼出しを「一覧取得」「取得結果の実在パスによる読込」の2段階に分け、同一呼出し内で一覧を待たず推測パスを追加しない。実在パスでの設定・ログ実装取得に成功し、resolvedを維持する。
+
 ## 2026-10-04 自動開始前校正調査での再発
 
 同日の復帰再調査でCore/Inc/BMI088*を検索パスへ渡してos error 123が再発した。再発防止策が適用されていなかった。Core/Incをパスとし-g 'BMI088*.h'へ切り替えてジャイロ定義の検索成功を確認した。今後、検索パスは実在ディレクトリまたは実在ファイルのみとし、パターンは必ず-gへ渡す。
