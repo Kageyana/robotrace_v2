@@ -16,6 +16,7 @@
 
 #include "diskio.h"
 #include "sd_spi.h"
+#include "logPerformance.h"
 #include "ff_gen_drv.h"
 // Debug: last SD read request/status for f_gets error logs
 volatile DWORD g_sd_last_read_sector = 0;
@@ -63,6 +64,10 @@ DRESULT SD_disk_read(BYTE pdrv, BYTE *buff, DWORD sector, UINT count) {
         }
     }
 
+    if (count == 1U) { LOG_PERF_ADD(diskReadSingle, 1U); }
+    else { LOG_PERF_ADD(diskReadMulti, 1U); }
+    LOG_PERF_ADD(diskReadBytes, (uint64_t)count * 512U);
+
     {
         SD_Status status = SD_ERROR;
         uint8_t attempt = 0;
@@ -103,6 +108,10 @@ DRESULT SD_disk_write(BYTE pdrv,  BYTE *buff, DWORD sector, UINT count) {
             return RES_PARERR;
         }
     }
+
+    if (count == 1U) { LOG_PERF_ADD(diskWriteSingle, 1U); }
+    else { LOG_PERF_ADD(diskWriteMulti, 1U); }
+    LOG_PERF_ADD(diskWriteBytes, (uint64_t)count * 512U);
 
     {
         SD_Status status = SD_ERROR;

@@ -9,7 +9,9 @@
 #include "courseAnalysis.h"
 #include "firmware_version.h"
 #include "IMU.h"
+#include "lineSensor.h"
 #include "logBufferWriter.h"
+#include "logPerformance.h"
 #include "markerSensor.h"
 #include "sd_functions.h"
 #include "stdio.h"
@@ -41,9 +43,117 @@ char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE] = "", formatLog[LOG_FORMAT_BUFFER
 _Static_assert(BUFFER_SIZE_LOG == LOG_BUFFER_SIZE_BYTES, "log buffer size mismatch");
 _Static_assert((BUFFER_SIZE_LOG % LOG_BUFFER_SECTOR_SIZE_BYTES) == 0U, "log buffer must be sector aligned");
 _Static_assert(LOG_RECORD_SIZE_BYTES <= LOG_BUFFER_SIZE_BYTES, "log record must fit in one log buffer");
+enum { LOG_READ_RECORD_BYTES = LOG_RECORD_SIZE_BYTES };
+// 列定義はFlashへ一度だけ生成し、停止時に記録部とメタデータの間へ保存する。
+#define LOG_SCHEMA_STORED(type, name, fmt, expr) "S," #type "," #name "," fmt "\n"
+#define LOG_SCHEMA_DERIVED(type, name, fmt, expr) "D," #type "," #name "," fmt "\n"
+static const char logSchemaText[] = LOG_FIELD_LIST(LOG_SCHEMA_STORED, LOG_SCHEMA_DERIVED);
+#undef LOG_SCHEMA_STORED
+#undef LOG_SCHEMA_DERIVED
+#define LOG_COLUMN_ADD(type, name, fmt, expr) + 1U
+enum { LOG_BINARY_COLUMNS = 0 LOG_FIELD_LIST(LOG_COLUMN_ADD, LOG_COLUMN_ADD) };
+#undef LOG_COLUMN_ADD
+_Static_assert(sizeof(logSchemaText) - 1U <= LOG_BINARY_SCHEMA_MAX_BYTES, "schema description too large");
+_Static_assert(LOG_BINARY_COLUMNS <= LOG_BINARY_MAX_COLUMNS, "too many log columns");
 static LogBufferWriter logBufferWriter;
-static _Alignas(LOG_BUFFER_SECTOR_SIZE_BYTES)
-	uint8_t logBuffers[LOG_BUFFER_COUNT][LOG_BUFFER_SIZE_BYTES];
+static _Alignas(LOG_BUFFER_SECTOR_SIZE_BYTES) union {
+    uint8_t logging[LOG_BUFFER_COUNT][LOG_BUFFER_SIZE_BYTES];
+    struct { uint8_t input[4096]; uint8_t output[2048]; } stopped;
+} logIoMemory;
+#define logBuffers (logIoMemory.logging)
+_Static_assert(sizeof(logIoMemory) == 6144U, "shared log I/O memory must remain 6 KiB");
+#if ROBOTRACE_LOG_PERFORMANCE
+volatile LogPerformanceStats logPerformanceStats;
+#endif
+
+static struct { FIL *file; FSIZE_t end, physical; UINT position, length; } logReadAhead;
+static UINT logCsvOutputLength;
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logReadAheadReset
+// 処理概要     seek・再open・closeで先読み状態を破棄する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void logReadAheadReset(void)
+{
+    memset(&logReadAhead, 0, sizeof(logReadAhead));
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logReadBuffered
+// 処理概要     記録部終端を超えず4KiB先読みから指定長を復元する
+// 引数         file: 入力, bytes: 出力, length: 復元長[B], end: 記録部終端[B]
+// 戻り値       FatFs結果（短い読込もエラー）
+/////////////////////////////////////////////////////////////////////
+static FRESULT logReadBuffered(FIL *file, uint8_t *bytes, UINT length, FSIZE_t end)
+{
+    if (logReadAhead.file != file || logReadAhead.end != end || logReadAhead.physical != f_tell(file)) {
+        logReadAheadReset();
+        logReadAhead.file = file; logReadAhead.end = end; logReadAhead.physical = f_tell(file);
+    }
+    while (length != 0U) {
+        if (logReadAhead.position == logReadAhead.length) {
+            FSIZE_t offset = f_tell(file);
+            if (offset >= end) { logReadAheadReset(); return FR_DISK_ERR; }
+            UINT request = end - offset > sizeof(logIoMemory.stopped.input) ?
+                (UINT)sizeof(logIoMemory.stopped.input) : (UINT)(end - offset);
+            UINT received = 0U;
+            LOG_PERF_BEGIN(tick);
+            FRESULT result = f_read(file, logIoMemory.stopped.input, request, &received);
+            LOG_PERF_END(readMs, tick); LOG_PERF_ADD(readCalls, 1U); LOG_PERF_ADD(readBytes, received);
+            if (result != FR_OK || received != request) {
+                logReadAheadReset(); return result == FR_OK ? FR_DISK_ERR : result;
+            }
+            logReadAhead.position = 0U; logReadAhead.length = received; logReadAhead.physical = f_tell(file);
+        }
+        UINT count = logReadAhead.length - logReadAhead.position;
+        if (count > length) count = length;
+        memcpy(bytes, logIoMemory.stopped.input + logReadAhead.position, count);
+        logReadAhead.position += count; bytes += count; length -= count;
+    }
+    return FR_OK;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logCsvFlush
+// 処理概要     蓄積CSVをまとめて書き、短い書込を検出する
+// 引数         file: 出力ファイル
+// 戻り値       true: 成功 false: 書込失敗
+/////////////////////////////////////////////////////////////////////
+static bool logCsvFlush(FIL *file)
+{
+    if (logCsvOutputLength == 0U) return true;
+    UINT written = 0U;
+    LOG_PERF_BEGIN(tick);
+    FRESULT result = f_write(file, logIoMemory.stopped.output, logCsvOutputLength, &written);
+    LOG_PERF_END(writeMs, tick); LOG_PERF_ADD(writeCalls, 1U); LOG_PERF_ADD(writeBytes, written);
+    if (result != FR_OK || written != logCsvOutputLength) return false;
+    logCsvOutputLength = 0U;
+    return true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logCsvAppend
+// 処理概要     f_putsと同じCRLF変換を行い2KiB単位でCSVを書き込む
+// 引数         file: 出力ファイル, text: 追記文字列
+// 戻り値       true: 成功 false: 書込失敗
+/////////////////////////////////////////////////////////////////////
+static bool logCsvAppend(FIL *file, const char *text)
+{
+    while (*text != '\0') {
+        char c = *text++;
+#if _USE_STRFUNC == 2
+        if (c == '\n') {
+            logIoMemory.stopped.output[logCsvOutputLength++] = '\r';
+            if (logCsvOutputLength == sizeof(logIoMemory.stopped.output) && !logCsvFlush(file)) return false;
+        }
+#endif
+        logIoMemory.stopped.output[logCsvOutputLength++] = (uint8_t)c;
+        if (logCsvOutputLength == sizeof(logIoMemory.stopped.output) && !logCsvFlush(file)) return false;
+    }
+    return true;
+}
 static float cross_start_mm[CROSSSEG_MAX];
 static float cross_end_mm[CROSSSEG_MAX];
 uint16_t cntSend = 0;
@@ -79,6 +189,10 @@ static bool lastPrimaryRouteValid = false;
 static bool runImuCalibrationValid = false;
 static uint16_t runImuCalibrationSamples = 0U;
 static uint16_t runImuCalibrationReadErrors = 0U;
+// 走行開始時の校正値を保持し、停止後の保存時に別走行の値を混ぜない。
+static uint16_t runLineSensorMax[NUM_SENSORS];
+static uint16_t runLineSensorMin[NUM_SENSORS];
+static bool runLineSensorCalibrationValid = false;
 
 typedef struct
 {
@@ -604,6 +718,15 @@ static void logBuildMetadata(void)
 	setLogHeaderStr("imuCalibrationValid", runImuCalibrationValid ? 1 : 0);
 	setLogHeaderStr("imuCalibrationSamples", runImuCalibrationSamples);
 	setLogHeaderStr("imuCalibrationReadErrors", runImuCalibrationReadErrors);
+	setLogHeaderStr("lineSensorCalibrationValid", runLineSensorCalibrationValid ? 1 : 0);
+	for (uint8_t i = 0U; i < NUM_SENSORS; i++)
+	{
+		char name[24];
+		snprintf(name, sizeof(name), "lSensorMax%u", (unsigned)i);
+		setLogHeaderStr(name, runLineSensorMax[i]);
+		snprintf(name, sizeof(name), "lSensorMin%u", (unsigned)i);
+		setLogHeaderStr(name, runLineSensorMin[i]);
+	}
 	setLogHeaderStr("distanceScaleVerified", primaryRouteValidation.distanceScaleVerified ? 1 : 0);
 	setLogHeaderStr("distanceScalePulsePerMeter", PULSE_METER);
 	setLogHeaderStr("distanceScaleError_p", primaryRouteValidation.distanceScaleError_p);
@@ -678,6 +801,9 @@ void initLog(void)
 	runImuCalibrationValid = IMU_CalibrationReady();
 	runImuCalibrationSamples = IMU_CalibrationSamples();
 	runImuCalibrationReadErrors = IMU_CalibrationReadErrors();
+	memcpy(runLineSensorMax, lSensorMax, sizeof(runLineSensorMax));
+	memcpy(runLineSensorMin, lSensorMin, sizeof(runLineSensorMin));
+	runLineSensorCalibrationValid = isLineSensorCalibrationValid();
 	primaryRouteValidation = (PrimaryRouteValidation){false, false, false, 0, 0, 0.0F, 1U};
 	// CSV変換ループの実行回数を走行ごとに正しく制御するため送信カウンタをリセット
 	cntSend = 0;
@@ -858,7 +984,6 @@ static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t *dataCr
 	uint8_t log[LOG_SIZE];
 	LogRecord rec;
 	FRESULT fresult;
-	UINT readByte;
 	uint16_t j, time, beforeTime = 0, cross_count = 0;
 	int16_t speed, beforeSpeed = 0;
 	float dt, dist_mm = 0.0F, goalMarkerX = 0.0F;
@@ -866,7 +991,9 @@ static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t *dataCr
 	int32_t goalMarkerPulse = 0, previousTotalPulse = 0;
 	int64_t correctedPulseTotal = 0;
 	uint32_t crc = UINT32_MAX;
+	logReadAheadReset();
 	if (f_lseek(file, LOG_BINARY_HEADER_BYTES) != FR_OK) return false;
+	LOG_PERF_BEGIN(scanTick); LOG_PERF_ADD(fullScans, 1U);
 	// クロスライン前後100mm直線化のため、2パスで補正する
 	// pass1: 距離基準でクロスライン区間を抽出
 	beforeTime = 0;
@@ -880,8 +1007,8 @@ static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t *dataCr
 	if (live) primaryRouteValidation.goalMarkerOnset_p = goalMarkerPulse;
 	for (j = 0; j < rows; j++)
 	{
-		fresult = f_read(file, log, sizeof(log), &readByte);
-		if (fresult != FR_OK || readByte != LOG_SIZE)
+		fresult = logReadBuffered(file, log, LOG_SIZE, LOG_BINARY_HEADER_BYTES + (FSIZE_t)rows * LOG_SIZE);
+		if (fresult != FR_OK)
 		{
 			printf("f_read error in endLog\r\n");
 			return false;
@@ -909,7 +1036,7 @@ static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t *dataCr
 		beforeSpeed = speed;
 		dt = (float)(time - beforeTime) / 1000.0f;
 		float previousX = xycie.x;
-		if (correctedPulse >= 0 && correctedPulse <= INT16_MAX)
+		if (live && correctedPulse >= 0 && correctedPulse <= INT16_MAX)
 		{
 			calcXYcie(totalPulse, rec.imuAngle_Z);
 		}
@@ -954,6 +1081,7 @@ static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t *dataCr
 
 	sourceCrossCount = cross_count;
 	*dataCrc = ~crc;
+	LOG_PERF_END(scanMs, scanTick);
 	if (!live) return true;
 	primaryRouteValidation.goalMarkerX_mm = goalMarkerX;
 	if (optimalTrace == BOOST_NONE)
@@ -1036,6 +1164,8 @@ bool endLog(void)
 		return false;
 	}
 
+	// キュー排出後から確定完了までは、停止中I/Oと共有バッファを占有する。
+	if (!sd_fatfs_lock(500U)) return false;
 	uint32_t finalWriteLength = logBufferWriterPrepareFinalWrite(&logBufferWriter);
 	if (finalWriteLength > 0U)
 	{
@@ -1048,13 +1178,15 @@ bool endLog(void)
 				(unsigned long)writtenlog, (unsigned long)finalWriteLength);
 			f_close(&fil_W);
 			logTempOpen = false;
+			sd_fatfs_unlock();
 			return false;
 		}
 	}
 
 	bool success = false;
 	LogBinaryHeader header = {logFileNumber, LOG_SCHEMA_PROFILE_LIGHT, LOG_RECORD_SIZE_BYTES,
-		cntSend, 0U, 0U, 0U, logBinarySchema()};
+		cntSend, 0U, 0U, 0U, logBinarySchema(), sizeof(logSchemaText) - 1U,
+        LOG_BINARY_COLUMNS, LOG_BINARY_DERIVED_VERSION};
 	FSIZE_t dataEnd = LOG_BINARY_HEADER_BYTES + (FSIZE_t)cntSend * LOG_SIZE;
 	if (f_lseek(&fil_W, dataEnd) != FR_OK || f_truncate(&fil_W) != FR_OK ||
 		f_sync(&fil_W) != FR_OK || !logScanRecords(&fil_W, cntSend, true, &savedDataCrc)) goto finish;
@@ -1063,6 +1195,7 @@ bool endLog(void)
 	header.dataCrc = savedDataCrc;
 	header.metadataCrc = ~logBinaryCrcUpdate(UINT32_MAX, (const uint8_t *)columnTitle, header.metadataBytes);
 	if (f_lseek(&fil_W, dataEnd) != FR_OK ||
+        f_write(&fil_W, logSchemaText, header.schemaBytes, &writtenlog) != FR_OK || writtenlog != header.schemaBytes ||
 		f_write(&fil_W, columnTitle, header.metadataBytes, &writtenlog) != FR_OK || writtenlog != header.metadataBytes) goto finish;
 	logBinaryEncodeHeader(logBuffers[0], &header);
 	if (f_lseek(&fil_W, 0U) != FR_OK ||
@@ -1083,6 +1216,7 @@ finish:
 		logRecoveryReady = true;
 		cntSend = 0;
 	}
+	sd_fatfs_unlock();
 	return success;
 }
 
@@ -1091,6 +1225,7 @@ finish:
 static struct {
     FIL *file;
     LogBinaryHeader header;
+    LogSourcePurpose purpose;
     LogRecord record;
     uint32_t row, crc;
     uint16_t previousTime;
@@ -1109,11 +1244,7 @@ static struct {
 /////////////////////////////////////////////////////////////////////
 static uint32_t logBinarySchema(void)
 {
-    static const char schema[] = "derived-v1;"
-#define LOG_SCHEMA_TEXT(type, name, fmt, expr) #type ":" #name ";"
-        LOG_FIELD_LIST(LOG_SCHEMA_TEXT, LOG_SCHEMA_TEXT);
-#undef LOG_SCHEMA_TEXT
-    return ~logBinaryCrcUpdate(UINT32_MAX, (const uint8_t *)schema, sizeof(schema) - 1U);
+    return ~logBinaryCrcUpdate(UINT32_MAX, (const uint8_t *)logSchemaText, sizeof(logSchemaText) - 1U);
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -1142,10 +1273,17 @@ static void logConversionNotify(LogConversionStage stage, uint32_t rows)
 static bool logReadContainerHeader(FIL *file, uint16_t number, LogBinaryHeader *header)
 {
     UINT read = 0U;
-    return f_read(file, logBuffers[0], LOG_BINARY_HEADER_BYTES, &read) == FR_OK &&
-        read == LOG_BINARY_HEADER_BYTES && logBinaryDecodeHeader(logBuffers[0], f_size(file), header) &&
-        header->number == number && header->profile == LOG_SCHEMA_PROFILE_LIGHT &&
-        header->recordBytes == LOG_SIZE && header->schema == logBinarySchema();
+    if (f_read(file, logBuffers[0], LOG_BINARY_HEADER_BYTES, &read) != FR_OK ||
+        read != LOG_BINARY_HEADER_BYTES || !logBinaryDecodeHeader(logBuffers[0], f_size(file), header) ||
+        header->number != number || header->profile != LOG_SCHEMA_PROFILE_LIGHT ||
+        header->recordBytes != LOG_SIZE || header->schema != logBinarySchema() ||
+        header->schemaBytes != sizeof(logSchemaText) - 1U || header->columns != LOG_BINARY_COLUMNS) return false;
+    // 機体の計画解析は現在のビルドと同じ列定義を要求する。PCは列定義から汎用復元する。
+    logReadAheadReset();
+    if (f_lseek(file, LOG_BINARY_HEADER_BYTES + (FSIZE_t)header->rows * header->recordBytes) != FR_OK ||
+        f_read(file, logIoMemory.stopped.input, header->schemaBytes, &read) != FR_OK ||
+        read != header->schemaBytes || memcmp(logIoMemory.stopped.input, logSchemaText, header->schemaBytes)) return false;
+    return true;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -1164,8 +1302,35 @@ bool logSourceIsBinary(FIL *file) { return binarySource.file == file; }
 /////////////////////////////////////////////////////////////////////
 FRESULT logSourceOpen(FIL *file, const char *csvName, BYTE mode)
 {
+    return logSourceOpenFor(file, csvName, mode, LOG_SOURCE_FULL);
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logSourceBinaryInfo
+// 処理概要     全件検証済みのバイナリ識別情報を取得する
+// 引数         file: 入力ファイル, header: 識別情報の出力先
+// 戻り値       true: 有効なバイナリ false: CSVまたは無効
+/////////////////////////////////////////////////////////////////////
+bool logSourceBinaryInfo(FIL *file, LogBinaryHeader *header)
+{
+    if (!logSourceIsBinary(file) || binarySource.error != FR_OK || header == NULL) return false;
+    *header = binarySource.header;
+    return true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logSourceOpenFor
+// 処理概要     全件検証後に用途を設定してバイナリ優先で開く
+// 引数         file: 入力, csvName: ログ名, mode: 読込モード, purpose: 読込用途
+// 戻り値       FatFs結果
+/////////////////////////////////////////////////////////////////////
+FRESULT logSourceOpenFor(FIL *file, const char *csvName, BYTE mode, LogSourcePurpose purpose)
+{
     uint16_t number;
-    if (binarySource.file != NULL) return FR_LOCKED;
+    if (binarySource.file != NULL || modeLOG || logTempOpen ||
+        logBufferWriter.flushPending || logBufferWriter.pendingPending) return FR_LOCKED;
+    if (purpose < LOG_SOURCE_FULL || purpose > LOG_SOURCE_PATH) return FR_INVALID_PARAMETER;
+    logReadAheadReset();
     if (!logBinaryParseName(csvName, "csv", &number)) return FR_INVALID_NAME;
     char name[20];
     logBinaryName(name, sizeof(name), number, "bin");
@@ -1176,7 +1341,7 @@ FRESULT logSourceOpen(FIL *file, const char *csvName, BYTE mode)
     UINT read;
     uint32_t crc;
     if (!logReadContainerHeader(file, number, &header) ||
-        f_lseek(file, LOG_BINARY_HEADER_BYTES + (FSIZE_t)header.rows * header.recordBytes) != FR_OK ||
+        f_lseek(file, LOG_BINARY_HEADER_BYTES + (FSIZE_t)header.rows * header.recordBytes + header.schemaBytes) != FR_OK ||
         f_read(file, columnTitle, header.metadataBytes, &read) != FR_OK || read != header.metadataBytes) goto invalid;
     columnTitle[header.metadataBytes] = '\0';
     if (columnTitle[header.metadataBytes - 1U] != '\n' ||
@@ -1187,6 +1352,8 @@ FRESULT logSourceOpen(FIL *file, const char *csvName, BYTE mode)
     memset(&binarySource, 0, sizeof(binarySource));
     binarySource.file = file;
     binarySource.header = header;
+    binarySource.purpose = purpose;
+    logReadAheadReset();
     binarySource.crc = UINT32_MAX;
     clearXYcie();
     return FR_OK;
@@ -1204,6 +1371,7 @@ invalid:
 FRESULT logSourceClose(FIL *file)
 {
     if (binarySource.file == file) binarySource.file = NULL;
+    logReadAheadReset();
     return f_close(file);
 }
 
@@ -1223,9 +1391,11 @@ static void logProcessRecord(void)
     }
     float dt = (float)(rec->cntlog - binarySource.previousTime) / 1000.0F;
     binarySource.roc = calcROC(speed, rec->gyroVal_Z, dt);
-    calcXYcie((int32_t)rec->encTotalOptimal, rec->imuAngle_Z);
-    binarySource.x = xycie.x;
-    binarySource.y = xycie.y;
+    if (binarySource.purpose == LOG_SOURCE_FULL || binarySource.purpose == LOG_SOURCE_PATH) {
+        calcXYcie((int32_t)rec->encTotalOptimal, rec->imuAngle_Z);
+        binarySource.x = xycie.x;
+        binarySource.y = xycie.y;
+    }
     binarySource.distanceMm += calcDlMm(speed, dt);
     binarySource.previousSpeed = speed;
     binarySource.previousTime = rec->cntlog;
@@ -1268,16 +1438,19 @@ char *logSourceGets(char *line, int capacity, FIL *file)
         return NULL;
     }
     uint8_t bytes[LOG_SIZE];
-    UINT read;
-    FRESULT result = f_read(file, bytes, sizeof(bytes), &read);
-    if (result != FR_OK || read != sizeof(bytes)) {
+    if (binarySource.row == 0U) { LOG_PERF_ADD(fullScans, 1U); }
+    FRESULT result = logReadBuffered(file, bytes, binarySource.header.recordBytes,
+        LOG_BINARY_HEADER_BYTES + (FSIZE_t)binarySource.header.rows * binarySource.header.recordBytes);
+    if (result != FR_OK) {
         binarySource.error = result == FR_OK ? FR_DISK_ERR : result;
         return NULL;
     }
     binarySource.crc = logBinaryCrcUpdate(binarySource.crc, bytes, sizeof(bytes));
     logaddress = bytes;
     logReadRecord(&binarySource.record);
+    LOG_PERF_BEGIN(processTick);
     logProcessRecord();
+    LOG_PERF_END(processMs, processTick);
     binarySource.row++;
     binarySource.rowReady = true;
     line[0] = '\n'; line[1] = '\0';
@@ -1390,16 +1563,20 @@ static bool logExistingCsvMatches(const char *name, const LogBinaryHeader *heade
     FRESULT result = f_open(&file, name, FA_READ | FA_OPEN_EXISTING);
     if (result == FR_NO_FILE) return true;
     if (result != FR_OK) return false;
-    uint32_t crc = UINT32_MAX;
-    bool matches = true;
-    for (uint32_t i = 0; i < header->metadataBytes; i++) {
-        uint8_t byte;
-        UINT read;
-        if (f_read(&file, &byte, 1U, &read) != FR_OK || read != 1U) { matches = false; break; }
-        crc = logBinaryCrcUpdate(crc, &byte, 1U);
+    logReadAheadReset();
+    UINT read = 0U;
+    bool matches = f_read(&file, logIoMemory.stopped.input, header->metadataBytes + 1U, &read) == FR_OK;
+    uint8_t *text = logIoMemory.stopped.input;
+    UINT n = header->metadataBytes;
+    matches = matches && read >= n;
+    if (matches && text[n - 1U] == '\r') {
+        matches = read > n && text[n] == '\n';
+        text[n - 1U] = '\n';
     }
+    matches = matches && text[n - 1U] == '\n' &&
+        ~logBinaryCrcUpdate(UINT32_MAX, text, n) == header->metadataCrc;
     if (f_close(&file) != FR_OK) matches = false;
-    return matches && ~crc == header->metadataCrc;
+    return matches;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -1422,17 +1599,28 @@ static bool logConvertOne(uint16_t number)
     if (!logSourceIsBinary(&input) || !logExistingCsvMatches(csv, &binarySource.header) ||
         f_open(&output, part, FA_WRITE | FA_CREATE_ALWAYS) != FR_OK) goto cleanup;
     outputOpen = true;
-    if (!logSourceGets(columnTitle, sizeof(columnTitle), &input) || f_puts(columnTitle, &output) < 0 ||
-        !logSourceGets(columnTitle, sizeof(columnTitle), &input) || f_puts(columnTitle, &output) < 0) goto cleanup;
+    logCsvOutputLength = 0U;
+#if _USE_EXPAND
+    FSIZE_t reserve = (FSIZE_t)binarySource.header.rows * LOG_CSV_LINE_BUFFER_SIZE +
+        2U * LOG_COLUMN_TITLE_BUFFER_SIZE;
+    FRESULT allocation = f_expand(&output, reserve, 1U);
+    if (allocation != FR_OK && allocation != FR_DENIED) goto cleanup;
+#endif
+    if (!logSourceGets(columnTitle, sizeof(columnTitle), &input) || !logCsvAppend(&output, columnTitle) ||
+        !logSourceGets(columnTitle, sizeof(columnTitle), &input) || !logCsvAppend(&output, columnTitle)) goto cleanup;
     logConversionNotify(LOG_CONVERT_WRITE, 0U);
     while (logSourceGets(line, sizeof(line), &input)) {
-        if (!logFormatSourceRow(line, sizeof(line)) || f_puts(line, &output) < 0) goto cleanup;
+        LOG_PERF_BEGIN(formatTick);
+        bool formatted = logFormatSourceRow(line, sizeof(line));
+        LOG_PERF_END(formatMs, formatTick);
+        if (!formatted || !logCsvAppend(&output, line)) goto cleanup;
         conversionWorkDone++;
         logConversionNotify(LOG_CONVERT_WRITE, binarySource.row);
     }
     if (logSourceError(&input) || !logSourceEof(&input)) goto cleanup;
     logConversionNotify(LOG_CONVERT_COMMIT, binarySource.header.rows);
-    if (f_sync(&output) != FR_OK) goto cleanup;
+    LOG_PERF_BEGIN(commitTick);
+    if (!logCsvFlush(&output) || f_truncate(&output) != FR_OK || f_sync(&output) != FR_OK) goto cleanup;
     FRESULT closeResult = f_close(&output);
     outputOpen = false;
     if (closeResult != FR_OK) goto cleanup;
@@ -1445,6 +1633,7 @@ static bool logConvertOne(uint16_t number)
     // 元バイナリは残っているため、置換途中の電源断でも再変換できる。
     if (exists == FR_OK && f_unlink(csv) != FR_OK) goto cleanup;
     if (f_rename(part, csv) != FR_OK || f_unlink(bin) != FR_OK) goto cleanup;
+    LOG_PERF_END(commitMs, commitTick);
     conversionWorkDone++;
     if (conversionProgress.fileIndex < conversionProgress.fileCount) logConversionNotify(LOG_CONVERT_DONE, conversionProgress.expectedRows);
     success = true;
@@ -1498,6 +1687,7 @@ static bool logPendingInventory(uint16_t after, uint16_t *next, uint32_t *nextRo
 /////////////////////////////////////////////////////////////////////
 bool logConvertPending(LogProgressCallback progress)
 {
+    LOG_PERF_BEGIN(conversionTick);
     if (modeLOG || logTempOpen || !sd_fatfs_lock(500U)) { logRecoveryReady = false; return false; }
     bool success = true;
     sd_set_analysis_active(true);
@@ -1528,12 +1718,33 @@ bool logConvertPending(LogProgressCallback progress)
     sd_set_analysis_active(false);
     sd_fatfs_unlock();
     logRecoveryReady = success;
+    LOG_PERF_END(conversionMs, conversionTick);
     return success;
 }
 
 /////////////////////////////////////////////////////////////////////
+// モジュール名 logPrepareBinaryStorage
+// 処理概要     起動時にbinのヘッダ・実長と未確定tmpを確認し、原本を保持する
+// 引数         なし
+// 戻り値       true: 保存開始可能 false: I/Oまたはヘッダ不正
+/////////////////////////////////////////////////////////////////////
+bool logPrepareBinaryStorage(void)
+{
+    if (modeLOG || logTempOpen || logBufferWriter.flushPending || logBufferWriter.pendingPending ||
+        !sd_fatfs_lock(500U)) { logRecoveryReady = false; return false; }
+    uint16_t next, count;
+    uint32_t rows;
+    uint64_t work;
+    logTempWarning = false;
+    bool result = logPendingInventory(0U, &next, &rows, &count, &work);
+    sd_fatfs_unlock();
+    logRecoveryReady = result;
+    return result;
+}
+
+/////////////////////////////////////////////////////////////////////
 // モジュール名 logRecoveryIsReady
-// 処理概要     復旧が完了して新規走行を開始可能か取得する
+// 処理概要     binの保存・初期確認に成功し新規走行を開始可能か取得する
 // 引数         なし
 // 戻り値       true: 開始可能 false: 保存・復旧失敗
 /////////////////////////////////////////////////////////////////////
@@ -1579,9 +1790,15 @@ int16_t getFileNumbers(void)
 				break;
 			}
 			uint16_t csvNumber;
-			if (logBinaryParseName(fno.fname, "csv", &csvNumber) && endFileIndex < FILENUMBER_NUM)
+			if ((logBinaryParseName(fno.fname, "bin", &csvNumber) ||
+                logBinaryParseName(fno.fname, "csv", &csvNumber)) && endFileIndex < FILENUMBER_NUM)
 			{
-				// csvファイルのとき
+				// 同番号のbin/旧CSVは一覧へ一度だけ登録する。
+                bool duplicate = false;
+                for (int16_t i = 0; i < endFileIndex; i++) {
+                    if (fileNumbers[i] == (int16_t)csvNumber) { duplicate = true; break; }
+                }
+                if (duplicate) continue;
 				fileNumbers[endFileIndex] = (int16_t)csvNumber;
 				endFileIndex++;
 			}
@@ -1602,35 +1819,7 @@ int16_t getFileNumbers(void)
 				}
 			}
 		}
-		// ログ数が上限を超えたら、FILENUMBER_ALARMの半分まで古いログを削除
-		if (logRecoveryReady && fileCount > FILENUMBER_LIMIT)
-		{
-			int16_t targetFileCount = (int16_t)(FILENUMBER_ALARM / 2);
-			if (targetFileCount < 1)
-			{
-				targetFileCount = 1;
-			}
-			int16_t toDelete = (int16_t)(fileCount - targetFileCount);
-			if (toDelete < 1)
-			{
-				toDelete = 1;
-			}
-			for (int16_t i = 0; i < toDelete; i++)
-			{
-				char deleteName[16];
-				snprintf(deleteName, sizeof(deleteName), "%d.csv", fileNumbers[i]);
-				char pendingName[20];
-				FILINFO pendingInfo;
-				logBinaryName(pendingName, sizeof(pendingName), (uint16_t)fileNumbers[i], "bin");
-				if (f_stat(pendingName, &pendingInfo) == FR_NO_FILE) f_unlink(deleteName);
-			}
-			// 配列を詰め直し
-			for (int16_t i = 0; i < fileCount - toDelete; i++)
-			{
-				fileNumbers[i] = fileNumbers[i + toDelete];
-			}
-			fileCount -= toDelete;
-		}
+		// PCへの取込前に原本を失わないよう、機体側では古いログを自動削除しない。
 		endFileIndex = fileCount - 1;	// 最終インデックスを更新
 		fileIndexLog = endFileIndex;	// 現在のログ番号を最終インデックスに設定
 	}
@@ -1647,17 +1836,11 @@ int16_t getFileNumbers(void)
 /////////////////////////////////////////////////////////////////////
 void setLogStr(char *column, char *format)
 {
-	char columnStr[30];	// ヘッダー文字列を一時的に格納するバッファ
-	char formatStr[30];	// フォーマット文字列を一時的に格納するバッファ
-
-	// copy str to local variable
-       snprintf((char *)columnStr, sizeof(columnStr), "%s", column); // バッファサイズを指定して安全にコピー
-       snprintf((char *)formatStr, sizeof(formatStr), "%s", format); // バッファサイズを指定して安全にコピー
-
-       strncat((char *)columnStr, ",", sizeof(columnStr) - strlen((char *)columnStr) - 1); // バッファサイズを指定して安全に結合
-       strncat((char *)formatStr, ",", sizeof(formatStr) - strlen((char *)formatStr) - 1); // バッファサイズを指定して安全に結合
-       strncat((char *)columnTitle, (char *)columnStr, sizeof(columnTitle) - strlen((char *)columnTitle) - 1); // バッファサイズを指定して安全に結合
-       strncat((char *)formatLog, (char *)formatStr, sizeof(formatLog) - strlen((char *)formatLog) - 1);       // バッファサイズを指定して安全に結合
+	// 長い列名を一時バッファで切らず、区切りも独立して追加する。
+	strncat(columnTitle, column, sizeof(columnTitle) - strlen(columnTitle) - 1U);
+	strncat(columnTitle, ",", sizeof(columnTitle) - strlen(columnTitle) - 1U);
+	strncat(formatLog, format, sizeof(formatLog) - strlen(formatLog) - 1U);
+	strncat(formatLog, ",", sizeof(formatLog) - strlen(formatLog) - 1U);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setLogHeaderStr

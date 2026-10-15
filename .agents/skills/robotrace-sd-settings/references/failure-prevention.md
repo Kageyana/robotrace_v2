@@ -9,10 +9,10 @@
 
 ## 保存・復旧
 
-- 再起動や修復前にbin/part/tmp・設定・失敗段階を保全する。実ボリューム容量/空きを取得し、全binを保持したままCSVを生成できる余地を確認する。元binを先に削除しない。
-- FR_OKだけで書込成功にしない。要求長と実書込長、f_puts戻り値、fptr、free_clstを確認する。CSVのsync/close/rename成功後だけbinを削除する。
+- 現行は機体でbinを保持し、PCのAutoCopyCsvFromSdでCSV化する。再起動や修復前にbin/part/tmp・設定・失敗段階を保全する。PCのtempとCSV保存先の空きを確認し、temp原本・保存先CSVの照合と永続化成功後だけSD原本を削除する。機体の起動時CSV復旧を前提にしない。
+- FR_OKだけで書込成功にしない。要求長と実書込長、fptr、free_clstを確認する。機体のbinはsync/close/renameで確定し、自動削除しない。旧CSV変換APIの互換検証では従来のsync/close/renameと原本保持も確認する。
 - 容量確保後も失敗したら媒体の種別・空き・失敗段階・戻り値を取り直す。前回の原因を当てはめない。CRC/実長/スキーマ/メタデータを名前付きフィールドで確認し、tuple添字を推測しない。
-- CubeMX/FatFs更新後はff.cのexFAT通常f_openにobj.n_frag=0の初期化が保持されているか確認する。RAM FatFsのモック成功では実FatFsを検証できない。実機でヘッダ→メタデータseek→CSV確定→再起動復旧完了を確認する。
+- CubeMX/FatFs更新後はff.cのexFAT通常f_openにobj.n_frag=0の初期化が保持されているか確認する。RAM FatFsのモック成功では実FatFsを検証できない。現行は実機のbin確定・再起動時ヘッダ確認とPC取込を検証する。旧機体CSV変換を検証するときだけヘッダ→メタデータseek→CSV確定→再起動復旧も確認する。
 - SD初期化はカード検出・SPI初期化・mountを分ける。リセットで一度直ったことだけで根本解決としない。再発時はCMD0/CMD8/ACMD41、電源・接触を観測する。
 - 解析の通常経路で再mount/全容量走査を増やさない。I/O再試行は既存の有限回数・有限待機とし、自動formatを行わない。読込エラーの診断を同じSDへ書き続けない。Base read/plan、Slip open/read/plan等の段階を記録する。
 - PC上の正常CSVは機体が読んだファイルと同一とは限らない。解析対象番号と実カードのファイル長・ハッシュ・ヘッダを照合する。
@@ -24,3 +24,12 @@
 - FIL、行バッファ、配列を増やすときはGET_SECTOR_SIZEと_MAX_SS、使用中リンカの8 KiB予約、_sbrk上限を確認する。全構成のmap/nm/objdumpでRAMと呼出しを含むスタックを点検し、実機最大値は別検証とする。
 - FatFs型のAPIをmain.h経由のSDcard.hへ追加しない。logSource.hの分離とinclude順序を維持し、ARMビルドとPCテストの両方を確認する。
 - bin/CSVの計画比較は毎回一次DISTANCE計画を再生成し、optimalTrace/analyzedNumber/PPAD/設定を同じ初期状態へ戻す。前のSLIP補正済みキャッシュを再補正しない。
+
+## PC変換の検証
+
+- 現行は自己記述RLOG v2。保存列を増減・並替してもPC変換器を更新せず、同じexeで各変種を検証する。列定義CRC・型・重複名・書式・実長・計算必須列を確認し、旧v1の6形式は拒否する。PCとARM、x87とSSE、別時点のメタデータを同一条件とみなさない。
+- ps1は配布前にUTF-8 BOMと実際のWindows PowerShell 5.1実行を確認する。SHA256・ドライブ検出をモジュール自動読込へ依存させず、.NET実装で取込と監視起動の両方を確認する。失敗時・同名衝突時のSD原本保持を検証する。詳細: `doc/失敗事例/2026-10-15-pc-binary-import-runtime-contract.md`。
+
+- 数値整形は機体と同じsnprintfを使用し、fprintfとの丸め差を前提にしない。丁度半分のfloatと実ログでもバイト比較する。参考RAMモックのf_expand上限を実ログ長と照合し、必要なら参考変換だけ通常割当フォールバックで比較する。
+
+- ヘッダ形式変更では全必須欄・CRC範囲・実長式を合成フィクスチャにも反映する。旧v1拒否は現行要件。詳細: `doc/失敗事例/2026-10-16-self-describing-header-test-contract.md`。
