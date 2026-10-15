@@ -9,6 +9,7 @@
 #include "courseAnalysis.h"
 #include "firmware_version.h"
 #include "IMU.h"
+#include "lineSensor.h"
 #include "logBufferWriter.h"
 #include "logPerformance.h"
 #include "markerSensor.h"
@@ -188,6 +189,10 @@ static bool lastPrimaryRouteValid = false;
 static bool runImuCalibrationValid = false;
 static uint16_t runImuCalibrationSamples = 0U;
 static uint16_t runImuCalibrationReadErrors = 0U;
+// 走行開始時の校正値を保持し、停止後の保存時に別走行の値を混ぜない。
+static uint16_t runLineSensorMax[NUM_SENSORS];
+static uint16_t runLineSensorMin[NUM_SENSORS];
+static bool runLineSensorCalibrationValid = false;
 
 typedef struct
 {
@@ -713,6 +718,15 @@ static void logBuildMetadata(void)
 	setLogHeaderStr("imuCalibrationValid", runImuCalibrationValid ? 1 : 0);
 	setLogHeaderStr("imuCalibrationSamples", runImuCalibrationSamples);
 	setLogHeaderStr("imuCalibrationReadErrors", runImuCalibrationReadErrors);
+	setLogHeaderStr("lineSensorCalibrationValid", runLineSensorCalibrationValid ? 1 : 0);
+	for (uint8_t i = 0U; i < NUM_SENSORS; i++)
+	{
+		char name[24];
+		snprintf(name, sizeof(name), "lSensorMax%u", (unsigned)i);
+		setLogHeaderStr(name, runLineSensorMax[i]);
+		snprintf(name, sizeof(name), "lSensorMin%u", (unsigned)i);
+		setLogHeaderStr(name, runLineSensorMin[i]);
+	}
 	setLogHeaderStr("distanceScaleVerified", primaryRouteValidation.distanceScaleVerified ? 1 : 0);
 	setLogHeaderStr("distanceScalePulsePerMeter", PULSE_METER);
 	setLogHeaderStr("distanceScaleError_p", primaryRouteValidation.distanceScaleError_p);
@@ -787,6 +801,9 @@ void initLog(void)
 	runImuCalibrationValid = IMU_CalibrationReady();
 	runImuCalibrationSamples = IMU_CalibrationSamples();
 	runImuCalibrationReadErrors = IMU_CalibrationReadErrors();
+	memcpy(runLineSensorMax, lSensorMax, sizeof(runLineSensorMax));
+	memcpy(runLineSensorMin, lSensorMin, sizeof(runLineSensorMin));
+	runLineSensorCalibrationValid = isLineSensorCalibrationValid();
 	primaryRouteValidation = (PrimaryRouteValidation){false, false, false, 0, 0, 0.0F, 1U};
 	// CSV変換ループの実行回数を走行ごとに正しく制御するため送信カウンタをリセット
 	cntSend = 0;
@@ -1819,17 +1836,11 @@ int16_t getFileNumbers(void)
 /////////////////////////////////////////////////////////////////////
 void setLogStr(char *column, char *format)
 {
-	char columnStr[30];	// ヘッダー文字列を一時的に格納するバッファ
-	char formatStr[30];	// フォーマット文字列を一時的に格納するバッファ
-
-	// copy str to local variable
-       snprintf((char *)columnStr, sizeof(columnStr), "%s", column); // バッファサイズを指定して安全にコピー
-       snprintf((char *)formatStr, sizeof(formatStr), "%s", format); // バッファサイズを指定して安全にコピー
-
-       strncat((char *)columnStr, ",", sizeof(columnStr) - strlen((char *)columnStr) - 1); // バッファサイズを指定して安全に結合
-       strncat((char *)formatStr, ",", sizeof(formatStr) - strlen((char *)formatStr) - 1); // バッファサイズを指定して安全に結合
-       strncat((char *)columnTitle, (char *)columnStr, sizeof(columnTitle) - strlen((char *)columnTitle) - 1); // バッファサイズを指定して安全に結合
-       strncat((char *)formatLog, (char *)formatStr, sizeof(formatLog) - strlen((char *)formatLog) - 1);       // バッファサイズを指定して安全に結合
+	// 長い列名を一時バッファで切らず、区切りも独立して追加する。
+	strncat(columnTitle, column, sizeof(columnTitle) - strlen(columnTitle) - 1U);
+	strncat(columnTitle, ",", sizeof(columnTitle) - strlen(columnTitle) - 1U);
+	strncat(formatLog, format, sizeof(formatLog) - strlen(formatLog) - 1U);
+	strncat(formatLog, ",", sizeof(formatLog) - strlen(formatLog) - 1U);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setLogHeaderStr
