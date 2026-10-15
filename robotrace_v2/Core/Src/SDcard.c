@@ -42,6 +42,18 @@ char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE] = "", formatLog[LOG_FORMAT_BUFFER
 _Static_assert(BUFFER_SIZE_LOG == LOG_BUFFER_SIZE_BYTES, "log buffer size mismatch");
 _Static_assert((BUFFER_SIZE_LOG % LOG_BUFFER_SECTOR_SIZE_BYTES) == 0U, "log buffer must be sector aligned");
 _Static_assert(LOG_RECORD_SIZE_BYTES <= LOG_BUFFER_SIZE_BYTES, "log record must fit in one log buffer");
+enum { LOG_READ_RECORD_BYTES = LOG_RECORD_SIZE_BYTES };
+// 列定義はFlashへ一度だけ生成し、停止時に記録部とメタデータの間へ保存する。
+#define LOG_SCHEMA_STORED(type, name, fmt, expr) "S," #type "," #name "," fmt "\n"
+#define LOG_SCHEMA_DERIVED(type, name, fmt, expr) "D," #type "," #name "," fmt "\n"
+static const char logSchemaText[] = LOG_FIELD_LIST(LOG_SCHEMA_STORED, LOG_SCHEMA_DERIVED);
+#undef LOG_SCHEMA_STORED
+#undef LOG_SCHEMA_DERIVED
+#define LOG_COLUMN_ADD(type, name, fmt, expr) + 1U
+enum { LOG_BINARY_COLUMNS = 0 LOG_FIELD_LIST(LOG_COLUMN_ADD, LOG_COLUMN_ADD) };
+#undef LOG_COLUMN_ADD
+_Static_assert(sizeof(logSchemaText) - 1U <= LOG_BINARY_SCHEMA_MAX_BYTES, "schema description too large");
+_Static_assert(LOG_BINARY_COLUMNS <= LOG_BINARY_MAX_COLUMNS, "too many log columns");
 static LogBufferWriter logBufferWriter;
 static _Alignas(LOG_BUFFER_SECTOR_SIZE_BYTES) union {
     uint8_t logging[LOG_BUFFER_COUNT][LOG_BUFFER_SIZE_BYTES];
@@ -1156,7 +1168,8 @@ bool endLog(void)
 
 	bool success = false;
 	LogBinaryHeader header = {logFileNumber, LOG_SCHEMA_PROFILE_LIGHT, LOG_RECORD_SIZE_BYTES,
-		cntSend, 0U, 0U, 0U, logBinarySchema()};
+		cntSend, 0U, 0U, 0U, logBinarySchema(), sizeof(logSchemaText) - 1U,
+        LOG_BINARY_COLUMNS, LOG_BINARY_DERIVED_VERSION};
 	FSIZE_t dataEnd = LOG_BINARY_HEADER_BYTES + (FSIZE_t)cntSend * LOG_SIZE;
 	if (f_lseek(&fil_W, dataEnd) != FR_OK || f_truncate(&fil_W) != FR_OK ||
 		f_sync(&fil_W) != FR_OK || !logScanRecords(&fil_W, cntSend, true, &savedDataCrc)) goto finish;
@@ -1165,6 +1178,7 @@ bool endLog(void)
 	header.dataCrc = savedDataCrc;
 	header.metadataCrc = ~logBinaryCrcUpdate(UINT32_MAX, (const uint8_t *)columnTitle, header.metadataBytes);
 	if (f_lseek(&fil_W, dataEnd) != FR_OK ||
+        f_write(&fil_W, logSchemaText, header.schemaBytes, &writtenlog) != FR_OK || writtenlog != header.schemaBytes ||
 		f_write(&fil_W, columnTitle, header.metadataBytes, &writtenlog) != FR_OK || writtenlog != header.metadataBytes) goto finish;
 	logBinaryEncodeHeader(logBuffers[0], &header);
 	if (f_lseek(&fil_W, 0U) != FR_OK ||
@@ -1213,11 +1227,7 @@ static struct {
 /////////////////////////////////////////////////////////////////////
 static uint32_t logBinarySchema(void)
 {
-    static const char schema[] = "derived-v1;"
-#define LOG_SCHEMA_TEXT(type, name, fmt, expr) #type ":" #name ";"
-        LOG_FIELD_LIST(LOG_SCHEMA_TEXT, LOG_SCHEMA_TEXT);
-#undef LOG_SCHEMA_TEXT
-    return ~logBinaryCrcUpdate(UINT32_MAX, (const uint8_t *)schema, sizeof(schema) - 1U);
+    return ~logBinaryCrcUpdate(UINT32_MAX, (const uint8_t *)logSchemaText, sizeof(logSchemaText) - 1U);
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -1246,10 +1256,17 @@ static void logConversionNotify(LogConversionStage stage, uint32_t rows)
 static bool logReadContainerHeader(FIL *file, uint16_t number, LogBinaryHeader *header)
 {
     UINT read = 0U;
-    return f_read(file, logBuffers[0], LOG_BINARY_HEADER_BYTES, &read) == FR_OK &&
-        read == LOG_BINARY_HEADER_BYTES && logBinaryDecodeHeader(logBuffers[0], f_size(file), header) &&
-        header->number == number && header->profile == LOG_SCHEMA_PROFILE_LIGHT &&
-        header->recordBytes == LOG_SIZE && header->schema == logBinarySchema();
+    if (f_read(file, logBuffers[0], LOG_BINARY_HEADER_BYTES, &read) != FR_OK ||
+        read != LOG_BINARY_HEADER_BYTES || !logBinaryDecodeHeader(logBuffers[0], f_size(file), header) ||
+        header->number != number || header->profile != LOG_SCHEMA_PROFILE_LIGHT ||
+        header->recordBytes != LOG_SIZE || header->schema != logBinarySchema() ||
+        header->schemaBytes != sizeof(logSchemaText) - 1U || header->columns != LOG_BINARY_COLUMNS) return false;
+    // 機体の計画解析は現在のビルドと同じ列定義を要求する。PCは列定義から汎用復元する。
+    logReadAheadReset();
+    if (f_lseek(file, LOG_BINARY_HEADER_BYTES + (FSIZE_t)header->rows * header->recordBytes) != FR_OK ||
+        f_read(file, logIoMemory.stopped.input, header->schemaBytes, &read) != FR_OK ||
+        read != header->schemaBytes || memcmp(logIoMemory.stopped.input, logSchemaText, header->schemaBytes)) return false;
+    return true;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -1307,7 +1324,7 @@ FRESULT logSourceOpenFor(FIL *file, const char *csvName, BYTE mode, LogSourcePur
     UINT read;
     uint32_t crc;
     if (!logReadContainerHeader(file, number, &header) ||
-        f_lseek(file, LOG_BINARY_HEADER_BYTES + (FSIZE_t)header.rows * header.recordBytes) != FR_OK ||
+        f_lseek(file, LOG_BINARY_HEADER_BYTES + (FSIZE_t)header.rows * header.recordBytes + header.schemaBytes) != FR_OK ||
         f_read(file, columnTitle, header.metadataBytes, &read) != FR_OK || read != header.metadataBytes) goto invalid;
     columnTitle[header.metadataBytes] = '\0';
     if (columnTitle[header.metadataBytes - 1U] != '\n' ||

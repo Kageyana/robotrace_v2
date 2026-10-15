@@ -8,11 +8,15 @@
 #include <limits.h>
 
 #define LOG_BINARY_HEADER_BYTES 512U
-#define LOG_BINARY_VERSION 1U
+#define LOG_BINARY_VERSION 2U
+#define LOG_BINARY_DERIVED_VERSION 1U
+#define LOG_BINARY_SCHEMA_MAX_BYTES 4095U
+#define LOG_BINARY_MAX_COLUMNS 256U
 
 typedef struct {
     uint32_t number, profile, recordBytes, rows, metadataBytes;
     uint32_t dataCrc, metadataCrc, schema;
+    uint32_t schemaBytes, columns, derivedVersion;
 } LogBinaryHeader;
 
 /////////////////////////////////////////////////////////////////////
@@ -86,6 +90,18 @@ static inline uint32_t logBinaryGet32(const uint8_t *p)
 }
 
 /////////////////////////////////////////////////////////////////////
+// モジュール名 logBinaryHeaderCrc
+// 処理概要     CRC格納欄を除く512 Bヘッダ全体のCRCを計算する
+// 引数         bytes: ヘッダ
+// 戻り値       CRC32/IEEE
+/////////////////////////////////////////////////////////////////////
+static inline uint32_t logBinaryHeaderCrc(const uint8_t *bytes)
+{
+    uint32_t crc = logBinaryCrcUpdate(UINT32_MAX, bytes, 40U);
+    return ~logBinaryCrcUpdate(crc, bytes + 44U, LOG_BINARY_HEADER_BYTES - 44U);
+}
+
+/////////////////////////////////////////////////////////////////////
 // モジュール名 logBinaryEncodeHeader
 // 処理概要     512 Bヘッダへ識別情報とCRCを格納する
 // 引数         bytes: 出力先, header: 保存情報
@@ -99,7 +115,10 @@ static inline void logBinaryEncodeHeader(uint8_t bytes[LOG_BINARY_HEADER_BYTES],
     const uint32_t values[] = {header->number, header->profile, header->recordBytes, header->rows,
         header->metadataBytes, header->dataCrc, header->metadataCrc, header->schema};
     for (unsigned i = 0; i < 8U; i++) logBinaryPut32(bytes + 8U + i * 4U, values[i]);
-    logBinaryPut32(bytes + 40, ~logBinaryCrcUpdate(UINT32_MAX, bytes, 40U));
+    logBinaryPut32(bytes + 44, header->schemaBytes);
+    logBinaryPut32(bytes + 48, header->columns);
+    logBinaryPut32(bytes + 52, header->derivedVersion);
+    logBinaryPut32(bytes + 40, logBinaryHeaderCrc(bytes));
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -111,7 +130,7 @@ static inline void logBinaryEncodeHeader(uint8_t bytes[LOG_BINARY_HEADER_BYTES],
 static inline bool logBinaryDecodeHeader(const uint8_t bytes[LOG_BINARY_HEADER_BYTES], uint64_t fileBytes, LogBinaryHeader *header)
 {
     if (memcmp(bytes, "RLOG", 4U) || logBinaryGet32(bytes + 4) != LOG_BINARY_VERSION ||
-        logBinaryGet32(bytes + 40) != ~logBinaryCrcUpdate(UINT32_MAX, bytes, 40U)) return false;
+        logBinaryGet32(bytes + 40) != logBinaryHeaderCrc(bytes)) return false;
     header->number = logBinaryGet32(bytes + 8);
     header->profile = logBinaryGet32(bytes + 12);
     header->recordBytes = logBinaryGet32(bytes + 16);
@@ -120,10 +139,17 @@ static inline bool logBinaryDecodeHeader(const uint8_t bytes[LOG_BINARY_HEADER_B
     header->dataCrc = logBinaryGet32(bytes + 28);
     header->metadataCrc = logBinaryGet32(bytes + 32);
     header->schema = logBinaryGet32(bytes + 36);
+    header->schemaBytes = logBinaryGet32(bytes + 44);
+    header->columns = logBinaryGet32(bytes + 48);
+    header->derivedVersion = logBinaryGet32(bytes + 52);
     return header->number > 0U && header->number <= INT16_MAX && header->profile <= 1U &&
-        header->recordBytes > 0U && header->recordBytes <= 512U && header->rows <= UINT16_MAX &&
+        header->recordBytes > 0U && header->recordBytes <= 2048U && header->rows <= UINT16_MAX &&
         header->metadataBytes > 0U && header->metadataBytes < 4096U &&
-        fileBytes == LOG_BINARY_HEADER_BYTES + (uint64_t)header->recordBytes * header->rows + header->metadataBytes;
+        header->schemaBytes > 0U && header->schemaBytes <= LOG_BINARY_SCHEMA_MAX_BYTES &&
+        header->columns > 0U && header->columns <= LOG_BINARY_MAX_COLUMNS &&
+        header->derivedVersion == LOG_BINARY_DERIVED_VERSION &&
+        fileBytes == LOG_BINARY_HEADER_BYTES + (uint64_t)header->recordBytes * header->rows +
+            header->schemaBytes + header->metadataBytes;
 }
 
 /////////////////////////////////////////////////////////////////////

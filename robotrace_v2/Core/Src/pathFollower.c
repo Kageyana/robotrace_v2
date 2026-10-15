@@ -140,6 +140,8 @@ static bool pathCacheMatches(const LogBinaryHeader *source, const ShortcutSettin
         routeCache.source.recordBytes == source->recordBytes && routeCache.source.rows == source->rows &&
         routeCache.source.metadataBytes == source->metadataBytes && routeCache.source.schema == source->schema &&
         routeCache.source.dataCrc == source->dataCrc && routeCache.source.metadataCrc == source->metadataCrc &&
+        routeCache.source.schemaBytes == source->schemaBytes && routeCache.source.columns == source->columns &&
+        routeCache.source.derivedVersion == source->derivedVersion &&
         old->maxLevel == settings->maxLevel && old->lookaheadBaseMm == settings->lookaheadBaseMm &&
         old->lookaheadPerMpsMm == settings->lookaheadPerMpsMm && old->kLateral_x100 == settings->kLateral_x100 &&
         old->kHeading_x100 == settings->kHeading_x100 && old->lineAlpha_x1000 == settings->lineAlpha_x1000 &&
