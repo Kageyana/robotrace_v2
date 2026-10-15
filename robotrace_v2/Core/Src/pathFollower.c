@@ -1,6 +1,7 @@
 #include "pathFollower.h"
 #include "logSource.h"
 #include "logPerformance.h"
+#include "autoRun.h"
 #include "pathPolicy.h"
 #include "PIDcontrol.h"
 #include "SDcard.h"
@@ -114,6 +115,37 @@ typedef struct
 #define driveRouteArcMm (runMemory.path.arcMm)
 #define routeFlags (runMemory.path.flags)
 #define routeCsvLine runAnalysisLine
+// キャッシュは共有RAM上の延長前基準経路だけ。走行メタデータは従来どおり別保持。
+static struct {
+    bool valid;
+    uint16_t baseCount;
+    uint32_t epoch;
+    LogBinaryHeader source;
+    ShortcutSettings settings;
+} routeCache;
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathCacheMatches
+// 処理概要     同一系列・検証済み元ログ・生成設定のキャッシュか確認する
+// 引数         source: 全件検証済み識別情報, settings: 生成設定
+// 戻り値       true: 再利用可能 false: 再生成が必要
+/////////////////////////////////////////////////////////////////////
+static bool pathCacheMatches(const LogBinaryHeader *source, const ShortcutSettings *settings)
+{
+    const ShortcutSettings *old = &routeCache.settings;
+    return routeCache.valid && autoRunState.seriesActive && runMemoryOwner == RUN_MEMORY_PATH &&
+        routeCache.epoch == autoRunSeriesGeneration() && routeCache.baseCount >= 2U &&
+        routeCache.baseCount <= PATH_ROUTE_MAX_POINTS &&
+        routeCache.source.number == source->number && routeCache.source.profile == source->profile &&
+        routeCache.source.recordBytes == source->recordBytes && routeCache.source.rows == source->rows &&
+        routeCache.source.metadataBytes == source->metadataBytes && routeCache.source.schema == source->schema &&
+        routeCache.source.dataCrc == source->dataCrc && routeCache.source.metadataCrc == source->metadataCrc &&
+        old->maxLevel == settings->maxLevel && old->lookaheadBaseMm == settings->lookaheadBaseMm &&
+        old->lookaheadPerMpsMm == settings->lookaheadPerMpsMm && old->kLateral_x100 == settings->kLateral_x100 &&
+        old->kHeading_x100 == settings->kHeading_x100 && old->lineAlpha_x1000 == settings->lineAlpha_x1000 &&
+        old->lineThetaGain_x1e9 == settings->lineThetaGain_x1e9;
+}
+
 static uint16_t routeCount = 0U;
 static int16_t routeSourceLog = 0;
 static uint8_t routeShortcutRequestedLevel = 0U;
@@ -920,8 +952,15 @@ static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel)
     if (logSourceOpenFor(&file, fileName, FA_OPEN_EXISTING | FA_READ, LOG_SOURCE_PATH) != FR_OK) goto failed;
     fileOpened = true;
     bool binary = logSourceBinaryInfo(&file, &source);
+    bool cached = binary && pathCacheMatches(&source, &generationSettings);
     if (!pathReadColumnHeader(&file, &columns)) { resultCode = -10; goto failed; }
-    {
+    if (cached) {
+        routeCount = routeCache.baseCount;
+        memset(lineRoute + routeCount, 0, sizeof(RoutePoint) * (PATH_ROUTE_MAX_POINTS - routeCount));
+        memset(driveRoute, 0, sizeof(driveRoute));
+        memset(routeFlags, 0, sizeof(routeFlags));
+        LOG_PERF_ADD(cacheHits, 1U);
+    } else {
         if (!runMemoryPrepare(RUN_MEMORY_PATH)) { resultCode = -9; goto failed; }
         memset(lineRoute, 0, sizeof(lineRoute));
         memset(driveRoute, 0, sizeof(driveRoute));
@@ -958,6 +997,11 @@ static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel)
     FRESULT closed = logSourceClose(&file);
     fileOpened = false;
     if (closed != FR_OK) { resultCode = -13; goto failed; }
+    routeCache.valid = binary && autoRunState.seriesActive;
+    routeCache.source = source;
+    routeCache.settings = generationSettings;
+    routeCache.epoch = autoRunSeriesGeneration();
+    routeCache.baseCount = routeCount;
 	pathComputeHeadings(lineRoute, routeCount);
 	pathBuildSpeedProfile(lineRoute, routeCount, 0U);
 	memcpy(driveRoute, lineRoute, sizeof(RoutePoint) * routeCount);
@@ -1113,6 +1157,7 @@ static bool pathFindLineMatch(float sensorX_mm, float sensorY_mm, uint16_t neare
 /////////////////////////////////////////////////////////////////////
 void pathFollowerInvalidateRoute(void)
 {
+    routeCache.valid = false;
 	routeCount = 0U;
 	routeSourceLog = 0;
 	pathGoalValid = false;

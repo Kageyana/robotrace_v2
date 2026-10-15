@@ -276,6 +276,7 @@ uint32_t goalTime = 0;
 ///////////////////////////////////////////////////////////////////////////
 void initSystem(void)
 {
+	pathFollowerInvalidateRoute();
 	HAL_StatusTypeDef resultHAL[12] = {};
 	bool statusGPIO = true;
 	int16_t cntFiles = 0;
