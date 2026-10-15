@@ -49,11 +49,64 @@ _Static_assert(LOG_RECORD_SIZE_BYTES <= LOG_BUFFER_SIZE_BYTES, "log record must 
 enum { LOG_READ_RECORD_BYTES = LOG_RECORD_SIZE_BYTES > 220U ? LOG_RECORD_SIZE_BYTES : 220U };
 _Static_assert(LOG_READ_RECORD_BYTES >= 220U, "read buffers must fit historical candidate records");
 static LogBufferWriter logBufferWriter;
+static _Alignas(LOG_BUFFER_SECTOR_SIZE_BYTES) union {
+    uint8_t logging[LOG_BUFFER_COUNT][LOG_BUFFER_SIZE_BYTES];
+    struct { uint8_t input[4096]; uint8_t output[2048]; } stopped;
+} logIoMemory;
+#define logBuffers (logIoMemory.logging)
+_Static_assert(sizeof(logIoMemory) == 6144U, "shared log I/O memory must remain 6 KiB");
 #if ROBOTRACE_LOG_PERFORMANCE
 volatile LogPerformanceStats logPerformanceStats;
 #endif
-static _Alignas(LOG_BUFFER_SECTOR_SIZE_BYTES)
-	uint8_t logBuffers[LOG_BUFFER_COUNT][LOG_BUFFER_SIZE_BYTES];
+
+static struct { FIL *file; FSIZE_t end, physical; UINT position, length; } logReadAhead;
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logReadAheadReset
+// 処理概要     seek・再open・closeで先読み状態を破棄する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void logReadAheadReset(void)
+{
+    memset(&logReadAhead, 0, sizeof(logReadAhead));
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logReadBuffered
+// 処理概要     記録部終端を超えず4KiB先読みから指定長を復元する
+// 引数         file: 入力, bytes: 出力, length: 復元長[B], end: 記録部終端[B]
+// 戻り値       FatFs結果（短い読込もエラー）
+/////////////////////////////////////////////////////////////////////
+static FRESULT logReadBuffered(FIL *file, uint8_t *bytes, UINT length, FSIZE_t end)
+{
+    if (logReadAhead.file != file || logReadAhead.end != end || logReadAhead.physical != f_tell(file)) {
+        logReadAheadReset();
+        logReadAhead.file = file; logReadAhead.end = end; logReadAhead.physical = f_tell(file);
+    }
+    while (length != 0U) {
+        if (logReadAhead.position == logReadAhead.length) {
+            FSIZE_t offset = f_tell(file);
+            if (offset >= end) { logReadAheadReset(); return FR_DISK_ERR; }
+            UINT request = end - offset > sizeof(logIoMemory.stopped.input) ?
+                (UINT)sizeof(logIoMemory.stopped.input) : (UINT)(end - offset);
+            UINT received = 0U;
+            LOG_PERF_BEGIN(tick);
+            FRESULT result = f_read(file, logIoMemory.stopped.input, request, &received);
+            LOG_PERF_END(readMs, tick); LOG_PERF_ADD(readCalls, 1U); LOG_PERF_ADD(readBytes, received);
+            if (result != FR_OK || received != request) {
+                logReadAheadReset(); return result == FR_OK ? FR_DISK_ERR : result;
+            }
+            logReadAhead.position = 0U; logReadAhead.length = received; logReadAhead.physical = f_tell(file);
+        }
+        UINT count = logReadAhead.length - logReadAhead.position;
+        if (count > length) count = length;
+        memcpy(bytes, logIoMemory.stopped.input + logReadAhead.position, count);
+        logReadAhead.position += count; bytes += count; length -= count;
+    }
+    return FR_OK;
+}
+
 static float cross_start_mm[CROSSSEG_MAX];
 static float cross_end_mm[CROSSSEG_MAX];
 uint16_t cntSend = 0;
@@ -925,7 +978,6 @@ static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t recordB
 	uint8_t log[LOG_READ_RECORD_BYTES];
 	LogRecord rec;
 	FRESULT fresult;
-	UINT readByte;
 	uint16_t j, time, beforeTime = 0, cross_count = 0;
 	int16_t speed, beforeSpeed = 0;
 	float dt, dist_mm = 0.0F, goalMarkerX = 0.0F;
@@ -933,7 +985,9 @@ static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t recordB
 	int32_t goalMarkerPulse = 0, previousTotalPulse = 0;
 	int64_t correctedPulseTotal = 0;
 	uint32_t crc = UINT32_MAX;
+	logReadAheadReset();
 	if (f_lseek(file, LOG_BINARY_HEADER_BYTES) != FR_OK) return false;
+	LOG_PERF_BEGIN(scanTick); LOG_PERF_ADD(fullScans, 1U);
 	// クロスライン前後100mm直線化のため、2パスで補正する
 	// pass1: 距離基準でクロスライン区間を抽出
 	beforeTime = 0;
@@ -947,8 +1001,8 @@ static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t recordB
 	if (live) primaryRouteValidation.goalMarkerOnset_p = goalMarkerPulse;
 	for (j = 0; j < rows; j++)
 	{
-		fresult = f_read(file, log, recordBytes, &readByte);
-		if (fresult != FR_OK || readByte != recordBytes)
+		fresult = logReadBuffered(file, log, recordBytes, LOG_BINARY_HEADER_BYTES + (FSIZE_t)rows * recordBytes);
+		if (fresult != FR_OK)
 		{
 			printf("f_read error in endLog\r\n");
 			return false;
@@ -976,7 +1030,7 @@ static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t recordB
 		beforeSpeed = speed;
 		dt = (float)(time - beforeTime) / 1000.0f;
 		float previousX = xycie.x;
-		if (correctedPulse >= 0 && correctedPulse <= INT16_MAX)
+		if (live && correctedPulse >= 0 && correctedPulse <= INT16_MAX)
 		{
 			calcXYcie(totalPulse, rec.imuAngle_Z);
 		}
@@ -1021,6 +1075,7 @@ static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t recordB
 
 	sourceCrossCount = cross_count;
 	*dataCrc = ~crc;
+	LOG_PERF_END(scanMs, scanTick);
 	if (!live) return true;
 	primaryRouteValidation.goalMarkerX_mm = goalMarkerX;
 	if (optimalTrace == BOOST_NONE)
@@ -1103,6 +1158,8 @@ bool endLog(void)
 		return false;
 	}
 
+	// キュー排出後から確定完了までは、停止中I/Oと共有バッファを占有する。
+	if (!sd_fatfs_lock(500U)) return false;
 	uint32_t finalWriteLength = logBufferWriterPrepareFinalWrite(&logBufferWriter);
 	if (finalWriteLength > 0U)
 	{
@@ -1115,6 +1172,7 @@ bool endLog(void)
 				(unsigned long)writtenlog, (unsigned long)finalWriteLength);
 			f_close(&fil_W);
 			logTempOpen = false;
+			sd_fatfs_unlock();
 			return false;
 		}
 	}
@@ -1150,6 +1208,7 @@ finish:
 		logRecoveryReady = true;
 		cntSend = 0;
 	}
+	sd_fatfs_unlock();
 	return success;
 }
 
@@ -1158,6 +1217,7 @@ finish:
 static struct {
     FIL *file;
     LogBinaryHeader header;
+    LogSourcePurpose purpose;
     LogRecord record;
     uint32_t row, crc;
     uint16_t previousTime;
@@ -1294,8 +1354,35 @@ bool logSourceIsBinary(FIL *file) { return binarySource.file == file; }
 /////////////////////////////////////////////////////////////////////
 FRESULT logSourceOpen(FIL *file, const char *csvName, BYTE mode)
 {
+    return logSourceOpenFor(file, csvName, mode, LOG_SOURCE_FULL);
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logSourceBinaryInfo
+// 処理概要     全件検証済みのバイナリ識別情報を取得する
+// 引数         file: 入力ファイル, header: 識別情報の出力先
+// 戻り値       true: 有効なバイナリ false: CSVまたは無効
+/////////////////////////////////////////////////////////////////////
+bool logSourceBinaryInfo(FIL *file, LogBinaryHeader *header)
+{
+    if (!logSourceIsBinary(file) || binarySource.error != FR_OK || header == NULL) return false;
+    *header = binarySource.header;
+    return true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logSourceOpenFor
+// 処理概要     全件検証後に用途を設定してバイナリ優先で開く
+// 引数         file: 入力, csvName: ログ名, mode: 読込モード, purpose: 読込用途
+// 戻り値       FatFs結果
+/////////////////////////////////////////////////////////////////////
+FRESULT logSourceOpenFor(FIL *file, const char *csvName, BYTE mode, LogSourcePurpose purpose)
+{
     uint16_t number;
-    if (binarySource.file != NULL) return FR_LOCKED;
+    if (binarySource.file != NULL || modeLOG || logTempOpen ||
+        logBufferWriter.flushPending || logBufferWriter.pendingPending) return FR_LOCKED;
+    if (purpose < LOG_SOURCE_FULL || purpose > LOG_SOURCE_PATH) return FR_INVALID_PARAMETER;
+    logReadAheadReset();
     if (!logBinaryParseName(csvName, "csv", &number)) return FR_INVALID_NAME;
     char name[20];
     logBinaryName(name, sizeof(name), number, "bin");
@@ -1317,6 +1404,8 @@ FRESULT logSourceOpen(FIL *file, const char *csvName, BYTE mode)
     memset(&binarySource, 0, sizeof(binarySource));
     binarySource.file = file;
     binarySource.header = header;
+    binarySource.purpose = purpose;
+    logReadAheadReset();
     binarySource.crc = UINT32_MAX;
     clearXYcie();
     return FR_OK;
@@ -1334,6 +1423,7 @@ invalid:
 FRESULT logSourceClose(FIL *file)
 {
     if (binarySource.file == file) binarySource.file = NULL;
+    logReadAheadReset();
     return f_close(file);
 }
 
@@ -1353,9 +1443,11 @@ static void logProcessRecord(void)
     }
     float dt = (float)(rec->cntlog - binarySource.previousTime) / 1000.0F;
     binarySource.roc = calcROC(speed, rec->gyroVal_Z, dt);
-    calcXYcie((int32_t)rec->encTotalOptimal, rec->imuAngle_Z);
-    binarySource.x = xycie.x;
-    binarySource.y = xycie.y;
+    if (binarySource.purpose == LOG_SOURCE_FULL || binarySource.purpose == LOG_SOURCE_PATH) {
+        calcXYcie((int32_t)rec->encTotalOptimal, rec->imuAngle_Z);
+        binarySource.x = xycie.x;
+        binarySource.y = xycie.y;
+    }
     binarySource.distanceMm += calcDlMm(speed, dt);
     binarySource.previousSpeed = speed;
     binarySource.previousTime = rec->cntlog;
@@ -1398,16 +1490,19 @@ char *logSourceGets(char *line, int capacity, FIL *file)
         return NULL;
     }
     uint8_t bytes[LOG_READ_RECORD_BYTES];
-    UINT read;
-    FRESULT result = f_read(file, bytes, binarySource.header.recordBytes, &read);
-    if (result != FR_OK || read != binarySource.header.recordBytes) {
+    if (binarySource.row == 0U) { LOG_PERF_ADD(fullScans, 1U); }
+    FRESULT result = logReadBuffered(file, bytes, binarySource.header.recordBytes,
+        LOG_BINARY_HEADER_BYTES + (FSIZE_t)binarySource.header.rows * binarySource.header.recordBytes);
+    if (result != FR_OK) {
         binarySource.error = result == FR_OK ? FR_DISK_ERR : result;
         return NULL;
     }
     binarySource.crc = logBinaryCrcUpdate(binarySource.crc, bytes, binarySource.header.recordBytes);
     logaddress = bytes;
     logReadRecord(&binarySource.record, logSchemaFormat(&binarySource.header), binarySource.header.profile);
+    LOG_PERF_BEGIN(processTick);
     logProcessRecord();
+    LOG_PERF_END(processMs, processTick);
     binarySource.row++;
     binarySource.rowReady = true;
     line[0] = '\n'; line[1] = '\0';
@@ -1648,6 +1743,7 @@ static bool logPendingInventory(uint16_t after, uint16_t *next, uint32_t *nextRo
 /////////////////////////////////////////////////////////////////////
 bool logConvertPending(LogProgressCallback progress)
 {
+    LOG_PERF_BEGIN(conversionTick);
     if (modeLOG || logTempOpen || !sd_fatfs_lock(500U)) { logRecoveryReady = false; return false; }
     bool success = true;
     sd_set_analysis_active(true);
@@ -1678,6 +1774,7 @@ bool logConvertPending(LogProgressCallback progress)
     sd_set_analysis_active(false);
     sd_fatfs_unlock();
     logRecoveryReady = success;
+    LOG_PERF_END(conversionMs, conversionTick);
     return success;
 }
 
