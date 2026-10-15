@@ -46,6 +46,7 @@ elseif(ROBOTRACE_SLIP_DETECTOR STREQUAL "LEGACY")
 else()
     message(FATAL_ERROR "ROBOTRACE_SLIP_DETECTOR must be LEGACY or SHADOW")
 endif()
+option(ROBOTRACE_LOG_PERFORMANCE "Collect stopped log conversion/analysis statistics" OFF)
 option(ROBOTRACE_ISR_TIMING "Collect running TIM6 cycle statistics for validation" OFF)
 
 execute_process(
@@ -126,6 +127,7 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     ROBOTRACE_SLIP_DETECTOR=${SLIP_DETECTOR_VALUE}
     LOG_SCHEMA_PROFILE_LIGHT=${ROBOTRACE_LOG_SCHEMA_PROFILE_LIGHT}
     ROBOTRACE_ISR_TIMING=$<BOOL:${ROBOTRACE_ISR_TIMING}>
+    ROBOTRACE_LOG_PERFORMANCE=$<BOOL:${ROBOTRACE_LOG_PERFORMANCE}>
 )
 
 # Remove wrong libob.a library dependency when using cpp files

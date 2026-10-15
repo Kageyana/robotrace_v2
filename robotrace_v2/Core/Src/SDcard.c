@@ -14,6 +14,7 @@
 #include "IMU.h"
 #include "lineSensor.h"
 #include "logBufferWriter.h"
+#include "logPerformance.h"
 #include "markerSensor.h"
 #include "sd_functions.h"
 #include "stdio.h"
@@ -48,6 +49,9 @@ _Static_assert(LOG_RECORD_SIZE_BYTES <= LOG_BUFFER_SIZE_BYTES, "log record must 
 enum { LOG_READ_RECORD_BYTES = LOG_RECORD_SIZE_BYTES > 220U ? LOG_RECORD_SIZE_BYTES : 220U };
 _Static_assert(LOG_READ_RECORD_BYTES >= 220U, "read buffers must fit historical candidate records");
 static LogBufferWriter logBufferWriter;
+#if ROBOTRACE_LOG_PERFORMANCE
+volatile LogPerformanceStats logPerformanceStats;
+#endif
 static _Alignas(LOG_BUFFER_SECTOR_SIZE_BYTES)
 	uint8_t logBuffers[LOG_BUFFER_COUNT][LOG_BUFFER_SIZE_BYTES];
 static float cross_start_mm[CROSSSEG_MAX];
