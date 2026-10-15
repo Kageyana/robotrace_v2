@@ -5,9 +5,6 @@
 #include "logSource.h"
 #include "autoRun.h"
 #include "logBinary.h"
-#include "log_schema_legacy.h"
-#include "log_schema_shadow_v2.h"
-#include "log_schema_candidate_v1.h"
 #include "courseLogCsv.h"
 #include "courseAnalysis.h"
 #include "firmware_version.h"
@@ -46,8 +43,18 @@ char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE] = "", formatLog[LOG_FORMAT_BUFFER
 _Static_assert(BUFFER_SIZE_LOG == LOG_BUFFER_SIZE_BYTES, "log buffer size mismatch");
 _Static_assert((BUFFER_SIZE_LOG % LOG_BUFFER_SECTOR_SIZE_BYTES) == 0U, "log buffer must be sector aligned");
 _Static_assert(LOG_RECORD_SIZE_BYTES <= LOG_BUFFER_SIZE_BYTES, "log record must fit in one log buffer");
-enum { LOG_READ_RECORD_BYTES = LOG_RECORD_SIZE_BYTES > 220U ? LOG_RECORD_SIZE_BYTES : 220U };
-_Static_assert(LOG_READ_RECORD_BYTES >= 220U, "read buffers must fit historical candidate records");
+enum { LOG_READ_RECORD_BYTES = LOG_RECORD_SIZE_BYTES };
+// 列定義はFlashへ一度だけ生成し、停止時に記録部とメタデータの間へ保存する。
+#define LOG_SCHEMA_STORED(type, name, fmt, expr) "S," #type "," #name "," fmt "\n"
+#define LOG_SCHEMA_DERIVED(type, name, fmt, expr) "D," #type "," #name "," fmt "\n"
+static const char logSchemaText[] = LOG_FIELD_LIST(LOG_SCHEMA_STORED, LOG_SCHEMA_DERIVED);
+#undef LOG_SCHEMA_STORED
+#undef LOG_SCHEMA_DERIVED
+#define LOG_COLUMN_ADD(type, name, fmt, expr) + 1U
+enum { LOG_BINARY_COLUMNS = 0 LOG_FIELD_LIST(LOG_COLUMN_ADD, LOG_COLUMN_ADD) };
+#undef LOG_COLUMN_ADD
+_Static_assert(sizeof(logSchemaText) - 1U <= LOG_BINARY_SCHEMA_MAX_BYTES, "schema description too large");
+_Static_assert(LOG_BINARY_COLUMNS <= LOG_BINARY_MAX_COLUMNS, "too many log columns");
 static LogBufferWriter logBufferWriter;
 static _Alignas(LOG_BUFFER_SECTOR_SIZE_BYTES) union {
     uint8_t logging[LOG_BUFFER_COUNT][LOG_BUFFER_SIZE_BYTES];
@@ -205,11 +212,7 @@ typedef struct
 {
 #define LOG_STRUCT_FIELD(type, name, fmt, expr) LOG_CTYPE_##type name;
 #define LOG_STRUCT_SKIP(type, name, fmt, expr)
-	LOG_FIELD_LIST_CORE(LOG_STRUCT_FIELD, LOG_STRUCT_SKIP)
-	LOG_FIELD_LIST_DEBUG(LOG_STRUCT_FIELD, LOG_STRUCT_SKIP)
-	LOG_FIELD_LIST_IMU(LOG_STRUCT_FIELD, LOG_STRUCT_SKIP)
-	LOG_FIELD_LIST_SHADOW(LOG_STRUCT_FIELD, LOG_STRUCT_SKIP)
-	LOG_FIELD_LIST_LAT_CANDIDATE(LOG_STRUCT_FIELD, LOG_STRUCT_SKIP)
+	LOG_FIELD_LIST(LOG_STRUCT_FIELD, LOG_STRUCT_SKIP)
 #undef LOG_STRUCT_FIELD
 #undef LOG_STRUCT_SKIP
 } LogRecord;
@@ -226,10 +229,6 @@ static float logReadF32(void);
 static void logReadRecord(LogRecord *rec, uint8_t schemaFormat, uint32_t profile);
 static void logBuildColumns(uint8_t schemaFormat, uint32_t profile);
 static uint32_t logBinarySchema(void);
-static uint32_t logLegacySchema(uint32_t profile);
-static uint32_t logShadowV2Schema(uint32_t profile);
-static uint32_t logCandidateV1Schema(uint32_t profile);
-static uint8_t logSchemaFormat(const LogBinaryHeader *header);
 static void logConversionNotify(LogConversionStage stage, uint32_t rows);
 static bool readSavedLogNumber(int16_t *outNumber);
 static void writeSavedLogNumber(int16_t fileNumber);
@@ -1010,7 +1009,7 @@ void endTempFile(void)
 // モジュール名 logScanRecords
 // 処理概要     記録のCRCとクロス区間を取得し、保存時は一次経路も検証する
 // 引数         file: 入力, rows: 行数, live: 終了検証, recordBytes: 記録長[B]
-//              schemaFormat: 0=現行/1=旧形式/2=初回SHADOW/3=横補正候補, profile: 通常/詳細, dataCrc: CRC出力
+//              schemaFormat: 現行定義（0）, profile: 通常/詳細, dataCrc: CRC出力
 // 戻り値       true: 読込成功 false: 読込失敗
 /////////////////////////////////////////////////////////////////////
 static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t recordBytes, uint8_t schemaFormat, uint32_t profile, uint32_t *dataCrc)
@@ -1219,7 +1218,8 @@ bool endLog(void)
 
 	bool success = false;
 	LogBinaryHeader header = {logFileNumber, LOG_SCHEMA_PROFILE_LIGHT, LOG_RECORD_SIZE_BYTES,
-		cntSend, 0U, 0U, 0U, logBinarySchema()};
+		cntSend, 0U, 0U, 0U, logBinarySchema(), sizeof(logSchemaText) - 1U,
+        LOG_BINARY_COLUMNS, LOG_BINARY_DERIVED_VERSION};
 	FSIZE_t dataEnd = LOG_BINARY_HEADER_BYTES + (FSIZE_t)cntSend * LOG_SIZE;
 	if (f_lseek(&fil_W, dataEnd) != FR_OK || f_truncate(&fil_W) != FR_OK ||
 		f_sync(&fil_W) != FR_OK || !logScanRecords(&fil_W, cntSend, true, LOG_SIZE, false, LOG_SCHEMA_PROFILE_LIGHT, &savedDataCrc)) goto finish;
@@ -1228,6 +1228,7 @@ bool endLog(void)
 	header.dataCrc = savedDataCrc;
 	header.metadataCrc = ~logBinaryCrcUpdate(UINT32_MAX, (const uint8_t *)columnTitle, header.metadataBytes);
 	if (f_lseek(&fil_W, dataEnd) != FR_OK ||
+        f_write(&fil_W, logSchemaText, header.schemaBytes, &writtenlog) != FR_OK || writtenlog != header.schemaBytes ||
 		f_write(&fil_W, columnTitle, header.metadataBytes, &writtenlog) != FR_OK || writtenlog != header.metadataBytes) goto finish;
 	logBinaryEncodeHeader(logBuffers[0], &header);
 	if (f_lseek(&fil_W, 0U) != FR_OK ||
@@ -1276,71 +1277,7 @@ static struct {
 /////////////////////////////////////////////////////////////////////
 static uint32_t logBinarySchema(void)
 {
-    static const char schema[] = "derived-v1;"
-#define LOG_SCHEMA_TEXT(type, name, fmt, expr) #type ":" #name ";"
-        LOG_FIELD_LIST(LOG_SCHEMA_TEXT, LOG_SCHEMA_TEXT);
-#undef LOG_SCHEMA_TEXT
-    return ~logBinaryCrcUpdate(UINT32_MAX, (const uint8_t *)schema, sizeof(schema) - 1U);
-}
-
-/////////////////////////////////////////////////////////////////////
-// モジュール名 logLegacySchema
-// 処理概要     改修前の固定列定義から旧形式の識別CRCを取得する
-// 引数         なし
-// 戻り値       旧スキーマ識別CRC
-/////////////////////////////////////////////////////////////////////
-static uint32_t logLegacySchema(uint32_t profile)
-{
-#define LOG_SCHEMA_TEXT(type, name, fmt, expr) #type ":" #name ";"
-    static const char light[] = "derived-v1;" LOG_LEGACY_FIELD_LIST_LIGHT(LOG_SCHEMA_TEXT, LOG_SCHEMA_TEXT);
-    static const char debug[] = "derived-v1;" LOG_LEGACY_FIELD_LIST_DEBUG_PROFILE(LOG_SCHEMA_TEXT, LOG_SCHEMA_TEXT);
-#undef LOG_SCHEMA_TEXT
-    const char *schema = profile ? light : debug;
-    return ~logBinaryCrcUpdate(UINT32_MAX, (const uint8_t *)schema, strlen(schema));
-}
-
-/////////////////////////////////////////////////////////////////////
-// モジュール名 logShadowV2Schema
-// 処理概要     初回SHADOWの固定列から157/194B形式の識別CRCを取得する
-// 引数         profile: 1=通常/0=詳細
-// 戻り値       スキーマ識別CRC
-/////////////////////////////////////////////////////////////////////
-static uint32_t logShadowV2Schema(uint32_t profile)
-{
-#define LOG_SCHEMA_TEXT(type, name, fmt, expr) #type ":" #name ";"
-    static const char light[] = "derived-v1;" LOG_V2_FIELD_LIST_LIGHT(LOG_SCHEMA_TEXT, LOG_SCHEMA_TEXT);
-    static const char debug[] = "derived-v1;" LOG_V2_FIELD_LIST_DEBUG_PROFILE(LOG_SCHEMA_TEXT, LOG_SCHEMA_TEXT);
-#undef LOG_SCHEMA_TEXT
-    const char *schema = profile ? light : debug;
-    return ~logBinaryCrcUpdate(UINT32_MAX, (const uint8_t *)schema, strlen(schema));
-}
-/////////////////////////////////////////////////////////////////////
-// モジュール名 logCandidateV1Schema
-// 処理概要     横補正候補付きの固定列から183/220 B形式の識別CRCを取得する
-// 引数         profile: 1=通常/0=詳細
-// 戻り値       スキーマ識別CRC
-/////////////////////////////////////////////////////////////////////
-static uint32_t logCandidateV1Schema(uint32_t profile)
-{
-#define LOG_SCHEMA_TEXT(type, name, fmt, expr) #type ":" #name ";"
-    static const char light[] = "derived-v1;" LOG_CANDIDATE_V1_FIELD_LIST_LIGHT(LOG_SCHEMA_TEXT, LOG_SCHEMA_TEXT);
-    static const char debug[] = "derived-v1;" LOG_CANDIDATE_V1_FIELD_LIST_DEBUG_PROFILE(LOG_SCHEMA_TEXT, LOG_SCHEMA_TEXT);
-#undef LOG_SCHEMA_TEXT
-    const char *schema = profile ? light : debug;
-    return ~logBinaryCrcUpdate(UINT32_MAX, (const uint8_t *)schema, strlen(schema));
-}
-/////////////////////////////////////////////////////////////////////
-// モジュール名 logSchemaFormat
-// 処理概要     検証済みヘッダの固定列定義を選択する
-// 引数         header: スキーマと長さを検証済みのヘッダ
-// 戻り値       0=現行/1=旧形式/2=初回SHADOW/3=横補正候補
-/////////////////////////////////////////////////////////////////////
-static uint8_t logSchemaFormat(const LogBinaryHeader *header)
-{
-    if (header->schema == logLegacySchema(header->profile)) return 1U;
-    if (header->schema == logShadowV2Schema(header->profile)) return 2U;
-    if (header->schema == logCandidateV1Schema(header->profile)) return 3U;
-    return 0U;
+    return ~logBinaryCrcUpdate(UINT32_MAX, (const uint8_t *)logSchemaText, sizeof(logSchemaText) - 1U);
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -1369,13 +1306,17 @@ static void logConversionNotify(LogConversionStage stage, uint32_t rows)
 static bool logReadContainerHeader(FIL *file, uint16_t number, LogBinaryHeader *header)
 {
     UINT read = 0U;
-    return f_read(file, logBuffers[0], LOG_BINARY_HEADER_BYTES, &read) == FR_OK &&
-        read == LOG_BINARY_HEADER_BYTES && logBinaryDecodeHeader(logBuffers[0], f_size(file), header) &&
-        header->number == number &&
-        ((header->profile == LOG_SCHEMA_PROFILE_LIGHT && header->recordBytes == LOG_SIZE && header->schema == logBinarySchema()) ||
-         (header->recordBytes == (header->profile ? 108U : 145U) && header->schema == logLegacySchema(header->profile)) ||
-         (header->recordBytes == (header->profile ? 157U : 194U) && header->schema == logShadowV2Schema(header->profile)) ||
-         (header->recordBytes == (header->profile ? 183U : 220U) && header->schema == logCandidateV1Schema(header->profile)));
+    if (f_read(file, logBuffers[0], LOG_BINARY_HEADER_BYTES, &read) != FR_OK ||
+        read != LOG_BINARY_HEADER_BYTES || !logBinaryDecodeHeader(logBuffers[0], f_size(file), header) ||
+        header->number != number || header->profile != LOG_SCHEMA_PROFILE_LIGHT ||
+        header->recordBytes != LOG_SIZE || header->schema != logBinarySchema() ||
+        header->schemaBytes != sizeof(logSchemaText) - 1U || header->columns != LOG_BINARY_COLUMNS) return false;
+    // 機体の計画解析は現在のビルドと同じ列定義を要求する。PCは列定義から汎用復元する。
+    logReadAheadReset();
+    if (f_lseek(file, LOG_BINARY_HEADER_BYTES + (FSIZE_t)header->rows * header->recordBytes) != FR_OK ||
+        f_read(file, logIoMemory.stopped.input, header->schemaBytes, &read) != FR_OK ||
+        read != header->schemaBytes || memcmp(logIoMemory.stopped.input, logSchemaText, header->schemaBytes)) return false;
+    return true;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -1433,13 +1374,13 @@ FRESULT logSourceOpenFor(FIL *file, const char *csvName, BYTE mode, LogSourcePur
     UINT read;
     uint32_t crc;
     if (!logReadContainerHeader(file, number, &header) ||
-        f_lseek(file, LOG_BINARY_HEADER_BYTES + (FSIZE_t)header.rows * header.recordBytes) != FR_OK ||
+        f_lseek(file, LOG_BINARY_HEADER_BYTES + (FSIZE_t)header.rows * header.recordBytes + header.schemaBytes) != FR_OK ||
         f_read(file, columnTitle, header.metadataBytes, &read) != FR_OK || read != header.metadataBytes) goto invalid;
     columnTitle[header.metadataBytes] = '\0';
     if (columnTitle[header.metadataBytes - 1U] != '\n' ||
         memchr(columnTitle, '\0', header.metadataBytes) != NULL ||
         ~logBinaryCrcUpdate(UINT32_MAX, (const uint8_t *)columnTitle, header.metadataBytes) != header.metadataCrc ||
-        !logScanRecords(file, (uint16_t)header.rows, false, header.recordBytes, logSchemaFormat(&header), header.profile, &crc) || crc != header.dataCrc ||
+        !logScanRecords(file, (uint16_t)header.rows, false, header.recordBytes, 0U, header.profile, &crc) || crc != header.dataCrc ||
         f_lseek(file, LOG_BINARY_HEADER_BYTES) != FR_OK) goto invalid;
     memset(&binarySource, 0, sizeof(binarySource));
     binarySource.file = file;
@@ -1515,7 +1456,7 @@ char *logSourceGets(char *line, int capacity, FIL *file)
     if (binarySource.headerStage < 2U) {
         if (binarySource.headerStage == 1U) {
             columnTitle[0] = formatLog[0] = '\0';
-            logBuildColumns(logSchemaFormat(&binarySource.header), binarySource.header.profile);
+            logBuildColumns(0U, binarySource.header.profile);
             strncat(columnTitle, "\n", sizeof(columnTitle) - strlen(columnTitle) - 1U);
             strncat(formatLog, "\n", sizeof(formatLog) - strlen(formatLog) - 1U);
         }
@@ -1539,7 +1480,7 @@ char *logSourceGets(char *line, int capacity, FIL *file)
     }
     binarySource.crc = logBinaryCrcUpdate(binarySource.crc, bytes, binarySource.header.recordBytes);
     logaddress = bytes;
-    logReadRecord(&binarySource.record, logSchemaFormat(&binarySource.header), binarySource.header.profile);
+    logReadRecord(&binarySource.record, 0U, binarySource.header.profile);
     LOG_PERF_BEGIN(processTick);
     logProcessRecord();
     LOG_PERF_END(processMs, processTick);
@@ -1631,27 +1572,7 @@ static bool logFormatSourceRow(char *line, size_t capacity)
 #define LOG_FORMAT_VALUE_F32(value) (value)
 #define LOG_CSV_ARG_STORED(type, name, fmt, expr) , LOG_FORMAT_VALUE_##type(rec.name)
 #define LOG_CSV_ARG_DERIVED(type, name, fmt, expr) , LOG_FORMAT_VALUE_##type(expr)
-    int length;
-    if (binarySource.header.schema == logLegacySchema(binarySource.header.profile)) {
-        if (binarySource.header.profile)
-            length = snprintf(line, capacity, formatLog LOG_LEGACY_FIELD_LIST_LIGHT(LOG_CSV_ARG_STORED, LOG_CSV_ARG_DERIVED));
-        else
-            length = snprintf(line, capacity, formatLog LOG_LEGACY_FIELD_LIST_DEBUG_PROFILE(LOG_CSV_ARG_STORED, LOG_CSV_ARG_DERIVED));
-    }
-    else if (logSchemaFormat(&binarySource.header) == 2U) {
-        if (binarySource.header.profile)
-            length = snprintf(line, capacity, formatLog LOG_V2_FIELD_LIST_LIGHT(LOG_CSV_ARG_STORED, LOG_CSV_ARG_DERIVED));
-        else
-            length = snprintf(line, capacity, formatLog LOG_V2_FIELD_LIST_DEBUG_PROFILE(LOG_CSV_ARG_STORED, LOG_CSV_ARG_DERIVED));
-    }
-    else if (logSchemaFormat(&binarySource.header) == 3U) {
-        if (binarySource.header.profile)
-            length = snprintf(line, capacity, formatLog LOG_CANDIDATE_V1_FIELD_LIST_LIGHT(LOG_CSV_ARG_STORED, LOG_CSV_ARG_DERIVED));
-        else
-            length = snprintf(line, capacity, formatLog LOG_CANDIDATE_V1_FIELD_LIST_DEBUG_PROFILE(LOG_CSV_ARG_STORED, LOG_CSV_ARG_DERIVED));
-    }
-    else
-        length = snprintf(line, capacity, formatLog LOG_FIELD_LIST(LOG_CSV_ARG_STORED, LOG_CSV_ARG_DERIVED));
+    int length = snprintf(line, capacity, formatLog LOG_FIELD_LIST(LOG_CSV_ARG_STORED, LOG_CSV_ARG_DERIVED));
 #undef LOG_CSV_ARG_STORED
 #undef LOG_CSV_ARG_DERIVED
 #undef LOG_FORMAT_VALUE_U8
@@ -2180,7 +2101,7 @@ static float logReadF32(void)
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logReadRecord
 // 処理概要     LOG_FIELD_LISTの順で1レコードを復元する
-// 引数         rec: 復元先, schemaFormat: 0=現行/1=旧形式/2=初回SHADOW/3=横補正候補, profile: 1=通常/0=詳細
+// 引数         rec: 復元先, schemaFormat: 現行定義（0）, profile: 1=通常/0=詳細
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 static void logReadRecord(LogRecord *rec, uint8_t schemaFormat, uint32_t profile)
@@ -2188,41 +2109,21 @@ static void logReadRecord(LogRecord *rec, uint8_t schemaFormat, uint32_t profile
     memset(rec, 0, sizeof(*rec));
 #define LOG_READ_FIELD(type, name, fmt, expr) rec->name = logRead##type();
 #define LOG_READ_SKIP(type, name, fmt, expr)
-	if (schemaFormat == 1U) {
-		if (profile) { LOG_LEGACY_FIELD_LIST_LIGHT(LOG_READ_FIELD, LOG_READ_SKIP) }
-		else { LOG_LEGACY_FIELD_LIST_DEBUG_PROFILE(LOG_READ_FIELD, LOG_READ_SKIP) }
-	} else if (schemaFormat == 2U) {
-		if (profile) { LOG_V2_FIELD_LIST_LIGHT(LOG_READ_FIELD, LOG_READ_SKIP) }
-		else { LOG_V2_FIELD_LIST_DEBUG_PROFILE(LOG_READ_FIELD, LOG_READ_SKIP) }
-	} else if (schemaFormat == 3U) {
-		if (profile) { LOG_CANDIDATE_V1_FIELD_LIST_LIGHT(LOG_READ_FIELD, LOG_READ_SKIP) }
-		else { LOG_CANDIDATE_V1_FIELD_LIST_DEBUG_PROFILE(LOG_READ_FIELD, LOG_READ_SKIP) }
-	} else {
-		LOG_FIELD_LIST(LOG_READ_FIELD, LOG_READ_SKIP)
-	}
+    (void)schemaFormat; (void)profile;
+    LOG_FIELD_LIST(LOG_READ_FIELD, LOG_READ_SKIP)
 #undef LOG_READ_FIELD
 #undef LOG_READ_SKIP
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logBuildColumns
 // 処理概要     指定スキーマからCSVヘッダーとprintf形式を生成する
-// 引数         schemaFormat: 0=現行/1=旧形式/2=初回SHADOW/3=横補正候補, profile: 1=通常/0=詳細
+// 引数         schemaFormat: 現行定義（0）, profile: 1=通常/0=詳細
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 static void logBuildColumns(uint8_t schemaFormat, uint32_t profile)
 {
 #define LOG_HEADER_FIELD(type, name, fmt, expr) setLogStr(#name, fmt);
-	if (schemaFormat == 1U) {
-		if (profile) { LOG_LEGACY_FIELD_LIST_LIGHT(LOG_HEADER_FIELD, LOG_HEADER_FIELD) }
-		else { LOG_LEGACY_FIELD_LIST_DEBUG_PROFILE(LOG_HEADER_FIELD, LOG_HEADER_FIELD) }
-	} else if (schemaFormat == 2U) {
-		if (profile) { LOG_V2_FIELD_LIST_LIGHT(LOG_HEADER_FIELD, LOG_HEADER_FIELD) }
-		else { LOG_V2_FIELD_LIST_DEBUG_PROFILE(LOG_HEADER_FIELD, LOG_HEADER_FIELD) }
-	} else if (schemaFormat == 3U) {
-		if (profile) { LOG_CANDIDATE_V1_FIELD_LIST_LIGHT(LOG_HEADER_FIELD, LOG_HEADER_FIELD) }
-		else { LOG_CANDIDATE_V1_FIELD_LIST_DEBUG_PROFILE(LOG_HEADER_FIELD, LOG_HEADER_FIELD) }
-	} else {
-		LOG_FIELD_LIST(LOG_HEADER_FIELD, LOG_HEADER_FIELD)
-	}
+    (void)schemaFormat; (void)profile;
+    LOG_FIELD_LIST(LOG_HEADER_FIELD, LOG_HEADER_FIELD)
 #undef LOG_HEADER_FIELD
 }

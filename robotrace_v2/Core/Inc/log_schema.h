@@ -13,7 +13,7 @@
 // シンボル定義
 //====================================//
 // CSV列の定義を順番どおりに集中管理。
-// STOREDはバイナリに保存、DERIVEDはendLogで計算。
+// STOREDはバイナリに保存、DERIVEDはCSV変換時に計算。RLOG v2の列定義もここから生成する。
 // 通常は軽量プロファイルで走行比較に必要な列だけを残す。
 // 詳細デバッグ列が必要な場合は、ビルド定義でLOG_SCHEMA_PROFILE_LIGHT=0にする。
 // STORED(type, name, fmt, expr) or DERIVED(type, name, fmt, expr)
