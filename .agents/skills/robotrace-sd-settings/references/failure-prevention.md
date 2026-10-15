@@ -33,3 +33,5 @@
 - 数値整形は機体と同じsnprintfを使用し、fprintfとの丸め差を前提にしない。丁度半分のfloatと実ログでもバイト比較する。参考RAMモックのf_expand上限を実ログ長と照合し、必要なら参考変換だけ通常割当フォールバックで比較する。
 
 - ヘッダ形式変更では全必須欄・CRC範囲・実長式を合成フィクスチャにも反映する。旧v1拒否は現行要件。詳細: `doc/失敗事例/2026-10-16-self-describing-header-test-contract.md`。
+
+- PC取込でbinが残る場合は変換器stderr・temp CSV・保存先copyingと失敗段階を照合する。CSV確定の共有違反32/33は同じ作業ファイルを有限時間再試行し、同名衝突・権限エラーとは分ける。原本削除は正式CSVの照合成功後に限る。日本語を含む試験用ps1も実行前にUTF-8 BOMを確認する。詳細: `doc/失敗事例/2026-10-15-pc-binary-import-runtime-contract.md`。
