@@ -68,6 +68,7 @@ bool autoRunParseConfig(const char *text, AutoRunMode modes[AUTO_RUN_CONFIG_SLOT
 bool autoRunFormatConfig(const AutoRunMode modes[AUTO_RUN_CONFIG_SLOT_COUNT], char *buffer, size_t capacity, size_t *length);
 AutoRunConfigLoadResult autoRunLoadConfig(AutoRunState *state, AutoRunConfigRead readConfig, AutoRunConfigWrite writeConfig, void *context);
 const char *autoRunModeName(AutoRunMode mode);
+uint32_t autoRunSeriesGeneration(void);
 void autoRunBeginSeries(AutoRunState *state);
 void autoRunAbortSeries(AutoRunState *state);
 bool autoRunPrepareRun(AutoRunState *state, uint8_t runNumber, AutoRunPlan *plan);

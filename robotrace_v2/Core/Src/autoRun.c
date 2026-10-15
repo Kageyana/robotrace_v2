@@ -4,6 +4,7 @@
 #include <string.h>
 
 AutoRunState autoRunState = {0};
+static uint32_t autoRunSeriesEpoch;
 
 static const AutoRunMode defaultModes[AUTO_RUN_CONFIG_SLOT_COUNT] = {
 	AUTO_RUN_MODE_DISTANCE,
@@ -347,6 +348,7 @@ void autoRunBeginSeries(AutoRunState *state)
 	{
 		return;
 	}
+	++autoRunSeriesEpoch;
 	resetSeriesState(state);
 	state->seriesActive = state->configReady;
 }
@@ -361,6 +363,7 @@ void autoRunAbortSeries(AutoRunState *state)
 {
 	if (state != NULL)
 	{
+		++autoRunSeriesEpoch;
 		resetSeriesState(state);
 	}
 }
@@ -460,3 +463,12 @@ int16_t autoRunPrimaryLogForHeader(const AutoRunState *state, int16_t currentLog
 	}
 	return state->currentPrimaryLogNumber;
 }
+
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 autoRunSeriesGeneration
+// 処理概要     経路キャッシュを系列開始・中止で失効させる世代を取得する
+// 引数         なし
+// 戻り値       系列の世代
+/////////////////////////////////////////////////////////////////////
+uint32_t autoRunSeriesGeneration(void) { return autoRunSeriesEpoch; }
