@@ -1,5 +1,6 @@
 #include "pathFollower.h"
 #include "logSource.h"
+#include "logPerformance.h"
 #include "pathPolicy.h"
 #include "PIDcontrol.h"
 #include "SDcard.h"
@@ -892,151 +893,71 @@ bool routeGenerateShortcut(uint8_t shortcutLevel)
 }
 
 /////////////////////////////////////////////////////////////////////
-// モジュール名 routeBuildFromLog
-// 処理概要     一次走行CSVから40mm間隔の再走行経路を生成する
+// モジュール名 routeBuildFromLogImpl
+// 処理概要     一次走行ログから40mm間隔の再走行経路を生成する
 // 引数         logNumber:ログ番号, shortcutLevel:短縮レベル
 // 戻り値       経路点数、負値はエラー
 /////////////////////////////////////////////////////////////////////
-int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
+static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel)
 {
-	FIL file;
-	FRESULT result;
-	RouteCsvColumns columns;
-	ShortcutSettings generationSettings = shortcutSettings;
-	uint8_t requestedShortcutLevel = shortcutLevel;
-	char fileName[16];
-	float lastX = 0.0f, lastY = 0.0f;
-	float previousX = 0.0f, previousY = 0.0f, totalLength = 0.0f;
-	bool havePoint = false;
-	bool parseError = false;
-	uint32_t parsedRows = 0U;
-	float pulse = 0.0f;
-	float previousPulse = 0.0f;
-	float lastPulse = 0.0f;
-	bool lockAcquired = sd_fatfs_lock(500U);
-	if (!lockAcquired) return -9;
-	if (!runMemoryPrepare(RUN_MEMORY_PATH))
-	{
-		sd_fatfs_unlock();
-		return -9;
-	}
-
-	snprintf(fileName, sizeof(fileName), "%d.csv", logNumber);
-	result = logSourceOpen(&file, fileName, FA_OPEN_EXISTING | FA_READ);
-	if (result != FR_OK)
-	{
-		sd_fatfs_unlock();
-		return -5;
-	}
-	if (!pathReadColumnHeader(&file, &columns))
-	{
-		logSourceClose(&file);
-		sd_fatfs_unlock();
-		return -10;
-	}
-	while (logSourceGets(routeCsvLine, sizeof(routeCsvLine), &file) != NULL)
-	{
-		float x, y;
-		if ((logSourceIsBinary(&file) ? !logSourceBinaryPoint(&file, &x, &y, &pulse) :
-			(!pathCsvRowComplete(routeCsvLine) || !pathReadCsvPoint(routeCsvLine, &columns, &x, &y, &pulse))))
-		{
-			parseError = true;
-			break;
-		}
-		if (pulse < previousPulse)
-		{
-			parseError = true;
-			break;
-		}
-		parsedRows++;
-		if (!havePoint)
-		{
-			havePoint = true;
-		}
-		totalLength += pathPointDistance(previousX, previousY, x, y);
-		previousX = x;
-		previousY = y;
-		lastX = x;
-		lastY = y;
-		previousPulse = pulse;
-		lastPulse = pulse;
-	}
-	if (logSourceError(&file) || parseError || !havePoint || totalLength < PATH_ROUTE_SPACING_MM ||
-		columns.expectedRows != parsedRows || lastPulse <= 0.0f ||
-		fabsf(totalLength - (lastPulse / PULSE_MILLIMETER)) > fmaxf(50.0f, totalLength * 0.05f))
-	{
-		logSourceClose(&file);
-		sd_fatfs_unlock();
-		return -11;
-	}
-	/*
-	 * 1パス目でEOFまで読み込んだFILをf_lseek()だけで巻き戻すと、
-	 * SPI接続のSDカードやFatFsの状態によって2パス目が空読みに
-	 * なることがある。いったん閉じて同じCSVを再オープンし、
-	 * 2パス目の読込状態を確実に初期化する。
-	 */
-	if (logSourceClose(&file) != FR_OK) { sd_fatfs_unlock(); return -13; }
-	result = logSourceOpen(&file, fileName, FA_OPEN_EXISTING | FA_READ);
-	if (result != FR_OK)
-	{
-		sd_fatfs_unlock();
-		return -13;
-	}
-	if (!pathReadColumnHeader(&file, &columns))
-	{
-		logSourceClose(&file);
-		sd_fatfs_unlock();
-		return -14;
-	}
-	memset(lineRoute, 0, sizeof(lineRoute));
-	memset(driveRoute, 0, sizeof(driveRoute));
-	memset(routeFlags, 0, sizeof(routeFlags));
-	routeCount = 1U;
-	lineRoute[0].x_mm = 0;
-	lineRoute[0].y_mm = 0;
-	routeFlags[0] = 0U;
-	float accumulated = 0.0f;
-	float previousFusedX = 0.0f;
-	float previousFusedY = 0.0f;
-	bool routeOverflow = false;
-	float secondPassPreviousPulse = 0.0f;
-	uint32_t secondPassRows = 0U;
-	while (logSourceGets(routeCsvLine, sizeof(routeCsvLine), &file) != NULL)
-	{
-		float rawX, rawY;
-		if ((logSourceIsBinary(&file) ? !logSourceBinaryPoint(&file, &rawX, &rawY, &pulse) :
-			(!pathCsvRowComplete(routeCsvLine) || !pathReadCsvPoint(routeCsvLine, &columns, &rawX, &rawY, &pulse))))
-		{
-			routeOverflow = true;
-			break;
-		}
-		secondPassRows++;
-		if (pulse < secondPassPreviousPulse)
-		{
-			routeOverflow = true;
-			break;
-		}
-		if (!pathAppendRouteSample(rawX, rawY,
-			&previousFusedX, &previousFusedY, &accumulated))
-		{
-			routeOverflow = true;
-			break;
-		}
-		secondPassPreviousPulse = pulse;
-	}
-	if (logSourceError(&file)) routeOverflow = true;
-	if (logSourceClose(&file) != FR_OK) routeOverflow = true;
-	sd_fatfs_unlock();
-	if (routeOverflow || secondPassRows != parsedRows) return -7;
-	if (pathPointDistance((float)lineRoute[routeCount - 1U].x_mm,
-		(float)lineRoute[routeCount - 1U].y_mm, lastX, lastY) >= 0.5f)
-	{
-		if (routeCount >= PATH_ROUTE_MAX_POINTS - PATH_GOAL_RESERVED_POINTS) return -7;
-		lineRoute[routeCount].x_mm = pathFloatToInt16(lastX);
-		lineRoute[routeCount].y_mm = pathFloatToInt16(lastY);
-		routeCount++;
-	}
-	if (routeCount < 2U) return -11;
+    FIL file;
+    RouteCsvColumns columns;
+    ShortcutSettings generationSettings = shortcutSettings;
+    uint8_t requestedShortcutLevel = shortcutLevel;
+    char fileName[16];
+    bool fileOpened = false;
+    int16_t resultCode = -5;
+    LogBinaryHeader source = {0};
+    if ((patternTrace > 10U && patternTrace < 100U) || modeLOG) return -9;
+    if (!sd_fatfs_lock(500U)) return -9;
+    // キャッシュ判定前にも公開計画を止め、割込みから生成途中の配列を参照させない。
+    optimalTrace = BOOST_NONE;
+    numPPADarry = numPPAMarry = 0;
+    pathGoalValid = false;
+    followerState = PATH_STATE_INACTIVE;
+    targetSpeedMps = 0.0f;
+    snprintf(fileName, sizeof(fileName), "%d.csv", logNumber);
+    if (logSourceOpenFor(&file, fileName, FA_OPEN_EXISTING | FA_READ, LOG_SOURCE_PATH) != FR_OK) goto failed;
+    fileOpened = true;
+    bool binary = logSourceBinaryInfo(&file, &source);
+    if (!pathReadColumnHeader(&file, &columns)) { resultCode = -10; goto failed; }
+    {
+        if (!runMemoryPrepare(RUN_MEMORY_PATH)) { resultCode = -9; goto failed; }
+        memset(lineRoute, 0, sizeof(lineRoute));
+        memset(driveRoute, 0, sizeof(driveRoute));
+        memset(routeFlags, 0, sizeof(routeFlags));
+        routeCount = 1U;
+        float previousX = 0.0f, previousY = 0.0f, totalLength = 0.0f;
+        float fusedX = 0.0f, fusedY = 0.0f, accumulated = 0.0f;
+        float lastX = 0.0f, lastY = 0.0f, previousPulse = 0.0f;
+        uint32_t parsedRows = 0U;
+        while (logSourceGets(routeCsvLine, sizeof(routeCsvLine), &file) != NULL) {
+            float x, y, pulse;
+            if ((binary ? !logSourceBinaryPoint(&file, &x, &y, &pulse) :
+                (!pathCsvRowComplete(routeCsvLine) || !pathReadCsvPoint(routeCsvLine, &columns, &x, &y, &pulse))) ||
+                pulse < previousPulse) { resultCode = -11; goto failed; }
+            totalLength += pathPointDistance(previousX, previousY, x, y);
+            previousX = lastX = x; previousY = lastY = y; previousPulse = pulse;
+            parsedRows++;
+            if (!pathAppendRouteSample(x, y, &fusedX, &fusedY, &accumulated)) { resultCode = -7; goto failed; }
+        }
+        if (logSourceError(&file) || parsedRows == 0U || totalLength < PATH_ROUTE_SPACING_MM ||
+            columns.expectedRows != parsedRows || previousPulse <= 0.0f ||
+            fabsf(totalLength - (previousPulse / PULSE_MILLIMETER)) > fmaxf(50.0f, totalLength * 0.05f)) {
+            resultCode = -11; goto failed;
+        }
+        if (pathPointDistance((float)lineRoute[routeCount - 1U].x_mm,
+            (float)lineRoute[routeCount - 1U].y_mm, lastX, lastY) >= 0.5f) {
+            if (routeCount >= PATH_ROUTE_MAX_POINTS - PATH_GOAL_RESERVED_POINTS) { resultCode = -7; goto failed; }
+            lineRoute[routeCount].x_mm = pathFloatToInt16(lastX);
+            lineRoute[routeCount].y_mm = pathFloatToInt16(lastY);
+            routeCount++;
+        }
+        if (routeCount < 2U) { resultCode = -11; goto failed; }
+    }
+    FRESULT closed = logSourceClose(&file);
+    fileOpened = false;
+    if (closed != FR_OK) { resultCode = -13; goto failed; }
 	pathComputeHeadings(lineRoute, routeCount);
 	pathBuildSpeedProfile(lineRoute, routeCount, 0U);
 	memcpy(driveRoute, lineRoute, sizeof(RoutePoint) * routeCount);
@@ -1057,7 +978,7 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	{
 		pathBuildSpeedProfile(driveRoute, routeCount, 0U);
 	}
-	if (!pathExtendDriveRouteTowardOrigin(routeShortcutLevel)) return -15;
+	if (!pathExtendDriveRouteTowardOrigin(routeShortcutLevel)) { resultCode = -15; goto failed; }
 	pathBuildDriveRouteArcLength();
 	routeSourceLog = (int16_t)logNumber;
 	routeShortcutRequestedLevel = requestedShortcutLevel;
@@ -1066,9 +987,31 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 	optimalTrace = shortcutOk ? BOOST_SHORTCUT : BOOST_PATH_REPLAY;
 	indexSC = (int16_t)routeCount;
 	optimalIndex = 0U;
+	sd_fatfs_unlock();
 	saveLogNumber((int16_t)logNumber);
 	analyzedNumber = (int16_t)logNumber;
 	return (int16_t)routeCount;
+failed:
+    if (fileOpened) (void)logSourceClose(&file);
+    pathFollowerInvalidateRoute();
+    optimalTrace = BOOST_NONE;
+    sd_fatfs_unlock();
+    return resultCode;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 routeBuildFromLog
+// 処理概要     検証済みログから経路を生成し経過時間を集計する
+// 引数         logNumber: 一次ログ番号, shortcutLevel: 短縮レベル
+// 戻り値       経路点数、失敗時は負のエラーコード
+/////////////////////////////////////////////////////////////////////
+int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
+{
+    LOG_PERF_BEGIN(tick);
+    int16_t result = routeBuildFromLogImpl(logNumber, shortcutLevel);
+    if (shortcutLevel > 0U) { LOG_PERF_END(shortcutMs, tick); }
+    else { LOG_PERF_END(pathMs, tick); }
+    return result;
 }
 
 /////////////////////////////////////////////////////////////////////
