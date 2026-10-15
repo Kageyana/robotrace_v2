@@ -13,7 +13,7 @@ rg -n 'Interrupt1ms|wheelClick' 'D:\robotrace\robotrace_v2\robotrace_v2\Core\Src
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'D:\robotrace\robotrace_v2\analysis\script\search_failure_notes.ps1' -Pattern '権限|パス|ログ' -FileGlob '*.md'
 ```
 
-- `search_failure_notes.ps1` は日本語を含むWindows PowerShell 5.1用なのでUTF-8 BOM付き保存を維持する。変更時は実際の `powershell.exe -File` で日本語＋globを確認する。
+- 日本語を含むWindows PowerShell 5.1用ps1はUTF-8 BOM付き保存を維持し、実行前にEF BB BFを確認する。`search_failure_notes.ps1`だけでなく取込・配布用スクリプトも対象。変更時は実際の `powershell.exe -NoProfile -File` で対象処理を確認する。
 - ログの標準パスは `F:\Dropbox\Document\robotrace\Log\v2`。無ければ現在のDropboxルートを確認し、旧ユーザー名の `C:\Users\ucawa\...` を推測で使わない。
 - CrossDevice動画は存在・`ffprobe`成功を確認してから抽出する。生成失敗後に古い画像や一時成果物を開かない。
 
@@ -25,6 +25,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'D:\robotrace\robotrace_
 - ロック作成のPermission deniedを、残留ロックと決めつけて削除しない。Git内部ファイル、ACL、グローバル設定を変更して権限制限を迂回しない。
 - 権限要求が拒否されたら同じ変更を別ツールから強行しない。安全に進められる作業を完了し、拒否された操作と理由をユーザーへ報告する。
 - `helper_unknown_error: setup refresh had errors` はソースの診断と分ける。同じ失敗をパス表記やシェルだけ変えて反復せず、必要最小限の同一処理を許可された環境で実行する。編集の代替には一時コピーのunified diffを使い、`git apply --check`、適用後diffを確認する。
+- Start-Processの出力リダイレクト先は親フォルダを先に作成する。ErrorActionPreference=Stopで失敗後の成功表示・後続処理を止め、PIDの生存は起動時と同じ権限で確認する。
 - 自分で開始した長時間処理は返されたsession_id/PIDを保持して対象だけ停止する。CIM照会の権限を前提にせず、全Python・MATLABプロセスを名前で終了しない。
 
 ## 3. ランタイム・引用符・文字コード
