@@ -1689,8 +1689,28 @@ bool logConvertPending(LogProgressCallback progress)
 }
 
 /////////////////////////////////////////////////////////////////////
+// モジュール名 logPrepareBinaryStorage
+// 処理概要     起動時にbinのヘッダ・実長と未確定tmpを確認し、原本を保持する
+// 引数         なし
+// 戻り値       true: 保存開始可能 false: I/Oまたはヘッダ不正
+/////////////////////////////////////////////////////////////////////
+bool logPrepareBinaryStorage(void)
+{
+    if (modeLOG || logTempOpen || logBufferWriter.flushPending || logBufferWriter.pendingPending ||
+        !sd_fatfs_lock(500U)) { logRecoveryReady = false; return false; }
+    uint16_t next, count;
+    uint32_t rows;
+    uint64_t work;
+    logTempWarning = false;
+    bool result = logPendingInventory(0U, &next, &rows, &count, &work);
+    sd_fatfs_unlock();
+    logRecoveryReady = result;
+    return result;
+}
+
+/////////////////////////////////////////////////////////////////////
 // モジュール名 logRecoveryIsReady
-// 処理概要     復旧が完了して新規走行を開始可能か取得する
+// 処理概要     binの保存・初期確認に成功し新規走行を開始可能か取得する
 // 引数         なし
 // 戻り値       true: 開始可能 false: 保存・復旧失敗
 /////////////////////////////////////////////////////////////////////
@@ -1736,9 +1756,15 @@ int16_t getFileNumbers(void)
 				break;
 			}
 			uint16_t csvNumber;
-			if (logBinaryParseName(fno.fname, "csv", &csvNumber) && endFileIndex < FILENUMBER_NUM)
+			if ((logBinaryParseName(fno.fname, "bin", &csvNumber) ||
+                logBinaryParseName(fno.fname, "csv", &csvNumber)) && endFileIndex < FILENUMBER_NUM)
 			{
-				// csvファイルのとき
+				// 同番号のbin/旧CSVは一覧へ一度だけ登録する。
+                bool duplicate = false;
+                for (int16_t i = 0; i < endFileIndex; i++) {
+                    if (fileNumbers[i] == (int16_t)csvNumber) { duplicate = true; break; }
+                }
+                if (duplicate) continue;
 				fileNumbers[endFileIndex] = (int16_t)csvNumber;
 				endFileIndex++;
 			}
@@ -1759,35 +1785,7 @@ int16_t getFileNumbers(void)
 				}
 			}
 		}
-		// ログ数が上限を超えたら、FILENUMBER_ALARMの半分まで古いログを削除
-		if (logRecoveryReady && fileCount > FILENUMBER_LIMIT)
-		{
-			int16_t targetFileCount = (int16_t)(FILENUMBER_ALARM / 2);
-			if (targetFileCount < 1)
-			{
-				targetFileCount = 1;
-			}
-			int16_t toDelete = (int16_t)(fileCount - targetFileCount);
-			if (toDelete < 1)
-			{
-				toDelete = 1;
-			}
-			for (int16_t i = 0; i < toDelete; i++)
-			{
-				char deleteName[16];
-				snprintf(deleteName, sizeof(deleteName), "%d.csv", fileNumbers[i]);
-				char pendingName[20];
-				FILINFO pendingInfo;
-				logBinaryName(pendingName, sizeof(pendingName), (uint16_t)fileNumbers[i], "bin");
-				if (f_stat(pendingName, &pendingInfo) == FR_NO_FILE) f_unlink(deleteName);
-			}
-			// 配列を詰め直し
-			for (int16_t i = 0; i < fileCount - toDelete; i++)
-			{
-				fileNumbers[i] = fileNumbers[i + toDelete];
-			}
-			fileCount -= toDelete;
-		}
+		// PCへの取込前に原本を失わないよう、機体側では古いログを自動削除しない。
 		endFileIndex = fileCount - 1;	// 最終インデックスを更新
 		fileIndexLog = endFileIndex;	// 現在のログ番号を最終インデックスに設定
 	}

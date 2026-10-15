@@ -164,95 +164,15 @@ static void showSlipAnalysisProgress(const char *stage, uint32_t lineNo)
 	}
 }
 /////////////////////////////////////////////////////////////////////
-// モジュール名 stopLogDisplayDmaAndWait
-// 処理概要     連続DMAを止め、送信中ページのI2C完了を待つ
-// 引数         timeout_ms: 待機上限[ms]
-// 戻り値       true: バス待機完了 false: タイムアウト
-/////////////////////////////////////////////////////////////////////
-static bool stopLogDisplayDmaAndWait(uint32_t timeout_ms)
-{
-	ssd1306_StopDMA();
-	uint32_t start = HAL_GetTick();
-	while (HAL_I2C_GetState(&SSD1306_I2C_PORT) != HAL_I2C_STATE_READY) {
-		if (HAL_GetTick() - start >= timeout_ms) return false;
-	}
-	return true;
-}
-
-static LogConversionProgress logDisplayProgress;
-static bool logDisplayProgressValid;
-
-/////////////////////////////////////////////////////////////////////
-// モジュール名 drawLogConversionProgress
-// 処理概要     CSV変換の最新進捗を画面バッファへ描画する
-// 引数         progress: 変換状態
-// 戻り値       なし
-/////////////////////////////////////////////////////////////////////
-static void drawLogConversionProgress(const LogConversionProgress *progress)
-{
-	static const char *const stages[] = {"Analyze", "Write", "Commit", "Done", "Failed"};
-	uint32_t percent = progress->expectedRows ? progress->processedRows * 100U / progress->expectedRows : 0U;
-	if (percent > 100U) percent = 100U;
-	ssd1306_FillRectangle(0, 15, 127, 63, Black);
-	ssd1306_SetCursor(0, 16);
-	ssd1306_printf(Font_6x8, "CSV %u/%u", progress->fileIndex, progress->fileCount);
-	ssd1306_SetCursor(0, 28);
-	ssd1306_printf(Font_6x8, "Log %u", progress->logNumber);
-	ssd1306_SetCursor(0, 40);
-	ssd1306_printf(Font_6x8, "%s %lu%%", stages[progress->stage], (unsigned long)percent);
-	ssd1306_SetCursor(0, 52);
-	ssd1306_printf(Font_6x8, "Total %u%%", progress->totalPercent);
-}
-/////////////////////////////////////////////////////////////////////
-// モジュール名 showLogConversionProgress
-// 処理概要     CSV変換を止めず、本数・段階・行数進捗をDMAで表示する
-// 引数         progress: 変換状態
-// 戻り値       なし
-/////////////////////////////////////////////////////////////////////
-static void showLogConversionProgress(const LogConversionProgress *progress)
-{
-	static uint32_t lastTick;
-	static uint16_t lastNumber;
-	static LogConversionStage lastStage = LOG_CONVERT_FAILED;
-	if (!modeDSP) return;
-	// 送信を見送った最終結果も、変換終了後に確実に表示する。
-	logDisplayProgress = *progress;
-	logDisplayProgressValid = true;
-	// 連続更新の停止要求だけを出し、送信中なら変換処理へ即座に戻る。
-	ssd1306_StopDMA();
-	if (!ssd1306_IsReadyForSingleUpdate()) return;
-	uint32_t tick = HAL_GetTick();
-	bool changed = lastNumber != progress->logNumber || lastStage != progress->stage;
-	if (!changed && tick - lastTick < 200U) return;
-	drawLogConversionProgress(progress);
-	// DMAは専用コピーを読むため、転送中もCSVの解析・書込みを継続できる。
-	if (ssd1306_UpdateScreenOnce_DMA()) {
-		lastTick = tick; lastNumber = progress->logNumber; lastStage = progress->stage;
-	}
-}
-
-/////////////////////////////////////////////////////////////////////
-// モジュール名 finishLogConversions
-// 処理概要     モーター停止状態で未変換ログをCSVへ確定する
+// モジュール名 finishBinaryLogStorage
+// 処理概要     停止出力を保ち、endLogで確定したbinの保存状態を確認する
 // 引数         なし
-// 戻り値       true: 完了またはSDなし false: 復旧失敗
+// 戻り値       true: 保存可能 false: 保存・初期確認失敗
 /////////////////////////////////////////////////////////////////////
-static bool finishLogConversions(void)
+static bool finishBinaryLogStorage(void)
 {
-	motorCommandOut(0, 0);
-	if (!initMSD) return logRecoveryIsReady();
-	logDisplayProgressValid = false;
-	bool result = logConvertPending(showLogConversionProgress);
-	// CSV変換完了後だけ転送を待ち、最終結果と従来の連続表示へ切り替える。
-	if (modeDSP && stopLogDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS)) {
-		if (logDisplayProgressValid) drawLogConversionProgress(&logDisplayProgress);
-		if (logHasIncompleteTemp() && result) {
-			ssd1306_SetCursor(0, 52);
-			ssd1306_printf(Font_6x8, "Incomplete BIN kept");
-		}
-		(void)updateDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS);
-	}
-	return result;
+    motorCommandOut(0, 0);
+    return logRecoveryIsReady();
 }
 
 // タイマ関連
@@ -351,7 +271,7 @@ void initSystem(void)
 
 		if(initMSD || softreset)
 		{
-			(void)finishLogConversions(); // 設定取得・ログ整理前に未変換ログを復旧
+			(void)logPrepareBinaryStorage(); // binのヘッダと保存状態だけを確認し、CSV化しない
 			cntFiles = getFileNumbers();	// 走行ログのファイル番号を取得
 			getLogNumber();		// 前回の解析ログナンバーを取得
 
@@ -370,7 +290,9 @@ void initSystem(void)
 
 			if (modeDSP)
 			{
-				ssd1306_printf(Font_6x8, "MicroSD success");
+				if (!logRecoveryIsReady()) ssd1306_printf(Font_6x8, "SD BIN invalid");
+				else if (logHasIncompleteTemp()) ssd1306_printf(Font_6x8, "SD TMP kept");
+				else ssd1306_printf(Font_6x8, "MicroSD success");
 			}
 			setLED(1, 0, 50, 0); // 初期化 成功 緑点灯
 		}
@@ -505,7 +427,7 @@ void initSystem(void)
 ///////////////////////////////////////////////////////////////////////////
 static const char *getRunStartBlockReason(void)
 {
-	if (insertSD() && !logRecoveryIsReady()) return "CSV recovery failed";
+	if (insertSD() && !logRecoveryIsReady()) return "BIN storage failed";
 	if (!initIMU)
 	{
 		return "IMU failed";
@@ -569,7 +491,7 @@ static bool blockRunStartIfNeeded(void)
 		autoStart = 0;
 		autoStartAnalyze = 0;
 		autoRunAbortSeries(&autoRunState);
-		(void)finishLogConversions();
+		(void)finishBinaryLogStorage();
 		showRunStartBlocked(reason);
 		return true;
 	}
@@ -584,7 +506,7 @@ static bool blockRunStartIfNeeded(void)
 	autoStart = 0;
 	autoStartAnalyze = 0;
 	autoRunAbortSeries(&autoRunState);
-	if (abortedAuto) (void)finishLogConversions();
+	if (abortedAuto) (void)finishBinaryLogStorage();
 	pattern.calibration = 1;
 	showRunStartBlocked(getRunStartBlockReason());
 	return true;
@@ -622,7 +544,7 @@ void loopSystem(void)
 				autoStart = 0U;
 				autoStartAnalyze = 0;
 				autoRunAbortSeries(&autoRunState);
-				(void)finishLogConversions();
+				(void)finishBinaryLogStorage();
 				showRunStartBlocked("auto_run source missing");
 				break;
 			}
@@ -686,7 +608,7 @@ void loopSystem(void)
 				autoStart = 0;
 				autoStartAnalyze = 0;
 				autoRunAbortSeries(&autoRunState);
-				(void)finishLogConversions();
+				(void)finishBinaryLogStorage();
 			}
 		}
 		else
@@ -787,7 +709,7 @@ void loopSystem(void)
 				if (!initMSD || !logRecoveryIsReady()) {
 					motorCommandOut(0, 0); autoStart = 0; setupFlags.start = 0;
 					autoRunAbortSeries(&autoRunState);
-					(void)finishLogConversions();
+					(void)finishBinaryLogStorage();
 					showRunStartBlocked("BIN open failed");
 					patternTrace = 103; break;
 				}
@@ -864,7 +786,7 @@ void loopSystem(void)
 				if (!initMSD || !logRecoveryIsReady()) {
 					autoStart = 0; setupFlags.start = 0;
 					autoRunAbortSeries(&autoRunState);
-					(void)finishLogConversions();
+					(void)finishBinaryLogStorage();
 					showRunStartBlocked("BIN open failed");
 					patternTrace = 103; break;
 				}
@@ -1025,7 +947,7 @@ void loopSystem(void)
 
 			if (autoStart == 0U)
 			{
-				(void)finishLogConversions();
+				(void)finishBinaryLogStorage();
 				patternTrace = 103;
 				break;
 			}
@@ -1034,9 +956,9 @@ void loopSystem(void)
 				autoStart = 0U;
 				autoStartAnalyze = 0;
 				autoRunAbortSeries(&autoRunState);
-				bool converted = finishLogConversions();
-				// 5走終了。変換失敗時は対象ログ番号を表示した画面を保持する。
-				if (converted) {
+				bool storageReady = finishBinaryLogStorage();
+				// 5走終了。bin保存状態を確認して終了を表示する。
+				if (storageReady) {
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(0, 15);
 				ssd1306_printf(Font_11x18, "Auto run");
@@ -1069,9 +991,9 @@ void loopSystem(void)
 		}
 		else
 		{
-			// 手動走行はCSV変換完了後にタイムを表示し、変換失敗時は失敗画面を保持する。
-			bool converted = finishLogConversions();
-			if (modeDSP && converted)
+			// 手動走行はbin保存完了後にタイムを表示する。
+			bool storageReady = finishBinaryLogStorage();
+			if (modeDSP && storageReady)
 			{
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				if (logOverflow || markerOverflow)
@@ -1175,7 +1097,7 @@ void emergencyStop(void)
 		
 	}
 
-	bool csvConverted = finishLogConversions();
+	bool storageReady = finishBinaryLogStorage();
 	if (modeDSP)
 	{
 		ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
@@ -1207,9 +1129,9 @@ void emergencyStop(void)
 		}
 	}
 
-	if (modeDSP && !csvConverted) {
+	if (modeDSP && !storageReady) {
 		ssd1306_SetCursor(0, 53);
-		ssd1306_printf(Font_6x8, "CSV failed: BIN kept");
+		ssd1306_printf(Font_6x8, "BIN storage failed");
 	}
 	autoStart = 0U;
 	autoStartAnalyze = 0;
