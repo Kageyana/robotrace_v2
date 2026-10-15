@@ -184,6 +184,8 @@ Codex は主にファームウェア開発に使用します。必要に応じ�
 
 DISTANCEの速度計画・マーカー配列とSLIP解析作業配列は同時使用するため、`runMemory.h`の`distance`側へまとめる。PATH/SHORTCUTのライン経路・走行経路・弧長・フラグは`path`側とし、両側を静的unionで共有する。切替は停止中・ログ非記録中・FatFsロック下で行い、旧計画を無効化してから書き換える。各走行のログ用メタデータは共有領域外に保持する。ログ読込行は6144 Bを共用する。
 
+ログI/O用6 KiBは、走行中の2 KiB×3本と、停止中の4 KiB先読み＋2 KiB CSV出力をunionで共用する。停止時はログキューと最終書込の完了後に切り替え、検証・確定中はFatFsロックを保持する。CRC32/IEEE・全件検証・CSVのCRLFを維持し、CSVは連続領域を事前確保して実長へ切詰めた後に確定する。性能診断は`ROBOTRACE_LOG_PERFORMANCE`（既定OFF）のRAM集計で行い、走行ログ列へ追加しない。
+
 主な開発環境は VS Code、STM32CubeIDE for Visual Studio Code 拡張機能、STM32CubeCLT、STM32CubeMX です。`.vscode/` には CMake、Flash、ST-Link デバッグ用の設定があります。
 
 想定ツールは CMake 3.22 以上、Ninja、ARM GCC、STM32CubeCLT、`STM32_Programmer_CLI` です。
@@ -494,6 +496,7 @@ cmake --build --preset Release
 - `goalMarkerOnset_p` は幅を確認したゴールマーカーの検出開始位置とする。`distanceScaleError_p` はログ行間の経過msを掛けて積算した `encCurrentCorr_p` と最終 `encTotalOptimal` の差とする。オートスタートが一次走行後に止まったら、まず `closureReason` とログ最終行の距離を確認する。
 - `courseAnalysis.c` の2次ログ再解析は、`courseMarker`, `encTotalOptimal`, `ROC`, `targetSpeed`, `optimalIndex`, `slipFlag`, `slipFlagLat` をCSVヘッダ名から解決する。ログ列追加時に固定列番号へ依存しない。
 - 共通ログ読込は `.bin` 優先、欠落時だけ従来CSVを使用する。バイナリでは値を直接復元し、曲率・クロス前後100 mm直線化・XY計算をCSV出力と共用する。CSV経由では引き続き列名を解決する。共通読込は停止中・FatFsロック下で1ファイルずつ実行する。
+- DISTANCE/SLIPの読込は不要なXY計算を省く。PATHの初回生成は検証・クロス抽出と経路検証・生成の2走査とする。同一連続走行内のPATH/SHORTCUTは延長前基準経路を再利用できるが、再利用時も元binの全件CRC検証を行う。元ログ・生成設定・系列世代・共有RAMの使用先が変わった場合や失敗時は無効化し、ゴール延長と速度計画は毎回作り直す。詳細と実測結果は`doc/log-processing-performance.md`を参照する。
 - 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_MARKER`, `BOOST_DISTANCE`, `BOOST_SHORTCUT`, `BOOST_PATH_REPLAY` を正とする。
 - 新しい走行モードを追加する場合は、`robotrace_v2/Core/Inc/courseAnalysis.h` に定義を追加する。
 - `emcStop` が 0 以外の場合は緊急停止しており、ゴールしていない走行として扱う。
