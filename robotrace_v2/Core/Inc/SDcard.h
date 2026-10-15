@@ -21,7 +21,9 @@ typedef struct {
 typedef void (*LogProgressCallback)(const LogConversionProgress *progress);
 
 // 停止中のメイン処理でのみ使用。共通読込は1ファイルずつ、呼出側でFatFsロックを保持する。
+// 旧CSV変換APIは互換検証用。通常の起動・走行終了からは呼び出さない。
 bool logConvertPending(LogProgressCallback progress);
+bool logPrepareBinaryStorage(void);
 bool logRecoveryIsReady(void);
 bool logHasIncompleteTemp(void);
 //====================================//
