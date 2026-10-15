@@ -19,3 +19,7 @@ FatFs設定がmain.hを取り込むため、main.hに含まれるSDcard.hでFatF
 ## 再発防止と確認
 
 FatFs型のAPIはmain.hから直接取り込まれるヘッダへ追加しない。読込APIの変更後はARM Debugビルドとtests/run_pc_tests.ps1を両方実行し、Windows/MCUの両方のinclude順序を確認する。修正後はDebugビルドと既存PCテスト、新規通常・詳細ログテストが成功したためresolved。実機I/Oの検証を意味しない。
+
+## 2026-10-15 実FatFsのホスト検証で再発
+
+新しい実FatFs/exFAT RAMディスク検証でff.c・ccsbcs.cを直接コンパイルすると、各翻訳単位のff.hが先にWindowsのLPTR/ERRORを取り込んだため同じ競合が再発した。テスト本体だけmain.hを先に読む対策では不十分だった。runnerへ`-include Core/Inc/main.h`（実際は絶対パス）を追加し、全翻訳単位でCMSISを先に評価するよう変更した。製品のFatFs・CMSISヘッダは変更しない。実FatFs/exFATで旧f_putsとのバイト一致、CRLF境界、事前確保・切詰め、複数セクター書込が成功した。初回コンパイル前に全翻訳単位のinclude順序を確定することを追加対策とする。
