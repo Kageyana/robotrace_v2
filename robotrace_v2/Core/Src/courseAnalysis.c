@@ -3,6 +3,7 @@
 //====================================//
 #include "courseAnalysis.h"
 #include "logSource.h"
+#include "logPerformance.h"
 #include "courseLogCsv.h"
 #include "control.h"
 #include "fatfs.h"
@@ -364,7 +365,7 @@ static int16_t readLogDistanceProgress(int logNumber,
 		ret = -6;
 		goto cleanup_read;
 	}
-	fresult = logSourceOpen(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // バイナリ優先、欠落時のみCSVを読む
+	fresult = logSourceOpenFor(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ, LOG_SOURCE_DISTANCE); // バイナリ優先、欠落時のみCSVを読む
 	if (!retried && (fresult == FR_DISK_ERR || fresult == FR_INT_ERR || fresult == FR_NOT_READY))
 	{
 		retried = true;
@@ -690,7 +691,10 @@ cleanup_read:
 /////////////////////////////////////////////////////////////////////
 int16_t readLogDistance(int logNumber)
 {
-	return readLogDistanceProgress(logNumber, NULL);
+	LOG_PERF_BEGIN(tick);
+	int16_t result = readLogDistanceProgress(logNumber, NULL);
+	LOG_PERF_END(distanceMs, tick);
+	return result;
 }
 /////////////////////////////////////////////////////////////////////
 // ローカル関数 parseSecondLogLine
@@ -734,13 +738,13 @@ static void logReadSlipIoError(int logNumber, UINT lineNo, FIL *fil, const char 
 		g_sd_last_read_blocks_status, g_sd_last_read_multi_status);
 }
 /////////////////////////////////////////////////////////////////////
-// モジュール名 readLogDistanceSlip
+// モジュール名 readLogDistanceSlipImpl
 // 処理概要     一次ログの距離計画に直前走行のスリップを反映する
 // 引数         baseLogNumber: 一次ログ番号、slipLogNumber: 直前走行ログ番号
 //              progress: 解析段階と読込行数を通知する関数
 // 戻り値       計画の要素数、失敗時は負のエラーコード
 /////////////////////////////////////////////////////////////////////
-int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
+static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNumber,
 	void (*progress)(const char *stage, uint32_t lineNo))
 {
 	if ((patternTrace > 10U && patternTrace < 100U) || modeLOG) return -9;
@@ -775,6 +779,7 @@ int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
 	FRESULT fresult;
 	char fileName[16];
 	int16_t ret = 0;
+	int16_t maxOptimalIndex = -1; // open失敗でcleanupへ進んでも初期化済みにする。
 	bool lock_acquired = sd_fatfs_lock(200);
 	bool fileOpened = false;
 	bool retried = false;
@@ -806,7 +811,7 @@ int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
 		ret = -6;
 		goto cleanup;
 	}
-	fresult = logSourceOpen(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // バイナリ優先、欠落時のみCSVを読む
+	fresult = logSourceOpenFor(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ, LOG_SOURCE_SLIP); // バイナリ優先、欠落時のみCSVを読む
 	if (!retried && (fresult == FR_DISK_ERR || fresult == FR_INT_ERR || fresult == FR_NOT_READY))
 	{
 		retried = true;
@@ -835,7 +840,6 @@ int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
 
 	TCHAR *log = runAnalysisLine;
 	const int log_len = CA_SECOND_LOG_LINE_BUFSIZE;
-	int16_t maxOptimalIndex = -1;
 	SecondLogColumnMap secondLogColumns;
 
 	// 先頭行を読み、列名行またはメタデータ行として扱う
@@ -1197,6 +1201,21 @@ int cmpfloat(const void *n1, const void *n2)
 	else
 		return 0;
 }
+/////////////////////////////////////////////////////////////////////
+// モジュール名 readLogDistanceSlip
+// 処理概要     スリップ解析を実行し停止中の経過時間を集計する
+// 引数         baseLogNumber: 一次ログ番号, slipLogNumber: 前走ログ番号, progress: 進捗通知
+// 戻り値       計画の要素数、失敗時は負のエラーコード
+/////////////////////////////////////////////////////////////////////
+int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
+    void (*progress)(const char *stage, uint32_t lineNo))
+{
+    LOG_PERF_BEGIN(tick);
+    int16_t result = readLogDistanceSlipImpl(baseLogNumber, slipLogNumber, progress);
+    LOG_PERF_END(slipMs, tick);
+    return result;
+}
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 readLogTest
 // 処理概要     試験用ログを読み込み、マーカー位置と読込件数を求める
