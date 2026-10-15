@@ -10,6 +10,7 @@
 #include "firmware_version.h"
 #include "IMU.h"
 #include "logBufferWriter.h"
+#include "logPerformance.h"
 #include "markerSensor.h"
 #include "sd_functions.h"
 #include "stdio.h"
@@ -42,6 +43,9 @@ _Static_assert(BUFFER_SIZE_LOG == LOG_BUFFER_SIZE_BYTES, "log buffer size mismat
 _Static_assert((BUFFER_SIZE_LOG % LOG_BUFFER_SECTOR_SIZE_BYTES) == 0U, "log buffer must be sector aligned");
 _Static_assert(LOG_RECORD_SIZE_BYTES <= LOG_BUFFER_SIZE_BYTES, "log record must fit in one log buffer");
 static LogBufferWriter logBufferWriter;
+#if ROBOTRACE_LOG_PERFORMANCE
+volatile LogPerformanceStats logPerformanceStats;
+#endif
 static _Alignas(LOG_BUFFER_SECTOR_SIZE_BYTES)
 	uint8_t logBuffers[LOG_BUFFER_COUNT][LOG_BUFFER_SIZE_BYTES];
 static float cross_start_mm[CROSSSEG_MAX];
