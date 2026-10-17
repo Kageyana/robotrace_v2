@@ -511,7 +511,7 @@ cmake --build --preset Release
 - 通常・詳細ログに左右個別の `encCurrentL`, `encCurrentR`（符号付き16bit、1 msあたりのパルス数 `[pulse/ms]`）と `encTotalL`, `encTotalR`（符号付き32bit、スタートマーカー基準の累積パルス数 `[pulse]`）を出力する。前進を正とし、累積値はスタートマーカー通過時だけ0へリセットする。停止時には保持し、ログ先頭はマーカー通過後なので0とは限らない。12878までのログは電源投入からの累積値だった。走行中の距離は開始付近の値との差で確認する。速度 `[m/s]` は `encCurrentL/R / PULSE_MILLIMETER`、距離 `[mm]` は累積パルス差 `/ PULSE_MILLIMETER` で換算する。左右個別値は診断用であり、距離換算の実測検証は左右平均を対象とする。
 - 通常・詳細ログに `lSensorCari0`～`lSensorCari9` を出力する。`lSensorCari[0]`～`[9]` の校正済み正規化値（0～4095、無次元）で、0は左端、9は右端。ログ取得時点の最新値を保存する。
 - `LOG_SCHEMA_PROFILE_LIGHT=0` のデバッグログでは `markerSensor`（LED差分から得たマーカー状態）、`sgMarkerCount`（スタート・ゴールマーカー累積数）、`encRightMarker_p`（右マーカーからの補正後エンコーダパルス）、`patternTrace`（走行状態）を追加出力する。ログヘッダには終了時の `sgMarkerAtLogEnd` と `encRightMarkerAtLogEnd_p` も出力する。
-- ログの `x`, `y` とゴールマーカー閉路Xは、`encTotalOptimal` のレコード間差分と `imuAngle_Z` の区間両端平均角度から計算する。疎な瞬時角速度の再積分は行わない。制御中の自己位置更新は従来どおりとする。
+- ログの `x`, `y` とゴールマーカー閉路Xは、マーカー位置補正前の生エンコーダ距離 `(encTotalL + encTotalR) / 2` のレコード間差分と `imuAngle_Z` の区間両端平均角度から計算する。左右累積値の和・差分はint64で扱い、平均の0.5パルスを維持する。`encTotalOptimal`のカーブ/CROSSマーカー補正とスリップ距離補正をXYへ混入させない。疎な瞬時角速度の再積分は行わない。制御中の自己位置更新・距離補正・速度計画は従来どおりとする。CSVメタデータは`logDerivedVersion=2,logXYDistance=raw_wheel_average`を記録する。
 - 経路追従専用列 `linePointX_mm`, `linePointY_mm`, `lineValid`, `pathErrorY_mm`, `pathErrorHeading_cdeg`, `pathState`, `pathLegalMargin_mm` は通常・詳細ともにログへ出力しない。一次経路生成・距離検証に必要な `x`, `y`, `encCurrentCorr_p` は維持する。これらの専用列を必須とする過去ログ用解析スクリプトは、新ログには使用できない。
 - 通常ログは `LOG_SCHEMA_PROFILE_LIGHT=1` を既定とし、ラップタイム、速度追従、角速度、マーカー、スリップフラグ、電圧指令、XY確認に必要な列だけを残す。
 - 通常・詳細ログに3軸加速度 `acceleVal_X`, `acceleVal_Y`, `acceleVal_Z` をfloatで出力する。値は `imuVal.accele.x/y/z`、単位は `[g]`（`m/s^2`への換算は `GRAVITY_MPS2` を掛ける）。IMUオフセット校正後の値で重力成分を含み、X・Yには既存の旋回中心補正を適用する。
@@ -527,7 +527,7 @@ cmake --build --preset Release
 - 新検出器は5ms移動平均、10/30ms縦残差、30ms横・旋回残差を用いる。走行中の加速度バイアス学習は行わず、IMUの静止重力基準除去APIを使用する。位置補正は二重適用しない。加速度・ジャイロの追加時間補正は根拠未確定のため0で固定し、非0の変更には整列処理の実装・検証が必要。旋回整合の8ms遅延・実効幅は13074～13083の経験モデルで、機体寸法の正へ転記しない。
 - 横接線補正候補の10列を通常・詳細ログの初回SHADOW診断の末尾へ追加する。`slipV2LatCandidate/Peak`は瞬時候補残差/区間最大絶対残差[m/s²]、`slipV2LatCandidateFlag`はON=1の独立フラグ、`slipV2LatCandidateValid/Reason`は有効性/現在無効理由。`slipV2LatCandidateOnMs/ValidMs`は区間ON/有効時間[ms]（65535で飽和）、`slipV2LatCandidateIntervalReason`は無効理由OR。`imuYawAlphaFiltered`は現行補正に使った角加速度[rad/s²]、`imuLatTangentialApplied`は現行で加算したX接線項[m/s²]の瞬時値。候補理由は共通ビットに256=接線項未取得を追加し、初回SHADOWの有効性とは分ける。候補ON率の分母は候補ValidMsとし、欠測・飽和を報告する。
 - 候補入力は既存静止重力除去後のX加速度から同周期の適用済みX接線項を2倍引く。右X・前Y・CW正の仮定に基づく診断だけで、共通IMU出力と既存SHADOWの計算を変えない。生X方向は実機未確認。初回SHADOWと同じ5/30ms窓、横閾値、3/5ms継続、43サンプル再充填を使う。メタデータへ候補版・式・軸仮定・位置・LPF・単位を保存する。詳細は`doc/slip-lateral-candidate.md`。
-- 保存列の追加・削除・順序変更ではPC変換器を更新しない。U8/U16/S16/U32/S32/F32と対応書式の範囲で、ファイル内の列定義から汎用変換する。計算列ROC/x/yはderivedVersion=1の現行処理を維持し、計算式・必須入力・保存型の追加時はPC変換器を更新する。既存6形式の互換読込は廃止する。機体の解析元は同一ビルドの列定義を要求する。詳細と上限は`doc/self-describing-log.md`を参照する。
+- 保存列の追加・削除・順序変更ではPC変換器を更新しない。U8/U16/S16/U32/S32/F32と対応書式の範囲で、ファイル内の列定義から汎用変換する。計算列ROC/x/yはderivedVersion=2とし、XYの距離入力は`encTotalL`/`encTotalR`（S32）を使う。計算式・必須入力・保存型の追加時はPC変換器を更新する。ユーザー指定により旧計算版1および旧6形式の互換読込は行わず、原本を保持して拒否する。機体の解析元は同一ビルドの列定義を要求する。詳細と上限は`doc/self-describing-log.md`を参照する。
 - 設定・制約・検証手順は`doc/slip-detector-v2.md`に記載する。DWT実測は今回の検証対象外とし、実機採用には初回ログ確認と最低10本の比較を別途行う。
 - スリップ内部量などの詳細デバッグ列が必要な場合は、ビルド定義で `LOG_SCHEMA_PROFILE_LIGHT=0` にして一時的に出力する。
 - ログ同士を比較する場合は、`batteryVoltage_V` の差を考慮する。電圧差によるモーター出力、速度追従、加速性能、スリップ傾向の変化を無視しない。

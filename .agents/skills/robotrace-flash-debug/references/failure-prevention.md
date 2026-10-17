@@ -2,6 +2,8 @@
 
 ## 成果物・PC検証
 
+- 複数リポジトリを扱う読取は絶対パス、Gitはgit -Cで対象を指定する。workdir確定後に対象のTest-Pathを確認し、ファームの相対パスを含む呼出しをPCツールworkdirへ変えない。共有logBinary.hはファーム側から配布し、ビルド前に両SHA256を照合する。詳しくは[workdir再発](../../../../doc/失敗事例/2026-10-16-self-describing-header-test-contract.md)と[共有ヘッダ改行](../../../../doc/失敗事例/2026-10-17-shared-header-line-ending-check.md)。
+
 - 共通事前確認に従い、ビルドはファームウェアルートの明示workdir、generatorはリポジトリルートまたは絶対パスで実行する。PC変換器のビルドとCMakeは呼出しを分け、各workdirを初回から指定する。生成失敗ならビルドせず、件数・型・マクロ・生成時刻を確認する。
 - 書込み前にHEAD/branch、構成、build日時、ELF絶対パスとSHA256を確認する。コミット後は再configure/buildして識別情報を更新する。実機初回ログのgitCommit/build情報が一致しなければ新変更の性能評価へ進まない。
 - 計測が依頼された場合は、対象ELFのnmでisrTimingStats等の必要シンボルを先に確認する。計測OFF版にない集計を回収できるとは仮定しない。

@@ -77,7 +77,7 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - `motorCurrentL`, `motorCurrentR`: latest left/right motor current `[A]`, updated every 10 ms after 32-sample ADC averaging and zero-offset calibration. Included in both profiles; appended after IMU fields in the light profile since 2026-10-07. Earlier light logs omit them.
 - `targetAngularvelo`: log target angular velocity, `[deg/s]`.
 - 2026-09-30以降の通常・詳細ログは `motorpwmL`, `motorpwmR` と経路追従専用7列（`linePointX_mm`, `linePointY_mm`, `lineValid`, `pathErrorY_mm`, `pathErrorHeading_cdeg`, `pathState`, `pathLegalMargin_mm`）を出力しない。以下の経路追従専用列の意味は過去ログ向け。専用列必須の解析スクリプトは新ログに使用しない。
-- `x`, `y`: estimated position from the start marker origin, `[mm]`. After the 12879–12884 recovery, firmware CSV generation uses `encTotalOptimal` differences and midpoint heading from stored 1-ms `imuAngle_Z`; the closure X check uses the same integration. Earlier firmware reintegrated sparse `gyroVal_Z` and held the latest corrected speed across each logging interval. Sparse integration can alias and must be compared with stored yaw before interpreting large course distortions.
+- `x`, `y`: スタートマーカー原点の推定位置[mm]。計算版2（logDerivedVersion=2、logXYDistance=raw_wheel_average）は、マーカー補正前の左右生エンコーダ累積値encTotalL/Rの平均距離差と、保存済み1ms積算角度imuAngle_Zの両端平均で計算する。int64の左右和を差分化して0.5倍し、半パルス・後退を保つ。encTotalOptimalのカーブ/CROSS位置補正をXYへ使わない。閉路Xも同じ計算とし、制御中自己位置・速度計画は変更しない。旧計算版1ではencTotalOptimalを使用していたが、ユーザー指定により新変換器の互換読込対象外。さらに古い疎なgyro再積分のログは別の過去形式であり、その形状を実滑りと即断しない。
 - `linePointX_mm`, `linePointY_mm`: corresponding first-run line point, `[mm]`.
 - `pathErrorY_mm`: signed lateral path error, `[mm]`.
 - `pathErrorHeading_cdeg`: heading error, `[0.01 deg]`.

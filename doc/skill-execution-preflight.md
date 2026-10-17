@@ -5,6 +5,7 @@
 ## 1. パスを確定してから実行する
 
 - リポジトリルートは `D:\robotrace\robotrace_v2`、ファームウェアルートは `D:\robotrace\robotrace_v2\robotrace_v2`。ビルドの `workdir` は後者、文書・fixture生成は前者を明示する。文書更新とビルドは別の呼出しにする。
+- ファームと`C:\tool\AutoCopyCsvFromSd`を同時に扱う場合、呼出しのworkdirを確定してからパスを組み立てる。複数リポジトリの読取は絶対パスに限定し、Gitは`git -C <対象ルート>`で対象を明示する。外側のworkdirだけを後からPCツール側へ変えて、ファームの相対パスを残さない。実行前に対象ファイルの`Test-Path -LiteralPath`を確認し、不一致ならその呼出しを開始しない。
 - 初回の検索は実在ディレクトリを `Test-Path -LiteralPath ... -PathType Container` で確認し、ディレクトリ＋`-g`へ限定する。未確認のファイル名やディレクトリ（`.agents`等）を検索パスへ指定しない。
 - 外部コマンドのパス引数へ `*`、`?`、Bashの `{a,b}` を渡さない。ファイルを絞るのは `rg --files` または以下の検索結果に実在パスが出てからとする。
 
