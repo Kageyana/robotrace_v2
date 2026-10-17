@@ -689,6 +689,8 @@ static void logBuildMetadata(void)
 	setLogHeaderStr("binaryLogNumber", logFileNumber);
 	setLogHeaderStr("binaryDataCrc", (int32_t)savedDataCrc);
 	setLogHeaderStr("binarySchema", (int32_t)logBinarySchema());
+	setLogHeaderStr("logDerivedVersion", LOG_BINARY_DERIVED_VERSION);
+	setLogHeaderStrS("logXYDistance", "raw_wheel_average");
 	// 1行目: 走行条件と校正値
 	setLogHeaderStrS("fwVersion", FW_VERSION);
 	setLogHeaderStrS("gitCommit", GIT_COMMIT);
@@ -1038,7 +1040,7 @@ static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t *dataCr
 		float previousX = xycie.x;
 		if (live && correctedPulse >= 0 && correctedPulse <= INT16_MAX)
 		{
-			calcXYcie(totalPulse, rec.imuAngle_Z);
+			calcXYcie((int64_t)rec.encTotalL + rec.encTotalR, rec.imuAngle_Z);
 		}
 		if (live && !goalMarkerBracketFound && primaryRouteValidation.goalMarkerOnsetValid &&
 			pulseDelta >= 0 && goalMarkerPulse >= previousTotalPulse && goalMarkerPulse <= totalPulse)
@@ -1392,7 +1394,7 @@ static void logProcessRecord(void)
     float dt = (float)(rec->cntlog - binarySource.previousTime) / 1000.0F;
     binarySource.roc = calcROC(speed, rec->gyroVal_Z, dt);
     if (binarySource.purpose == LOG_SOURCE_FULL || binarySource.purpose == LOG_SOURCE_PATH) {
-        calcXYcie((int32_t)rec->encTotalOptimal, rec->imuAngle_Z);
+        calcXYcie((int64_t)rec->encTotalL + rec->encTotalR, rec->imuAngle_Z);
         binarySource.x = xycie.x;
         binarySource.y = xycie.y;
     }

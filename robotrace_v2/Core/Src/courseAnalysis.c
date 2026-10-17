@@ -36,7 +36,7 @@ int32_t DistanceOptimal = 0; // 2次走行用の目標走行距離[pulse]
 int16_t analyzedNumber = 0;	 // 前回解析したログ番号
 int32_t encTotalOptimal = 0; // 2次走行用の補正済み走行距離[pulse]
 float xydegz = 0;
-static int32_t xyPreviousTotalPulse = 0;
+static int64_t xyPreviousTotalPulseSum = 0;
 int32_t straightMeter;
 bool straightState;
 bool straightMarkerPending;
@@ -1314,18 +1314,19 @@ int16_t calcXYcies(int logNumber)
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 calcXYcie
-// 処理概要     累積距離と1ms積算角度からログ用XY座標を積分する
-// 引数         totalPulse: スタート基準の累積距離[pulse], angleDeg: 積算角度[deg]
+// 処理概要     マーカー補正前の左右累積距離と1ms積算角度からログ用XY座標を積分する
+// 引数         totalPulseSum: スタート基準の左右生エンコーダ累積値の和[pulse], angleDeg: 積算角度[deg]
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void calcXYcie(int32_t totalPulse, float angleDeg)
+void calcXYcie(int64_t totalPulseSum, float angleDeg)
 {
-	// ログ間の距離差と区間両端の平均姿勢を使い、疎な瞬時角速度の再積分を避ける。
-	float distanceMm = (float)((int64_t)totalPulse - xyPreviousTotalPulse) / PULSE_MILLIMETER;
+	// 左右の和を整数で差分化し、平均の0.5パルスと大きな累積値でも距離増分を保つ。
+	// encTotalOptimalのマーカー補正をXYへ混入させず、疎な瞬時角速度も再積分しない。
+	float distanceMm = (float)(totalPulseSum - xyPreviousTotalPulseSum) * 0.5F / PULSE_MILLIMETER;
 	float headingRad = (xydegz + angleDeg) * 0.5F * DEG2RAD;
 	xycie.x += distanceMm * sinf(headingRad);
 	xycie.y += distanceMm * cosf(headingRad);
-	xyPreviousTotalPulse = totalPulse;
+	xyPreviousTotalPulseSum = totalPulseSum;
 	xydegz = angleDeg;
 }
 // モジュール名 clearXYcie
@@ -1338,7 +1339,7 @@ void clearXYcie(void)
 	xycie.x = 0;
 	xycie.y = 0;
 	xydegz = 0;
-	xyPreviousTotalPulse = 0;
+	xyPreviousTotalPulseSum = 0;
 }
 /////////////////////////////////////////////////////////////////////
 // ローカル関数 clampMarkerIndex
