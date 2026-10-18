@@ -13,6 +13,13 @@ description: ロボトレース走行ログを解析、比較、可視化する�
 
 Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md` as the source for project-wide units, log schema, paths, and safety policy.
 
+スリップ評価では[XY基準・動画の優先順](../../../doc/slip-evaluation-policy.md)を使う。最初に一次基準のXY差で滑り有無を判定し、その後動画を確認する。現行は`Dx<=Dx_primary AND abs(Dy-Dy_primary)<=20mm`（Dx/Dyは絶対値、両端を含む）。旧Y条件の結果を現行条件として流用せず、既存動画ラベルを再利用した再判定では旧新ラベルと時系列を保存する。動画が明確なら動画、不確定ならXY判定を閾値調整の正として採用し、XY判定・動画の確実性・最終ラベル・採用根拠を別に保存する。解析だけの回はファームウェア・設定を変更しない。
+
+動画の実測寸法は[マーカー・レンズ高さ](../../../doc/video-slip-marker-geometry.md)を参照する。2026-10-18のレンズ高は680mmへ訂正済み。新規解析で共通関数の旧デフォルト710mmを暗黙に使わず、校正と追跡へ同じ高さを明示する。過去の別系列の入力条件を変更するときは旧結果を保全して再解析する。
+
+
+
+
 ## Inputs
 
 - Logs live under `F:\Dropbox\Document\robotrace\Log\v2` when accessible.
