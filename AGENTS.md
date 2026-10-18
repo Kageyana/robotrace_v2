@@ -506,6 +506,7 @@ cmake --build --preset Release
 - ログ解析では、ラップタイム、速度追従、角速度、スリップを重視する。
 - バッテリー状態はログ内パラメータ `batteryVoltage_V` を参照する。単位は `[V]`。
 - オートスタートログは `autoRunNumber`, `requestedMode`, `primaryLogNumber`, `slipSourceLogNumber` を1行目に記録する。`requestedMode` は要求方式、`optimalTrace` は実際の走行モードであり、DISTANCEとSLIPを区別するときは両方を参照する。
+- 手動解析後のDISTANCE/SLIP/PATH/SHORTCUTも、実際に保持している有効な計画の一次ログ番号を走行開始時に固定し、既存`primaryLogNumber`へ保存する。`autoRunNumber=0,requestedMode=MANUAL`は維持し、系列所属は一次番号だけで自動走行と推定しない。手動一次・計画なし・参照未取得は0とし、設定ファイルの解析番号だけで参照を補わない。列数・レコード長は変更しない。
 - `batteryVoltage_mV` は走行中にLPF更新したバッテリー電圧 `[mV]`、`motorVoltageCmdL_mV`, `motorVoltageCmdR_mV` はバッテリー電圧で割る前の左右モーター指令電圧 `[mV]` とする。
 - 左右実DUTYの `motorpwmL`, `motorpwmR` は通常・詳細ともにログへ出力しない。
 - 通常・詳細ログに左右個別の `encCurrentL`, `encCurrentR`（符号付き16bit、1 msあたりのパルス数 `[pulse/ms]`）と `encTotalL`, `encTotalR`（符号付き32bit、スタートマーカー基準の累積パルス数 `[pulse]`）を出力する。前進を正とし、累積値はスタートマーカー通過時だけ0へリセットする。停止時には保持し、ログ先頭はマーカー通過後なので0とは限らない。12878までのログは電源投入からの累積値だった。走行中の距離は開始付近の値との差で確認する。速度 `[m/s]` は `encCurrentL/R / PULSE_MILLIMETER`、距離 `[mm]` は累積パルス差 `/ PULSE_MILLIMETER` で換算する。左右個別値は診断用であり、距離換算の実測検証は左右平均を対象とする。

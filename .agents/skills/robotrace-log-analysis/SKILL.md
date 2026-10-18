@@ -27,6 +27,7 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 - A PATH route source must be a normally completed primary log with source format version 1, valid closure, exact expected row count, successful IMU calibration, and verified distance conversion. Saved legacy-format and invalid primary logs must be rejected as route sources; if the primary validation fails, autorun must stop before the next run.
 - Firmware-side secondary-log parsing resolves required fields by header name, not fixed column number. Required fields are `courseMarker`, `encTotalOptimal`, `ROC`, `targetSpeed`, `optimalIndex`, `slipFlag`, and `slipFlagLat`.
 - Distinguish run mode by `optimalTrace`.
+- 手動解析後のDISTANCE/SLIP/PATH/SHORTCUTも、変更後は`primaryLogNumber`へ走行開始時の一次参照を保存する。`autoRunNumber=0,requestedMode=MANUAL`は維持するため、一次番号だけで自動系列へ所属させない。過去の0は未記録として扱い、直前番号で補完しない。手動DISTANCEとSLIPの区別を一次番号から推測しない。詳細は[手動参照番号](../../../doc/manual-run-primary-log.md)。
 - Exclude failed runs when `emcStop != 0`.
 - Invalidate logs with `cntlog` gaps or processing drops; identify and report the cause.
 - If battery voltage differs significantly, recommend charging and retrying instead of comparing as equal conditions.

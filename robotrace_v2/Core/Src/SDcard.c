@@ -193,6 +193,8 @@ static uint16_t runImuCalibrationReadErrors = 0U;
 static uint16_t runLineSensorMax[NUM_SENSORS];
 static uint16_t runLineSensorMin[NUM_SENSORS];
 static bool runLineSensorCalibrationValid = false;
+// 手動走行の開始時点で固定した計画元。停止後の解析番号変更をログへ混入させない。
+static int16_t runPrimaryLogNumber = 0;
 
 typedef struct
 {
@@ -778,7 +780,7 @@ static void logBuildMetadata(void)
 	{
 		setLogHeaderStr("autoRunNumber", 0);
 		setLogHeaderStrS("requestedMode", "MANUAL");
-		setLogHeaderStr("primaryLogNumber", 0);
+		setLogHeaderStr("primaryLogNumber", runPrimaryLogNumber);
 		setLogHeaderStr("slipSourceLogNumber", 0);
 	}
 	// ゴール誤検出調査用。行ログが終了直前で途切れても累積値を確認できる。
@@ -836,6 +838,18 @@ void initLog(void)
 	memcpy(runLineSensorMax, lSensorMax, sizeof(runLineSensorMax));
 	memcpy(runLineSensorMin, lSensorMin, sizeof(runLineSensorMin));
 	runLineSensorCalibrationValid = isLineSensorCalibrationValid();
+	runPrimaryLogNumber = 0;
+	if (optimalTrace == BOOST_DISTANCE && runMemoryOwner == RUN_MEMORY_DISTANCE &&
+		numPPADarry > 0 && numPPADarry <= OPT_BUFF_SIZE && analyzedNumber > 0)
+	{
+		// SLIPも同じ距離計画を使い、analyzedNumberは元の一次ログ番号を保持する。
+		runPrimaryLogNumber = analyzedNumber;
+	}
+	else if ((optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT) &&
+		runMemoryOwner == RUN_MEMORY_PATH && pathRouteCount() > 1U && pathRouteSourceLog() > 0)
+	{
+		runPrimaryLogNumber = pathRouteSourceLog();
+	}
 	primaryRouteValidation = (PrimaryRouteValidation){false, false, false, 0, 0, 0.0F, 1U};
 	// CSV変換ループの実行回数を走行ごとに正しく制御するため送信カウンタをリセット
 	cntSend = 0;
