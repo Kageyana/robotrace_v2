@@ -10,7 +10,8 @@
 #endif
 #define SLIP_V2_VERSION 3U
 #define SLIP_V2_LONG_POLICY "fast_only"
-#define SLIP_LAT_CANDIDATE_VERSION 1U
+#define SLIP_LAT_CANDIDATE_VERSION 5U
+#define SLIP_LAT_CANDIDATE_LPF_COEF 0.8F
 #define SLIP_V2_READY_SAMPLES (SLIP_V2_FILTER_MS + SLIP_V2_SLOW_MS + SLIP_V2_ENCODER_YAW_DELAY_MS)
 #define SLIP_V2_FAST_MS 10U
 #define SLIP_V2_SLOW_MS 30U
@@ -24,6 +25,10 @@
 #define SLIP_V2_LONG_OFF 8.0F
 #define SLIP_V2_LAT_ON 4.6F
 #define SLIP_V2_LAT_OFF 3.8F
+// 角加速度LPFと応答をそろえた残差に対するユーザー指定の暫定閾値[m/s^2]。
+// 初回SHADOW横の閾値とは分離し、制御へは接続しない。
+#define SLIP_LAT_CANDIDATE_ON 6.5F
+#define SLIP_LAT_CANDIDATE_OFF 4.5F
 #define SLIP_V2_YAW_ON_DPS 60.0F
 #define SLIP_V2_YAW_OFF_DPS 45.0F
 #define SLIP_V2_ON_MS 3U
@@ -79,6 +84,8 @@ typedef struct {
     uint8_t highMs, lowMs;
     SlipLateralCandidateResult result;
     SlipLateralCandidateInterval interval;
+    float neutralFiltered;
+    bool neutralStarted;
 } SlipLateralCandidateState;
 typedef struct {
     SlipDetectionFrame filter[SLIP_V2_FILTER_MS], history[SLIP_V2_HISTORY];

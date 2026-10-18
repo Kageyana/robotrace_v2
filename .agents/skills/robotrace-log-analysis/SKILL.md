@@ -18,7 +18,9 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 動画の実測寸法は[マーカー・レンズ高さ](../../../doc/video-slip-marker-geometry.md)を参照する。2026-10-18のレンズ高は680mmへ訂正済み。新規解析で共通関数の旧デフォルト710mmを暗黙に使わず、校正と追跡へ同じ高さを明示する。過去の別系列の入力条件を変更するときは旧結果を保全して再解析する。
 
 
+2026-10-18のユーザー指定：モータ指令電圧上限が同じ走行は電圧差のみで除外せず、速度等は別に記録する。現行横候補版5は、接線補正を除いた同窓残差Rnへ角加速度と同じ一次LPF（前回0.8・今回0.2）を適用し、同窓の適用済み接線項Tbarを引く。ON6.5/OFF4.5m/s²、3/5ms、5/30ms窓と43サンプル充填。ON6.5はユーザー指定で今回テスト・ビルド未実施。最初の有効Rnで初期化し、無効でLPFを消去、区間統計リセットでは保持する。版5の保存候補残差から(R0±Rc)/2でRn/Tbarを逆算しない（この分離は追加LPF前の版1〜4に限る）。版・式・追加LPF係数/初期化方式のメタデータを先に確認する。旧ON5.2での既知16陽性窓保持を現行ON6.5へ流用せず、一次の不要ON・短い滑りの減衰・遅延の実機確認は残る。検出器版3/fast_only・初回SHADOW横4.6/3.8・従来制御は維持。詳細はdoc/slip-lateral-candidate.md。
 
+2026-10-18の対象訂正：新判定の二次実走は13505以降、一次13504の横判定はユーザー確認の誤検出として陰性対照へ保存する。13500～13503を初回新判定とした以前の結論は撤回。保存版・閾値・ビルドが同一でも対象所属を勝手に復元しない。詳細はdoc/slip-lateral-candidate.md。
 
 ## Inputs
 
@@ -106,7 +108,7 @@ These 29 diagnostics are restored to both the 72-column light and 87-column deta
 
 ## Lateral tangential candidate diagnostics
 
-- See `doc/slip-lateral-candidate.md`. The candidate is diagnostic only; common IMU values and initial SHADOW residuals are unchanged. It replaces only the already-applied X tangential term with its opposite sign: `currentLinearX - 2*appliedTangentialX`. The right-X assumption remains physically unverified. Do not fit the observed regression coefficient into the correction.
+- See `doc/slip-lateral-candidate.md`. The candidate is diagnostic only; common IMU values and initial SHADOW residuals are unchanged. Versions 1–4 use `currentLinearX - 2*appliedTangentialX` with common windows. Version 5 additionally filters the neutral residual with the matched 0.8 LPF before subtracting the windowed tangential term. Do not treat the saved v5 residual as the old unfiltered residual or derive the tangential window by `(R0-Rcandidate)/2`. The right-X assumption remains physically unverified. Do not fit the observed regression coefficient into the correction.
 - `slipV2LatCandidate` and `slipV2LatCandidatePeak` are the signed residual and interval absolute peak [m/s²]; `slipV2LatCandidateFlag` is ON=1, not a bitmask. `slipV2LatCandidateValid/Reason` are independent of the initial SHADOW validity. Reason 256 means tangential sample unavailable and applies only to the candidate; other reason bits match v2.
 - `slipV2LatCandidateOnMs/ValidMs` and `slipV2LatCandidateIntervalReason` preserve interval ON/valid time and invalidity OR. Counters saturate at 65535. Use candidate ValidMs for candidate rates and initial SHADOW ValidMs for baseline rates. Exclude saturated intervals and report unmatched validity. Never compare intervals with candidate-only missing data as equal conditions.
 - `imuYawAlphaFiltered` [rad/s²] and `imuLatTangentialApplied` [m/s²] are instantaneous snapshots from the existing correction. They are not 30ms-averaged residuals. Align smoothing and intervals before studying angular-acceleration dependence; sparse CSV cannot reproduce the actual 1ms filter history.

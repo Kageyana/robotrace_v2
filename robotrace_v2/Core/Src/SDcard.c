@@ -43,6 +43,8 @@ char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE] = "", formatLog[LOG_FORMAT_BUFFER
 _Static_assert(BUFFER_SIZE_LOG == LOG_BUFFER_SIZE_BYTES, "log buffer size mismatch");
 _Static_assert((BUFFER_SIZE_LOG % LOG_BUFFER_SECTOR_SIZE_BYTES) == 0U, "log buffer must be sector aligned");
 _Static_assert(LOG_RECORD_SIZE_BYTES <= LOG_BUFFER_SIZE_BYTES, "log record must fit in one log buffer");
+_Static_assert(SLIP_LAT_CANDIDATE_LPF_COEF == IMU_ALPHA_LPF_COEF,
+    "lateral candidate LPF must match the applied angular acceleration LPF");
 enum { LOG_READ_RECORD_BYTES = LOG_RECORD_SIZE_BYTES };
 // 列定義はFlashへ一度だけ生成し、停止時に記録部とメタデータの間へ保存する。
 #define LOG_SCHEMA_STORED(type, name, fmt, expr) "S," #type "," #name "," fmt "\n"
@@ -704,7 +706,11 @@ static void logBuildMetadata(void)
     setLogHeaderStrS("slipLongPolicy", SLIP_V2_LONG_POLICY);
 	setLogHeaderStr("slipDetectorMode", ROBOTRACE_SLIP_DETECTOR);
 	setLogHeaderStr("slipLatCandidateVersion", SLIP_LAT_CANDIDATE_VERSION);
-	setLogHeaderStrS("slipLatCandidateFormula", "current_minus_2_applied_tangent_X");
+	setLogHeaderStrFPrecision("slipLatCandidateOn_mps2", SLIP_LAT_CANDIDATE_ON, 9U);
+	setLogHeaderStrFPrecision("slipLatCandidateOff_mps2", SLIP_LAT_CANDIDATE_OFF, 9U);
+	setLogHeaderStrS("slipLatCandidateFormula", "lpf_neutral_minus_windowed_tangent_X");
+	setLogHeaderStrFPrecision("slipLatCandidateLpf", SLIP_LAT_CANDIDATE_LPF_COEF, 6U);
+	setLogHeaderStrS("slipLatCandidateLpfInit", "first_valid_neutral_reset_on_invalid");
 	setLogHeaderStrS("slipLatCandidateAxes", "Xright_Yforward_CWpositive_unverified");
 	setLogHeaderStrFPrecision("slipLatOffsetX_m", IMU_OFFSET_X_M, 8U);
 	setLogHeaderStrFPrecision("slipLatOffsetY_m", IMU_OFFSET_Y_M, 8U);

@@ -9,6 +9,10 @@ _Static_assert(SLIP_V2_SLOW_MS + SLIP_V2_ENCODER_YAW_DELAY_MS < SLIP_V2_HISTORY,
     "slip history must include delayed windows");
 _Static_assert(SLIP_V2_ACCEL_DELAY_MS == 0U && SLIP_V2_GYRO_DELAY_MS == 0U,
     "nonzero IMU delay needs an aligned history implementation");
+_Static_assert(SLIP_LAT_CANDIDATE_ON > SLIP_LAT_CANDIDATE_OFF && SLIP_LAT_CANDIDATE_OFF > 0.0F,
+    "candidate hysteresis thresholds must be positive and ordered");
+_Static_assert(SLIP_LAT_CANDIDATE_LPF_COEF >= 0.0F && SLIP_LAT_CANDIDATE_LPF_COEF < 1.0F,
+    "candidate LPF coefficient must be stable");
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SlipDetection_Reset
@@ -69,6 +73,8 @@ static void invalidateCandidate(SlipLateralCandidateState *state, uint16_t reaso
     state->filterIndex = state->filterCount = state->historyIndex = state->historyCount = state->sampleCount = 0U;
     state->highMs = state->lowMs = state->result.flag = state->result.valid = 0U;
     state->result.residual = 0.0F;
+    state->neutralFiltered = 0.0F;
+    state->neutralStarted = false;
     state->result.reason = reason;
     state->interval.invalidReason |= reason;
 }
@@ -111,7 +117,7 @@ static void updateCandidate(SlipLateralCandidateState *state, const SlipDetectio
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 finishCandidate
-// 処理概要     共通窓が有効な周期に候補加速度と同じvωを比較する
+// 処理概要     接線補正を除いた残差へ同じ一次LPFを適用し補正項との応答をそろえる
 // 引数         state: 全検出器状態
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
@@ -125,18 +131,30 @@ static void finishCandidate(SlipDetectionState *state)
         const SlipDetectionFrame *f = &state->history[(state->historyIndex + SLIP_V2_HISTORY - 1U - k) % SLIP_V2_HISTORY];
         sum += c->history[(c->historyIndex + SLIP_V2_SLOW_MS - 1U - k) % SLIP_V2_SLOW_MS] - f->v * f->yawRad;
     }
-    c->result.residual = sum / SLIP_V2_SLOW_MS;
+    // 同じ窓の共通残差と符号置換残差から、接線補正前の残差と適用済み項を分離する。
+    float unaligned = sum / SLIP_V2_SLOW_MS;
+    float neutral = 0.5F * state->result.lateral + 0.5F * unaligned;
+    float tangent = 0.5F * state->result.lateral - 0.5F * unaligned;
+    if (!isfinite(unaligned) || !isfinite(neutral) || !isfinite(tangent)) {
+        invalidateCandidate(c, SLIP_V2_NONFINITE); return;
+    }
+    // 開始・無効復帰では最初の有効値で初期化する。区間統計リセットでは保持する。
+    c->neutralFiltered = c->neutralStarted ?
+        SLIP_LAT_CANDIDATE_LPF_COEF * c->neutralFiltered +
+        (1.0F - SLIP_LAT_CANDIDATE_LPF_COEF) * neutral : neutral;
+    c->neutralStarted = true;
+    c->result.residual = c->neutralFiltered - tangent;
     if (!isfinite(c->result.residual)) { invalidateCandidate(c, SLIP_V2_NONFINITE); return; }
     c->result.valid = 1U;
     c->result.reason = 0U;
     float magnitude = fabsf(c->result.residual);
     if (!c->result.flag) {
         c->lowMs = 0U;
-        c->highMs = magnitude > SLIP_V2_LAT_ON ? (uint8_t)(c->highMs + 1U) : 0U;
+        c->highMs = magnitude > SLIP_LAT_CANDIDATE_ON ? (uint8_t)(c->highMs + 1U) : 0U;
         if (c->highMs >= SLIP_V2_ON_MS) { c->result.flag = 1U; c->highMs = 0U; }
     } else {
         c->highMs = 0U;
-        c->lowMs = magnitude < SLIP_V2_LAT_OFF ? (uint8_t)(c->lowMs + 1U) : 0U;
+        c->lowMs = magnitude < SLIP_LAT_CANDIDATE_OFF ? (uint8_t)(c->lowMs + 1U) : 0U;
         if (c->lowMs >= SLIP_V2_OFF_MS) { c->result.flag = 0U; c->lowMs = 0U; }
     }
     c->interval.peak = fmaxf(c->interval.peak, magnitude);
