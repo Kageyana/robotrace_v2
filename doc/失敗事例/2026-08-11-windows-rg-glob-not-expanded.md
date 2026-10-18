@@ -12,6 +12,14 @@ tags:
 
 # PowerShellでUnix風globを前提にしたrg確認が失敗した
 
+## 2026-10-18 手動一次参照メタデータ調査での再発
+
+`Core/Src/path*.c`と`Core/Inc/path*.h`をrgのパス引数へ渡し、os error 123が再発した。既存の事前確認を読んでいたが、検索コマンドへ適用できなかった。同じシェル内の後続読込が成功して呼出し全体の終了コードは0となったため、検索自体の失敗を終了コードだけでは判別できなかった。原本・ファームウェアへの影響はない。
+
+ディレクトリを検索ルート、パターンを`-g`へ分けて所属ソースを取得した。再発防止として`analysis/script/search_firmware_sources.ps1`を追加した。検索ルートは実在するCore/SrcとCore/Incに固定し、パターンは常に`-g`へ渡す。rgの終了コード2以上は後続処理へ進まず例外にする。PowerShell用ファイルはUTF-8 BOM付きで保存する。
+
+確認は`powershell.exe -NoProfile -ExecutionPolicy Bypass -File analysis/script/search_firmware_sources.ps1 -Pattern 'routeBuildFromLog|pathRouteSourceLog' -FileGlob 'path*.c'`。実ソースの一致行と終了コード0、BOMを確認した。ビルド・デバッグSkillの調査前手順にもこの固定ルート検索を追加し、今回の回避策はresolved。全ソース検索の一般化やファームウェア変更はこの記録へ含めない。
+
 ## 2026-10-15 CSV変換中のモーター指令調査での再発
 
 `Core/Src/interrupt*`をrgのパスに渡してos error 123、存在未確認の`buzzer.c/.h`を指定してos error 2が発生した。既存の事前列挙対策を適用できていなかった。実在する`Core/Src`全体を検索し、1ms処理が`timer.c`、ホイールクリック出力が`setup.c`にあることを確認した。追加の予防手順として、モジュール名が不明な初回検索は必ず`rg -n '検索語' robotrace_v2/Core/Src -g '*.c'`とし、個別ファイルへ絞るのはその結果に実在パスが出た後だけとする。同形式で`void wheelClick`の検索と終了成功を確認したためresolvedを維持する。ファームウェアの変更・実機操作は行っていない。
@@ -98,3 +106,7 @@ Src/log*をパスに渡した検索でos error 123、推測したtim.cで存在�
 ## 2026-10-13 ログ項目整理での推測ファイル名の再発
 
 ログ読込処理を調べる際、存在を確認せずlogReader.c/.hを検索対象へ指定し、os error 2となった。既存の事前列挙を適用できていなかった。`rg --files robotrace_v2/Core`で実在するcourseLogCsv.c/.h、logSource.h、logBinary.hを確認し、実読込がSDcard.cにあることも検索で確認した。次回は新しいモジュール名を検索パスへ追加する前に、必ずrg --filesの結果と照合する。対処検証済み、resolvedを維持する。
+
+## 2026-10-18 閾値再選定時の推測名の再発
+
+`reevaluate_xy_yband20_13472_13479.py`、`check_slip_lat_threshold_parity.py`、`reviewed_labels.json`等の推測名をGet-Contentへ渡し、存在しないエラーとなった。既存の事前列挙を適用できなかった。実在する`reevaluate_xy_y_band_13472_13479.py`、`run_slip_lat_video_threshold_tests.py`、`video_label_review.json`はrg --files/Get-ChildItemで確認してから読み直した。過去の解析フォルダごとに成果物名が異なり、別系列の同名ファイルを仮定しない。再発防止参照へ、履歴のパスも列挙結果と照合してから読む手順を追加した。正規パスでの読取と41走の解析・実C検証で対処確認済み、resolvedを維持する。
