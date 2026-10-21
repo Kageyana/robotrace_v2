@@ -110,3 +110,12 @@ Src/log*をパスに渡した検索でos error 123、推測したtim.cで存在�
 ## 2026-10-18 閾値再選定時の推測名の再発
 
 `reevaluate_xy_yband20_13472_13479.py`、`check_slip_lat_threshold_parity.py`、`reviewed_labels.json`等の推測名をGet-Contentへ渡し、存在しないエラーとなった。既存の事前列挙を適用できなかった。実在する`reevaluate_xy_y_band_13472_13479.py`、`run_slip_lat_video_threshold_tests.py`、`video_label_review.json`はrg --files/Get-ChildItemで確認してから読み直した。過去の解析フォルダごとに成果物名が異なり、別系列の同名ファイルを仮定しない。再発防止参照へ、履歴のパスも列挙結果と照合してから読む手順を追加した。正規パスでの読取と41走の解析・実C検証で対処確認済み、resolvedを維持する。
+
+
+## 2026-10-19 縦時間応答調査でのspi.c推測の再発
+
+対象タスクは縦スリップ残差のセンサー時間応答切り分け。未確認のrobotrace_v2/Core/Src/spi.cをrgの対象へ指定し、os error 2となった。iocの検索自体は成功したが、生成先の分割形式を名前から推測した点で既存対策を再適用できていなかった。解析値やファームウェアへの影響はない。
+
+対処はSrcディレクトリ＋-gへ限定した検索で、main.c:469のMX_SPI2_Init、同487の8分周とiocの5.625MHzを確認した。ペリフェラル初期化の調査では、CubeMXの分割生成を仮定してspi.c/tim.cを検索パスへ指定しない。最初に `rg -n "MX_SPI2_Init|BaudRatePrescaler" robotrace_v2/Core/Src -g "*.c"` のように実在ディレクトリを検索し、結果に出たファイルだけを読む。このプロジェクトのSPI2初期化はmain.cに存在する。
+
+ログ解析Skillの実行前確認と再発防止参照へ同じ入口を追加する。指定した正規検索は終了コード0、main.cの実在と定義・分周行を確認済み。Skill/参照の既存内容を保持した追記を検証する。検索手順の対処はresolved。内部センサー応答・実縦滑りの未確定事項とは別である。

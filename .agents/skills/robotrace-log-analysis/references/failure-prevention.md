@@ -4,6 +4,8 @@
 
 ## 入力境界
 
+- ペリフェラル初期化の調査では、CubeMXの分割生成を仮定してspi.c/tim.cを検索パスへ指定しない。最初に `rg -n "MX_SPI2_Init|BaudRatePrescaler" robotrace_v2/Core/Src -g "*.c"` のように実在ディレクトリを検索し、結果に出たファイルだけを読む。このプロジェクトのSPI2初期化はmain.cに存在する。
+
 - 過去の解析成果物やテストを読む前に、rg --filesまたはGet-ChildItemの実在名と照合する。系列ごとの成果物名を推測しない。詳細は[推測パスの再発](../../../../doc/失敗事例/2026-08-11-windows-rg-glob-not-expanded.md)。
 
 - CSVは拡張子だけで選ばない。basenameがASCIIの `^[0-9]+$` に一致するものだけを整数化し、数値の範囲・件数・欠落番号を照合する。`imu_temp_*.csv`、boost、bin/part/tmpは別形式。
