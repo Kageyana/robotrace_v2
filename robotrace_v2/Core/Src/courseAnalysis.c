@@ -1190,21 +1190,6 @@ float asignVelocity(int16_t ROC)
 	return ret;
 }
 /////////////////////////////////////////////////////////////////////
-// モジュール名 cmpfloat
-// 処理概要     float値を比較する
-// 引数         n1: 比較する第1の値へのポインタ, n2: 第2の値へのポインタ
-// 戻り値       n1が大きければ1、小さければ-1、同値なら0
-/////////////////////////////////////////////////////////////////////
-int cmpfloat(const void *n1, const void *n2)
-{
-	if (*(float *)n1 > *(float *)n2)
-		return 1;
-	else if (*(float *)n1 < *(float *)n2)
-		return -1;
-	else
-		return 0;
-}
-/////////////////////////////////////////////////////////////////////
 // モジュール名 readLogDistanceSlip
 // 処理概要     スリップ解析を実行し停止中の経過時間を集計する
 // 引数         baseLogNumber: 一次ログ番号, slipLogNumber: 前走ログ番号, progress: 進捗通知
@@ -1219,93 +1204,6 @@ int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
     return result;
 }
 
-/////////////////////////////////////////////////////////////////////
-// モジュール名 readLogTest
-// 処理概要     試験用ログを読み込み、マーカー位置と読込件数を求める
-// 引数         logNumber: 読み込むログ番号
-// 戻り値       読込データ件数、失敗時は負のエラーコード
-/////////////////////////////////////////////////////////////////////
-int16_t readLogTest(int logNumber)
-{
-	// ログファイルを読み込むための変数
-	FIL fil_Read;
-	FRESULT fresult;
-	char fileName[10];
-	int16_t ret = 0;
-	bool lock_acquired = sd_fatfs_lock(200);
-
-	if (!lock_acquired)
-	{
-		return -9; // SD/FatFs使用中
-	}
-
-	if (!runMemoryPrepare(RUN_MEMORY_DISTANCE))
-	{
-		sd_fatfs_unlock();
-		return -9;
-	}
-
-	snprintf(fileName, sizeof(fileName), "%d", logNumber);			   // ログ番号を文字列へ変換する
-	strcat(fileName, ".csv");										   // CSV拡張子を追加する
-	fresult = f_open(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ); // バイナリ優先、欠落時のみCSVを読む
-
-	if (fresult == FR_OK)
-	{
-		TCHAR *log = runAnalysisLine;
-		const int log_len = CA_SECOND_LOG_LINE_BUFSIZE;
-		int32_t time, marker, velo, distance;
-		float angVelo;
-		int32_t startEnc = 0, numD = 0, numM = 0, beforeMarker = 0;
-		bool analysis = false;
-
-		// 解析の前処理
-		// 解析データ配列を初期化する
-		memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
-
-		// ログデータの読み込みを開始する
-		while (f_gets(log, log_len, &fil_Read))
-		{
-			if (sscanf(log, "%ld,%ld,%f,%ld,%ld", &time, &velo, &angVelo, &marker, &distance) != 5)
-			{
-				continue; // メタデータ行と列名行を除外
-			}
-
-			// マーカー状態を解析する
-			if (marker == 1 && beforeMarker == 0)
-			{
-				// ゴールマーカー検出時に解析フラグを反転する
-				analysis = !analysis;
-				startEnc = distance;
-			}
-			else if (marker == 0 && beforeMarker == 2)
-			{
-				// カーブマーカー通過時にマーカー位置を記録する
-				markerPos[numM].distance = distance;
-				markerPos[numM].indexPPAD = numD;
-				numM++; // マーカー解析インデックスを更新する
-			}
-			if (!analysis && startEnc > 0)
-				break;
-			numD++;
-		}
-		ret = numD;
-	}
-	else
-	{
-		ret = -1;
-	}
-	f_close(&fil_Read);
-	if (lock_acquired)
-	{
-		sd_fatfs_unlock();
-	}
-
-	// 解析済みログ番号を更新する
-	// saveLogNumber(logNumber);
-	analyzedNumber = logNumber;
-
-	return ret;
-}
 // モジュール名 calcXYcies
 // 処理概要     一次走行ログから再走行またはショートカット経路を生成する
 // 引数         logNumber: 解析するログ番号

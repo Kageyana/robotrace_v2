@@ -1,4 +1,4 @@
-﻿#ifndef COURSEANALYSIS_H_
+#ifndef COURSEANALYSIS_H_
 #define COURSEANALYSIS_H_
 //====================================//
 // インクルード
@@ -105,8 +105,6 @@ int16_t readLogDistance(int logNumber);
 int16_t readLogDistanceSlip(int16_t baseLogNumber, int16_t slipLogNumber,
 	void (*progress)(const char *stage, uint32_t lineNo));
 float asignVelocity(int16_t ROC);
-int cmpfloat(const void *n1, const void *n2);
-int16_t readLogTest(int logNumber);
 int16_t calcXYcies(int logNumber);
 void calcXYcie(int64_t totalPulseSum, float angleDeg);
 void clearXYcie(void);

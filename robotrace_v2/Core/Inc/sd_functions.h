@@ -26,31 +26,7 @@ int sd_mount(void);
 int sd_unmount(void);
 int sd_remount(void);
 
-// Basic file operations
-int sd_write_file(const char *filename, const char *text);
-int sd_append_file(const char *filename, const char *text);
-int sd_read_file(const char *filename, char *buffer, UINT bufsize, UINT *bytes_read);
-int sd_delete_file(const char *filename);
-int sd_rename_file(const char *oldname, const char *newname);
-
-
-// Directory handling
-FRESULT sd_create_directory(const char *path);
-void sd_list_directory_recursive(const char *path, int depth);
-void sd_list_files(void);
-
 // Space information
 int sd_get_space_kb(void);
-
-//csv File operations
-// CSV Record structure
-typedef struct CsvRecord {
-    char field1[32];
-    char field2[32];
-    int value;
-} CsvRecord;
-
-// CSV reader (caller defines record array)
-int sd_read_csv(const char *filename, CsvRecord *records, int max_records, int *record_count);
 
 #endif // __SD_FUNCTIONS_H__

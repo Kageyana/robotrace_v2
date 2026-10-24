@@ -38,7 +38,6 @@ bool logHasIncompleteTemp(void);
 #define BUFFER_SIZE_MARKER 500
 #define FILENUMBER_NUM 1000		// ログファイルナンバーの上限
 #define FILENUMBER_ALARM 50	// 書き込み不備を警告する数
-#define FILENUMBER_LIMIT 100	// 超過時に古いログを削除する上限数
 
 #define PATH_SETTING "./setting/"
 #define FILENAME_LOGNUMBER "lognum"	// 保存ログ番号ファイル名(拡張子なし)
@@ -66,7 +65,6 @@ void endTempFile(void);
 bool endLog(void);
 bool logLastPrimaryRouteValid(void);
 uint8_t logLastPrimaryRouteReason(void);
-void writeMarkerPos(uint32_t distance, uint8_t marker);
 void initLog(void);
 // スキーマ順で1レコードを書き込む。
 bool writeLogBufferPuts(void);
@@ -75,13 +73,11 @@ void send8bit(uint8_t data);
 void send16bit(uint16_t data);
 void send32bit(uint32_t data);
 int16_t getFileNumbers(void);
-int16_t getNextLogNumber(void);
 int16_t getLastLogNumber(void);
 void setLogStr(char *column, char *format);
 void setLogHeaderStr(char *name, int32_t value);
 void setLogHeaderStrF(char *name, float value);
 void setLogHeaderStrS(char *name, const char *value);
-void SDtest(void);
 void createDir(char *dirName);
 bool sd_fatfs_lock(uint32_t timeout_ms);
 void sd_fatfs_unlock(void);
@@ -89,5 +85,4 @@ bool sd_fatfs_is_locked(void);
 bool sd_fatfs_try_lock(void);
 void sd_set_analysis_active(bool active);
 bool sd_is_analysis_active(void);
-void sd_flush_log(void);
 #endif // SDCARD_H_

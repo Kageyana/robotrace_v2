@@ -32,7 +32,6 @@ extern volatile IsrTimingStats isrTimingStats[ISR_TIMING_MODE_COUNT];
 //====================================//
 void Interrupt1ms(void);
 void Interrupt500us(void);
-void Interrupt300ns(void);
 void logWriteTask(void);
 
 #endif // TIMER_H_

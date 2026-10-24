@@ -421,28 +421,6 @@ bool sd_is_analysis_active(void)
 {
 	return sd_analysis_active;
 }
-void sd_flush_log(void)
-{
-	if (sd_is_analysis_active())
-	{
-		return;
-	}
-
-	// drain pending writes before analysis
-	while (logBufferWriter.flushPending || logBufferWriter.pendingPending)
-	{
-		writeLogPuts();
-	}
-
-	if (sd_fatfs_try_lock())
-	{
-		f_sync(&fil_W);
-		sd_fatfs_unlock();
-	}
-}
-
-
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 sd_fatfs_try_lock
 // 処理概要     FatFsロックをノンブロッキングで取得する
@@ -630,23 +608,6 @@ static int16_t calcNextLogNumber(void)
 	if (result != FR_OK || closeResult != FR_OK || maximum >= INT16_MAX) return 0;
 	return (int16_t)(maximum + 1U);
 }
-/////////////////////////////////////////////////////////////////////
-// モジュール名 getNextLogNumber
-// 処理概要     画面表示用の次ログ番号を取得する
-// 引数         なし
-// 戻り値       次のログ番号
-/////////////////////////////////////////////////////////////////////
-int16_t getNextLogNumber(void)
-{
-	// まだ採番前なら計算値のみ返す
-	if (logFileNumber == 0)
-	{
-		return calcNextLogNumber();
-	}
-	// 直前採番の次を返す
-	return (int16_t)(logFileNumber + 1);
-}
-
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getLastLogNumber
 // 処理概要     バイナリ保存用に予約した直前ログ番号を取得する
@@ -1946,28 +1907,6 @@ void setLogHeaderStrS(char *name, const char *value)
 
 	snprintf(headerStr, sizeof(headerStr), "%s=%s,", name, value);
 	strncat(columnTitle, headerStr, sizeof(columnTitle) - strlen(columnTitle) - 1);
-}
-/////////////////////////////////////////////////////////////////////
-// モジュール名 SDtest
-// 処理概要     SDカードの読み書きテスト
-// 引数         なし
-// 戻り値       なし
-/////////////////////////////////////////////////////////////////////
-void SDtest(void)
-{
-	FIL fil_T; // テスト用ファイル
-	FRESULT fresult;		// f_write status
-
-	fresult = f_open(&fil_T, "test.csv", FA_OPEN_ALWAYS | FA_WRITE); // create file
-	uint32_t start = HAL_GetTick(); // SPI待ちにタイムアウトを設定
-	while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY)
-	{
-		if (HAL_GetTick() - start > 1000)
-		{
-			break;
-		}
-	}
-	f_close(&fil_T);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 createDir

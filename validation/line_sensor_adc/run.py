@@ -51,8 +51,11 @@ def main():
              "validateLineSensorCalibrationValues", "isLineSensorCalibrationValid", "finishLineSensorCalibration",
              "powerLineSensors", "lineSensorPhaseChanged", "startLineSensorAcquisition",
              "completeLineSensorAcquisition", "failLineSensorAcquisition", "monitorLineSensorUpdate1ms",
-             "getLineSensor", "normalizeLineSensor"]
+             "getLineSensor", "normalizeLineSensor", "getAngleSensor"]
+    imu_h = (INC / "IMU.h").read_text(encoding="utf-8-sig")
+    constants += "\n" + next(x for x in imu_h.splitlines() if x.startswith("#define IMU_PI_F "))
     body = constants + "\n" + data + calibration + "\n".join(function(line, x) for x in names)
+    body = next(x for x in line.splitlines() if x.strip() == "float angleSensor;") + "\n" + body
     body += function(marker, "getMarkerSensor") + function(marker, "powerMarkerSensors")
     body += function(battery, "getVref").replace("(__IO uint16_t*)0x1FFF7A2A", "&mockVrefCal")
     body += "\n".join(function(callbacks, x) for x in ["HAL_ADC_ConvCpltCallback",

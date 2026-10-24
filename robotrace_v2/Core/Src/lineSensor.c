@@ -461,11 +461,13 @@ void getLineSensor(bool phase, const uint16_t *sample, uint32_t epoch)
 /////////////////////////////////////////////////////////////////////
 void getAngleSensor(void)
 {
-	uint16_t index, sen1, sen2, i, min;
+	uint16_t index = 0U, sen1, sen2, i, min;
 	float nsen1, nsen2, phi, dthita;
 
-	min = 1000;
-	for (i = 0; i < NUM_SENSORS; i++)
+	// 全入力範囲で最小値を選び、端や無効入力では角度を0にする。
+	angleSensor = 0.0F;
+	min = lSensor[0];
+	for (i = 1U; i < NUM_SENSORS; i++)
 	{
 		if (lSensor[i] < min)
 		{
@@ -474,11 +476,12 @@ void getAngleSensor(void)
 		}
 	}
 
-	if (index >= 0 && index <= NUM_SENSORS - 1)
+	if (index > 0U && index < NUM_SENSORS - 1U)
 	{ // 両端のセンサが白線の上にあるときは無視
 		// 白線に一番近いセンサの両隣のセンサ値を取得
 		sen1 = lSensor[index - 1];
 		sen2 = lSensor[index + 1];
+		if (sen1 == 0U && sen2 == 0U) return;
 		// 正規化
 		nsen1 = (float)sen1 / (sen1 + sen2);
 		nsen2 = (float)sen2 / (sen1 + sen2);

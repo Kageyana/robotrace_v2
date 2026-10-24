@@ -179,6 +179,21 @@ static void lateStart(void) { timerRegisters.CNT = 3700; timerRegisters.SR |= TI
 static void powerCycle(void) { powerLineSensors(0); powerLineSensors(1); }
 
 int main(void) {
+    // 全10位置・端・全ゼロ・1000以上の入力で実関数の境界と有限値を確認する。
+    for (unsigned index = 0; index < NUM_SENSORS; ++index) {
+        for (unsigned i = 0; i < NUM_SENSORS; ++i) lSensor[i] = 3000U;
+        lSensor[index] = 2000U;
+        angleSensor = 999.0F;
+        getAngleSensor();
+        CHECK(isfinite(angleSensor));
+        if (index == 0U || index == NUM_SENSORS - 1U) CHECK(angleSensor == 0.0F);
+        else CHECK(fabsf(angleSensor - ((float)index - 5.5F) * THITA_SENSOR) < 0.001F);
+    }
+    memset(lSensor, 0, sizeof(lSensor));
+    getAngleSensor(); CHECK(angleSensor == 0.0F);
+    for (unsigned i = 0; i < NUM_SENSORS; ++i) lSensor[i] = UINT16_MAX;
+    getAngleSensor(); CHECK(angleSensor == 0.0F);
+    puts("PASS: sensor angle retained, both endpoints ignored, full ADC range and zero input safe");
     CHECK(!isLineSensorCalibrationValid());
     finishLineSensorCalibration(); CHECK(!isLineSensorCalibrationValid());
     reset();
