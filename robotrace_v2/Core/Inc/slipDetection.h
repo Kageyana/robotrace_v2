@@ -21,7 +21,7 @@
 #define SLIP_V2_LONG_OFF 8.0F
 // 角加速度LPFと応答をそろえた残差に対するユーザー指定の暫定閾値[m/s^2]。
 // V2の正式な横判定とSLIP速度計画に使用する。
-#define SLIP_LAT_CANDIDATE_ON 6.5F
+#define SLIP_LAT_CANDIDATE_ON 6.7F
 #define SLIP_LAT_CANDIDATE_OFF 4.5F
 #define SLIP_V2_YAW_ON_DPS 60.0F
 #define SLIP_V2_YAW_OFF_DPS 45.0F

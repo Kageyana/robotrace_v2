@@ -6,11 +6,13 @@
 
 - 検出器の保存版は`slipDetectorVersion=4`、方式は`slipDetectorMode=ACTIVE_V2`。
 - 縦は`slipV2LongFast`だけでON/OFFを判定する。ON 10/OFF 8 m/s²、3/5ms。`slipV2LongSlow`は診断として維持する。
-- 横は時間応答を整合した候補版5を正式採用し、`slipV2Lat`へ記録する。ON 6.5/OFF 4.5 m/s²、3/5ms、LPF 0.8、`slipLatPolicy=matched_candidate_v5`。
+- 横は時間応答を整合した候補版5を正式採用し、`slipV2Lat`へ記録する。ON 6.7/OFF 4.5 m/s²、3/5ms、LPF 0.8、`slipLatPolicy=matched_candidate_v5`。
 - `slipV2Flags`のbit0は縦、bit1は採用横、bit2はYaw不整合。`slipV2Lat`・`slipV2PeakLat`・`slipV2OnLatMs`も採用横の残差・ピーク・ON時間へ変更した。採用前の基準横4.6/3.8の意味へ読み替えない。
 - 横独自の`slipV2LatValid/Reason/ValidMs/IntervalReason`を保存する。横接線項だけが無効なときも、縦の有効性と分ける。`slipV2LatCandidate`・`…Flag`・`…Peak`・`…OnMs`の重複4列は削除した。内部の候補状態と診断メタデータは判定実装の識別に使うため維持する。
 - V1の検出コード、電流/PWMによる旧ゲート、LEGACY/SHADOW選択、旧距離スケール補正を削除した。未検証の滑り量推定モデルは制御へ組み込まない。
 - 1msのセンサー取得→V2更新→制御・ログスナップショットの順序を維持する。割り込みでSD読込・書込・表示処理を追加していない。
+
+2026-10-24の既存変更で横ONを6.5から6.7 m/s²へ調整した。保存検出器版4・横OFF4.5・窓/LPF/継続時間は維持する。19:59:54ビルドの13589〜13599で保存閾値6.699999809（floatの6.7相当）を確認。一次の短い不要ONは残り、調査中断時の採用値として記録する。
 
 ## SLIP計画
 

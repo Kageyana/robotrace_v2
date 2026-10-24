@@ -552,6 +552,8 @@ cmake --build --preset Release
 
 ### 2026-10-21以降のV2正式採用ログ
 
+- 2026-10-24の現行横ON閾値は6.7 m/s²、OFFは4.5 m/s²。正式採用直後のON6.5とはログメタデータで区別する。窓・LPF・3/5ms継続・検出器版4は維持する。
+
 - 横ログ重複整理後は通常66列/170 B、詳細72列/179 B。正式採用直後の13571～13577は通常70列/181 Bであり、保存スキーマで区別する。以下のSHADOW時代の列数・意味は履歴であり、新規ログでは本節を優先する。
 - 旧`slipFlag`, `slipFlagLat`, `slipRatio`, `slipRatioLat`, `slipLatEnabled`, `slipLatOnCountEnabled`, `slipISumOkCount`, `slipPwmSumF`, `slipISumF`, `slipEncAyF`, `slipImuAyF`を削除する。
 - `slipV2Lat`, `slipV2Flags`の横bit、`slipV2PeakLat`, `slipV2OnLatMs`は採用横（LatCandidate版5）の残差・フラグ・ピーク・ON時間を表し、重複する`slipV2LatCandidate/Flag/Peak/OnMs`列は保存しない。
