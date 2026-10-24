@@ -67,9 +67,7 @@ int32_t encClick = 0;
 // プロトタイプ宣言
 //======================================//
 static void setup_sensors(void); 		// センサ表示とテストメニューを制御する処理
-static void setup_pid_trace(void);		// ゲイン調整(直線トレース)
-static void setup_pid_traceOmegaFB(void); // ゲイン調整(直線トレース 角速度フィードバック)
-static void setup_pid_speed(void);		// ゲイン調整(速度)
+static void setup_pid(pidParam *pid, bool speedTest);
 static void setup_start(void);			// スタート待ち画面とキャリブレーションを制御する処理
 static bool calibrationLinePosition(float *position);
 static void setup_log(void);			// ログ解析と表示を制御
@@ -550,278 +548,86 @@ static void setup_sensors(void)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
-// モジュール名 setup_pid_trace
-// 処理概要     ゲイン調整(直線トレース)
-// 引数         なし
+// モジュール名 setup_pid
+// 処理概要     PIDゲインの表示・編集・試験状態を共通処理し方式ごとの出力を維持する
+// 引数         pid: 調整対象, speedTest: trueなら速度PIDとFFの調整
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////////////////
-static void setup_pid_trace(void)
+static void setup_pid(pidParam *pid, bool speedTest)
 {
-	if (pattern.display != pattern.beforeHex)
-	{
-		// 切替時に実行
-		ssd1306_printf(Font_6x8, "Trace PID");
+    const uint8_t lineRows[] = {18U, 32U, 44U, 0U};
+    const uint8_t speedRows[] = {18U, 30U, 42U, 54U};
+    const uint8_t *rows = speedTest ? speedRows : lineRows;
+    const uint8_t count = speedTest ? 4U : 3U;
+    FontDef gainFont = speedTest ? Font_6x8 : Font_7x10;
+    int16_t *gains[] = {&pid->kp, &pid->ki, &pid->kd, &speedFeedForwardGain};
+    char *labels[] = {"kp:", "ki:", "kd:", "ff:"};
 
-		ssd1306_SetCursor(0, 18);
-		ssd1306_printf(Font_7x10, "kp:");
-		ssd1306_SetCursor(0, 32);
-		ssd1306_printf(Font_7x10, "ki:");
-		ssd1306_SetCursor(0, 44);
-		ssd1306_printf(Font_7x10, "kd:");
-		ssd1306_SetCursor(60, 30);
-		ssd1306_printf(Font_7x10, "pwm:");
-	}
+    if (pattern.display != pattern.beforeHex)
+    {
+        ssd1306_printf(Font_6x8, speedTest ? "Speed PID" : "Trace PID");
+        for (uint8_t i = 0U; i < count; i++)
+        {
+            ssd1306_SetCursor(0, rows[i]);
+            ssd1306_printf(gainFont, labels[i]);
+        }
+        ssd1306_SetCursor(60, 30);
+        ssd1306_printf(Font_7x10, "pwm:");
+    }
 
-	data_select(&testFlags.trace_test, SW_PUSH); // PUSHでトレースON/OFFの選択
-	// PUSHでトレースON/OFF
-	if (testFlags.trace_test == 1)
-	{
-		motorCommandOutSynth(lineTraceCtrl.pwm, 0, 0); // モータを指定PWMで駆動
-		powerLineSensors(1);                          // ラインセンサを有効化
-	}
-	else
-	{
-		motorCommandOutSynth(0, 0, 0);                // モータ停止
-		powerLineSensors(0);                         // ラインセンサ停止
-	}
-	if (testFlags.trace_test != testFlags.beforeMotorTest && testFlags.trace_test == 0)
-	{
-		testFlags.trace_test = 2;                              // 停止待機状態へ遷移
-	}
-	if (testFlags.trace_test == 2 && encCurrentL == 0) // ホイールの回転が停止したら0
-	{
-		testFlags.trace_test = 0;                              // 完全停止後に終了
-	}
-	testFlags.beforeMotorTest = testFlags.trace_test;                        // 状態を保存
+    data_select(&testFlags.trace_test, SW_PUSH);
+    if (testFlags.trace_test == 1)
+    {
+        if (speedTest)
+        {
+            // 速度試験の既存出力を維持する。通常走行の速度PID出力とは別の操作。
+            powerLineSensors(1);
+            setTargetSpeed(0.0F);
+            motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.kp, 0);
+        }
+        else
+        {
+            motorCommandOutSynth(pid->pwm, 0, 0);
+            powerLineSensors(1);
+        }
+    }
+    else
+    {
+        motorCommandOutSynth(0, 0, 0);
+        powerLineSensors(0);
+    }
 
-	// ゲイン表示
-	dataTuningUD(&pattern.gain, 1, 3, 1);
-	if (testFlags.trace_test == 0)
-	{
-		ssd1306_SetCursor(21, 18);
-		if (pattern.gain == 1)
-			ssd1306_printfB(Font_7x10, "%3d", lineTraceCtrl.kp);
-		else
-			ssd1306_printf(Font_7x10, "%3d", lineTraceCtrl.kp);
-		ssd1306_SetCursor(21, 32);
-		if (pattern.gain == 2)
-			ssd1306_printfB(Font_7x10, "%3d", lineTraceCtrl.ki);
-		else
-			ssd1306_printf(Font_7x10, "%3d", lineTraceCtrl.ki);
-		ssd1306_SetCursor(21, 44);
-		if (pattern.gain == 3)
-			ssd1306_printfB(Font_7x10, "%3d", lineTraceCtrl.kd);
-		else
-			ssd1306_printf(Font_7x10, "%3d", lineTraceCtrl.kd);
+    if (speedTest)
+    {
+        veloCtrlL.kp = veloCtrlR.kp = veloCtrl.kp;
+        veloCtrlL.ki = veloCtrlR.ki = veloCtrl.ki;
+        veloCtrlL.kd = veloCtrlR.kd = veloCtrl.kd;
+    }
+    else
+    {
+        if (testFlags.trace_test != testFlags.beforeMotorTest && testFlags.trace_test == 0)
+            testFlags.trace_test = 2;
+        if (testFlags.trace_test == 2 && encCurrentL == 0)
+            testFlags.trace_test = 0;
+        testFlags.beforeMotorTest = testFlags.trace_test;
+    }
 
-		// 制御量表示
-		ssd1306_SetCursor(88, 30);
-		ssd1306_printf(Font_7x10, "%4d", lineTraceCtrl.pwm);
-
-		switch (pattern.gain)
-		{
-		case 1:
-			// kp
-			dataTuningLR(&lineTraceCtrl.kp, 1, 0, 255);
-			break;
-		case 2:
-			// ki
-			dataTuningLR(&lineTraceCtrl.ki, 1, 0, 255);
-			break;
-		case 3:
-			// kd
-			dataTuningLR(&lineTraceCtrl.kd, 1, 0, 255);
-			break;
-		}
-	}
-}
-///////////////////////////////////////////////////////////////////////////////////////
-// モジュール名 setup_pid_trace
-// 処理概要     ゲイン調整(直線トレース)
-// 引数         なし
-// 戻り値       なし
-///////////////////////////////////////////////////////////////////////////////////////
-static void setup_pid_traceOmegaFB(void)
-{
-	if (pattern.display != pattern.beforeHex)
-	{
-		// 切替時に実行
-		ssd1306_printf(Font_6x8, "Trace PID");
-
-		ssd1306_SetCursor(0, 18);
-		ssd1306_printf(Font_7x10, "kp:");
-		ssd1306_SetCursor(0, 32);
-		ssd1306_printf(Font_7x10, "ki:");
-		ssd1306_SetCursor(0, 44);
-		ssd1306_printf(Font_7x10, "kd:");
-		ssd1306_SetCursor(60, 30);
-		ssd1306_printf(Font_7x10, "pwm:");
-	}
-
-	data_select(&testFlags.trace_test, SW_PUSH); // PUSHでトレースON/OFFの選択
-	// PUSHでトレースON/OFF
-	if (testFlags.trace_test == 1)
-	{
-		motorCommandOutSynth(lineTraceOmegaFBCtrl.pwm, 0, 0); // モータを指定PWMで駆動
-		powerLineSensors(1);                          // ラインセンサを有効化
-	}
-	else
-	{
-		motorCommandOutSynth(0, 0, 0);                // モータ停止
-		powerLineSensors(0);                         // ラインセンサ停止
-	}
-	if (testFlags.trace_test != testFlags.beforeMotorTest && testFlags.trace_test == 0)
-	{
-		testFlags.trace_test = 2;                              // 停止待機状態へ遷移
-	}
-	if (testFlags.trace_test == 2 && encCurrentL == 0) // ホイールの回転が停止したら0
-	{
-		testFlags.trace_test = 0;                              // 完全停止後に終了
-	}
-	testFlags.beforeMotorTest = testFlags.trace_test;                        // 状態を保存
-
-	// ゲイン表示
-	dataTuningUD(&pattern.gain, 1, 3, 1);
-	if (testFlags.trace_test == 0)
-	{
-		ssd1306_SetCursor(21, 18);
-		if (pattern.gain == 1)
-			ssd1306_printfB(Font_7x10, "%3d", lineTraceOmegaFBCtrl.kp);
-		else
-			ssd1306_printf(Font_7x10, "%3d", lineTraceOmegaFBCtrl.kp);
-		ssd1306_SetCursor(21, 32);
-		if (pattern.gain == 2)
-			ssd1306_printfB(Font_7x10, "%3d", lineTraceOmegaFBCtrl.ki);
-		else
-			ssd1306_printf(Font_7x10, "%3d", lineTraceOmegaFBCtrl.ki);
-		ssd1306_SetCursor(21, 44);
-		if (pattern.gain == 3)
-			ssd1306_printfB(Font_7x10, "%3d", lineTraceOmegaFBCtrl.kd);
-		else
-			ssd1306_printf(Font_7x10, "%3d", lineTraceOmegaFBCtrl.kd);
-
-		// 制御量表示
-		ssd1306_SetCursor(88, 30);
-		ssd1306_printf(Font_7x10, "%4d", lineTraceOmegaFBCtrl.pwm);
-
-		switch (pattern.gain)
-		{
-		case 1:
-			// kp
-			dataTuningLR(&lineTraceOmegaFBCtrl.kp, 1, 0, 255);
-			break;
-		case 2:
-			// ki
-			dataTuningLR(&lineTraceOmegaFBCtrl.ki, 1, 0, 255);
-			break;
-		case 3:
-			// kd
-			dataTuningLR(&lineTraceOmegaFBCtrl.kd, 1, 0, 255);
-			break;
-		}
-	}
-}
-///////////////////////////////////////////////////////////////////////////////////////
-// モジュール名 setup_pid_speed
-// 処理概要     ゲイン調整(速度)
-// 引数         なし
-// 戻り値       なし
-///////////////////////////////////////////////////////////////////////////////////////
-static void setup_pid_speed(void)
-{
-	if (pattern.display != pattern.beforeHex)
-	{
-		// 切替時に表示項目を初期化
-		ssd1306_printf(Font_6x8, "Speed PID");
-
-		ssd1306_SetCursor(0, 18);
-		ssd1306_printf(Font_6x8, "kp:");
-		ssd1306_SetCursor(0, 30);
-		ssd1306_printf(Font_6x8, "ki:");
-		ssd1306_SetCursor(0, 42);
-		ssd1306_printf(Font_6x8, "kd:");
-		ssd1306_SetCursor(0, 54);
-		ssd1306_printf(Font_6x8, "ff:");	// フィードフォワード係数の表示欄
-		ssd1306_SetCursor(60, 30);
-		ssd1306_printf(Font_7x10, "pwm:");
-	}
-
-	data_select(&testFlags.trace_test, SW_PUSH); // PUSHでトレースON/OFFの選択
-	// PUSHでトレースON/OFF
-	if (testFlags.trace_test == 1)
-	{
-		// トレースON時の制御
-		powerLineSensors(1); // ラインセンサを有効化
-		setTargetSpeed(0.0f); // 目標速度をリセット
-		motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.kp, 0); // モータを指定PWMで駆動
-	}
-	else
-	{
-		// トレースOFF時の制御
-		motorCommandOutSynth(0, 0, 0); // モータ停止
-		powerLineSensors(0);          // ラインセンサ停止
-	}
-
-	veloCtrlL.kp = veloCtrl.kp; // 左右速度制御ゲイン同期
-	veloCtrlR.kp = veloCtrl.kp;
-	veloCtrlL.ki = veloCtrl.ki;
-	veloCtrlR.ki = veloCtrl.ki;
-	veloCtrlL.kd = veloCtrl.kd;
-	veloCtrlR.kd = veloCtrl.kd;
-
-	// ゲイン表示
-	dataTuningUD(&pattern.gain, 1, 4, 1); // 調整対象のゲインを選択(フィードフォワード係数を含む)
-	if (testFlags.trace_test == 0)
-	{
-		ssd1306_SetCursor(21, 18);
-		if (pattern.gain == 1)
-			ssd1306_printfB(Font_6x8, "%3d", veloCtrl.kp);
-		else
-			ssd1306_printf(Font_6x8, "%3d", veloCtrl.kp);
-
-		ssd1306_SetCursor(21, 30);
-		if (pattern.gain == 2)
-			ssd1306_printfB(Font_6x8, "%3d", veloCtrl.ki);
-		else
-			ssd1306_printf(Font_6x8, "%3d", veloCtrl.ki);
-
-		ssd1306_SetCursor(21, 42);
-		if (pattern.gain == 3)
-			ssd1306_printfB(Font_6x8, "%3d", veloCtrl.kd);
-		else
-			ssd1306_printf(Font_6x8, "%3d", veloCtrl.kd);
-
-		ssd1306_SetCursor(21, 54);
-		if (pattern.gain == 4)
-			ssd1306_printfB(Font_6x8, "%3d", speedFeedForwardGain);
-		else
-			ssd1306_printf(Font_6x8, "%3d", speedFeedForwardGain);
-
-		// 制御量表示
-		ssd1306_SetCursor(88, 30);
-		ssd1306_printf(Font_7x10, "%4d", veloCtrl.pwm);
-
-		// 選択したゲインを調整
-		switch (pattern.gain)
-		{
-		case 1:
-			// kpゲインを調整
-			dataTuningLR(&veloCtrl.kp, 1, 0, 255);
-			break;
-		case 2:
-			// kiゲインを調整
-			dataTuningLR(&veloCtrl.ki, 1, 0, 255);
-			break;
-		case 3:
-			// kdゲインを調整
-			dataTuningLR(&veloCtrl.kd, 1, 0, 255);
-			break;
-		case 4:
-			// フィードフォワード係数を調整
-			dataTuningLR(&speedFeedForwardGain, 1, 0, 255);
-			break;
-		}
-	}
+    dataTuningUD(&pattern.gain, 1, count, 1);
+    if (testFlags.trace_test == 0)
+    {
+        for (uint8_t i = 0U; i < count; i++)
+        {
+            ssd1306_SetCursor(21, rows[i]);
+            if (pattern.gain == (int16_t)(i + 1U))
+                ssd1306_printfB(gainFont, "%3d", *gains[i]);
+            else
+                ssd1306_printf(gainFont, "%3d", *gains[i]);
+        }
+        ssd1306_SetCursor(88, 30);
+        ssd1306_printf(Font_7x10, "%4d", pid->pwm);
+        if (pattern.gain >= 1 && pattern.gain <= count)
+            dataTuningLR(gains[pattern.gain - 1], 1, 0, 255);
+    }
 }
 /////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_calibration
@@ -1519,7 +1325,7 @@ void setup(void)
 	//------------------------------------------------------------------
 	case HEX_PID_TRACE:
 	{
-		setup_pid_trace(); // ゲイン調整(直線トレース)
+		setup_pid(&lineTraceCtrl, false); // ゲイン調整(直線トレース)
 		break;
 	}
 	//------------------------------------------------------------------
@@ -1527,7 +1333,7 @@ void setup(void)
 	//------------------------------------------------------------------
 	case HEX_PID_TRACE_OMEGA:
 	{
-		setup_pid_traceOmegaFB(); // ゲイン調整(直線トレース)
+		setup_pid(&lineTraceOmegaFBCtrl, false); // ゲイン調整(直線トレース)
 		break;
 	}
 	//------------------------------------------------------------------
@@ -1535,7 +1341,7 @@ void setup(void)
 	//------------------------------------------------------------------
 	case HEX_PID_SPEED:
 	{
-		setup_pid_speed(); // 速度PIDゲイン調整
+		setup_pid(&veloCtrl, true); // 速度PIDゲイン調整
 		break;
 	}
 
