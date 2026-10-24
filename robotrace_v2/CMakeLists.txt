@@ -37,7 +37,7 @@ add_executable(${CMAKE_PROJECT_NAME})
 # ログスキーマのプロファイル。1:通常の軽量ログ、0:詳細デバッグ列を含むログ。
 # マーカー誤検出の調査時は -DROBOTRACE_LOG_SCHEMA_PROFILE_LIGHT=0 を指定する。
 set(ROBOTRACE_LOG_SCHEMA_PROFILE_LIGHT "1" CACHE STRING "1=light log schema, 0=debug log schema")
-option(ROBOTRACE_LOG_PERFORMANCE "Collect stopped log conversion/analysis statistics" OFF)
+option(ROBOTRACE_LOG_PERFORMANCE "Collect stopped binary log validation/analysis statistics" OFF)
 option(ROBOTRACE_ISR_TIMING "Collect running TIM6 cycle statistics for validation" OFF)
 
 execute_process(

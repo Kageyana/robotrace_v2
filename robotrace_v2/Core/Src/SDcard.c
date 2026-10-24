@@ -30,7 +30,6 @@ FIL fil_R;
 // 詳細デバッグ列を含むCSVのフォーマットと1行分を格納できるサイズにする。
 #define LOG_COLUMN_TITLE_BUFFER_SIZE 4096U
 #define LOG_FORMAT_BUFFER_SIZE       512U
-#define LOG_CSV_LINE_BUFFER_SIZE    1024U
 #define LOG_TEMP_PREALLOC_BYTES (2UL * 1024UL * 1024UL)
 char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE] = "", formatLog[LOG_FORMAT_BUFFER_SIZE] = "";
 
@@ -60,7 +59,7 @@ _Static_assert(LOG_BINARY_COLUMNS <= LOG_BINARY_MAX_COLUMNS, "too many log colum
 static LogBufferWriter logBufferWriter;
 static _Alignas(LOG_BUFFER_SECTOR_SIZE_BYTES) union {
     uint8_t logging[LOG_BUFFER_COUNT][LOG_BUFFER_SIZE_BYTES];
-    struct { uint8_t input[4096]; uint8_t output[2048]; } stopped;
+    struct { uint8_t input[4096]; } stopped;
 } logIoMemory;
 #define logBuffers (logIoMemory.logging)
 _Static_assert(sizeof(logIoMemory) == 6144U, "shared log I/O memory must remain 6 KiB");
@@ -69,7 +68,6 @@ volatile LogPerformanceStats logPerformanceStats;
 #endif
 
 static struct { FIL *file; FSIZE_t end, physical; UINT position, length; } logReadAhead;
-static UINT logCsvOutputLength;
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logReadAheadReset
@@ -117,45 +115,6 @@ static FRESULT logReadBuffered(FIL *file, uint8_t *bytes, UINT length, FSIZE_t e
     return FR_OK;
 }
 
-/////////////////////////////////////////////////////////////////////
-// モジュール名 logCsvFlush
-// 処理概要     蓄積CSVをまとめて書き、短い書込を検出する
-// 引数         file: 出力ファイル
-// 戻り値       true: 成功 false: 書込失敗
-/////////////////////////////////////////////////////////////////////
-static bool logCsvFlush(FIL *file)
-{
-    if (logCsvOutputLength == 0U) return true;
-    UINT written = 0U;
-    LOG_PERF_BEGIN(tick);
-    FRESULT result = f_write(file, logIoMemory.stopped.output, logCsvOutputLength, &written);
-    LOG_PERF_END(writeMs, tick); LOG_PERF_ADD(writeCalls, 1U); LOG_PERF_ADD(writeBytes, written);
-    if (result != FR_OK || written != logCsvOutputLength) return false;
-    logCsvOutputLength = 0U;
-    return true;
-}
-
-/////////////////////////////////////////////////////////////////////
-// モジュール名 logCsvAppend
-// 処理概要     f_putsと同じCRLF変換を行い2KiB単位でCSVを書き込む
-// 引数         file: 出力ファイル, text: 追記文字列
-// 戻り値       true: 成功 false: 書込失敗
-/////////////////////////////////////////////////////////////////////
-static bool logCsvAppend(FIL *file, const char *text)
-{
-    while (*text != '\0') {
-        char c = *text++;
-#if _USE_STRFUNC == 2
-        if (c == '\n') {
-            logIoMemory.stopped.output[logCsvOutputLength++] = '\r';
-            if (logCsvOutputLength == sizeof(logIoMemory.stopped.output) && !logCsvFlush(file)) return false;
-        }
-#endif
-        logIoMemory.stopped.output[logCsvOutputLength++] = (uint8_t)c;
-        if (logCsvOutputLength == sizeof(logIoMemory.stopped.output) && !logCsvFlush(file)) return false;
-    }
-    return true;
-}
 static float cross_start_mm[CROSSSEG_MAX];
 static float cross_end_mm[CROSSSEG_MAX];
 uint16_t cntSend = 0;
@@ -182,10 +141,6 @@ static bool logTempWarning = false;
 static bool logTempOpen = false;
 static uint32_t savedDataCrc = 0U;
 static uint16_t sourceCrossCount = 0U;
-static LogProgressCallback logProgressCallback;
-static LogConversionProgress conversionProgress;
-static uint64_t conversionWorkDone, conversionWorkTotal;
-static bool conversionBatchComplete;
 static bool lastRunSaved = false;
 static bool lastPrimaryRouteValid = false;
 static bool runImuCalibrationValid = false;
@@ -234,7 +189,6 @@ static float logReadF32(void);
 static void logReadRecord(LogRecord *rec, uint8_t schemaFormat, uint32_t profile);
 static void logBuildColumns(uint8_t schemaFormat, uint32_t profile);
 static uint32_t logBinarySchema(void);
-static void logConversionNotify(LogConversionStage stage, uint32_t rows);
 static bool readSavedLogNumber(int16_t *outNumber);
 static void writeSavedLogNumber(int16_t fileNumber);
 static int16_t calcNextLogNumber(void);
@@ -823,7 +777,7 @@ void initLog(void)
 		runPrimaryLogNumber = pathRouteSourceLog();
 	}
 	primaryRouteValidation = (PrimaryRouteValidation){false, false, false, 0, 0, 0.0F, 1U};
-	// CSV変換ループの実行回数を走行ごとに正しく制御するため送信カウンタをリセット
+	// 走行ごとの記録件数を初期化する
 	cntSend = 0;
 	char fileName[20];
 	int16_t next = calcNextLogNumber();
@@ -1035,7 +989,7 @@ static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t recordB
 			return false;
 		}
 		crc = logBinaryCrcUpdate(crc, log, recordBytes);
-		if (logProgressCallback != NULL) { conversionWorkDone++; logConversionNotify(LOG_CONVERT_SCAN, (uint32_t)j + 1U); }
+
 		logaddress = log;
 		logReadRecord(&rec, schemaFormat, profile);
 
@@ -1174,7 +1128,7 @@ bool endLog(void)
 	if (!logTempOpen) return false;
 	FRESULT fresult;
 	UINT writtenlog;
-	while (logBufferWriter.flushPending || logBufferWriter.pendingPending) // drain pending writes before CSV conversion
+	while (logBufferWriter.flushPending || logBufferWriter.pendingPending) // 確定処理前に保留中の書込を完了する
 	{
 		writeLogPuts();
 	}
@@ -1266,23 +1220,6 @@ static struct {
 static uint32_t logBinarySchema(void)
 {
     return ~logBinaryCrcUpdate(UINT32_MAX, (const uint8_t *)logSchemaText, sizeof(logSchemaText) - 1U);
-}
-
-/////////////////////////////////////////////////////////////////////
-// モジュール名 logConversionNotify
-// 処理概要     行数を基準とした変換進捗を通知する
-// 引数         stage: 処理段階, rows: 処理済み行数
-// 戻り値       なし
-/////////////////////////////////////////////////////////////////////
-static void logConversionNotify(LogConversionStage stage, uint32_t rows)
-{
-    conversionProgress.stage = stage;
-    conversionProgress.processedRows = rows;
-    uint64_t percent = conversionWorkTotal ? (conversionWorkDone * 100U / conversionWorkTotal) : 0U;
-    if (percent > 99U) percent = 99U;
-    if (stage == LOG_CONVERT_DONE && conversionBatchComplete && conversionProgress.fileIndex == conversionProgress.fileCount) percent = 100U;
-    conversionProgress.totalPercent = (uint8_t)percent;
-    if (logProgressCallback) logProgressCallback(&conversionProgress);
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -1543,139 +1480,15 @@ bool logSourceBinaryPoint(FIL *file, float *x, float *y, float *pulse)
 }
 
 /////////////////////////////////////////////////////////////////////
-// モジュール名 logFormatSourceRow
-// 処理概要     共通計算済み記録を従来のCSV書式へ変換する
-// 引数         line: 出力先, capacity: 容量[B]
-// 戻り値       true: 変換成功 false: 容量不足
-/////////////////////////////////////////////////////////////////////
-static bool logFormatSourceRow(char *line, size_t capacity)
-{
-    LogRecord rec = binarySource.record;
-    float log_roc = binarySource.roc, log_x = binarySource.x, log_y = binarySource.y;
-#define LOG_FORMAT_VALUE_U8(value) (value)
-#define LOG_FORMAT_VALUE_U16(value) (value)
-#define LOG_FORMAT_VALUE_S16(value) (value)
-#define LOG_FORMAT_VALUE_U32(value) ((int32_t)(value))
-#define LOG_FORMAT_VALUE_S32(value) ((long)(value))
-#define LOG_FORMAT_VALUE_F32(value) (value)
-#define LOG_CSV_ARG_STORED(type, name, fmt, expr) , LOG_FORMAT_VALUE_##type(rec.name)
-#define LOG_CSV_ARG_DERIVED(type, name, fmt, expr) , LOG_FORMAT_VALUE_##type(expr)
-    int length = snprintf(line, capacity, formatLog LOG_FIELD_LIST(LOG_CSV_ARG_STORED, LOG_CSV_ARG_DERIVED));
-#undef LOG_CSV_ARG_STORED
-#undef LOG_CSV_ARG_DERIVED
-#undef LOG_FORMAT_VALUE_U8
-#undef LOG_FORMAT_VALUE_U16
-#undef LOG_FORMAT_VALUE_S16
-#undef LOG_FORMAT_VALUE_U32
-#undef LOG_FORMAT_VALUE_S32
-#undef LOG_FORMAT_VALUE_F32
-    return length >= 0 && (size_t)length < capacity;
-}
-
-/////////////////////////////////////////////////////////////////////
-// モジュール名 logExistingCsvMatches
-// 処理概要     同番号CSVの走行メタデータが元バイナリと同一か確認する
-// 引数         name: CSV名, header: 元バイナリ情報
-// 戻り値       true: 未作成または同一ログ false: 不一致またはI/Oエラー
-/////////////////////////////////////////////////////////////////////
-static bool logExistingCsvMatches(const char *name, const LogBinaryHeader *header)
-{
-    FIL file;
-    FRESULT result = f_open(&file, name, FA_READ | FA_OPEN_EXISTING);
-    if (result == FR_NO_FILE) return true;
-    if (result != FR_OK) return false;
-    logReadAheadReset();
-    UINT read = 0U;
-    bool matches = f_read(&file, logIoMemory.stopped.input, header->metadataBytes + 1U, &read) == FR_OK;
-    uint8_t *text = logIoMemory.stopped.input;
-    UINT n = header->metadataBytes;
-    matches = matches && read >= n;
-    if (matches && text[n - 1U] == '\r') {
-        matches = read > n && text[n] == '\n';
-        text[n - 1U] = '\n';
-    }
-    matches = matches && text[n - 1U] == '\n' &&
-        ~logBinaryCrcUpdate(UINT32_MAX, text, n) == header->metadataCrc;
-    if (f_close(&file) != FR_OK) matches = false;
-    return matches;
-}
-
-/////////////////////////////////////////////////////////////////////
-// モジュール名 logConvertOne
-// 処理概要     1ログを作業CSVへ変換し、確定成功後に元バイナリを削除する
-// 引数         number: ログ番号
-// 戻り値       true: 全処理成功 false: 元バイナリを保持して失敗
-/////////////////////////////////////////////////////////////////////
-static bool logConvertOne(uint16_t number)
-{
-    char csv[20], part[20], bin[20], line[LOG_CSV_LINE_BUFFER_SIZE];
-    FIL input, output;
-    bool inputOpen = false, outputOpen = false, success = false;
-    logBinaryName(csv, sizeof(csv), number, "csv");
-    logBinaryName(part, sizeof(part), number, "part");
-    logBinaryName(bin, sizeof(bin), number, "bin");
-    logConversionNotify(LOG_CONVERT_SCAN, 0U);
-    if (logSourceOpen(&input, csv, FA_READ | FA_OPEN_EXISTING) != FR_OK) goto cleanup;
-    inputOpen = true;
-    if (!logSourceIsBinary(&input) || !logExistingCsvMatches(csv, &binarySource.header) ||
-        f_open(&output, part, FA_WRITE | FA_CREATE_ALWAYS) != FR_OK) goto cleanup;
-    outputOpen = true;
-    logCsvOutputLength = 0U;
-#if _USE_EXPAND
-    FSIZE_t reserve = (FSIZE_t)binarySource.header.rows * LOG_CSV_LINE_BUFFER_SIZE +
-        2U * LOG_COLUMN_TITLE_BUFFER_SIZE;
-    FRESULT allocation = f_expand(&output, reserve, 1U);
-    if (allocation != FR_OK && allocation != FR_DENIED) goto cleanup;
-#endif
-    if (!logSourceGets(columnTitle, sizeof(columnTitle), &input) || !logCsvAppend(&output, columnTitle) ||
-        !logSourceGets(columnTitle, sizeof(columnTitle), &input) || !logCsvAppend(&output, columnTitle)) goto cleanup;
-    logConversionNotify(LOG_CONVERT_WRITE, 0U);
-    while (logSourceGets(line, sizeof(line), &input)) {
-        LOG_PERF_BEGIN(formatTick);
-        bool formatted = logFormatSourceRow(line, sizeof(line));
-        LOG_PERF_END(formatMs, formatTick);
-        if (!formatted || !logCsvAppend(&output, line)) goto cleanup;
-        conversionWorkDone++;
-        logConversionNotify(LOG_CONVERT_WRITE, binarySource.row);
-    }
-    if (logSourceError(&input) || !logSourceEof(&input)) goto cleanup;
-    logConversionNotify(LOG_CONVERT_COMMIT, binarySource.header.rows);
-    LOG_PERF_BEGIN(commitTick);
-    if (!logCsvFlush(&output) || f_truncate(&output) != FR_OK || f_sync(&output) != FR_OK) goto cleanup;
-    FRESULT closeResult = f_close(&output);
-    outputOpen = false;
-    if (closeResult != FR_OK) goto cleanup;
-    closeResult = logSourceClose(&input);
-    inputOpen = false;
-    if (closeResult != FR_OK) goto cleanup;
-    FILINFO info;
-    FRESULT exists = f_stat(csv, &info);
-    if (exists != FR_NO_FILE && exists != FR_OK) goto cleanup;
-    // 元バイナリは残っているため、置換途中の電源断でも再変換できる。
-    if (exists == FR_OK && f_unlink(csv) != FR_OK) goto cleanup;
-    if (f_rename(part, csv) != FR_OK || f_unlink(bin) != FR_OK) goto cleanup;
-    LOG_PERF_END(commitMs, commitTick);
-    conversionWorkDone++;
-    if (conversionProgress.fileIndex < conversionProgress.fileCount) logConversionNotify(LOG_CONVERT_DONE, conversionProgress.expectedRows);
-    success = true;
-cleanup:
-    if (outputOpen) (void)f_close(&output);
-    if (inputOpen) (void)logSourceClose(&input);
-    if (!success) logConversionNotify(LOG_CONVERT_FAILED, conversionProgress.processedRows);
-    return success;
-}
-
-/////////////////////////////////////////////////////////////////////
-// モジュール名 logPendingInventory
-// 処理概要     未変換ログの本数・作業量・次の番号を取得する
-// 引数         after: 直前番号, next: 次番号, nextRows: 次の行数, count: 本数, work: 作業量
+// モジュール名 logCheckStoredHeaders
+// 処理概要     保存済みbinのヘッダを検証し未確定tmpの存在を確認する
+// 引数         なし
 // 戻り値       true: 列挙成功 false: 不正ログまたはI/Oエラー
 /////////////////////////////////////////////////////////////////////
-static bool logPendingInventory(uint16_t after, uint16_t *next, uint32_t *nextRows, uint16_t *count, uint64_t *work)
+static bool logCheckStoredHeaders(void)
 {
     DIR dir;
     FILINFO info;
-    *next = 0; *nextRows = 0; *count = 0; *work = 0;
     if (f_opendir(&dir, "/") != FR_OK) return false;
     bool success = true;
     FRESULT result;
@@ -1687,59 +1500,12 @@ static bool logPendingInventory(uint16_t after, uint16_t *next, uint32_t *nextRo
         if (!logBinaryParseName(info.fname, "bin", &number)) continue;
         FIL file;
         LogBinaryHeader header;
-        if (f_open(&file, info.fname, FA_READ | FA_OPEN_EXISTING) != FR_OK) { success = false; conversionProgress.logNumber = number; break; }
+        if (f_open(&file, info.fname, FA_READ | FA_OPEN_EXISTING) != FR_OK) { success = false; break; }
         bool valid = logReadContainerHeader(&file, number, &header);
         if (f_close(&file) != FR_OK) valid = false;
-        if (!valid) { success = false; conversionProgress.logNumber = number; break; }
-        if (*count == UINT16_MAX) { success = false; break; }
-        (*count)++;
-        *work += (uint64_t)header.rows * 2U + 1U;
-        if (number > after && (*next == 0U || number < *next)) { *next = number; *nextRows = header.rows; }
+        if (!valid) { success = false; break; }
     } while (info.fname[0] != '\0');
     if (f_closedir(&dir) != FR_OK) success = false;
-    return success;
-}
-
-/////////////////////////////////////////////////////////////////////
-// モジュール名 logConvertPending
-// 処理概要     未変換ログを番号順にCSV化し、起動時の中断復旧にも使う
-// 引数         progress: 進捗通知（NULLでも実行可）
-// 戻り値       true: 全変換成功 false: 走行開始禁止を維持
-/////////////////////////////////////////////////////////////////////
-bool logConvertPending(LogProgressCallback progress)
-{
-    LOG_PERF_BEGIN(conversionTick);
-    if (modeLOG || logTempOpen || !sd_fatfs_lock(500U)) { logRecoveryReady = false; return false; }
-    bool success = true;
-    sd_set_analysis_active(true);
-    logProgressCallback = progress;
-    logTempWarning = false;
-    conversionProgress = (LogConversionProgress){0};
-    conversionWorkDone = 0;
-    conversionBatchComplete = false;
-    uint16_t next, count, after = 0;
-    uint32_t rows;
-    if (!logPendingInventory(after, &next, &rows, &count, &conversionWorkTotal)) success = false;
-    conversionProgress.fileCount = count;
-    while (success && next != 0U) {
-        conversionProgress.fileIndex++;
-        conversionProgress.logNumber = next;
-        conversionProgress.expectedRows = rows;
-        if (!logConvertOne(next)) { success = false; break; }
-        after = next;
-        uint64_t remainingWork;
-        if (!logPendingInventory(after, &next, &rows, &count, &remainingWork)) success = false;
-    }
-    if (!success) logConversionNotify(LOG_CONVERT_FAILED, conversionProgress.processedRows);
-    else if (conversionProgress.fileCount > 0U) {
-        conversionBatchComplete = true;
-        logConversionNotify(LOG_CONVERT_DONE, conversionProgress.expectedRows);
-    }
-    logProgressCallback = NULL;
-    sd_set_analysis_active(false);
-    sd_fatfs_unlock();
-    logRecoveryReady = success;
-    LOG_PERF_END(conversionMs, conversionTick);
     return success;
 }
 
@@ -1753,11 +1519,8 @@ bool logPrepareBinaryStorage(void)
 {
     if (modeLOG || logTempOpen || logBufferWriter.flushPending || logBufferWriter.pendingPending ||
         !sd_fatfs_lock(500U)) { logRecoveryReady = false; return false; }
-    uint16_t next, count;
-    uint32_t rows;
-    uint64_t work;
     logTempWarning = false;
-    bool result = logPendingInventory(0U, &next, &rows, &count, &work);
+    bool result = logCheckStoredHeaders();
     sd_fatfs_unlock();
     logRecoveryReady = result;
     return result;

@@ -10,19 +10,6 @@
 #include <stdio.h>
 #include "courseLogCsv.h"
 
-typedef enum { LOG_CONVERT_SCAN, LOG_CONVERT_WRITE, LOG_CONVERT_COMMIT,
-    LOG_CONVERT_DONE, LOG_CONVERT_FAILED } LogConversionStage;
-typedef struct {
-    uint16_t logNumber, fileIndex, fileCount;
-    LogConversionStage stage;
-    uint32_t processedRows, expectedRows;
-    uint8_t totalPercent;
-} LogConversionProgress;
-typedef void (*LogProgressCallback)(const LogConversionProgress *progress);
-
-// 停止中のメイン処理でのみ使用。共通読込は1ファイルずつ、呼出側でFatFsロックを保持する。
-// 旧CSV変換APIは互換検証用。通常の起動・走行終了からは呼び出さない。
-bool logConvertPending(LogProgressCallback progress);
 bool logPrepareBinaryStorage(void);
 bool logRecoveryIsReady(void);
 bool logHasIncompleteTemp(void);
