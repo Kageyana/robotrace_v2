@@ -170,10 +170,9 @@ void motorCommandOut(int16_t cmdL, int16_t cmdR)
 // 処理概要     各PID制御量を正規化指令として合成し、電圧補償してモータに出力する
 // 引数         tCmd: トレース制御量 sCmd: 速度制御量
 //              yrCmd: ヨーレート制御量
-//              dCmd : 距離制御量
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
-void motorCommandOutSynth(int16_t tCmd, int16_t sCmd, int16_t yrCmd, int16_t dCmd)
+void motorCommandOutSynth(int16_t tCmd, int16_t sCmd, int16_t yrCmd)
 {
 	int16_t overCmd, traceCmd = tCmd;
 
@@ -193,8 +192,8 @@ void motorCommandOutSynth(int16_t tCmd, int16_t sCmd, int16_t yrCmd, int16_t dCm
 		}
 	}
 
-	int16_t cmdR = clampCommand((int32_t)sCmd - traceCmd - yrCmd + dCmd);
-	int16_t cmdL = clampCommand((int32_t)sCmd + traceCmd + yrCmd + dCmd);
+	int16_t cmdR = clampCommand((int32_t)sCmd - traceCmd - yrCmd);
+	int16_t cmdL = clampCommand((int32_t)sCmd + traceCmd + yrCmd);
 
 	motorCommandOut(cmdL, cmdR);
 }

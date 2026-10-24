@@ -576,12 +576,12 @@ static void setup_pid_trace(void)
 	// PUSHでトレースON/OFF
 	if (testFlags.trace_test == 1)
 	{
-		motorCommandOutSynth(lineTraceCtrl.pwm, 0, 0, 0); // モータを指定PWMで駆動
+		motorCommandOutSynth(lineTraceCtrl.pwm, 0, 0); // モータを指定PWMで駆動
 		powerLineSensors(1);                          // ラインセンサを有効化
 	}
 	else
 	{
-		motorCommandOutSynth(0, 0, 0, 0);                // モータ停止
+		motorCommandOutSynth(0, 0, 0);                // モータ停止
 		powerLineSensors(0);                         // ラインセンサ停止
 	}
 	if (testFlags.trace_test != testFlags.beforeMotorTest && testFlags.trace_test == 0)
@@ -662,12 +662,12 @@ static void setup_pid_traceOmegaFB(void)
 	// PUSHでトレースON/OFF
 	if (testFlags.trace_test == 1)
 	{
-		motorCommandOutSynth(lineTraceOmegaFBCtrl.pwm, 0, 0, 0); // モータを指定PWMで駆動
+		motorCommandOutSynth(lineTraceOmegaFBCtrl.pwm, 0, 0); // モータを指定PWMで駆動
 		powerLineSensors(1);                          // ラインセンサを有効化
 	}
 	else
 	{
-		motorCommandOutSynth(0, 0, 0, 0);                // モータ停止
+		motorCommandOutSynth(0, 0, 0);                // モータ停止
 		powerLineSensors(0);                         // ラインセンサ停止
 	}
 	if (testFlags.trace_test != testFlags.beforeMotorTest && testFlags.trace_test == 0)
@@ -753,12 +753,12 @@ static void setup_pid_speed(void)
 		// トレースON時の制御
 		powerLineSensors(1); // ラインセンサを有効化
 		setTargetSpeed(0.0f); // 目標速度をリセット
-		motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.kp, 0, 0); // モータを指定PWMで駆動
+		motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.kp, 0); // モータを指定PWMで駆動
 	}
 	else
 	{
 		// トレースOFF時の制御
-		motorCommandOutSynth(0, 0, 0, 0); // モータ停止
+		motorCommandOutSynth(0, 0, 0); // モータ停止
 		powerLineSensors(0);          // ラインセンサ停止
 	}
 
@@ -1189,7 +1189,7 @@ static void setup_start(void)
 			break; // 自動校正の目標更新と出力は1ms処理に任せる
 		}
 		setTargetAngularVelocity(CALIBRATIONSPEED);
-		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm);
 		if (imuVal.angle.z < -340.0f)
 		{
 			pattern.calibration = 5;
@@ -1201,7 +1201,7 @@ static void setup_start(void)
 		if (!autoStartAfterCalibration)
 		{
 			setTargetAngularVelocity(-400.0F);
-			motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+			motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm);
 		}
 		if (autoStartAfterCalibration ? autoStartCalibrationReturned : lSensor[5] < 1000)
 		{
@@ -1224,7 +1224,7 @@ static void setup_start(void)
 		}
 		else
 		{
-			motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+			motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0);
 		}
 		if (countdown <= 0)
 		{
@@ -1370,7 +1370,7 @@ void setupCalibrationTurn1ms(void)
 				autoStartCalibrationSettledMs = 0;
 				motorControlTrace();
 				// 平均速度0のまま、通常ラインPIDの左右差で白線中央へ向ける。
-				motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+				motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0);
 				return;
 			}
 			if (fabsf(imuVal.gyro.z) <= AUTO_CALIBRATION_STOP_RATE_DPS)
@@ -1403,7 +1403,7 @@ void setupCalibrationTurn1ms(void)
 		}
 	}
 	motorControlYawRate();
-	motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+	motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -1857,7 +1857,7 @@ void setupNonDisp(void)
 	case 3:
 		// 左旋回
 		setTargetAngularVelocity(CALIBRATIONSPEED);
-		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm);
 		if (imuVal.angle.z < -35.0f)
 		{
 			pattern.calibration = 4;
@@ -1867,7 +1867,7 @@ void setupNonDisp(void)
 	case 4:
 		// 停止
 		setTargetSpeed(0);
-		motorCommandOutSynth(0, veloCtrl.pwm, 0, 0);
+		motorCommandOutSynth(0, veloCtrl.pwm, 0);
 		if (abs(encCurrentN) == 0)
 		{
 			pattern.calibration = 5;
@@ -1877,7 +1877,7 @@ void setupNonDisp(void)
 	case 5:
 		// 右旋回
 		setTargetAngularVelocity(-CALIBRATIONSPEED);
-		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm);
 		if (imuVal.angle.z > 35.0f)
 		{
 			pattern.calibration = 6;
@@ -1887,7 +1887,7 @@ void setupNonDisp(void)
 	case 6:
 		// 停止
 		setTargetSpeed(0);
-		motorCommandOutSynth(0, veloCtrl.pwm, 0, 0);
+		motorCommandOutSynth(0, veloCtrl.pwm, 0);
 		if (abs(encCurrentN) == 0)
 		{
 			pattern.calibration = 7;
@@ -1897,7 +1897,7 @@ void setupNonDisp(void)
 	case 7:
 		// 初期位置に戻る
 		setTargetAngularVelocity(CALIBRATIONSPEED);
-		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm, 0);
+		motorCommandOutSynth(0, veloCtrl.pwm, yawRateCtrl.pwm);
 		if (lSensor[5] < 1000)
 		{
 			finishLineSensorCalibration();
@@ -1907,7 +1907,7 @@ void setupNonDisp(void)
 
 	case 8:
 		// 停止
-		motorCommandOutSynth(0, veloCtrl.pwm, 0, 0);
+		motorCommandOutSynth(0, veloCtrl.pwm, 0);
 		if (abs(encCurrentN) == 0)
 		{
 			powerLineSensors(0); // ラインセンサ消灯

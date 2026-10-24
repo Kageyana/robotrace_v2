@@ -703,7 +703,7 @@ void loopSystem(void)
 			setTargetSpeed(tgtParam.search); // 目標速度
 		}
 		// ライントレース
-		motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+		motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0);
 		// motorCommandOut(veloCtrlL.pwm,veloCtrlR.pwm);
 
 		// スタートマーカーを通過したら本走行に移行
@@ -760,7 +760,7 @@ void loopSystem(void)
 			// 探索走行
 			setTargetSpeed(tgtParam.search);
 			// ライントレース
-			// motorCommandOutSynth(lineTraceOmegaFBCtrl.pwm, veloCtrl.pwm, 0, 0);
+			// motorCommandOutSynth(lineTraceOmegaFBCtrl.pwm, veloCtrl.pwm, 0);
 			motorCommandOut(veloCtrlL.pwm,veloCtrlR.pwm);
 		}
 		else if (optimalTrace == BOOST_DISTANCE)
@@ -802,7 +802,7 @@ void loopSystem(void)
 			// 目標速度に設定
 			setTargetSpeed(boostSpeed);
 			// モーター出力
-			// motorCommandOutSynth(lineTraceOmegaFBCtrl.pwm, veloCtrl.pwm, 0, 0);
+			// motorCommandOutSynth(lineTraceOmegaFBCtrl.pwm, veloCtrl.pwm, 0);
 			motorCommandOut(veloCtrlL.pwm,veloCtrlR.pwm);
 		}
 		else if (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT)
@@ -814,7 +814,7 @@ void loopSystem(void)
 			int32_t steeringPwm = ((int32_t)yawRateCtrl.pwm * pathBlend)
 				+ ((int32_t)lineTraceOmegaFBCtrl.pwm * (1000 - pathBlend));
 			steeringPwm /= 1000;
-			motorCommandOutSynth(0, veloCtrl.pwm, steeringPwm, 0);
+			motorCommandOutSynth(0, veloCtrl.pwm, steeringPwm);
 		}
 
 		// 通常走行はゴールマーカー、PATH系は中間延長点の経路弧長をゴールとする。
@@ -842,7 +842,7 @@ void loopSystem(void)
 		{
 			setTargetSpeed(tgtParam.stop);
 		}
-		motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0, 0);
+		motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0);
 
 		if (encCurrentN == 0)
 		{
@@ -852,7 +852,7 @@ void loopSystem(void)
 
 	case 102:
 		setTargetSpeed(0);
-		motorCommandOutSynth(0, 0, 0, 0);
+		motorCommandOutSynth(0, 0, 0);
 
 		int16_t savedLogNo = 0;
 		bool logSaved = false;
@@ -974,7 +974,7 @@ void loopSystem(void)
 		break;
 
 	case 103:
-		motorCommandOutSynth(0, 0, 0, 0);
+		motorCommandOutSynth(0, 0, 0);
 		powerLineSensors(0);
 		powerMarkerSensors(0);
 		
@@ -1022,7 +1022,7 @@ void emergencyStop(void)
 	setTargetSpeed(0);
 	while (encCurrentN > 5)
 	{
-		motorCommandOutSynth(0, veloCtrl.pwm, 0, 0);
+		motorCommandOutSynth(0, veloCtrl.pwm, 0);
 	}
 	motorCommandOut(0, 0);
 	

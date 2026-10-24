@@ -37,7 +37,7 @@ extern bool calibrateMotorCurrent;
 float motorCommandToVoltage_V(int16_t command);
 int16_t motorVoltageToCommand(float voltage_V);
 void motorCommandOut(int16_t cmdL, int16_t cmdR);
-void motorCommandOutSynth(int16_t tCmd, int16_t sCmd, int16_t yrCmd, int16_t dCmd);
+void motorCommandOutSynth(int16_t tCmd, int16_t sCmd, int16_t yrCmd);
 void motorVoltageOut(float voltageL_V, float voltageR_V);
 void getMotorAD(uint16_t LAD, uint16_t RAD);
 void getMotorCurrent(void);
