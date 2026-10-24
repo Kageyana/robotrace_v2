@@ -61,3 +61,13 @@ gcc -std=c11 -Wall -Wextra -I tests/accel_y_sign -I robotrace_v2/Core/Inc tests/
 2026-10-13、通常43列化のschema/互換ホストテストで通常権限のMinGW起動が同じDLL再配置エラーとなった。制限外の同一テストで43/87列、3世代6形式の読込・保存復旧・次走解析一致が成功し、4構成ARMビルドも成功した。実行環境を分ける既存対策は有効だが、最初のホストコンパイル前にこの事例を確認できていなかった。書込み・デバッグSkillへ、ホスト/ARMコンパイル前の起動環境確認を追加する。根本原因の未確定は継続する。
 
 2026-10-14、直線加減速の残差解析では既に生成済みのGCCホスト`planner.exe`を通常環境から起動してもWinError 623（Illegal System DLL Relocation）が発生した。コンパイラやGNUツールだけでなく、それらで生成したホストexeも事前確認対象となる。同じ読取専用解析を許可された制限外環境で実行し、一次基準4計画・DISTANCE/SLIP各4本の集計と図生成に成功した。一次4＋二次8本の原本ハッシュは前回検証とも一致。ログ解析Skillにもホスト実行環境確認を追記し、ファームウェアをこの起動失敗の回避目的で変更しない手順を残した。回避策の検証は成功、DLL配置の根本原因はopenのまま。
+
+2026-10-21追記: ST-LINK_gdbserver.exe --helpにも、通常制限環境でシステムDLLの無効な再配置が再発した。承認付き制限外環境の同一コマンドは成功し、attach/Flash読出し/GDB/書込みも実行可能だった。GNUツール以外のCubeCLT同梱exeも初回から制限外の実行対象へ含める。根本原因は未確定でopenのまま。書込み・デバッグSkillの実行前参照へ対象を追加した。
+
+## 2026-10-21 横ログ重複整理のPC変換器起動
+
+RlogToCsv.exeを通常制限環境からPowerShellの出力リダイレクト付きで起動すると、StandardOutputEncoding is only supported when standard output is redirectedで起動失敗した。出力取得をPython subprocessのPIPEへ明示すると、実際のCreateProcess失敗はWinError 623（システムDLLの無効な再配置）だった。既知の「GCC生成ホストexeも初回から制限外」の対象へPC変換器を含める確認が不足していた。
+
+同一のPython subprocessコマンドを承認された制限外環境で実行すると、既存のRlogToCsv.exeのまま通常66列・詳細72列の各50行を変換できた。全CRC・機体側CSVとの全保存値/派生値一致はanalysis/slip-lat-log-dedup/validation.jsonで確認した。変換器コード・原本ログ・DLL/ACLは変更していない。起動エラーを製品ログ破損と混同しない。
+
+再発防止: ログ形式変更時のPC変換器検証も、RlogToCsv.exeの最初の起動からrequire_escalatedを使い、入力bin/出力CSVを今回解析フォルダへ限定する。出力はPython subprocessのstdout=PIPE,stderr=STDOUT等で明示的に取得し、終了コード0と新規出力の存在を確認してから数値照合する。SD設定・書込みデバッグSkillの実行前へ反映した。回避手順は今回の2プロファイルで検証済み。DLL配置の根本原因は未確定のためopenを維持する。

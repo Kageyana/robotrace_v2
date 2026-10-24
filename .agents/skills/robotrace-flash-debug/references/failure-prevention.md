@@ -2,6 +2,11 @@
 
 ## 成果物・PC検証
 
+- このWindows制限環境ではST-LINK_gdbserver、Programmer CLI、GDB等のCubeCLT同梱exeにもDLL再配置エラーがある。GNUツールだけに限定せず、help/版表示を含め初回から許可された制限外環境で実行する。再発記録は[2026-10-11事例の2026-10-21追記](../../../../doc/失敗事例/2026-10-11-bmi088-forward-y-sign.md)を確認する。
+- PowerShellでファイルパスを含むCMakeの-Dを使う場合、引数全体を単一引用符で囲む。独自構成では存在確認したツールチェーン/Ninja絶対パスを使用し、configure終了コード0を確認してからbuildする。通常は既存presetを使う。[分割失敗](../../../../doc/失敗事例/2026-10-21-cmake-toolchain-argument-split.md)を参照。
+- 計測ラッパーの挿入では、ネストするCの関数呼出しを正規表現の最短一致で置換しない。既知の完全な式を個別パッチし、変更した全式とコンパイル成功を確認してからFlashへ進む。[括弧破損](../../../../doc/失敗事例/2026-10-21-diagnostic-wrapper-parentheses.md)を参照。
+- 再起動で失敗時RAMが失われた場合、後から取得したSPIエラー0やoverflow=falseで当時の原因を否定しない。既存tmpは読み取りで保全し、静止中の合成保存と実走行時の非同期I/Oを区別する。メインの通常経路からFA_READ/f_lseek/f_readを使い、GDBでFILのfptr/clustや読取ポインタを組み替えない。[Write failed調査](../../../../doc/失敗事例/2026-10-21-post-run-write-failed.md)を参照。
+
 - ホストテスト等の無変換コピーもコンパイル前にバイト契約を確認する。原本同一を要求する場合はread_bytes/write_bytesまたはCopy-Itemで改行を保存し、SHA256一致を確認してから実行する。read_text/write_textで生成したコピーへ原本バイト一致を仮定しない。内容変換コピーは変換・改行規則を別に保存する。詳細は[改行差の再発](../../../../doc/失敗事例/2026-10-17-shared-header-line-ending-check.md)。
 
 - ファームウェアのソース所在を調べるときは、リポジトリルートから`powershell.exe -NoProfile -ExecutionPolicy Bypass -File analysis/script/search_firmware_sources.ps1 -Pattern 'routeBuildFromLog|pathRouteSourceLog' -FileGlob 'path*.c'`のように固定ルート補助を使う。検索パターンをパスへ渡さず、rg終了コード2以上で停止する。本文中の既知の実在ファイルを読む場合は個別パスを使用できる。詳細は[ソース検索での再発](../../../../doc/失敗事例/2026-08-11-windows-rg-glob-not-expanded.md)。
@@ -35,3 +40,7 @@
 - 取得周期測定では停止中TIM3/TIM6/TIM7の進行による観測影響を分ける。DBGMCU元値を保存し、必要な凍結設定と計測区間を管理し、最後に復元する。注入件数・停止区間を通常実行統計へ混ぜない。
 - 古いDebugベンチAPIは現行mainの存在を検索/nmで確認するまで呼ばない。再生XYは別ソース経路と一致するとは限らず、fixtureの距離進捗を対象driveRouteの弧長へ写像する。
 - 開始要求はアプリ初期化後。IWDG初期化順序とHAL tickの開始順を確認し、リセット後の要求0/PWM0・自動再開なしを確認する。PRIMARYの保存/CSV検証が失敗したら残りケースへ進まない。
+
+- レコードごと等の頻回関数へ、ホスト評価の条件付きGDBブレークを置いて大量ヒットさせない。観測が遅延する場合は中断し、通常メイン処理で必要な境界値をRAMへ一度保存する計測へ置き換える。モーター停止を確認し、再利用するブレークは対象関数と実際の停止回数を先に限定する。
+
+- 新規パーサー・整数範囲チェックはARMビルドだけでなくMinGWの`-Wall -Wextra -Werror`でもコンパイル・実行する。int32_tとUINT8_MAX/UINT16_MAXを比べる際は、上限がint32_t内であることを確認し同符号へ明示変換する。検証例は`tests/slip_v2_active_test.c`、詳細は[整数境界の型差](../../../../doc/失敗事例/2026-10-21-slip-v2-host-signed-bounds.md)。

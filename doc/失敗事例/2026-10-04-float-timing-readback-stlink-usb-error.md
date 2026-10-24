@@ -20,3 +20,5 @@ status: resolved
 
 復旧確認: USB再接続後にattach成功。機体をリセットせず、logFileNumber=12921、isrTimingStatsの一次走行22824サンプル、emcStop=0、左右PWM=0を取得した。集計保全と接続解除を確認済み。失敗時はサーバーのUSBエラーを先に確認し、GDBの接続待ちを繰り返さない。
 
+
+2026-10-21追記: SDログ保存調査の一時診断後、GDB/サーバー終了後の元ファーム復元用Programmer CLIでDEV_USB_COMM_ERRが発生した。同条件の接続を反復せず、ユーザーによるST-Link側USB再接続後にDevice ID 0x421で復元を再開した。頻回ヒットの条件付きGDBブレークを中断した直後だったが、因果関係は未確定。元ファーム復元結果は2026-10-21-post-run-write-failed.mdとanalysis/sd-write-failed-20261021/flash-restore-after-usb.txtを参照。過去の回収成功とは別に、今回もUSB通信の物理原因は未確定。
