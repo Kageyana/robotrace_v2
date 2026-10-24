@@ -54,3 +54,5 @@ V1・旧Candidate列名へのフォールバックはない。更新前の未取
 - 正式採用直後の70列実機ログ13571～13577では、保存とDISTANCE→SLIPへの接続を確認した。ただし元13574の終端不整合と13575のXY条件外があり、改善の再現性を証明していない。今回の66列/72列の最初の実機ログ、制御周期の最大実測時間、10本以上の同条件走行による再現性は実機で確認する。
 
 今回の再現手順と結果は`analysis/slip-lat-log-dedup/README.md`、導入時の旧70列検証は`analysis/slip-v2-active-validation/README.md`。ホストテストは`robotrace_v2/tests/slip_v2_active_test.c`と`run_log_deferred_tests.ps1`。テスト・解析成果物はリポジトリのGit除外設定に従う。
+
+2026-10-24：ユーザー指示で推定調査を一旦中断。[到達点と未解決事項](slip-evaluation-checkpoint-2026-10-24.md)へ保存した。
