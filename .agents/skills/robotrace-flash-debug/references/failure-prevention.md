@@ -45,3 +45,15 @@
 - レコードごと等の頻回関数へ、ホスト評価の条件付きGDBブレークを置いて大量ヒットさせない。観測が遅延する場合は中断し、通常メイン処理で必要な境界値をRAMへ一度保存する計測へ置き換える。モーター停止を確認し、再利用するブレークは対象関数と実際の停止回数を先に限定する。
 
 - 新規パーサー・整数範囲チェックはARMビルドだけでなくMinGWの`-Wall -Wextra -Werror`でもコンパイル・実行する。int32_tとUINT8_MAX/UINT16_MAXを比べる際は、上限がint32_t内であることを確認し同符号へ明示変換する。検証例は`tests/slip_v2_active_test.c`、詳細は[整数境界の型差](../../../../doc/失敗事例/2026-10-21-slip-v2-host-signed-bounds.md)。
+
+## 現行ログと抽出テスト（2026-10-24）
+
+- 機体CSV変換・旧CSV解析と対応する旧テストは廃止済み。現行binの検証はリポジトリルートから`python validation/log_storage/run.py`。PC変換確認時だけ`--converter C:/tool/AutoCopyCsvFromSd/RlogToCsv.exe`を付け、最初から必要な実行権限を使用する。
+- センサー角度関数の抽出では実関数だけでなく`angleSensor`の公開変数定義と`IMU_PI_F`も実ソースから取り込む。抽出対象を追加したら依存する公開値・定数を先に列挙し、O0/O2のWall/Wextra/Werrorでコンパイルする。未宣言のテスト依存を製品コードの変更で回避しない。
+- 保存故障は実際のopen/read/closeの段階に注入する。正常openがcloseを呼ぶと仮定しない。詳細は`doc/失敗事例/2026-10-24-cleanup-host-fixture-contract.md`。
+
+## 共通UI・設定定義のホスト比較（2026-10-25）
+
+- 共通ループの追加前に、UI選択値・配列添字・sizeof・unsigned接尾辞を含む比較式の型を確認する。整数上限マクロだけを対象にしない。変換値が対象型の範囲に収まることを確かめて同符号へ明示変換し、実関数をO0/O2・Wall/Wextra/Werrorでコンパイルする。詳細は[符号比較の再発追記](../../../../doc/失敗事例/2026-10-21-slip-v2-host-signed-bounds.md)。
+- 変更前スナップショットを比較参照へ追加する場合は、参照側の既存warningを先に識別する。許容が必要な既存診断だけを参照ブロック内のdiagnostic push/popで囲み、理由を記載する。現行コードのWerrorを弱めない。詳細は[参照実装の警告契約](../../../../doc/失敗事例/2026-10-24-cleanup-host-fixture-contract.md)。
+- リポジトリルートを明示workdirとして、最初から必要権限で`python validation/control_refactor/run.py`を実行する。任意の作業前Coreがある場合のみ`--baseline build/main-refactor-20261025/before`を付ける。通常実行にスナップショットを必須としない。失敗時は実機検証へ進めず、ビルド診断とアサートを区別して対処する。

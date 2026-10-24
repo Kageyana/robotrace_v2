@@ -70,7 +70,7 @@ File: `speed_ff.txt`
 
 File: `targetSpeeds.txt`
 
-- Implementation: `control.c`, `writeTgtspeeds()`, `readTgtspeeds()`
+- Implementation: `control.c`, `writeTgtspeeds()`, `readTgtspeeds()`. Structure, default order, UI ranges and storage order share `Core/Inc/speedParameters.h` / `SPEED_PARAM_FIELDS`; preserve the 19-field format when editing this list.
 - Format: 19 fixed-width comma-separated fields.
 - Write format: each item `%04d,`
 - Read format: each item `%04hd,`
@@ -122,22 +122,14 @@ File: `lsval.txt`
 - Order: `lSensorMax[0]` to `lSensorMax[9]`, then `lSensorMin[0]` to `lSensorMin[9]`.
 - If corrupt, running is prohibited by policy.
 
-### Deferred binary run logs
+### Current binary logs and analysis
 
-- See `doc/deferred-log-storage.md` for the container layout and recovery checks.
-- Runs write numbered `.tmp` files; `endLog()` seals binary records and immutable end-of-run metadata, then renames to `.bin`. It no longer creates a CSV.
-- Auto-start intermediate runs read `.bin` directly. CSV conversion happens at series completion, manual completion, emergency stop, or series abort.
-- `logConvertPending()` writes `.part`, syncs/closes it, commits `.csv`, then deletes `.bin`. Failed conversion keeps the binary; reboot retries sealed logs before CSV listing/pruning.
-- Unsealed `.tmp` files are kept with a warning. Never promote them automatically. Incompatible schema/profile or CRC/length errors block recovery and new starts.
-- Allocation considers numeric `.csv`, `.bin`, `.tmp`, and `.part` names. Never overwrite a reserved log number or prune pending binary logs.
-- New CSV metadata includes `binaryLogNumber`, `binaryDataCrc`, and `binarySchema`; CRC values use signed 32-bit text but represent CRC bit patterns. CSV data columns and the existing big-endian record encoding are unchanged.
-- Run `robotrace_v2/tests/run_log_deferred_tests.ps1` for both profiles and the existing PC/schema/XY tests. Check actual on-device stop/save/recovery/progress behavior before claiming hardware validation.
-
-### Slip diagnostic schema compatibility
-
-- On 2026-10-14 the user requested restoring light to 72 columns/183 B; debug retains 87 columns/220 B. SHADOW and lateral-candidate diagnostics are again recorded in both profiles. The temporary light43/108 B logs remain readable without adding missing diagnostics. Keep old field lists immutable: pre-SHADOW light108/debug145 B in `log_schema_legacy.h`; initial SHADOW light157/debug194 B in `log_schema_shadow_v2.h`; lateral candidate light183/debug220 B in `log_schema_candidate_v1.h`.
-- Identify profile, schema CRC and record size as one tuple; never infer a format from record size alone. All six supported formats are readable by either current build profile. Current light72/debug87 reuse the corresponding frozen lateral-candidate schemas because their names, types, order and meaning match. Allocate read buffers for at least 220 B even in the 183 B light build.
-- Converting old logs preserves their original columns. Missing diagnostics mean unrecorded. Reject unknown schema, CRC/size/profile errors and retain originals until CSV commit succeeds. Run `tests/run_slip_log_compat_tests.ps1` in addition to existing storage tests; it exercises both reader profiles and all three historical generations, plans, recovery and failure retention.
+- Runs write numbered `.tmp` files; `endLog()` seals records, schema and metadata with CRC and renames to `.bin`. The on-device CSV conversion API and its legacy tests were removed on 2026-10-24.
+- `logSource.h` exposes current-bin-only `logSourceOpen(file, number, purpose)`, `logSourceInfo`, `logSourceMetadata`, `logSourceNext` and close/error/EOF. Metadata is immutable while open; data rows are typed `LogSourceRow`. No generated CSV headers, column maps or CSV fallback are used.
+- The robot's selection list contains only bin files. Number allocation still reserves numeric `.csv`, `.bin`, `.tmp` and `.part` names. Keep tmp and all unimported originals. Boot validates headers/schema/length; opening an analysis source verifies every data and metadata CRC.
+- The PC converter continues to decode self-describing RLOG v2 and import old CSV files. Current normal/debug profiles are 66 columns/170 B and 72 columns/179 B. Stored fields, encoding, CRC and derivedVersion are unchanged by API cleanup.
+- Run `python validation/log_storage/run.py` from the repository root for both profiles, failure injection, current V2, auto-run configuration, source eligibility and all four plans. Add `--converter C:/tool/AutoCopyCsvFromSd/RlogToCsv.exe` to compare PC output values. Use permitted unrestricted execution for GCC and generated exe.
+- Do not run removed `run_slip_log_compat_tests.ps1`, CSV-conversion performance runners or tests requiring pre-change snapshots. Check actual stop/save/reboot and the first real log separately.
 
 ### Analysis and Log Numbers
 
@@ -176,6 +168,6 @@ File: `boost_%05d.csv`
 - Prohibit running if `lsval.txt` is corrupt.
 - Parser changes must preserve partial reflection, out-of-range defaulting, repair behavior, and `lsval.txt` run prohibition.
 
-## CSV header generation validation
+## PC CSV output validation
 
-When adding a column, test the actual `logBuildColumns()`/`setLogStr()` path in both profiles. Compare all column names and separators with the schema and check the numeric row count; macro-only schema counts or substring checks are insufficient. The former 30-byte name buffer truncated the 33-character candidate interval-reason name and removed its separator in logs 13130–13144. Append full names and separators directly to the sufficiently sized aggregate buffer. This fix preserves binary schema/record length. Keep affected originals and restore only explicitly validated known-schema copies as described by the log-analysis skill; confirm the first real log after any future format fix. For this fix, all 11 physical CSVs 13145–13155 have the complete 72-column header and matching data rows; detailed physical CSV and boot recovery were not independently revalidated in this batch.
+The robot no longer implements `logBuildColumns()`/`setLogStr()` or CSV formatting. Validate current column names, separators, row counts and values through the deployed PC converter using the real saved bins exported by `validation/log_storage/run.py`. Keep unknown-schema and CRC rejection. Historical truncated headers remain historical originals; do not reintroduce the old firmware parser to read them.

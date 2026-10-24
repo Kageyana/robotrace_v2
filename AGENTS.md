@@ -180,11 +180,11 @@ Codex は主にファームウェア開発に使用します。必要に応じ�
 
 このファームウェアは、ARM GCC を使う STM32F446 向けの C11 プロジェクトです。
 
-使用中のリンカスクリプトは `robotrace_v2/STM32F446XX_FLASH.ld`。CSV一括変換の下位処理と割り込みの余裕のため、`_Min_Stack_Size=0x2000`（8 KiB）を予約し、`_sbrk()`のヒープ上限にも使用する。RAM・スタックの変更時は全ビルド構成を確認し、実機の最大使用量は別途検証する。
+使用中のリンカスクリプトは `robotrace_v2/STM32F446XX_FLASH.ld`。停止時ログ検証と割り込みの余裕のため、`_Min_Stack_Size=0x2000`（8 KiB）を予約し、`_sbrk()`のヒープ上限にも使用する。RAM・スタックの変更時は全ビルド構成を確認し、実機の最大使用量は別途検証する。
 
-DISTANCEの速度計画・マーカー配列とSLIP解析作業配列は同時使用するため、`runMemory.h`の`distance`側へまとめる。PATH/SHORTCUTのライン経路・走行経路・弧長・フラグは`path`側とし、両側を静的unionで共有する。切替は停止中・ログ非記録中・FatFsロック下で行い、旧計画を無効化してから書き換える。各走行のログ用メタデータは共有領域外に保持する。ログ読込行は6144 Bを共用する。
+DISTANCEの速度計画・マーカー配列とSLIP解析作業配列は同時使用するため、`runMemory.h`の`distance`側へまとめる。PATH/SHORTCUTのライン経路・走行経路・弧長・フラグは`path`側とし、両側を静的unionで共有する。切替は停止中・ログ非記録中・FatFsロック下で行い、旧計画を無効化してから書き換える。各走行のログ用メタデータは共有領域外に保持する。ログ解析は`logSource.h`の型付き読込を使用し、CSV読込行バッファは持たない。
 
-ログI/O用6 KiBは、走行中の2 KiB×3本と停止中の4 KiB先読みで共用する。残り2 KiBは旧CSV変換の互換検証用とし、通常運用では機体側のCSV変換を行わない。停止時はログキューと最終書込の完了後に切り替え、検証・確定中はFatFsロックを保持する。CRC32/IEEE・全件検証を維持する。性能診断は`ROBOTRACE_LOG_PERFORMANCE`（既定OFF）のRAM集計で行い、走行ログ列へ追加しない。
+ログI/O用6 KiBは、走行中の2 KiB×3本と停止中の4 KiB先読みで共用する。停止中に使わない残り2 KiBは走行用領域としてのみ保持し、機体側のCSV変換コードと出力バッファは持たない。停止時はログキューと最終書込の完了後に切り替え、検証・確定中はFatFsロックを保持する。CRC32/IEEE・全件検証を維持する。性能診断は`ROBOTRACE_LOG_PERFORMANCE`（既定OFF）のRAM集計で行い、走行ログ列へ追加しない。
 
 主な開発環境は VS Code、STM32CubeIDE for Visual Studio Code 拡張機能、STM32CubeCLT、STM32CubeMX です。`.vscode/` には CMake、Flash、ST-Link デバッグ用の設定があります。
 
@@ -342,7 +342,7 @@ cmake --build --preset Release
 
 速度、制御、センサー、緊急停止に関わる変更では、まず以下を確認します。
 
-- 速度・加速度: `robotrace_v2/Core/Inc/control.h`, `robotrace_v2/Core/Src/control.c`, `robotrace_v2/Core/Src/setup.c` の `speedParamTable`, `./setting/targetSpeeds.txt`
+- 速度・加速度: `robotrace_v2/Core/Inc/speedParameters.h` の `SPEED_PARAM_FIELDS`を構造体・既定値・保存順・調整範囲・UIの共通定義とする。既定値定数は`control.h`と`courseAnalysis.h`、読み書きは`control.c`、UIは`setup.c`、実機値は`./setting/targetSpeeds.txt`を参照する。
 - PID ゲイン、速度フィードフォワード: `robotrace_v2/Core/Inc/PIDcontrol.h`, `robotrace_v2/Core/Src/PIDcontrol.c`, `robotrace_v2/Core/Src/setup.c`, `./setting/line.txt`, `lineomega.txt`, `speed.txt`, `yawRate.txt`, `speed_ff.txt`
 - ラインセンサー校正・閾値: `robotrace_v2/Core/Inc/lineSensor.h`, `robotrace_v2/Core/Src/lineSensor.c`, `./setting/lsval.txt`
 - スリップ判定、クロスライン検出、走行中ゲイン変更: `robotrace_v2/Core/Inc/control.h`, `robotrace_v2/Core/Src/control.c`
@@ -450,7 +450,7 @@ cmake --build --preset Release
 - `BOOST_MARKER`: マーカー位置によって区間速度を決定するモード。現在は使用していない。
 - `BOOST_DISTANCE`: 1次走行の走行距離と比較し、現在の走行位置と曲率半径から速度を決定して走行する。
 - `BOOST_SHORTCUT`: `BOOST_PATH_REPLAY` の経路にLevel 1の直線回廊短縮を適用し、合法余裕を確認してヨーレート制御で走行する。
-- `BOOST_PATH_REPLAY`: 条件を満たす一次ログの `x`, `y`, `encTotalOptimal` を列名で解決し、40 mm間隔に再標本化した経路を走行する。ラインセンサーは限定的な実座標姿勢補正とロスト時フォールバックに使う。Level 0専用速度は `targetSpeeds.txt` の `pathReplay` とする。
+- `BOOST_PATH_REPLAY`: 条件を満たす現行binの `x`, `y`, `encTotalOptimal` を型付きAPIで復元し、40 mm間隔に再標本化した経路を走行する。ラインセンサーは限定的な実座標姿勢補正とロスト時フォールバックに使う。Level 0専用速度は `targetSpeeds.txt` の `pathReplay` とする。
 - PATH REPLAY / SHORTCUT は一次経路の終端から原点までの距離の半分だけ経路を延長し、その延長点をゴールとする。経路延長不能、配列容量超過、無効な経路元は生成エラーとして走行開始を禁止する。自己位置喪失時の停止を維持する。
 
 ### 速度計画と確認観点
@@ -461,10 +461,10 @@ cmake --build --preset Release
 
 ### 制御出力の合成ルール
 
-- `motorCommandOutSynth(tCmd, sCmd, yrCmd, dCmd)` は速度、トレース、ヨー、距離の各制御出力を左右の正規化指令に合成し、出力層で電圧補償して実DUTYへ変換する。
+- `motorCommandOutSynth(tCmd, sCmd, yrCmd)` は速度、トレース、ヨーレートの各制御出力を左右の正規化指令に合成し、出力層で電圧補償して実DUTYへ変換する。未使用だった距離制御引数は削除済み。
 - 正規化指令 `cmd=1000` は `MOTOR_COMMAND_NOMINAL_V=7.1 V` のモーター指令電圧として扱う。
-- 右正規化指令は `sCmd - traceCmd - yrCmd + dCmd` とする。
-- 左正規化指令は `sCmd + traceCmd + yrCmd + dCmd` とする。
+- 右正規化指令は `sCmd - traceCmd - yrCmd` とする。
+- 左正規化指令は `sCmd + traceCmd + yrCmd` とする。
 - 左右の正規化指令と実DUTYはそれぞれ `-1000` から `1000` に飽和させる。
 - 走行モードごとの出力経路を変更する場合は、`control.c` と `PIDcontrol.c` を確認する。
 
@@ -484,10 +484,10 @@ cmake --build --preset Release
 
 実機走行ログは `F:\Dropbox\Document\robotrace\Log\v2` に保存されています。
 
-- ログファイルは CSV 形式、文字コード UTF-8、区切り文字はカンマ。1行目が `key=value` の走行パラメータ、2行目が列名、3行目以降が走行データ。旧ログの混在1行ヘッダも列名で判定する。
+- ログファイルは CSV 形式、文字コード UTF-8、区切り文字はカンマ。1行目が `key=value` の走行パラメータ、2行目が列名、3行目以降が走行データ。旧ログの混在1行ヘッダの列名判定はPC側の解析だけで扱い、機体はCSVを解析元にしない。
 - 走行中は `<番号>.tmp` へ512 Bのコンテナヘッダと従来のバイナリレコードを保存する。停止後に余剰領域を切り詰め、停止時の走行メタデータとCRCを保存・同期・クローズして `<番号>.bin` へ変更する。コンテナ形式・復旧手順は `doc/deferred-log-storage.md` を参照する。
 - バイナリは自己記述RLOG v2とし、512 Bヘッダ・記録・列定義・メタデータを保存する。列名・型・S/D種別・数値書式・順序を`log_schema.h`から自動生成する。形式バージョン、列定義CRC、レコードサイズ、行数、データ/メタデータ/ヘッダCRC、実長を検証する。旧v1・不正binはCSVへフォールバックせず原本を保持する。未確定 `.tmp` は保持して警告し、自動昇格しない。
-- 通常のCSV変換はPC側で行い、型・列順のスキーマCRCと全記録CRCを検証する。機体側の旧変換APIは互換検証用に残すが通常経路から呼び出さない。採番は既存の `.csv` / `.bin` / `.tmp` / `.part` の予約番号を引き続き考慮する。詳細は`doc/pc-binary-log-import.md`を参照する。
+- 通常のCSV変換はPC側で行い、型・列順のスキーマCRCと全記録CRCを検証する。機体側のCSV変換APIは削除済み。機体の解析元と選択一覧は現行binだけとし、旧CSVへのフォールバックは行わない。採番は既存の `.csv` / `.bin` / `.tmp` / `.part` の予約番号を引き続き考慮する。詳細は`doc/pc-binary-log-import.md`を参照する。
 - CSVメタデータの `binaryLogNumber` は予約番号、`binaryDataCrc` は記録部CRC32/IEEE、`binarySchema` はスキーマ識別CRC32/IEEEを表す。CRCは既存整数書式に合わせた符号付き32bit表示で、ビット列として扱う。CSVデータ列・単位・100/145 Bの記録部は変更しない。
 - ラインセンサー校正完了後のログ初期化時に最大・最小値と有効状態を走行別に保持し、メタデータへ `lSensorMax0`～`lSensorMax9`、`lSensorMin0`～`lSensorMin9`、`lineSensorCalibrationValid`（有効=1）として保存する。最大・最小は正規化前のLED点灯・消灯差分AD値（0～4095）、添字0は左端。遅延CSV変換・起動時復旧でも保存済みの値を使用し、CSVデータ列・記録レコードの形式は変更しない。旧ログの項目欠落は未記録と扱う。
 - ログファイル名は通し番号を使う。
@@ -497,8 +497,9 @@ cmake --build --preset Release
 - 一次ログの1行目には `pathSourceFormatVersion=1`, `closureValid`, `closureReason`, `logExpectedRows`, `imuCalibrationValid`, `imuCalibrationSamples`, `imuCalibrationReadErrors`, `distanceScaleVerified`, `distanceScalePulsePerMeter`, `distanceScaleError_p` を記録する。PATH経路元には、正常終了かつ閉路有効・行数一致・IMU校正成功・距離換算検証成功のログだけを使う。保存済み旧形式ログはPATH経路元として受け付けない。これらはCSV列およびバイナリレコード構成を変更しない。
 - ログ取得の目標距離間隔は `robotrace_v2/Core/Inc/SDcard.h` の `LOG_DISTANCE_MM=5` を正とする。センサー値は1 ms周期で更新するため、高速時は実際のログ行間隔が5 mmを超えることがある。実間隔は `encTotalOptimal` の差で評価する。
 - `goalMarkerOnset_p` は幅を確認したゴールマーカーの検出開始位置とする。`distanceScaleError_p` はログ行間の経過msを掛けて積算した `encCurrentCorr_p` と最終 `encTotalOptimal` の差とする。オートスタートが一次走行後に止まったら、まず `closureReason` とログ最終行の距離を確認する。
-- `courseAnalysis.c`のSLIP解析は、V2の縦・横それぞれの区間有効ms/ON msと無効理由をCSV列名で解決し、`optimalIndex`別の時間率を次走計画へ反映する。旧`slipFlag`/`slipFlagLat`だけのログは拒否する。正常終了・同じ一次参照・DISTANCE・行数一致を確認し、一次計画を毎回再生成して二重補正を防ぐ。無効/未観測を滑りなしとして増速しない。
-- 共通ログ読込は `.bin` 優先、欠落時だけ従来CSVを使用する。バイナリでは値を直接復元し、曲率・クロス前後100 mm直線化・XY計算をCSV出力と共用する。CSV経由では引き続き列名を解決する。共通読込は停止中・FatFsロック下で1ファイルずつ実行する。
+- `courseAnalysis.c`のSLIP解析は、V2の縦・横それぞれの区間有効ms/ON msと無効理由を型付き`LogSourceRow`から取得し、`optimalIndex`別の時間率を次走計画へ反映する。旧スキーマのログは拒否する。正常終了・同じ一次参照・DISTANCE・行数一致を確認し、一次計画を毎回再生成して二重補正を防ぐ。無効/未観測を滑りなしとして増速しない。
+- 共通ログ読込は現行スキーマの `.bin` のみとし、`logSource.h`のメタデータ取得・型付き次行取得を使用する。曲率・クロス前後100 mm直線化・XY計算は維持し、機体側のCSVヘッダ生成・CSV行読込・数値解析は行わない。停止中・FatFsロック下で1ファイルずつ実行する。
+- SLIP/PATHの整数メタデータ取得は`logMetadataReadInt()`へ統一する。カンマ区切りの完全一致キーと有限なint32整数相当値を使用し、`0`と`0.00`は同値として読む。欠落・重複・非有限値・端数・範囲外を拒否する。各方式の解析元条件とCRC検証は維持する。
 - DISTANCE/SLIPの読込は不要なXY計算を省く。PATHの初回生成は検証・クロス抽出と経路検証・生成の2走査とする。同一連続走行内のPATH/SHORTCUTは延長前基準経路を再利用できるが、再利用時も元binの全件CRC検証を行う。元ログ・生成設定・系列世代・共有RAMの使用先が変わった場合や失敗時は無効化し、ゴール延長と速度計画は毎回作り直す。詳細と実測結果は`doc/log-processing-performance.md`を参照する。
 - 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_MARKER`, `BOOST_DISTANCE`, `BOOST_SHORTCUT`, `BOOST_PATH_REPLAY` を正とする。
 - 新しい走行モードを追加する場合は、`robotrace_v2/Core/Inc/courseAnalysis.h` に定義を追加する。
@@ -598,6 +599,7 @@ cmake --build --preset Release
 
 ### 実装済み履歴
 
+- 2026-10-24: 未使用の試験関数・SDサンプルAPI・到達不能のヨーレート調整画面と旧テストを整理した。センサー角度計算は保持し、端・全ゼロ・全入力範囲の安全な処理を追加。機体CSV変換と旧CSV解析を廃止し、現行bin専用の型付き読込APIへ統合した。保存形式と安全検証は維持し、6 KiBのCSV行バッファを削除。現行回帰は`validation/log_storage/run.py`と`validation/line_sensor_adc/run.py`を使用する。2026-10-25に13614〜13623の10本でbin保存・PC変換・5走×2系列・DISTANCE→SLIPの参照接続を確認した。SHORTCUTはLevel 0でありLevel 1確認には含めず、再起動操作・ISR最大時間・性能再現性は別途とする。
 - 2026-10-04: UI手動校正とスタート時の旋回校正の完了判定をSD保存から分離し、SDなしでも有効な校正後に手動走行を開始できるようにした。異常校正値の走行禁止を維持。PC判定テストとDebug/Releaseビルドで確認。ユーザーより実機書き込み・動作確認完了の報告あり。
 - 2026-06-28: 誤字由来の識別子を正規化し、解析済みログ番号ファイル名を `analize.txt` から `analysis.txt` へ変更した。旧名の読み取りフォールバックは設けない。
 - 2026-06-28: ログヘッダへ `fwVersion`, `gitCommit`, `buildDate`, `buildTime`, `branch` を出力するようにした。設定ファイル欠落時のデフォルト作成、破損時の部分反映と修復、`lsval.txt` 破損時および IMU/ラインセンサー異常時の走行禁止、TIM7 ログ要求周期の命名整理を実装した。

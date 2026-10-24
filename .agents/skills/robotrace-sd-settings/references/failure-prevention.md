@@ -10,20 +10,20 @@
 ## 保存・復旧
 
 - 現行は機体でbinを保持し、PCのAutoCopyCsvFromSdでCSV化する。再起動や修復前にbin/part/tmp・設定・失敗段階を保全する。PCのtempとCSV保存先の空きを確認し、temp原本・保存先CSVの照合と永続化成功後だけSD原本を削除する。機体の起動時CSV復旧を前提にしない。
-- FR_OKだけで書込成功にしない。要求長と実書込長、fptr、free_clstを確認する。機体のbinはsync/close/renameで確定し、自動削除しない。旧CSV変換APIの互換検証では従来のsync/close/renameと原本保持も確認する。
+- FR_OKだけで書込成功にしない。要求長と実書込長、fptr、free_clstを確認する。機体のbinはsync/close/renameで確定し、自動削除しない。機体CSV変換APIは削除済み。保存失敗はbin/tmpの各段階で注入し、PC出力は別工程として照合する。
 - 容量確保後も失敗したら媒体の種別・空き・失敗段階・戻り値を取り直す。前回の原因を当てはめない。CRC/実長/スキーマ/メタデータを名前付きフィールドで確認し、tuple添字を推測しない。
-- CubeMX/FatFs更新後はff.cのexFAT通常f_openにobj.n_frag=0の初期化が保持されているか確認する。RAM FatFsのモック成功では実FatFsを検証できない。現行は実機のbin確定・再起動時ヘッダ確認とPC取込を検証する。旧機体CSV変換を検証するときだけヘッダ→メタデータseek→CSV確定→再起動復旧も確認する。
+- CubeMX/FatFs更新後はff.cのexFAT通常f_openにobj.n_frag=0の初期化が保持されているか確認する。RAM FatFsのモック成功では実FatFsを検証できない。現行は実機のbin確定・再起動時ヘッダ確認とPC取込を検証する。旧機体CSV変換や再起動時CSV復旧の試験は再導入しない。
 - SD初期化はカード検出・SPI初期化・mountを分ける。リセットで一度直ったことだけで根本解決としない。再発時はCMD0/CMD8/ACMD41、電源・接触を観測する。
 - 解析の通常経路で再mount/全容量走査を増やさない。I/O再試行は既存の有限回数・有限待機とし、自動formatを行わない。読込エラーの診断を同じSDへ書き続けない。Base read/plan、Slip open/read/plan等の段階を記録する。
 - PC上の正常CSVは機体が読んだファイルと同一とは限らない。解析対象番号と実カードのファイル長・ハッシュ・ヘッダを照合する。
 
 ## 形式・メモリ
 
-- 読取側を列挙し、既存列の順序/型を保つ。必須列はヘッダ名で解決し、列追加時は実logBuildColumns/setLogStr出力の全名前・区切り・データ列数を通常/詳細で検証する。文字列長はstrlen/sizeofから求める。
+- 読取側を列挙し、既存列の順序/型を保つ。機体の解析元は現行binだけを型付きAPIで読み、列追加時はPC変換器出力の全名前・区切り・データ列数を通常/詳細で検証する。文字列長はstrlen/sizeofから求める。
 - snprintf戻り値で切詰めを検出する。行末改行・全行列数・最大行長・期待行数を検査し、連結行を経路解析へ渡さない。現行バッファ容量をソースで確認し、旧1024 Bの検査値を固定ルールにしない。
 - FIL、行バッファ、配列を増やすときはGET_SECTOR_SIZEと_MAX_SS、使用中リンカの8 KiB予約、_sbrk上限を確認する。全構成のmap/nm/objdumpでRAMと呼出しを含むスタックを点検し、実機最大値は別検証とする。
 - FatFs型のAPIをmain.h経由のSDcard.hへ追加しない。logSource.hの分離とinclude順序を維持し、ARMビルドとPCテストの両方を確認する。
-- bin/CSVの計画比較は毎回一次DISTANCE計画を再生成し、optimalTrace/analyzedNumber/PPAD/設定を同じ初期状態へ戻す。前のSLIP補正済みキャッシュを再補正しない。
+- binの整理前後の計画比較は毎回一次DISTANCE計画を再生成し、optimalTrace/analyzedNumber/PPAD/設定を同じ初期状態へ戻す。前のSLIP補正済みキャッシュを再補正しない。
 
 ## PC変換の検証
 
@@ -43,3 +43,8 @@
 - 自己記述情報やCRCがない対象を、隣接番号の列形式だけで正常ログへ昇格しない。ユーザー依頼で診断用の部分抽出を行う場合は、形式仮定・元CRC未検証・停止条件・対象byte範囲を記録し、別フォルダの*_partial.csvへ隔離する。終了時設定・終了理由・正常完走を推測で補わず、機体経路元や通常取込へ公開しない。変換器用の合成コンテナCRCは元記録の検証にならない。
 - Pythonで任意バイト列や置換文字を表示するときは、実行前にPYTHONIOENCODING=utf-8を設定し、保存テキストにもencodingを明示する。
 - 事例と検証条件: doc/失敗事例/2026-10-18-unsealed-tmp-partial-recovery.md、analysis/sd-tmp-recovery-20261018/README.md。保存失敗の実機原因は別途取得する。
+
+## 型付き読込の回帰契約（2026-10-24）
+
+- 正常openはハンドルを保持し、closeは呼出側が実行する。close故障をopenの失敗と期待せず、open/read/closeと起動時ヘッダ検証の各段階へ個別に故障を注入する。
+- スキーマが変わらないAPI整理でも、通常/詳細の実保存レコード・列定義・DISTANCE/SLIP/PATH/SHORTCUT計画を作業前と照合する。旧CSVを機体へ戻して比較しない。現行回帰は`validation/log_storage/run.py`。

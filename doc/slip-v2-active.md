@@ -44,15 +44,15 @@ SLIP解析用RAMへ横の有効時間配列2KiBを追加した。その他の配
 |slipV2LatCandidateValidMs|slipV2LatValidMsへ改名|
 |slipV2LatCandidateIntervalReason|slipV2LatIntervalReasonへ改名|
 
-V1・旧Candidate列名へのフォールバックはない。更新前の未取込binは先にPCへ取り込み、原本の保全を確認する。機体のバイナリ読込は現在のスキーマと一致するログだけを使うため、更新後は新ファームで一次・DISTANCEを取り直してSLIPへ進む。起動時に旧スキーマの未取込binが残っていると既存のログ検証で開始禁止になるため、機体側で旧binを自動削除・上書きしない。CSVも現在の横専用列名を必要とする。PC変換器は自己記述列定義に従い、既存ログ原本は元の列のまま保全する。
+V1・旧Candidate列名へのフォールバックはない。更新前の未取込binは先にPCへ取り込み、原本の保全を確認する。機体のバイナリ読込は現在のスキーマと一致するログだけを使うため、更新後は新ファームで一次・DISTANCEを取り直してSLIPへ進む。起動時に旧スキーマの未取込binが残っていると既存のログ検証で開始禁止になるため、機体側で旧binを自動削除・上書きしない。機体の旧CSV読込は2026-10-24に廃止した。PCでの過去ログ解析は保存時の列定義を使用する。PC変換器は自己記述列定義に従い、既存ログ原本は元の列のまま保全する。
 
 ## 確認と残る実機確認
 
 - ホスト：縦Fast単独、採用横とビット/区間ON時間の一致、無効・再充填、V2列の並替、V1列のみの拒否、区間時間不正の拒否。
-- ホスト：通常/詳細の実SDcard/courseAnalysisを使ったCSV・バイナリ計画一致、保存/CRC/I/O/復旧・PATHの回帰。
+- ホスト：通常/詳細の実SDcard/courseAnalysisを使った現行binの型付き解析と整理前後の計画一致、保存/CRC/I/O/復旧・PATHの回帰。
 - 重複整理の前後比較では、実CSV13549～13557の原本を保持し、新列へ投影したテスト専用コピーを使用する。全8本・各469要素のSLIP計画が変更前と一致することを通常/詳細で確認する。これは新形式の実走行ログではない。
 - 正式採用直後の70列実機ログ13571～13577では、保存とDISTANCE→SLIPへの接続を確認した。ただし元13574の終端不整合と13575のXY条件外があり、改善の再現性を証明していない。今回の66列/72列の最初の実機ログ、制御周期の最大実測時間、10本以上の同条件走行による再現性は実機で確認する。
 
-今回の再現手順と結果は`analysis/slip-lat-log-dedup/README.md`、導入時の旧70列検証は`analysis/slip-v2-active-validation/README.md`。ホストテストは`robotrace_v2/tests/slip_v2_active_test.c`と`run_log_deferred_tests.ps1`。テスト・解析成果物はリポジトリのGit除外設定に従う。
+今回の再現手順と結果は`analysis/slip-lat-log-dedup/README.md`、導入時の旧70列検証は`analysis/slip-v2-active-validation/README.md`。現行ホストテストは`python validation/log_storage/run.py`。旧V1/SHADOW切替や機体CSV変換の試験は廃止した。テスト・解析成果物はリポジトリのGit除外設定に従う。
 
 2026-10-24：ユーザー指示で推定調査を一旦中断。[到達点と未解決事項](slip-evaluation-checkpoint-2026-10-24.md)へ保存した。

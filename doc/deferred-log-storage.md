@@ -1,5 +1,7 @@
 # 走行ログのバイナリ保存とCSV一括変換
 
+> 2026-10-24: 機体側CSV変換API・旧CSV読込・CSV行バッファを削除した。現行bin専用の型付き読込と`validation/log_storage/run.py`を使用する。以下の機体CSV変換や旧テストの説明は当時の履歴。現行仕様は[整理後の構成](main-code-cleanup.md)を参照する。
+
 > 2026-10-15の追加変更で、通常運用は機体でbinを保存し、AutoCopyCsvFromSdでPC側CSV変換する方式へ移行した。[現行の保存・取込手順](pc-binary-log-import.md)を優先する。以下の機体CSV一括変換・起動時変換復旧は旧方式と互換検証の記録。
 
 ## 保存と走行の流れ

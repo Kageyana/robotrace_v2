@@ -4,9 +4,9 @@
 
 2026-10-15のユーザー指示により、走行終了後・起動時の機体側CSV変換を廃止した。走行終了時のキュー排出、最終書込、閉路検証、CRC・メタデータ保存、truncate/sync/close/renameによる番号付きbin確定は維持する。オートスタートの走行間解析も従来どおりbinから行う。
 
-`control.c`の通常起動・手動終了・5走終了・打切り・緊急停止から旧CSV変換APIを呼ばない。終了時は保存状態を確認して時間・終了結果を表示する。旧APIは既存CSV互換テスト用に残している。
+`control.c`の通常起動・手動終了・5走終了・打切り・緊急停止ではCSVを生成しない。終了時は保存状態を確認して時間・終了結果を表示する。2026-10-24の整理で旧API自体も削除した。機体内解析は`logSourceOpen`・`logSourceMetadata`・`logSourceNext`による現行bin専用の型付き読込を使う。
 
-起動時の`logPrepareBinaryStorage()`はbinのヘッダCRC・対応スキーマ・実長を確認し、未確定tmpを検出する。記録全件のCRC検証は解析元を開く時とPC変換時に行う。tmp/partを自動昇格・削除しない。ヘッダまたはI/O不正では開始を禁止し、初期表示に`SD BIN invalid`、tmp検出時は`SD TMP kept`を表示する。機体側の番号一覧はbin/旧CSVをまとめ、同番号を重複させない。PC未取込原本を失わないため古いログの自動削除は廃止した。
+起動時の`logPrepareBinaryStorage()`はbinのヘッダCRC・対応スキーマ・実長を確認し、未確定tmpを検出する。記録全件のCRC検証は解析元を開く時とPC変換時に行う。tmp/partを自動昇格・削除しない。ヘッダまたはI/O不正では開始を禁止し、初期表示に`SD BIN invalid`、tmp検出時は`SD TMP kept`を表示する。機体側の選択一覧はbinだけを扱う。CSVへの読込フォールバックは行わず、採番時には既存csv/bin/tmp/partの予約番号を保護する。PC未取込原本を失わないため古いログの自動削除は廃止した。
 
 ## PCの取込
 
@@ -23,6 +23,8 @@
 `-SourceFolder <フォルダ> -NoDeleteSource`で原本保持の1回取込ができる。通常監視にPython・MATLAB・コンパイラは不要。変換器のソースとRLOG v2ヘッダを同梱する。保存列の追加・削除・順序変更では更新不要。計算列や保存型・コンテナ仕様を変更するときはPC変換器も更新する。
 
 ps1の右クリック「PowerShellで実行」でも起動できる。既存監視が動いていれば二重起動の案内を表示し、Enterまで画面を残す。起動エラーも画面と`temp/startup-error.log`へ記録する。非表示/非対話起動、単発取込、`-NoPause`指定は入力待ちしない。既存監視が起動中なら再実行せずカードを挿せばよい。
+
+現行回帰は`python validation/log_storage/run.py --converter C:/tool/AutoCopyCsvFromSd/RlogToCsv.exe`。機体CSV互換テストに代わり、実保存binの全検証と型付き行・PC出力の数値一致を確認する。
 
 ## 確認結果（移行前RLOG v1）
 
