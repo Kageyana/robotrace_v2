@@ -117,25 +117,10 @@ typedef struct
 
 // 速度パラメータの一覧テーブル
 static const SpeedParamInfo speedParamTable[] = {
-	{"STRAIGHT", &tgtParam.search, 0.1f, 0.0f, 10.0f, "m/s"},
-	{"STOP", &tgtParam.stop, 0.1f, 0.0f, 10.0f, "m/s"},
-	{"BST STRT", &tgtParam.bstStraight, 0.1f, 0.0f, 10.0f, "m/s"},
-	{"BST 1500", &tgtParam.bst1500, 0.1f, 0.0f, 10.0f, "m/s"},
-	{"BST 1300", &tgtParam.bst1300, 0.1f, 0.0f, 10.0f, "m/s"},
-	{"BST 1000", &tgtParam.bst1000, 0.1f, 0.0f, 10.0f, "m/s"},
-	{"BST 800", &tgtParam.bst800, 0.1f, 0.0f, 10.0f, "m/s"},
-	{"BST 700", &tgtParam.bst700, 0.1f, 0.0f, 10.0f, "m/s"},
-	{"BST 600", &tgtParam.bst600, 0.1f, 0.0f, 10.0f, "m/s"},
-	{"BST 500", &tgtParam.bst500, 0.1f, 0.0f, 10.0f, "m/s"},
-	{"BST 400", &tgtParam.bst400, 0.1f, 0.0f, 10.0f, "m/s"},
-	{"BST 300", &tgtParam.bst300, 0.1f, 0.0f, 10.0f, "m/s"},
-	{"BST 200", &tgtParam.bst200, 0.1f, 0.0f, 10.0f, "m/s"},
-	{"BST 100", &tgtParam.bst100, 0.1f, 0.0f, 10.0f, "m/s"},
-	{"BST acceleF", &tgtParam.acceleF, 0.1f, 0.0f, 20.0f, "m/ss"},
-	{"BST acceleD", &tgtParam.acceleD, 0.1f, 0.0f, 20.0f, "m/ss"},
-	{"BST shortCut", &tgtParam.shortCut, 0.1f, 0.0f, 10.0f, "m/s"},
-	{"BST dLead", &tgtParam.decelLeadMm, 1.0f, 0.0f, 99.0f, "mm"},
-	{"PATH L0", &tgtParam.pathReplay, 0.1f, 0.0f, 10.0f, "m/s"}
+#define SPEED_PARAM_UI(member, initial, label, step, minimum, maximum, unit) \
+    {label, &tgtParam.member, step, minimum, maximum, unit},
+    SPEED_PARAM_FIELDS(SPEED_PARAM_UI)
+#undef SPEED_PARAM_UI
 }; // 速度パラメータの対応テーブル
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_speed_param

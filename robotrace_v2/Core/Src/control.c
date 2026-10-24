@@ -44,25 +44,10 @@ uint16_t analogVal2[4];			  // ADC結果格納配列
 
 // 速度パラメータ関連
 speedParam tgtParam = {
-	PARAM_SEARCH,
-	PARAM_STOP,
-	PARAM_BOOST_STRAIGHT,
-	PARAM_BOOST_1500,
-	PARAM_BOOST_1300,
-	PARAM_BOOST_1000,
-	PARAM_BOOST_800,
-	PARAM_BOOST_700,
-	PARAM_BOOST_600,
-	PARAM_BOOST_600,
-	PARAM_BOOST_400,
-	PARAM_BOOST_300,
-	PARAM_BOOST_200,
-	PARAM_BOOST_100,
-	MACHINEACCELE,
-	MACHINEDECREACE,
-	PARAM_SHORTCUT,
-	PARAM_DECEL_LEAD_MM,
-	PARAM_PATH_REPLAY};
+#define SPEED_PARAM_DEFAULT(member, initial, label, step, minimum, maximum, unit) initial,
+    SPEED_PARAM_FIELDS(SPEED_PARAM_DEFAULT)
+#undef SPEED_PARAM_DEFAULT
+};
 // 経路追従へ渡す1msの生エンコーダ増分。未検証の滑り距離補正は行わない。
 static int32_t encCurrentCorr_p = 0;
 static const char *getRunStartBlockReason(void);
@@ -1285,7 +1270,6 @@ int32_t Control_GetEncCurrentCorr_p(void)
 {
 	return encCurrentCorr_p;
 }
-#define TARGET_SPEED_PARAM_COUNT ((int16_t)(sizeof(speedParam) / sizeof(float)))
 
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 applyTargetSpeedStoredValue
@@ -1295,31 +1279,15 @@ int32_t Control_GetEncCurrentCorr_p(void)
 ///////////////////////////////////////////////////////////////////////////
 static void applyTargetSpeedStoredValue(int16_t index, int16_t value)
 {
-	float converted = (float)value / 100.0F;
-
-	switch (index)
-	{
-	case 0: tgtParam.search = converted; break;
-	case 1: tgtParam.stop = converted; break;
-	case 2: tgtParam.bstStraight = converted; break;
-	case 3: tgtParam.bst1500 = converted; break;
-	case 4: tgtParam.bst1300 = converted; break;
-	case 5: tgtParam.bst1000 = converted; break;
-	case 6: tgtParam.bst800 = converted; break;
-	case 7: tgtParam.bst700 = converted; break;
-	case 8: tgtParam.bst600 = converted; break;
-	case 9: tgtParam.bst500 = converted; break;
-	case 10: tgtParam.bst400 = converted; break;
-	case 11: tgtParam.bst300 = converted; break;
-	case 12: tgtParam.bst200 = converted; break;
-	case 13: tgtParam.bst100 = converted; break;
-	case 14: tgtParam.acceleF = converted; break;
-	case 15: tgtParam.acceleD = converted; break;
-	case 16: tgtParam.shortCut = converted; break;
-	case 17: tgtParam.decelLeadMm = converted; break;
-	case 18: tgtParam.pathReplay = converted; break;
-	default: break;
-	}
+    const float converted = (float)value / SPEED_PARAM_STORAGE_SCALE;
+    switch (index)
+    {
+#define SPEED_PARAM_APPLY(member, initial, label, step, minimum, maximum, unit) \
+        case SPEED_PARAM_##member: tgtParam.member = converted; break;
+        SPEED_PARAM_FIELDS(SPEED_PARAM_APPLY)
+#undef SPEED_PARAM_APPLY
+        default: break;
+    }
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setEncoderVal
@@ -1342,51 +1310,27 @@ void setEncoderVal(void)
 	encClick += encCurrentL;		// ホイールクリック用
 }
 ///////////////////////////////////////////////////////////////////////////
-// モジュール名 writePIDparameters
-// 処理概要     PIDゲインをSDカードに記録する
-// 引数         pid:pidParam型の変数
+// モジュール名 writeTgtspeeds
+// 処理概要     共通定義の保存順で19項目の速度パラメータをSDへ記録する
+// 引数         なし
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
 void writeTgtspeeds(void)
 {
-	FIL fil;
-	FRESULT fresult;
-	char format[100] = "", fileName[30] = PATH_SETTING;
-	int16_t i;
-
-	// ファイル読み込み
-	strcat(fileName, FILENAME_TARGET_SPEED);					 // ファイル名追加
-	strcat(fileName, ".txt");									 // 拡張子追加
-	fresult = f_open(&fil, fileName, FA_CREATE_ALWAYS | FA_WRITE); // ファイルを開く
-
-	if (fresult == FR_OK)
-	{
-		for (i = 0; i < sizeof(speedParam) / sizeof(float); i++)
-		{
-			strcat(format, "%04d,");
-		}
-
-		f_printf(&fil, format, (int32_t)(roundf(tgtParam.search * 100)),
-										(int32_t)(roundf(tgtParam.stop * 100)),
-										(int32_t)(roundf(tgtParam.bstStraight * 100)),
-										(int32_t)(roundf(tgtParam.bst1500 * 100)),
-										(int32_t)(roundf(tgtParam.bst1300 * 100)),
-										(int32_t)(roundf(tgtParam.bst1000 * 100)),
-										(int32_t)(roundf(tgtParam.bst800 * 100)),
-										(int32_t)(roundf(tgtParam.bst700 * 100)),
-										(int32_t)(roundf(tgtParam.bst600 * 100)),
-										(int32_t)(roundf(tgtParam.bst500 * 100)),
-										(int32_t)(roundf(tgtParam.bst400 * 100)),
-										(int32_t)(roundf(tgtParam.bst300 * 100)),
-										(int32_t)(roundf(tgtParam.bst200 * 100)),
-										(int32_t)(roundf(tgtParam.bst100 * 100)),
-										(int32_t)(roundf(tgtParam.acceleF * 100)),
-										(int32_t)(roundf(tgtParam.acceleD * 100)),
-										(int32_t)(roundf(tgtParam.shortCut * 100)),
-										(int32_t)(roundf(tgtParam.decelLeadMm * 100)),
-										(int32_t)(roundf(tgtParam.pathReplay * 100)));
-		f_close(&fil);
-	}
+    FIL fil;
+    char fileName[30] = PATH_SETTING;
+    strcat(fileName, FILENAME_TARGET_SPEED);
+    strcat(fileName, ".txt");
+    if (f_open(&fil, fileName, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
+    {
+#define SPEED_PARAM_FORMAT(member, initial, label, step, minimum, maximum, unit) SPEED_PARAM_STORAGE_FORMAT
+#define SPEED_PARAM_VALUE(member, initial, label, step, minimum, maximum, unit) \
+        , (int32_t)roundf(tgtParam.member * SPEED_PARAM_STORAGE_SCALE)
+        f_printf(&fil, SPEED_PARAM_FIELDS(SPEED_PARAM_FORMAT) SPEED_PARAM_FIELDS(SPEED_PARAM_VALUE));
+#undef SPEED_PARAM_FORMAT
+#undef SPEED_PARAM_VALUE
+        f_close(&fil);
+    }
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 readTgtspeeds
@@ -1402,20 +1346,27 @@ void readTgtspeeds(void)
 	TCHAR paramStr[100];
 	int values[TARGET_SPEED_PARAM_COUNT] = {0};
 	int defaults[TARGET_SPEED_PARAM_COUNT];
-	int minimums[TARGET_SPEED_PARAM_COUNT] = {0};
-	int maximums[TARGET_SPEED_PARAM_COUNT];
+	int minimums[TARGET_SPEED_PARAM_COUNT] = {
+#define SPEED_PARAM_MIN(member, initial, label, step, minimum, maximum, unit) (int)((minimum) * SPEED_PARAM_STORAGE_SCALE),
+        SPEED_PARAM_FIELDS(SPEED_PARAM_MIN)
+#undef SPEED_PARAM_MIN
+    };
+    int maximums[TARGET_SPEED_PARAM_COUNT] = {
+#define SPEED_PARAM_MAX(member, initial, label, step, minimum, maximum, unit) (int)((maximum) * SPEED_PARAM_STORAGE_SCALE),
+        SPEED_PARAM_FIELDS(SPEED_PARAM_MAX)
+#undef SPEED_PARAM_MAX
+    };
 	bool present[TARGET_SPEED_PARAM_COUNT] = {false};
 	bool repair = false;
-	const float defaultSpeedValues[TARGET_SPEED_PARAM_COUNT] = {
-		tgtParam.search, tgtParam.stop, tgtParam.bstStraight, tgtParam.bst1500,
-		tgtParam.bst1300, tgtParam.bst1000, tgtParam.bst800, tgtParam.bst700,
-		tgtParam.bst600, tgtParam.bst500, tgtParam.bst400, tgtParam.bst300,
-		tgtParam.bst200, tgtParam.bst100, tgtParam.acceleF, tgtParam.acceleD,
-		tgtParam.shortCut, tgtParam.decelLeadMm, tgtParam.pathReplay};
+    const float defaultSpeedValues[TARGET_SPEED_PARAM_COUNT] = {
+#define SPEED_PARAM_CURRENT(member, initial, label, step, minimum, maximum, unit) tgtParam.member,
+        SPEED_PARAM_FIELDS(SPEED_PARAM_CURRENT)
+#undef SPEED_PARAM_CURRENT
+    };
 	for (int16_t i = 0; i < TARGET_SPEED_PARAM_COUNT; i++)
 	{
-		defaults[i] = (int)lroundf(defaultSpeedValues[i] * 100.0F);
-		maximums[i] = (i == 14 || i == 15) ? 2000 : ((i == 17) ? 9900 : 1000);
+		defaults[i] = (int)lroundf(defaultSpeedValues[i] * SPEED_PARAM_STORAGE_SCALE);
+
 	}
 
 	// ファイル読み込み
@@ -1429,12 +1380,12 @@ void readTgtspeeds(void)
 		for (int16_t i = 0; i < TARGET_SPEED_PARAM_COUNT; i++)
 		{
 			int16_t value = 0;
-			if (f_gets(paramStr, 6, &fil) == NULL)
+			if (f_gets(paramStr, SPEED_PARAM_STORAGE_FIELD_BYTES + 1U, &fil) == NULL)
 			{
 				repair = true;
 				break;
 			}
-			if (sscanf(paramStr, "%04hd,", &value) != 1)
+			if (sscanf(paramStr, SPEED_PARAM_STORAGE_READ_FORMAT, &value) != 1)
 			{
 				repair = true;
 				break;

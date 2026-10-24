@@ -4,6 +4,7 @@
 // インクルード
 //====================================//
 #include "main.h"
+#include "speedParameters.h"
 #include "SDcard.h"
 #include "IMU.h"
 #include <stdbool.h>
@@ -55,28 +56,7 @@
 // ファイル名
 #define FILENAME_TARGET_SPEED "targetSpeeds"
 
-typedef struct
-{
-	float search;
-	float stop;
-	float bstStraight;
-	float bst1500;
-	float bst1300;
-	float bst1000;
-	float bst800;
-	float bst700;
-	float bst600;
-	float bst500;
-	float bst400;
-	float bst300;
-	float bst200;
-	float bst100;
-	float acceleF;
-	float acceleD;
-	float shortCut;
-	float decelLeadMm;
-	float pathReplay;
-} speedParam;
+
 //====================================//
 // グローバル変数の宣言
 //====================================//
