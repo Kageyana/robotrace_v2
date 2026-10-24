@@ -45,7 +45,7 @@ def main():
         folder.mkdir(exist_ok=True)
         binary = folder / "check.exe"
         command = flags + [f"-DLOG_SCHEMA_PROFILE_LIGHT={profile}", HERE / "check.c"]
-        command += [PROJECT / "Core/Src" / name for name in ("slipDetection.c", "runMemory.c", "autoRun.c")]
+        command += [PROJECT / "Core/Src" / name for name in ("slipDetection.c", "runMemory.c", "autoRun.c", "logMetadata.c")]
         command += ["-Wl,--gc-sections,--exclude-all-symbols", "-lm", "-o", binary]
         run(command, folder / "compile.log")
         text = run([binary, folder], folder / "check.log")

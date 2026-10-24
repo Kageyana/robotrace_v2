@@ -1,5 +1,6 @@
 #include "pathFollower.h"
 #include "logSource.h"
+#include "logMetadata.h"
 #include "logPerformance.h"
 #include "autoRun.h"
 #include "pathPolicy.h"
@@ -320,37 +321,34 @@ static int16_t pathFloatToInt16(float value)
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathReadSourceMetadata
 // 処理概要     全CRC検証済みメタデータから経路元の妥当性を確認する
-// 引数         file:読込ファイル, columns:経路元情報の格納先
+// 引数         file:読込ファイル, source:経路元情報の格納先
 // 戻り値       true:有効な一次経路元 false:必要な検証情報なし
 /////////////////////////////////////////////////////////////////////
-static bool pathReadSourceMetadata(FIL *file, RouteSourceInfo *columns)
+static bool pathReadSourceMetadata(FIL *file, RouteSourceInfo *source)
 {
-	const char *metadata = logSourceMetadata(file);
-	if (metadata == NULL) return false;
-	const bool supportedVersion = strstr(metadata, "pathSourceFormatVersion=1,") != NULL;
-	const char *valid = strstr(metadata, "closureValid=1,");
-	const char *reason = strstr(metadata, "closureReason=0,");
-	const char *mode = strstr(metadata, "optimalTrace=0.00,");
-	const char *stop = strstr(metadata, "emcStop=0.00,");
-	const char *scale = strstr(metadata, "encoderPulsePerMeter=");
-	char *scaleEnd = NULL;
-	const unsigned long sourcePulsePerMeter = (scale != NULL) ?
-		strtoul(scale + strlen("encoderPulsePerMeter="), &scaleEnd, 10) : 0UL;
-	const char *calibrated = strstr(metadata, "imuCalibrationValid=1,");
-	const char *calibrationSamples = strstr(metadata, "imuCalibrationSamples=100,");
-	const char *calibrationErrors = strstr(metadata, "imuCalibrationReadErrors=0,");
-	const char *distanceVerified = strstr(metadata, "distanceScaleVerified=1,");
-	const char *expectedRows = strstr(metadata, "logExpectedRows=");
-	columns->expectedRows = (expectedRows != NULL) ?
-		(uint32_t)strtoul(expectedRows + strlen("logExpectedRows="), NULL, 10) : 0U;
-	columns->closureValid = pathPolicySourceMetadataValid(
-		supportedVersion, valid != NULL, (reason != NULL) ? 0U : 1U,
-		mode != NULL, stop != NULL, (scaleEnd != NULL && *scaleEnd == ',') ?
-		(uint32_t)sourcePulsePerMeter : 0U, calibrated != NULL,
-		(calibrationSamples != NULL) ? IMU_CALIBRATION_SAMPLE_COUNT : 0U,
-		(calibrationErrors != NULL) ? 0U : 1U, distanceVerified != NULL,
-		columns->expectedRows);
-	return columns->closureValid;
+    const char *metadata = logSourceMetadata(file);
+    int32_t version, closure, reason, mode, stop, scale;
+    int32_t calibrated, samples, errors, distanceVerified, expectedRows;
+    if (!logMetadataReadInt(metadata, "pathSourceFormatVersion", &version) ||
+        !logMetadataReadInt(metadata, "closureValid", &closure) ||
+        !logMetadataReadInt(metadata, "closureReason", &reason) ||
+        !logMetadataReadInt(metadata, "optimalTrace", &mode) ||
+        !logMetadataReadInt(metadata, "emcStop", &stop) ||
+        !logMetadataReadInt(metadata, "encoderPulsePerMeter", &scale) ||
+        !logMetadataReadInt(metadata, "imuCalibrationValid", &calibrated) ||
+        !logMetadataReadInt(metadata, "imuCalibrationSamples", &samples) ||
+        !logMetadataReadInt(metadata, "imuCalibrationReadErrors", &errors) ||
+        !logMetadataReadInt(metadata, "distanceScaleVerified", &distanceVerified) ||
+        !logMetadataReadInt(metadata, "logExpectedRows", &expectedRows) ||
+        expectedRows <= 0 || expectedRows > (int32_t)UINT16_MAX || reason < 0 || scale <= 0 ||
+        samples < 0 || errors < 0) return false;
+    source->expectedRows = (uint32_t)expectedRows;
+    source->closureValid = pathPolicySourceMetadataValid(
+        version == 1, closure == 1, (uint32_t)reason,
+        mode == BOOST_NONE, stop == 0, (uint32_t)scale,
+        calibrated == 1, (uint32_t)samples, (uint32_t)errors,
+        distanceVerified == 1, source->expectedRows);
+    return source->closureValid;
 }
 
 /////////////////////////////////////////////////////////////////////

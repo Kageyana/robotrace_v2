@@ -913,6 +913,45 @@ static void testSourceMetadataAndStartSnapshot(void)
 }
 
 /////////////////////////////////////////////////////////////////////
+// モジュール名 testPathMetadataFields
+// 処理概要     CRC正常なbinでも数値表記の違いを受理し重複・偽キー・範囲外を拒否する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void testPathMetadataFields(void)
+{
+    const struct { const char *oldText, *newText; bool accepted; } cases[] = {
+        {"optimalTrace=0.00,","optimalTrace=0,",true},
+        {"emcStop=0.00,","emcStop=0,",true},
+        {"imuCalibrationSamples=100,","imuCalibrationSamples=100.00,",true},
+        {"closureValid=1,","closureValid=1,closureValid=1,",false},
+        {"closureValid=1,","otherclosureValid=1,",false},
+        {"logExpectedRows=100,","logExpectedRows=100.5,",false},
+        {"logExpectedRows=100,","logExpectedRows=65536,",false},
+        {"logExpectedRows=100,","logExpectedRows=-1,",false},
+        {"encoderPulsePerMeter=58019,","encoderPulsePerMeter=58020,",false},
+        {"imuCalibrationReadErrors=0,","imuCalibrationReadErrors=nan,",false},
+        {"closureReason=0,","closureReason=8,",false}
+    };
+    for (size_t i=0;i<sizeof(cases)/sizeof(cases[0]);i++) {
+        resetMock(); saveRun(100,0);
+        MockFile *bin=findFile("1.bin"); LogBinaryHeader h;
+        CHECK(logBinaryDecodeHeader(bin->data,bin->size,&h)); bin->data[bin->size]=0;
+        uint8_t *meta=bin->data+512+(size_t)h.rows*h.recordBytes+h.schemaBytes;
+        char *field=strstr((char *)meta,cases[i].oldText); CHECK(field);
+        size_t prefix=(size_t)(field-(char *)meta), oldBytes=strlen(cases[i].oldText);
+        size_t newBytes=strlen(cases[i].newText), suffix=h.metadataBytes-prefix-oldBytes;
+        memmove(field+newBytes,field+oldBytes,suffix);
+        memcpy(field,cases[i].newText,newBytes);
+        bin->size=bin->size-oldBytes+newBytes;
+        h.metadataBytes=(uint32_t)(h.metadataBytes-oldBytes+newBytes);
+        h.metadataCrc=~logBinaryCrcUpdate(UINT32_MAX,meta,h.metadataBytes);
+        logBinaryEncodeHeader(bin->data,&h);
+        CHECK((routeBuildFromLog(1,0)>0)==cases[i].accepted && findFile("1.bin"));
+    }
+}
+
+/////////////////////////////////////////////////////////////////////
 // モジュール名 exportFixture
 // 処理概要     PC変換・整理前後の計画比較用に実保存binと型付き行を出力する
 // 引数         folder: 今回の検証出力フォルダ
@@ -956,7 +995,7 @@ int main(int argc,char **argv)
 {
     testStorageAndSnapshots(); testPlansAndReader(); testMarkerIndependentXY();
     testSavingFailures(); testCorruptionAndReadFailures(); testSlipRowBounds();
-    testSourceMetadataAndStartSnapshot();
+    testSourceMetadataAndStartSnapshot(); testPathMetadataFields();
     exportFixture(argc>1?argv[1]:NULL,argc>2);
     puts("PASS: binary storage, typed reader, CRC and I/O faults, snapshots, DISTANCE/SLIP/PATH, CSV rejection");
     return 0;

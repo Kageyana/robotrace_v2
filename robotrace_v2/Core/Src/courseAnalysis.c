@@ -3,6 +3,7 @@
 //====================================//
 #include "courseAnalysis.h"
 #include "logSource.h"
+#include "logMetadata.h"
 #include "logPerformance.h"
 #include "control.h"
 #include "fatfs.h"
@@ -664,31 +665,6 @@ int16_t readLogDistance(int logNumber)
 	LOG_PERF_END(distanceMs, tick);
 	return result;
 }
-/////////////////////////////////////////////////////////////////////
-// モジュール名 readSlipMetadataInt
-// 処理概要     SLIP解析元のメタデータから整数相当の値を取得する
-// 引数         line: メタデータ行, key: 項目名, value: 取得先
-// 戻り値       true: 正常 false: 欠落・重複・不正値
-/////////////////////////////////////////////////////////////////////
-static bool readSlipMetadataInt(const char *line, const char *key, int32_t *value)
-{
-    size_t length = strlen(key);
-    bool found = false;
-    for (const char *field = line; field != NULL && *field != '\0'; ) {
-        if (strncmp(field, key, length) == 0 && field[length] == '=') {
-            char *end;
-            double v = strtod(field + length + 1U, &end);
-            if (found || end == field + length + 1U ||
-                (*end != ',' && *end != '\r' && *end != '\n' && *end != '\0') ||
-                !isfinite(v) || v < INT32_MIN || v > INT32_MAX || v != trunc(v)) return false;
-            *value = (int32_t)v;
-            found = true;
-        }
-        const char *next = strchr(field, ',');
-        field = next != NULL ? next + 1 : NULL;
-    }
-    return found;
-}
 static void logReadSlipIoError(int logNumber, UINT lineNo, FIL *fil, const char *tag)
 {
 	DWORD pos = f_tell(fil);
@@ -795,12 +771,12 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
 	if (header == NULL) { ret = -2; goto cleanup; }
     // 正常終了した同じ一次参照のDISTANCEログだけを解析元とする。
     int32_t sourceMode, sourcePrimary, sourceSlip, sourceStop, sourceGoal;
-    if (!readSlipMetadataInt(header, "optimalTrace", &sourceMode) || sourceMode != BOOST_DISTANCE ||
-        !readSlipMetadataInt(header, "primaryLogNumber", &sourcePrimary) || sourcePrimary != baseLogNumber ||
-        !readSlipMetadataInt(header, "slipSourceLogNumber", &sourceSlip) || sourceSlip != 0 ||
-        !readSlipMetadataInt(header, "emcStop", &sourceStop) || sourceStop != 0 ||
-        !readSlipMetadataInt(header, "sgMarkerAtLogEnd", &sourceGoal) || sourceGoal != COUNT_GOAL ||
-        !readSlipMetadataInt(header, "logExpectedRows", &expectedRows) || expectedRows <= 0 || expectedRows > (int32_t)UINT16_MAX) {
+    if (!logMetadataReadInt(header, "optimalTrace", &sourceMode) || sourceMode != BOOST_DISTANCE ||
+        !logMetadataReadInt(header, "primaryLogNumber", &sourcePrimary) || sourcePrimary != baseLogNumber ||
+        !logMetadataReadInt(header, "slipSourceLogNumber", &sourceSlip) || sourceSlip != 0 ||
+        !logMetadataReadInt(header, "emcStop", &sourceStop) || sourceStop != 0 ||
+        !logMetadataReadInt(header, "sgMarkerAtLogEnd", &sourceGoal) || sourceGoal != COUNT_GOAL ||
+        !logMetadataReadInt(header, "logExpectedRows", &expectedRows) || expectedRows <= 0 || expectedRows > (int32_t)UINT16_MAX) {
         ret = -7;
         goto cleanup;
     }
