@@ -17,10 +17,10 @@ typedef struct
 	int16_t slipV2TotalMs;
 	int16_t slipV2ValidMs;
 	int16_t slipV2OnLongMs;
-	int16_t slipV2LatCandidateValidMs;
-	int16_t slipV2LatCandidateOnMs;
+	int16_t slipV2LatValidMs;
+	int16_t slipV2OnLatMs;
 	int16_t slipV2IntervalReason;
-	int16_t slipV2LatCandidateIntervalReason;
+	int16_t slipV2LatIntervalReason;
 } CourseLogColumnMap;
 
 typedef struct
@@ -43,10 +43,10 @@ typedef struct
 	int32_t slipV2TotalMs;
 	int32_t slipV2ValidMs;
 	int32_t slipV2OnLongMs;
-	int32_t slipV2LatCandidateValidMs;
-	int32_t slipV2LatCandidateOnMs;
+	int32_t slipV2LatValidMs;
+	int32_t slipV2OnLatMs;
 	int32_t slipV2IntervalReason;
-	int32_t slipV2LatCandidateIntervalReason;
+	int32_t slipV2LatIntervalReason;
 } CourseLogSlipRow;
 
 void courseLogInitColumnMap(CourseLogColumnMap *map);

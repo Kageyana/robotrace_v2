@@ -910,7 +910,7 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
         if (optimalIdx >= baseCount) { ret = -1; break; }
         // 混合有効区間はON位置が不明なので、その軸のリスク集計には含めない。
         uint16_t longValid = row.slipV2IntervalReason == 0 && row.slipV2ValidMs == row.slipV2TotalMs ? (uint16_t)row.slipV2ValidMs : 0U;
-        uint16_t latValid = row.slipV2LatCandidateIntervalReason == 0 && row.slipV2LatCandidateValidMs == row.slipV2TotalMs ? (uint16_t)row.slipV2LatCandidateValidMs : 0U;
+        uint16_t latValid = row.slipV2LatIntervalReason == 0 && row.slipV2LatValidMs == row.slipV2TotalMs ? (uint16_t)row.slipV2LatValidMs : 0U;
         if (longValid > UINT16_MAX - validLongMs[optimalIdx] || latValid > UINT16_MAX - validLatMs[optimalIdx] || rocCnt[optimalIdx] == UINT16_MAX) {
             ret = -7; // 停止中の解析配列でも時間カウンタの折返しを許さない。
             break;
@@ -920,7 +920,7 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
         observedLongMs += longValid;
         observedLatMs += latValid;
         if (longValid != 0U) longOnMs[optimalIdx] += (uint16_t)row.slipV2OnLongMs;
-        if (latValid != 0U) latOnMs[optimalIdx] += (uint16_t)row.slipV2LatCandidateOnMs;
+        if (latValid != 0U) latOnMs[optimalIdx] += (uint16_t)row.slipV2OnLatMs;
         rocAbsSum[optimalIdx] += fabsf(row.ROC);
         rocCnt[optimalIdx]++;
 

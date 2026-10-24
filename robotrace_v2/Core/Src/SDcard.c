@@ -1564,7 +1564,7 @@ bool logSourceSlipRow(FIL *file, const char *line, const CourseLogColumnMap *col
     if (!binarySource.rowReady) return false;
     LogRecord *r = &binarySource.record;
     *row = (CourseLogSlipRow){r->courseMarker, (int32_t)r->encTotalOptimal, binarySource.roc,
-        r->targetSpeed, r->optimalIndex, r->slipV2TotalMs, r->slipV2ValidMs, r->slipV2OnLongMs, r->slipV2LatCandidateValidMs, r->slipV2LatCandidateOnMs, r->slipV2IntervalReason, r->slipV2LatCandidateIntervalReason};
+        r->targetSpeed, r->optimalIndex, r->slipV2TotalMs, r->slipV2ValidMs, r->slipV2OnLongMs, r->slipV2LatValidMs, r->slipV2OnLatMs, r->slipV2IntervalReason, r->slipV2LatIntervalReason};
     return courseLogValidateSlipRow(row);
 }
 

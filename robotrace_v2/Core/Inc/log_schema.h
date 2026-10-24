@@ -115,24 +115,20 @@
     STORED(U16, slipV2TotalMs, "%d", slipV2.interval.totalMs) \
     STORED(U16, slipV2IntervalReason, "%d", slipV2.interval.invalidReason)
 
-// 採用横の独立した有効性・理由・統計を保持する。共通横列と残差・ONは同じになる。
-#define LOG_FIELD_LIST_LAT_CANDIDATE(STORED, DERIVED) \
-    STORED(F32, slipV2LatCandidate, "%f", slipV2.lateralCandidate.result.residual) \
-    STORED(U8, slipV2LatCandidateFlag, "%d", slipV2.lateralCandidate.result.flag) \
-    STORED(U8, slipV2LatCandidateValid, "%d", slipV2.lateralCandidate.result.valid) \
-    STORED(U16, slipV2LatCandidateReason, "%d", slipV2.lateralCandidate.result.reason) \
-    STORED(F32, slipV2LatCandidatePeak, "%f", slipV2.lateralCandidate.interval.peak) \
-    STORED(U16, slipV2LatCandidateOnMs, "%d", slipV2.lateralCandidate.interval.onMs) \
-    STORED(U16, slipV2LatCandidateValidMs, "%d", slipV2.lateralCandidate.interval.validMs) \
-    STORED(U16, slipV2LatCandidateIntervalReason, "%d", slipV2.lateralCandidate.interval.invalidReason) \
+// 採用横の独立した有効性・理由を保持する。残差・フラグ・ピーク・ON時間はV2共通列へ統合する。
+#define LOG_FIELD_LIST_LAT_DIAGNOSTICS(STORED, DERIVED) \
+    STORED(U8, slipV2LatValid, "%d", slipV2.lateralCandidate.result.valid) \
+    STORED(U16, slipV2LatReason, "%d", slipV2.lateralCandidate.result.reason) \
+    STORED(U16, slipV2LatValidMs, "%d", slipV2.lateralCandidate.interval.validMs) \
+    STORED(U16, slipV2LatIntervalReason, "%d", slipV2.lateralCandidate.interval.invalidReason) \
     STORED(F32, imuYawAlphaFiltered, "%f", slipV2.lateralCandidate.result.alphaRadps2) \
     STORED(F32, imuLatTangentialApplied, "%f", slipV2.lateralCandidate.result.tangentialAppliedXMps2)
 
-// 通常70列・181 B、詳細76列・190 B。診断29列を両プロファイルへ記録する。
+// 通常66列・170 B、詳細72列・179 B。診断25列を両プロファイルへ記録する。
 #define LOG_FIELD_LIST(STORED, DERIVED) \
     LOG_BASE_FIELD_LIST(STORED, DERIVED) \
     LOG_FIELD_LIST_V2(STORED, DERIVED) \
-    LOG_FIELD_LIST_LAT_CANDIDATE(STORED, DERIVED)
+    LOG_FIELD_LIST_LAT_DIAGNOSTICS(STORED, DERIVED)
 
 // バイナリログで保存する型の対応表。
 #define LOG_CTYPE_U8  uint8_t

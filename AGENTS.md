@@ -552,9 +552,11 @@ cmake --build --preset Release
 
 ### 2026-10-21以降のV2正式採用ログ
 
-- 通常70列/181 B、詳細76列/190 B。以下のSHADOW時代の列数・意味は履歴であり、新規ログでは本節を優先する。
+- 横ログ重複整理後は通常66列/170 B、詳細72列/179 B。正式採用直後の13571～13577は通常70列/181 Bであり、保存スキーマで区別する。以下のSHADOW時代の列数・意味は履歴であり、新規ログでは本節を優先する。
 - 旧`slipFlag`, `slipFlagLat`, `slipRatio`, `slipRatioLat`, `slipLatEnabled`, `slipLatOnCountEnabled`, `slipISumOkCount`, `slipPwmSumF`, `slipISumF`, `slipEncAyF`, `slipImuAyF`を削除する。
-- `slipV2Lat`, `slipV2Flags`の横bit、`slipV2PeakLat`, `slipV2OnLatMs`は採用横（LatCandidate版5）と同じ判定を表す。`slipV2LatCandidate*`は横独自の有効性・理由と統計のため維持する。
+- `slipV2Lat`, `slipV2Flags`の横bit、`slipV2PeakLat`, `slipV2OnLatMs`は採用横（LatCandidate版5）の残差・フラグ・ピーク・ON時間を表し、重複する`slipV2LatCandidate/Flag/Peak/OnMs`列は保存しない。
+- 横独自の有効性は`slipV2LatValid`、現在無効理由は`slipV2LatReason`、区間有効時間[ms]は`slipV2LatValidMs`、区間無効理由ORは`slipV2LatIntervalReason`へ改名して保存する。接線項未取得は理由256で、共通の`slipV2Valid/ValidMs`へ代用しない。横ON率は`slipV2OnLatMs / slipV2LatValidMs`で求める。
+- SLIP読込は`slipV2OnLatMs/slipV2LatValidMs/slipV2LatIntervalReason`を使う。旧Candidate列名へのフォールバックは設けない。判定式・閾値・検出器版4・計画版2は変更せず、形式変更は自己記述スキーマで識別する。
 - SLIP解析用共有RAMは縦/横それぞれの有効msとON msを保持し、横有効ms配列2 KiBを追加する。最小反映ON時間3ms、速度計画の各倍率・先行減速・速度差制限は維持する。
 - 手動SLIP計画も`slipSourceLogNumber`へ元DISTANCE番号を走行開始時に固定して保存する。通常DISTANCEは0。`primaryLogNumber`は元の一次番号を維持する。
 - V1互換・SHADOW切替は不要。更新後は新しい一次とDISTANCEのログを取得し、既存オートスタートのDISTANCE→SLIPへ進む。機体bin解析は現行スキーマ一致のみ、PCの自己記述変換とCRC検証は維持する。

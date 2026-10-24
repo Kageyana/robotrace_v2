@@ -47,10 +47,10 @@ void courseLogInitColumnMap(CourseLogColumnMap *map)
 	map->slipV2TotalMs = -1;
 	map->slipV2ValidMs = -1;
 	map->slipV2OnLongMs = -1;
-	map->slipV2LatCandidateValidMs = -1;
-	map->slipV2LatCandidateOnMs = -1;
+	map->slipV2LatValidMs = -1;
+	map->slipV2OnLatMs = -1;
 	map->slipV2IntervalReason = -1;
-	map->slipV2LatCandidateIntervalReason = -1;
+	map->slipV2LatIntervalReason = -1;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -72,10 +72,10 @@ static void setColumn(CourseLogColumnMap *map, const char *start, const char *en
 	else if (map->slipV2TotalMs < 0 && csvFieldEquals(start, end, "slipV2TotalMs")) map->slipV2TotalMs = column;
 	else if (map->slipV2ValidMs < 0 && csvFieldEquals(start, end, "slipV2ValidMs")) map->slipV2ValidMs = column;
 	else if (map->slipV2OnLongMs < 0 && csvFieldEquals(start, end, "slipV2OnLongMs")) map->slipV2OnLongMs = column;
-	else if (map->slipV2LatCandidateValidMs < 0 && csvFieldEquals(start, end, "slipV2LatCandidateValidMs")) map->slipV2LatCandidateValidMs = column;
-	else if (map->slipV2LatCandidateOnMs < 0 && csvFieldEquals(start, end, "slipV2LatCandidateOnMs")) map->slipV2LatCandidateOnMs = column;
+	else if (map->slipV2LatValidMs < 0 && csvFieldEquals(start, end, "slipV2LatValidMs")) map->slipV2LatValidMs = column;
+	else if (map->slipV2OnLatMs < 0 && csvFieldEquals(start, end, "slipV2OnLatMs")) map->slipV2OnLatMs = column;
 	else if (map->slipV2IntervalReason < 0 && csvFieldEquals(start, end, "slipV2IntervalReason")) map->slipV2IntervalReason = column;
-	else if (map->slipV2LatCandidateIntervalReason < 0 && csvFieldEquals(start, end, "slipV2LatCandidateIntervalReason")) map->slipV2LatCandidateIntervalReason = column;
+	else if (map->slipV2LatIntervalReason < 0 && csvFieldEquals(start, end, "slipV2LatIntervalReason")) map->slipV2LatIntervalReason = column;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -125,7 +125,7 @@ bool courseLogHasDistanceColumns(const CourseLogColumnMap *map)
 bool courseLogHasSlipColumns(const CourseLogColumnMap *map)
 {
 	return map != NULL && map->courseMarker >= 0 && map->encTotalOptimal >= 0 && map->ROC >= 0 &&
-		map->targetSpeed >= 0 && map->optimalIndex >= 0 && map->slipV2TotalMs >= 0 && map->slipV2ValidMs >= 0 && map->slipV2OnLongMs >= 0 && map->slipV2LatCandidateValidMs >= 0 && map->slipV2LatCandidateOnMs >= 0 && map->slipV2IntervalReason >= 0 && map->slipV2LatCandidateIntervalReason >= 0;
+		map->targetSpeed >= 0 && map->optimalIndex >= 0 && map->slipV2TotalMs >= 0 && map->slipV2ValidMs >= 0 && map->slipV2OnLongMs >= 0 && map->slipV2LatValidMs >= 0 && map->slipV2OnLatMs >= 0 && map->slipV2IntervalReason >= 0 && map->slipV2LatIntervalReason >= 0;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -170,10 +170,10 @@ static int16_t maxColumn(const CourseLogColumnMap *map, bool slip)
 		COURSE_LOG_MAX_COLUMN(slipV2TotalMs);
 		COURSE_LOG_MAX_COLUMN(slipV2ValidMs);
 		COURSE_LOG_MAX_COLUMN(slipV2OnLongMs);
-		COURSE_LOG_MAX_COLUMN(slipV2LatCandidateValidMs);
-		COURSE_LOG_MAX_COLUMN(slipV2LatCandidateOnMs);
+		COURSE_LOG_MAX_COLUMN(slipV2LatValidMs);
+		COURSE_LOG_MAX_COLUMN(slipV2OnLatMs);
 		COURSE_LOG_MAX_COLUMN(slipV2IntervalReason);
-		COURSE_LOG_MAX_COLUMN(slipV2LatCandidateIntervalReason);
+		COURSE_LOG_MAX_COLUMN(slipV2LatIntervalReason);
 	}
 	else
 	{
@@ -250,10 +250,10 @@ static bool parseMappedRow(const char *line, const CourseLogColumnMap *map, bool
 				else if (column == map->slipV2TotalMs) mapIndex = 8;
 				else if (column == map->slipV2ValidMs) mapIndex = 9;
 				else if (column == map->slipV2OnLongMs) mapIndex = 10;
-				else if (column == map->slipV2LatCandidateValidMs) mapIndex = 11;
-				else if (column == map->slipV2LatCandidateOnMs) mapIndex = 12;
+				else if (column == map->slipV2LatValidMs) mapIndex = 11;
+				else if (column == map->slipV2OnLatMs) mapIndex = 12;
 				else if (column == map->slipV2IntervalReason) mapIndex = 13;
-				else if (column == map->slipV2LatCandidateIntervalReason) mapIndex = 14;
+				else if (column == map->slipV2LatIntervalReason) mapIndex = 14;
 			}
 			else
 			{
@@ -326,10 +326,10 @@ bool courseLogParseSlipRow(const char *line, const CourseLogColumnMap *map, Cour
 	row->slipV2TotalMs = values[8].integer;
 	row->slipV2ValidMs = values[9].integer;
 	row->slipV2OnLongMs = values[10].integer;
-	row->slipV2LatCandidateValidMs = values[11].integer;
-	row->slipV2LatCandidateOnMs = values[12].integer;
+	row->slipV2LatValidMs = values[11].integer;
+	row->slipV2OnLatMs = values[12].integer;
 	row->slipV2IntervalReason = values[13].integer;
-	row->slipV2LatCandidateIntervalReason = values[14].integer;
+	row->slipV2LatIntervalReason = values[14].integer;
 	return courseLogValidateSlipRow(row);
 }
 
@@ -348,8 +348,8 @@ bool courseLogValidateSlipRow(const CourseLogSlipRow *row)
 		row->slipV2TotalMs > 0 && row->slipV2TotalMs < (int32_t)UINT16_MAX &&
 		row->slipV2ValidMs >= 0 && row->slipV2ValidMs <= row->slipV2TotalMs &&
 		row->slipV2OnLongMs >= 0 && row->slipV2OnLongMs <= row->slipV2ValidMs &&
-		row->slipV2LatCandidateValidMs >= 0 && row->slipV2LatCandidateValidMs <= row->slipV2TotalMs &&
-		row->slipV2LatCandidateOnMs >= 0 && row->slipV2LatCandidateOnMs <= row->slipV2LatCandidateValidMs &&
+		row->slipV2LatValidMs >= 0 && row->slipV2LatValidMs <= row->slipV2TotalMs &&
+		row->slipV2OnLatMs >= 0 && row->slipV2OnLatMs <= row->slipV2LatValidMs &&
 		row->slipV2IntervalReason >= 0 && row->slipV2IntervalReason <= 511 &&
-		row->slipV2LatCandidateIntervalReason >= 0 && row->slipV2LatCandidateIntervalReason <= 511;
+		row->slipV2LatIntervalReason >= 0 && row->slipV2LatIntervalReason <= 511;
 }
