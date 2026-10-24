@@ -4,7 +4,6 @@
 #include "courseAnalysis.h"
 #include "logSource.h"
 #include "logPerformance.h"
-#include "courseLogCsv.h"
 #include "control.h"
 #include "fatfs.h"
 #include "PIDcontrol.h"
@@ -52,12 +51,6 @@ static float calcDecelLeadMmByRoc(int16_t rocPrev, int16_t rocNow);
 static void applyDecelLeadToPpad(int16_t count);
 static void applyDecelLeadToArray(float *speed, int16_t count);
 
-typedef CourseLogColumnMap SecondLogColumnMap;
-
-static bool parseSecondLogHeader(const char *line, SecondLogColumnMap *map)
-{
-	return courseLogParseHeaderLine(line, map) && courseLogHasSlipColumns(map);
-}
 
 Courseplot xycie;							   // XY座標値（走行中に計算し、ログ保存に使用する）
 
@@ -340,7 +333,7 @@ static int16_t readLogDistanceProgress(int logNumber,
 	// ログファイルを読み込むための変数
 	FIL fil_Read;
 	FRESULT fresult;
-	char fileName[10];
+
 	int16_t ret = 0;
 	bool fileOpened = false; // f_close
 	bool retried = false;
@@ -358,15 +351,14 @@ static int16_t readLogDistanceProgress(int logNumber,
 	}
 	// 解析中はログ書き込みを抑制する
 	sd_set_analysis_active(true); // SD/FatFs使用中
-	snprintf(fileName, sizeof(fileName), "%d", logNumber); // ログ番号をファイル名に変換する
-	strcat(fileName, ".csv"); // CSV拡張子を追加する
+
 	retry_open:
 	// ログ保存時に同期・クローズ済みのファイルを開く。I/Oエラー時の再試行だけ再マウントする。
 	if (retried && !sd_remount_for_analysis()) {
 		ret = -6;
 		goto cleanup_read;
 	}
-	fresult = logSourceOpenFor(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ, LOG_SOURCE_DISTANCE); // バイナリ優先、欠落時のみCSVを読む
+	fresult = logSourceOpen(&fil_Read, logNumber, LOG_SOURCE_DISTANCE);
 	if (!retried && (fresult == FR_DISK_ERR || fresult == FR_INT_ERR || fresult == FR_NOT_READY))
 	{
 		retried = true;
@@ -377,8 +369,6 @@ static int16_t readLogDistanceProgress(int logNumber,
 	{
 		fileOpened = true; // 正常に開けたファイルだけを後で閉じる
 		// ログデータを取得する
-		TCHAR *log = runAnalysisLine;
-		const int log_len = CA_SECOND_LOG_LINE_BUFSIZE;
 		int32_t marker, distance, roc;
 		int32_t numD = 0, numM = 0, cntCurR = 0, numStraight = 0;
 		int32_t previousDistance = 0, analysisBaseDistance = 0;
@@ -392,32 +382,13 @@ static int16_t readLogDistanceProgress(int logNumber,
 		// PPAD配列をゼロクリアする
 		memset(&PPAD, 0, sizeof(AnalysisData) * OPT_BUFF_SIZE);
 
-		CourseLogColumnMap distanceColumns;
-		TCHAR *header = logSourceGets(log, log_len, &fil_Read);
-		if (!header)
-		{
-			ret = logSourceError(&fil_Read) ? -5 : -2;
-			errorDetected = true;
-			if (ret == -5) logReadSlipIoError(logNumber, 0, &fil_Read, "io_fail");
-		}
-		else if (!courseLogResolveHeader((const char *)header, NULL, false, &distanceColumns))
-		{
-			TCHAR *secondHeader = logSourceGets(log, log_len, &fil_Read);
-			if (!secondHeader || !courseLogResolveHeader((const char *)header,
-				(const char *)secondHeader, false, &distanceColumns))
-			{
-				ret = -2;
-				errorDetected = true;
-			}
-		}
-
 		UINT lineNo = 0;
 		if (progress) progress("Base read", 0U);
 		// ログデータの読み込みを開始する
 		while (!errorDetected)
 		{
-			TCHAR *s = logSourceGets(log, log_len, &fil_Read);
-			if (!s)
+			LogSourceRow row;
+			if (!logSourceNext(&fil_Read, &row))
 			{
 				if (logSourceError(&fil_Read))
 				{
@@ -430,11 +401,6 @@ static int16_t readLogDistanceProgress(int logNumber,
 			lineNo++;
 			if (progress && (lineNo % 512U) == 0U) progress("Base read", lineNo);
 
-			CourseLogDistanceRow row;
-			if (!logSourceDistanceRow(&fil_Read, (const char *)log, &distanceColumns, &row))
-			{
-				continue;
-			}
 			marker = row.courseMarker;
 			distance = row.encTotalOptimal;
 			roc = (int32_t)lroundf(row.ROC);
@@ -699,18 +665,6 @@ int16_t readLogDistance(int logNumber)
 	return result;
 }
 /////////////////////////////////////////////////////////////////////
-// ローカル関数 parseSecondLogLine
-// 処理概要     2次走行ログからスリップ解析に必要な列を抽出する
-// 引数         file: 共通読込ファイル, line: CSV行, map: 列対応表, 各出力ポインタ: 抽出結果の格納先
-// 戻り値       true: 解析成功, false: 解析失敗または値が範囲外
-/////////////////////////////////////////////////////////////////////
-static bool parseSecondLogLine(FIL *file, const char *line, const SecondLogColumnMap *map,
-        CourseLogSlipRow *row)
-{
-    return logSourceSlipRow(file, line, map, row) && courseLogValidateSlipRow(row);
-}
-
-/////////////////////////////////////////////////////////////////////
 // モジュール名 readSlipMetadataInt
 // 処理概要     SLIP解析元のメタデータから整数相当の値を取得する
 // 引数         line: メタデータ行, key: 項目名, value: 取得先
@@ -775,7 +729,7 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
 
 	FIL fil_Read;
 	FRESULT fresult;
-	char fileName[16];
+
 	int16_t ret = 0;
 	int32_t expectedRows = 0;
 	int16_t maxOptimalIndex = -1; // open失敗でcleanupへ進んでも初期化済みにする。
@@ -802,8 +756,6 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
 	float *riskExpanded = runMemory.distance.slip.riskExpanded;
 	float *v3 = runMemory.distance.slip.v3;
 
-	snprintf(fileName, sizeof(fileName), "%d", slipLogNumber);			   // ログ番号を文字列へ変換する
-	strcat(fileName, ".csv");										   // CSV拡張子を追加する
 	retry_open_slip:
 	if (retried && progress) progress("Slip retry", 0U);
 	// 一次ログ解析後も同じマウントを使い、I/Oエラー後だけ再マウントする。
@@ -811,7 +763,7 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
 		ret = -6;
 		goto cleanup;
 	}
-	fresult = logSourceOpenFor(&fil_Read, fileName, FA_OPEN_EXISTING | FA_READ, LOG_SOURCE_SLIP); // バイナリ優先、欠落時のみCSVを読む
+	fresult = logSourceOpen(&fil_Read, slipLogNumber, LOG_SOURCE_SLIP);
 	if (!retried && (fresult == FR_DISK_ERR || fresult == FR_INT_ERR || fresult == FR_NOT_READY))
 	{
 		retried = true;
@@ -839,27 +791,8 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
 		v2Max[i] = PPAD[i].boostSpeed;
 	}
 
-	TCHAR *log = runAnalysisLine;
-	const int log_len = CA_SECOND_LOG_LINE_BUFSIZE;
-	SecondLogColumnMap secondLogColumns;
-
-	// 先頭行を読み、列名行またはメタデータ行として扱う
-	TCHAR *header = logSourceGets(log, log_len, &fil_Read);
-	if (!header)
-	{
-		int eof = logSourceEof(&fil_Read);
-		int err = logSourceError(&fil_Read);
-		if (!eof && err != 0)
-		{
-			ret = -5; // f_gets I/O error
-			logReadSlipIoError(slipLogNumber, 0, &fil_Read, "io_fail");
-		}
-		else
-		{
-			ret = -2; // 解析対象がない
-		}
-		goto cleanup;
-	}
+	const char *header = logSourceMetadata(&fil_Read);
+	if (header == NULL) { ret = -2; goto cleanup; }
     // 正常終了した同じ一次参照のDISTANCEログだけを解析元とする。
     int32_t sourceMode, sourcePrimary, sourceSlip, sourceStop, sourceGoal;
     if (!readSlipMetadataInt(header, "optimalTrace", &sourceMode) || sourceMode != BOOST_DISTANCE ||
@@ -871,24 +804,16 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
         ret = -7;
         goto cleanup;
     }
-	if (!parseSecondLogHeader((const char *)header, &secondLogColumns) &&
-		(logSourceGets(log, log_len, &fil_Read) == NULL ||
-		 !parseSecondLogHeader((const char *)log, &secondLogColumns)))
-	{
-		ret = -2; // 2次ログに必要な列がない
-		goto cleanup;
-	}
-
 	UINT lineNo = 0;
 	uint32_t observedLongMs = 0U, observedLatMs = 0U;
-	bool fgets_null = false;
+	bool sourceEnded = false;
 	if (progress) progress("Slip read", 0U);
 
 	while (1) {
-		TCHAR* s = logSourceGets(log, log_len, &fil_Read);
-		if (!s)
+		LogSourceRow row;
+		if (!logSourceNext(&fil_Read, &row))
 		{
-			fgets_null = true;
+			sourceEnded = true;
 			break;
 		}
 		lineNo++;
@@ -901,8 +826,7 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
 			break;
 		}
 
-        CourseLogSlipRow row;
-        if (!parseSecondLogLine(&fil_Read, (const char *)log, &secondLogColumns, &row)) {
+        if (!logSourceValidateSlipRow(&row)) {
             ret = -7; // 不正行を滑りなしとして読み飛ばさない。
             break;
         }
@@ -931,13 +855,13 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
 
 		// 読み取った区間までの集計を継続する
 	}
-	if (ret == 0 && fgets_null)
+	if (ret == 0 && sourceEnded)
 	{
 		int eof = logSourceEof(&fil_Read);
 		int err = logSourceError(&fil_Read);
 		if (!eof && err != 0)
 		{
-			ret = -5; // f_gets I/O error
+			ret = -5; // bin読込エラー
 			logReadSlipIoError(slipLogNumber, lineNo, &fil_Read, "io_fail");
 		}
 	}

@@ -83,12 +83,9 @@
 
 typedef struct
 {
-	int16_t x;
-	int16_t y;
-	int16_t pulse;
-	uint32_t expectedRows;
-	bool closureValid;
-} RouteCsvColumns;
+    uint32_t expectedRows;
+    bool closureValid;
+} RouteSourceInfo;
 
 typedef struct
 {
@@ -114,7 +111,6 @@ typedef struct
 #define driveRoute (runMemory.path.drive)
 #define driveRouteArcMm (runMemory.path.arcMm)
 #define routeFlags (runMemory.path.flags)
-#define routeCsvLine runAnalysisLine
 // キャッシュは共有RAM上の延長前基準経路だけ。走行メタデータは従来どおり別保持。
 static struct {
     bool valid;
@@ -322,89 +318,29 @@ static int16_t pathFloatToInt16(float value)
 }
 
 /////////////////////////////////////////////////////////////////////
-// モジュール名 pathHeaderFieldEquals
-// 処理概要     CSVヘッダ項目名を空白除去後に比較する
-// 引数         start,end: 項目範囲, name: 比較名
-// 戻り値       true: 一致 false: 不一致
+// モジュール名 pathReadSourceMetadata
+// 処理概要     全CRC検証済みメタデータから経路元の妥当性を確認する
+// 引数         file:読込ファイル, columns:経路元情報の格納先
+// 戻り値       true:有効な一次経路元 false:必要な検証情報なし
 /////////////////////////////////////////////////////////////////////
-static bool pathHeaderFieldEquals(const char *start, const char *end, const char *name)
+static bool pathReadSourceMetadata(FIL *file, RouteSourceInfo *columns)
 {
-	while (start < end && (*start == ' ' || *start == '\t')) start++;
-	while (end > start && (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r' || end[-1] == '\n')) end--;
-	return (size_t)(end - start) == strlen(name) && strncmp(start, name, (size_t)(end - start)) == 0;
-}
-
-/////////////////////////////////////////////////////////////////////
-// モジュール名 pathCsvRowComplete
-// 処理概要     CSV行が改行まで読み込まれた完全な行か確認する
-// 引数         line: CSV行
-// 戻り値       true:完全 false:切り詰めまたは未終端
-/////////////////////////////////////////////////////////////////////
-static bool pathCsvRowComplete(const char *line)
-{
-	return line != NULL && (strchr(line, '\n') != NULL || strchr(line, '\r') != NULL);
-}
-
-/////////////////////////////////////////////////////////////////////
-// モジュール名 pathParseHeader
-// 処理概要     CSVヘッダから経路生成に必要な列番号を解決する
-// 引数         line:CSVヘッダ, columns:列番号の格納先
-// 戻り値       true:必要列あり false:必要列なし
-/////////////////////////////////////////////////////////////////////
-static bool pathParseHeader(const char *line, RouteCsvColumns *columns)
-{
-	const char *start = line;
-	const char *p = line;
-	int16_t column = 0;
-	columns->x = -1;
-	columns->y = -1;
-	columns->pulse = -1;
-
-	while (*p != '\0' && *p != '\r' && *p != '\n')
-	{
-		if (*p == ',')
-		{
-			if (pathHeaderFieldEquals(start, p, "x")) columns->x = column;
-			else if (pathHeaderFieldEquals(start, p, "y")) columns->y = column;
-			else if (pathHeaderFieldEquals(start, p, "encTotalOptimal")) columns->pulse = column;
-			column++;
-			start = p + 1;
-		}
-		p++;
-	}
-	if (pathHeaderFieldEquals(start, p, "x")) columns->x = column;
-	else if (pathHeaderFieldEquals(start, p, "y")) columns->y = column;
-	else if (pathHeaderFieldEquals(start, p, "encTotalOptimal")) columns->pulse = column;
-	return columns->x >= 0 && columns->y >= 0 && columns->pulse >= 0;
-}
-
-/////////////////////////////////////////////////////////////////////
-// モジュール名 pathReadColumnHeader
-// 処理概要     旧混在形式または新2行形式から経路ログ列名を読み込む
-// 引数         file:読込ファイル, columns:列番号の格納先
-// 戻り値       true:必要列あり false:読込失敗または必要列なし
-/////////////////////////////////////////////////////////////////////
-static bool pathReadColumnHeader(FIL *file, RouteCsvColumns *columns)
-{
-	if (logSourceGets(routeCsvLine, sizeof(routeCsvLine), file) == NULL ||
-		(strchr(routeCsvLine, '\n') == NULL && strchr(routeCsvLine, '\r') == NULL))
-	{
-		return false;
-	}
-	const bool supportedVersion = strstr(routeCsvLine, "pathSourceFormatVersion=1,") != NULL;
-	const char *valid = strstr(routeCsvLine, "closureValid=1,");
-	const char *reason = strstr(routeCsvLine, "closureReason=0,");
-	const char *mode = strstr(routeCsvLine, "optimalTrace=0.00,");
-	const char *stop = strstr(routeCsvLine, "emcStop=0.00,");
-	const char *scale = strstr(routeCsvLine, "encoderPulsePerMeter=");
+	const char *metadata = logSourceMetadata(file);
+	if (metadata == NULL) return false;
+	const bool supportedVersion = strstr(metadata, "pathSourceFormatVersion=1,") != NULL;
+	const char *valid = strstr(metadata, "closureValid=1,");
+	const char *reason = strstr(metadata, "closureReason=0,");
+	const char *mode = strstr(metadata, "optimalTrace=0.00,");
+	const char *stop = strstr(metadata, "emcStop=0.00,");
+	const char *scale = strstr(metadata, "encoderPulsePerMeter=");
 	char *scaleEnd = NULL;
 	const unsigned long sourcePulsePerMeter = (scale != NULL) ?
 		strtoul(scale + strlen("encoderPulsePerMeter="), &scaleEnd, 10) : 0UL;
-	const char *calibrated = strstr(routeCsvLine, "imuCalibrationValid=1,");
-	const char *calibrationSamples = strstr(routeCsvLine, "imuCalibrationSamples=100,");
-	const char *calibrationErrors = strstr(routeCsvLine, "imuCalibrationReadErrors=0,");
-	const char *distanceVerified = strstr(routeCsvLine, "distanceScaleVerified=1,");
-	const char *expectedRows = strstr(routeCsvLine, "logExpectedRows=");
+	const char *calibrated = strstr(metadata, "imuCalibrationValid=1,");
+	const char *calibrationSamples = strstr(metadata, "imuCalibrationSamples=100,");
+	const char *calibrationErrors = strstr(metadata, "imuCalibrationReadErrors=0,");
+	const char *distanceVerified = strstr(metadata, "distanceScaleVerified=1,");
+	const char *expectedRows = strstr(metadata, "logExpectedRows=");
 	columns->expectedRows = (expectedRows != NULL) ?
 		(uint32_t)strtoul(expectedRows + strlen("logExpectedRows="), NULL, 10) : 0U;
 	columns->closureValid = pathPolicySourceMetadataValid(
@@ -414,58 +350,9 @@ static bool pathReadColumnHeader(FIL *file, RouteCsvColumns *columns)
 		(calibrationSamples != NULL) ? IMU_CALIBRATION_SAMPLE_COUNT : 0U,
 		(calibrationErrors != NULL) ? 0U : 1U, distanceVerified != NULL,
 		columns->expectedRows);
-	if (!columns->closureValid) return false;
-	if (logSourceGets(routeCsvLine, sizeof(routeCsvLine), file) == NULL ||
-		(strchr(routeCsvLine, '\n') == NULL && strchr(routeCsvLine, '\r') == NULL))
-	{
-		return false;
-	}
-	return pathParseHeader(routeCsvLine, columns);
+	return columns->closureValid;
 }
 
-/////////////////////////////////////////////////////////////////////
-// モジュール名 pathCsvFloatAt
-// 処理概要     CSV行の指定列を浮動小数値として読む
-// 引数         line: CSV行, targetColumn: 列番号, value: 読取先
-// 戻り値       true: 読取成功 false: 読取失敗
-/////////////////////////////////////////////////////////////////////
-static bool pathCsvFloatAt(const char *line, int16_t targetColumn, float *value)
-{
-	const char *start = line;
-	int16_t column = 0;
-	while (column < targetColumn)
-	{
-		start = strchr(start, ',');
-		if (start == NULL) return false;
-		start++;
-		column++;
-	}
-	char *end = NULL;
-	float parsed = strtof(start, &end);
-	if (end == start) return false;
-	if (*end != ',' && *end != '\r' && *end != '\n' && *end != '\0') return false;
-	*value = parsed;
-	return true;
-}
-
-/////////////////////////////////////////////////////////////////////
-// モジュール名 pathReadCsvPoint
-// 処理概要     CSV行からジャイロ経路座標と累積距離を読む
-// 引数         line: CSV行, columns: 列情報, xMm/yMm: 座標[mm], pulse: 累積パルス
-// 戻り値       true: 読取成功 false: 読取失敗
-/////////////////////////////////////////////////////////////////////
-static bool pathReadCsvPoint(const char *line, const RouteCsvColumns *columns,
-	float *xMm, float *yMm, float *pulse)
-{
-	if (!pathCsvFloatAt(line, columns->x, xMm) ||
-		!pathCsvFloatAt(line, columns->y, yMm) ||
-		!pathCsvFloatAt(line, columns->pulse, pulse))
-	{
-		return false;
-	}
-	if (!isfinite(*xMm) || !isfinite(*yMm) || !isfinite(*pulse)) return false;
-	return true;
-}
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathAppendRouteSample
 // 処理概要     経路を40mm間隔で再標本化する
@@ -935,10 +822,10 @@ bool routeGenerateShortcut(uint8_t shortcutLevel)
 static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel)
 {
     FIL file;
-    RouteCsvColumns columns;
+    RouteSourceInfo columns;
     ShortcutSettings generationSettings = shortcutSettings;
     uint8_t requestedShortcutLevel = shortcutLevel;
-    char fileName[16];
+
     bool fileOpened = false;
     int16_t resultCode = -5;
     LogBinaryHeader source = {0};
@@ -950,12 +837,12 @@ static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel)
     pathGoalValid = false;
     followerState = PATH_STATE_INACTIVE;
     targetSpeedMps = 0.0f;
-    snprintf(fileName, sizeof(fileName), "%d.csv", logNumber);
-    if (logSourceOpenFor(&file, fileName, FA_OPEN_EXISTING | FA_READ, LOG_SOURCE_PATH) != FR_OK) goto failed;
+
+    if (logSourceOpen(&file, logNumber, LOG_SOURCE_PATH) != FR_OK) goto failed;
     fileOpened = true;
-    bool binary = logSourceBinaryInfo(&file, &source);
-    bool cached = binary && pathCacheMatches(&source, &generationSettings);
-    if (!pathReadColumnHeader(&file, &columns)) { resultCode = -10; goto failed; }
+    if (!logSourceInfo(&file, &source)) { resultCode = -10; goto failed; }
+    bool cached = pathCacheMatches(&source, &generationSettings);
+    if (!pathReadSourceMetadata(&file, &columns)) { resultCode = -10; goto failed; }
     if (cached) {
         routeCount = routeCache.baseCount;
         memset(lineRoute + routeCount, 0, sizeof(RoutePoint) * (PATH_ROUTE_MAX_POINTS - routeCount));
@@ -972,10 +859,10 @@ static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel)
         float fusedX = 0.0f, fusedY = 0.0f, accumulated = 0.0f;
         float lastX = 0.0f, lastY = 0.0f, previousPulse = 0.0f;
         uint32_t parsedRows = 0U;
-        while (logSourceGets(routeCsvLine, sizeof(routeCsvLine), &file) != NULL) {
-            float x, y, pulse;
-            if ((binary ? !logSourceBinaryPoint(&file, &x, &y, &pulse) :
-                (!pathCsvRowComplete(routeCsvLine) || !pathReadCsvPoint(routeCsvLine, &columns, &x, &y, &pulse))) ||
+        LogSourceRow row;
+        while (logSourceNext(&file, &row)) {
+            float x = row.x, y = row.y, pulse = (float)row.encTotalOptimal;
+            if (!isfinite(x) || !isfinite(y) || !isfinite(pulse) ||
                 pulse < previousPulse) { resultCode = -11; goto failed; }
             totalLength += pathPointDistance(previousX, previousY, x, y);
             previousX = lastX = x; previousY = lastY = y; previousPulse = pulse;
@@ -999,7 +886,7 @@ static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel)
     FRESULT closed = logSourceClose(&file);
     fileOpened = false;
     if (closed != FR_OK) { resultCode = -13; goto failed; }
-    routeCache.valid = binary && autoRunState.seriesActive;
+    routeCache.valid = autoRunState.seriesActive;
     routeCache.source = source;
     routeCache.settings = generationSettings;
     routeCache.epoch = autoRunSeriesGeneration();

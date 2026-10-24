@@ -6,7 +6,6 @@
 
 #define OPT_BUFF_SIZE 1000
 #define PATH_ROUTE_MAX_POINTS 1514U
-#define RUN_ANALYSIS_LINE_SIZE 6144U
 
 typedef struct
 {
@@ -70,8 +69,7 @@ typedef enum
 } RunMemoryOwner;
 
 extern RunMemory runMemory;
-// ログ解析はFatFsロック下で逐次実行するため、読込行も共用できる。
-extern char runAnalysisLine[RUN_ANALYSIS_LINE_SIZE];
+// 解析元は型付きbin読込とし、CSV行バッファは持たない。
 extern RunMemoryOwner runMemoryOwner;
 
 bool runMemoryPrepare(RunMemoryOwner owner);

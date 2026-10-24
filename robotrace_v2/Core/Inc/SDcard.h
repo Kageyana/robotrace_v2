@@ -8,7 +8,6 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
-#include "courseLogCsv.h"
 
 bool logPrepareBinaryStorage(void);
 bool logRecoveryIsReady(void);
@@ -61,7 +60,6 @@ void send16bit(uint16_t data);
 void send32bit(uint32_t data);
 int16_t getFileNumbers(void);
 int16_t getLastLogNumber(void);
-void setLogStr(char *column, char *format);
 void setLogHeaderStr(char *name, int32_t value);
 void setLogHeaderStrF(char *name, float value);
 void setLogHeaderStrS(char *name, const char *value);

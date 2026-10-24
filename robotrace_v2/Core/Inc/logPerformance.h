@@ -9,10 +9,10 @@
 
 // 停止中の処理だけで集計する。時間は割込み待ちを含む経過msで、各段階は重複する。
 typedef struct {
-    uint32_t scanMs, readMs, processMs, formatMs, writeMs, commitMs, conversionMs;
+    uint32_t scanMs, readMs, processMs;
     uint32_t distanceMs, slipMs, pathMs, shortcutMs;
-    uint32_t fullScans, cacheHits, readCalls, writeCalls;
-    uint64_t readBytes, writeBytes;
+    uint32_t fullScans, cacheHits, readCalls;
+    uint64_t readBytes;
     uint32_t diskReadSingle, diskReadMulti, diskWriteSingle, diskWriteMulti;
     uint64_t diskReadBytes, diskWriteBytes;
 } LogPerformanceStats;

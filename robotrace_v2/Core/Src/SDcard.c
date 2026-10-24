@@ -5,7 +5,6 @@
 #include "logSource.h"
 #include "autoRun.h"
 #include "logBinary.h"
-#include "courseLogCsv.h"
 #include "courseAnalysis.h"
 #include "firmware_version.h"
 #include "IMU.h"
@@ -27,11 +26,10 @@ FIL fil_W;
 FIL fil_R;
 
 // ログヘッダー
-// 詳細デバッグ列を含むCSVのフォーマットと1行分を格納できるサイズにする。
+// 走行ごとのメタデータを保存・検証する共通領域。
 #define LOG_COLUMN_TITLE_BUFFER_SIZE 4096U
-#define LOG_FORMAT_BUFFER_SIZE       512U
 #define LOG_TEMP_PREALLOC_BYTES (2UL * 1024UL * 1024UL)
-char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE] = "", formatLog[LOG_FORMAT_BUFFER_SIZE] = "";
+static char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE] = "";
 
 // ログバッファ
 // Log buffers
@@ -186,8 +184,7 @@ static uint32_t logReadU32(void);
 static int32_t logReadS32(void);
 static float logReadF32(void);
 
-static void logReadRecord(LogRecord *rec, uint8_t schemaFormat, uint32_t profile);
-static void logBuildColumns(uint8_t schemaFormat, uint32_t profile);
+static void logReadRecord(LogRecord *rec);
 static uint32_t logBinarySchema(void);
 static bool readSavedLogNumber(int16_t *outNumber);
 static void writeSavedLogNumber(int16_t fileNumber);
@@ -601,7 +598,7 @@ uint8_t logLastPrimaryRouteReason(void)
 static void logBuildMetadata(void)
 {
 	columnTitle[0] = 0; // バッファを安全に初期化
-	formatLog[0] = 0;   // バッファを安全に初期化
+
 
 	updateBatteryVoltage(); // ログヘッダへ停止時点の電圧を残す
 	updateImuTempEndTemperature(); // ログ終了時の温度を取得
@@ -950,11 +947,10 @@ void endTempFile(void)
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logScanRecords
 // 処理概要     記録のCRCとクロス区間を取得し、保存時は一次経路も検証する
-// 引数         file: 入力, rows: 行数, live: 終了検証, recordBytes: 記録長[B]
-//              schemaFormat: 現行定義（0）, profile: 通常/詳細, dataCrc: CRC出力
+// 引数         file: 入力, rows: 行数, live: 終了検証, dataCrc: CRC出力
 // 戻り値       true: 読込成功 false: 読込失敗
 /////////////////////////////////////////////////////////////////////
-static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t recordBytes, uint8_t schemaFormat, uint32_t profile, uint32_t *dataCrc)
+static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t *dataCrc)
 {
 	uint8_t log[LOG_READ_RECORD_BYTES];
 	LogRecord rec;
@@ -982,16 +978,16 @@ static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t recordB
 	if (live) primaryRouteValidation.goalMarkerOnset_p = goalMarkerPulse;
 	for (j = 0; j < rows; j++)
 	{
-		fresult = logReadBuffered(file, log, recordBytes, LOG_BINARY_HEADER_BYTES + (FSIZE_t)rows * recordBytes);
+		fresult = logReadBuffered(file, log, LOG_SIZE, LOG_BINARY_HEADER_BYTES + (FSIZE_t)rows * LOG_SIZE);
 		if (fresult != FR_OK)
 		{
 			printf("f_read error in endLog\r\n");
 			return false;
 		}
-		crc = logBinaryCrcUpdate(crc, log, recordBytes);
+		crc = logBinaryCrcUpdate(crc, log, LOG_SIZE);
 
 		logaddress = log;
-		logReadRecord(&rec, schemaFormat, profile);
+		logReadRecord(&rec);
 
 		time = rec.cntlog;
 		speed = (int16_t)rec.encCurrentN;
@@ -1164,7 +1160,7 @@ bool endLog(void)
         LOG_BINARY_COLUMNS, LOG_BINARY_DERIVED_VERSION};
 	FSIZE_t dataEnd = LOG_BINARY_HEADER_BYTES + (FSIZE_t)cntSend * LOG_SIZE;
 	if (f_lseek(&fil_W, dataEnd) != FR_OK || f_truncate(&fil_W) != FR_OK ||
-		f_sync(&fil_W) != FR_OK || !logScanRecords(&fil_W, cntSend, true, LOG_SIZE, false, LOG_SCHEMA_PROFILE_LIGHT, &savedDataCrc)) goto finish;
+		f_sync(&fil_W) != FR_OK || !logScanRecords(&fil_W, cntSend, true, &savedDataCrc)) goto finish;
 	logBuildMetadata();
 	header.metadataBytes = (uint32_t)strlen(columnTitle);
 	header.dataCrc = savedDataCrc;
@@ -1206,9 +1202,7 @@ static struct {
     uint16_t previousTime;
     int16_t previousSpeed;
     float distanceMm, roc, x, y;
-    uint8_t headerStage;
     FRESULT error;
-    bool rowReady;
 } binarySource;
 
 /////////////////////////////////////////////////////////////////////
@@ -1245,55 +1239,35 @@ static bool logReadContainerHeader(FIL *file, uint16_t number, LogBinaryHeader *
 }
 
 /////////////////////////////////////////////////////////////////////
-// モジュール名 logSourceIsBinary
-// 処理概要     共通読込中のファイルがバイナリか判定する
-// 引数         file: ファイル
-// 戻り値       true: バイナリ false: CSV
-/////////////////////////////////////////////////////////////////////
-bool logSourceIsBinary(FIL *file) { return binarySource.file == file; }
-
-/////////////////////////////////////////////////////////////////////
-// モジュール名 logSourceOpen
-// 処理概要     バイナリを優先して開き、欠落時だけ既存CSVを開く
-// 引数         file: ファイル, csvName: 番号.csv, mode: 読込モード
-// 戻り値       FatFs結果（不正バイナリはFR_INVALID_OBJECT）
-/////////////////////////////////////////////////////////////////////
-FRESULT logSourceOpen(FIL *file, const char *csvName, BYTE mode)
-{
-    return logSourceOpenFor(file, csvName, mode, LOG_SOURCE_FULL);
-}
-
-/////////////////////////////////////////////////////////////////////
-// モジュール名 logSourceBinaryInfo
+// モジュール名 logSourceInfo
 // 処理概要     全件検証済みのバイナリ識別情報を取得する
 // 引数         file: 入力ファイル, header: 識別情報の出力先
-// 戻り値       true: 有効なバイナリ false: CSVまたは無効
+// 戻り値       true: 検証済みの現行bin false: 無効な読込状態
 /////////////////////////////////////////////////////////////////////
-bool logSourceBinaryInfo(FIL *file, LogBinaryHeader *header)
+bool logSourceInfo(FIL *file, LogBinaryHeader *header)
 {
-    if (!logSourceIsBinary(file) || binarySource.error != FR_OK || header == NULL) return false;
+    if (file == NULL || binarySource.file != file || binarySource.error != FR_OK || header == NULL) return false;
     *header = binarySource.header;
     return true;
 }
 
 /////////////////////////////////////////////////////////////////////
-// モジュール名 logSourceOpenFor
-// 処理概要     全件検証後に用途を設定してバイナリ優先で開く
-// 引数         file: 入力, csvName: ログ名, mode: 読込モード, purpose: 読込用途
+// モジュール名 logSourceOpen
+// 処理概要     現行binだけを開き全件CRC検証後に解析用途を設定する
+// 引数         file: 入力, logNumber: ログ番号, purpose: 読込用途
 // 戻り値       FatFs結果
 /////////////////////////////////////////////////////////////////////
-FRESULT logSourceOpenFor(FIL *file, const char *csvName, BYTE mode, LogSourcePurpose purpose)
+FRESULT logSourceOpen(FIL *file, int logNumber, LogSourcePurpose purpose)
 {
-    uint16_t number;
+    if (file == NULL || logNumber <= 0 || logNumber > INT16_MAX) return FR_INVALID_PARAMETER;
+    uint16_t number = (uint16_t)logNumber;
     if (binarySource.file != NULL || modeLOG || logTempOpen ||
         logBufferWriter.flushPending || logBufferWriter.pendingPending) return FR_LOCKED;
-    if (purpose < LOG_SOURCE_FULL || purpose > LOG_SOURCE_PATH) return FR_INVALID_PARAMETER;
+    if (purpose < LOG_SOURCE_DISTANCE || purpose > LOG_SOURCE_PATH) return FR_INVALID_PARAMETER;
     logReadAheadReset();
-    if (!logBinaryParseName(csvName, "csv", &number)) return FR_INVALID_NAME;
     char name[20];
     logBinaryName(name, sizeof(name), number, "bin");
     FRESULT result = f_open(file, name, FA_READ | FA_OPEN_EXISTING);
-    if (result == FR_NO_FILE) return f_open(file, csvName, mode);
     if (result != FR_OK) return result;
     LogBinaryHeader header;
     UINT read;
@@ -1305,7 +1279,7 @@ FRESULT logSourceOpenFor(FIL *file, const char *csvName, BYTE mode, LogSourcePur
     if (columnTitle[header.metadataBytes - 1U] != '\n' ||
         memchr(columnTitle, '\0', header.metadataBytes) != NULL ||
         ~logBinaryCrcUpdate(UINT32_MAX, (const uint8_t *)columnTitle, header.metadataBytes) != header.metadataCrc ||
-        !logScanRecords(file, (uint16_t)header.rows, false, header.recordBytes, 0U, header.profile, &crc) || crc != header.dataCrc ||
+        !logScanRecords(file, (uint16_t)header.rows, false, &crc) || crc != header.dataCrc ||
         f_lseek(file, LOG_BINARY_HEADER_BYTES) != FR_OK) goto invalid;
     memset(&binarySource, 0, sizeof(binarySource));
     binarySource.file = file;
@@ -1328,7 +1302,8 @@ invalid:
 /////////////////////////////////////////////////////////////////////
 FRESULT logSourceClose(FIL *file)
 {
-    if (binarySource.file == file) binarySource.file = NULL;
+    if (binarySource.file != file || file == NULL) return FR_INVALID_OBJECT;
+    binarySource.file = NULL;
     logReadAheadReset();
     return f_close(file);
 }
@@ -1349,7 +1324,7 @@ static void logProcessRecord(void)
     }
     float dt = (float)(rec->cntlog - binarySource.previousTime) / 1000.0F;
     binarySource.roc = calcROC(speed, rec->gyroVal_Z, dt);
-    if (binarySource.purpose == LOG_SOURCE_FULL || binarySource.purpose == LOG_SOURCE_PATH) {
+    if (binarySource.purpose == LOG_SOURCE_PATH) {
         calcXYcie((int64_t)rec->encTotalL + rec->encTotalR, rec->imuAngle_Z);
         binarySource.x = xycie.x;
         binarySource.y = xycie.y;
@@ -1368,60 +1343,12 @@ static void logProcessRecord(void)
 }
 
 /////////////////////////////////////////////////////////////////////
-// モジュール名 logSourceGets
-// 処理概要     ヘッダを返し、データ部では文字列化せず1記録を復元する
-// 引数         line: 出力先, capacity: 容量[B], file: ファイル
-// 戻り値       成功時line、EOFまたはエラー時NULL（行値は専用APIから取得）
-/////////////////////////////////////////////////////////////////////
-char *logSourceGets(char *line, int capacity, FIL *file)
-{
-    if (!logSourceIsBinary(file)) return f_gets(line, capacity, file);
-    binarySource.rowReady = false;
-    if (binarySource.error != FR_OK || capacity < 2) return NULL;
-    if (binarySource.headerStage < 2U) {
-        if (binarySource.headerStage == 1U) {
-            columnTitle[0] = formatLog[0] = '\0';
-            logBuildColumns(0U, binarySource.header.profile);
-            strncat(columnTitle, "\n", sizeof(columnTitle) - strlen(columnTitle) - 1U);
-            strncat(formatLog, "\n", sizeof(formatLog) - strlen(formatLog) - 1U);
-        }
-        size_t length = strlen(columnTitle);
-        if (length >= (size_t)capacity) { binarySource.error = FR_INVALID_PARAMETER; return NULL; }
-        memmove(line, columnTitle, length + 1U);
-        binarySource.headerStage++;
-        return line;
-    }
-    if (binarySource.row >= binarySource.header.rows) {
-        if (~binarySource.crc != binarySource.header.dataCrc) binarySource.error = FR_INVALID_OBJECT;
-        return NULL;
-    }
-    uint8_t bytes[LOG_READ_RECORD_BYTES];
-    if (binarySource.row == 0U) { LOG_PERF_ADD(fullScans, 1U); }
-    FRESULT result = logReadBuffered(file, bytes, binarySource.header.recordBytes,
-        LOG_BINARY_HEADER_BYTES + (FSIZE_t)binarySource.header.rows * binarySource.header.recordBytes);
-    if (result != FR_OK) {
-        binarySource.error = result == FR_OK ? FR_DISK_ERR : result;
-        return NULL;
-    }
-    binarySource.crc = logBinaryCrcUpdate(binarySource.crc, bytes, binarySource.header.recordBytes);
-    logaddress = bytes;
-    logReadRecord(&binarySource.record, 0U, binarySource.header.profile);
-    LOG_PERF_BEGIN(processTick);
-    logProcessRecord();
-    LOG_PERF_END(processMs, processTick);
-    binarySource.row++;
-    binarySource.rowReady = true;
-    line[0] = '\n'; line[1] = '\0';
-    return line;
-}
-
-/////////////////////////////////////////////////////////////////////
 // モジュール名 logSourceError
-// 処理概要     CSVまたはバイナリ読込のエラーを取得する
+// 処理概要     現行bin読込のエラーを取得する
 // 引数         file: ファイル
 // 戻り値       0: エラーなし その他: エラー
 /////////////////////////////////////////////////////////////////////
-int logSourceError(FIL *file) { return logSourceIsBinary(file) ? (int)binarySource.error : f_error(file); }
+int logSourceError(FIL *file) { return file != NULL && binarySource.file == file ? (int)binarySource.error : FR_INVALID_OBJECT; }
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logSourceEof
@@ -1431,52 +1358,80 @@ int logSourceError(FIL *file) { return logSourceIsBinary(file) ? (int)binarySour
 /////////////////////////////////////////////////////////////////////
 int logSourceEof(FIL *file)
 {
-    return logSourceIsBinary(file) ? binarySource.row == binarySource.header.rows && binarySource.error == FR_OK : f_eof(file);
+    return file != NULL && binarySource.file == file && binarySource.row == binarySource.header.rows && binarySource.error == FR_OK;
 }
 
 /////////////////////////////////////////////////////////////////////
-// モジュール名 logSourceDistanceRow
-// 処理概要     距離解析用の値を共通形式へ復元する
-// 引数         file: ファイル, line: CSV行, columns: 列対応, row: 出力先
-// 戻り値       true: 有効 false: 不正
+// モジュール名 logSourceMetadata
+// 処理概要     全CRC検証済みの走行メタデータを取得する
+// 引数         file: 読込中のファイル
+// 戻り値       メタデータ文字列、無効な状態ではNULL
 /////////////////////////////////////////////////////////////////////
-bool logSourceDistanceRow(FIL *file, const char *line, const CourseLogColumnMap *columns, CourseLogDistanceRow *row)
+const char *logSourceMetadata(FIL *file)
 {
-    if (!logSourceIsBinary(file)) return courseLogParseDistanceRow(line, columns, row);
-    if (!binarySource.rowReady) return false;
-    LogRecord *r = &binarySource.record;
-    *row = (CourseLogDistanceRow){r->cntlog, r->encCurrentN, r->gyroVal_Z,
-        r->courseMarker, (int32_t)r->encTotalOptimal, binarySource.roc};
+    return file != NULL && binarySource.file == file && binarySource.error == FR_OK ? columnTitle : NULL;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logSourceNext
+// 処理概要     現行binの次の記録を共通解析行へ復元し終端CRCを確認する
+// 引数         file: 読込中のファイル, row: 復元先
+// 戻り値       true: 1件取得 false: 終端またはエラー（logSourceErrorで区別）
+/////////////////////////////////////////////////////////////////////
+bool logSourceNext(FIL *file, LogSourceRow *row)
+{
+    if (file == NULL || binarySource.file != file) return false;
+    if (row == NULL) { binarySource.error = FR_INVALID_PARAMETER; return false; }
+    if (binarySource.error != FR_OK) return false;
+    if (binarySource.row >= binarySource.header.rows) {
+        if (~binarySource.crc != binarySource.header.dataCrc) binarySource.error = FR_INVALID_OBJECT;
+        return false;
+    }
+    uint8_t bytes[LOG_READ_RECORD_BYTES];
+    if (binarySource.row == 0U) { LOG_PERF_ADD(fullScans, 1U); }
+    FRESULT result = logReadBuffered(file, bytes, LOG_SIZE,
+        LOG_BINARY_HEADER_BYTES + (FSIZE_t)binarySource.header.rows * LOG_SIZE);
+    if (result != FR_OK) { binarySource.error = result; return false; }
+    binarySource.crc = logBinaryCrcUpdate(binarySource.crc, bytes, LOG_SIZE);
+    logaddress = bytes;
+    logReadRecord(&binarySource.record);
+    LOG_PERF_BEGIN(processTick);
+    logProcessRecord();
+    LOG_PERF_END(processMs, processTick);
+    binarySource.row++;
+    const LogRecord *r = &binarySource.record;
+    *row = (LogSourceRow){
+        .cntlog = r->cntlog, .encCurrentN = r->encCurrentN, .gyroValZ = r->gyroVal_Z,
+        .courseMarker = r->courseMarker, .encTotalOptimal = (int32_t)r->encTotalOptimal,
+        .ROC = binarySource.roc, .targetSpeed = r->targetSpeed, .optimalIndex = r->optimalIndex,
+        .slipV2TotalMs = r->slipV2TotalMs, .slipV2ValidMs = r->slipV2ValidMs,
+        .slipV2OnLongMs = r->slipV2OnLongMs, .slipV2LatValidMs = r->slipV2LatValidMs,
+        .slipV2OnLatMs = r->slipV2OnLatMs, .slipV2IntervalReason = r->slipV2IntervalReason,
+        .slipV2LatIntervalReason = r->slipV2LatIntervalReason,
+        .x = binarySource.x, .y = binarySource.y
+    };
     return true;
 }
 
 /////////////////////////////////////////////////////////////////////
-// モジュール名 logSourceSlipRow
-// 処理概要     スリップ解析用の値を共通形式へ復元する
-// 引数         file: ファイル, line: CSV行, columns: 列対応, row: 出力先
-// 戻り値       true: 有効 false: 不正
+// モジュール名 logSourceValidateSlipRow
+// 処理概要     V2の区間時間・ON時間と解析値の範囲を検証する
+// 引数         row: 現行binから復元した行
+// 戻り値       true: 正常 false: 不正または区間カウンタ飽和
 /////////////////////////////////////////////////////////////////////
-bool logSourceSlipRow(FIL *file, const char *line, const CourseLogColumnMap *columns, CourseLogSlipRow *row)
+bool logSourceValidateSlipRow(const LogSourceRow *row)
 {
-    if (!logSourceIsBinary(file)) return courseLogParseSlipRow(line, columns, row);
-    if (!binarySource.rowReady) return false;
-    LogRecord *r = &binarySource.record;
-    *row = (CourseLogSlipRow){r->courseMarker, (int32_t)r->encTotalOptimal, binarySource.roc,
-        r->targetSpeed, r->optimalIndex, r->slipV2TotalMs, r->slipV2ValidMs, r->slipV2OnLongMs, r->slipV2LatValidMs, r->slipV2OnLatMs, r->slipV2IntervalReason, r->slipV2LatIntervalReason};
-    return courseLogValidateSlipRow(row);
-}
-
-/////////////////////////////////////////////////////////////////////
-// モジュール名 logSourceBinaryPoint
-// 処理概要     バイナリ記録から経路生成用のXYと距離を取得する
-// 引数         file: ファイル, x: X[mm], y: Y[mm], pulse: 累積距離[pulse]
-// 戻り値       true: 有効な点 false: 不正
-/////////////////////////////////////////////////////////////////////
-bool logSourceBinaryPoint(FIL *file, float *x, float *y, float *pulse)
-{
-    if (!logSourceIsBinary(file) || !binarySource.rowReady) return false;
-    *x = binarySource.x; *y = binarySource.y; *pulse = (float)binarySource.record.encTotalOptimal;
-    return isfinite(*x) && isfinite(*y) && isfinite(*pulse);
+	return row != NULL && row->courseMarker >= 0 && row->courseMarker <= (int32_t)UINT8_MAX &&
+		row->optimalIndex >= 0 && row->optimalIndex <= INT16_MAX &&
+		isfinite(row->ROC) && fabsf(row->ROC) <= INT16_MAX &&
+		isfinite(row->targetSpeed) && row->targetSpeed >= 0.0F && row->targetSpeed <= UINT8_MAX &&
+		row->slipV2TotalMs > 0 && row->slipV2TotalMs < (int32_t)UINT16_MAX &&
+		row->slipV2ValidMs >= 0 && row->slipV2ValidMs <= row->slipV2TotalMs &&
+		row->slipV2OnLongMs >= 0 && row->slipV2OnLongMs <= row->slipV2ValidMs &&
+		row->slipV2LatValidMs >= 0 && row->slipV2LatValidMs <= row->slipV2TotalMs &&
+		row->slipV2OnLatMs >= 0 && row->slipV2OnLatMs <= row->slipV2LatValidMs &&
+		row->slipV2IntervalReason >= 0 && row->slipV2IntervalReason <= 511 &&
+		row->slipV2LatIntervalReason >= 0 && row->slipV2LatIntervalReason <= 511;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -1573,17 +1528,11 @@ int16_t getFileNumbers(void)
 				printf("f_readdir error: %d\r\n", fresult); // エラー内容を出力
 				break;
 			}
-			uint16_t csvNumber;
-			if ((logBinaryParseName(fno.fname, "bin", &csvNumber) ||
-                logBinaryParseName(fno.fname, "csv", &csvNumber)) && endFileIndex < FILENUMBER_NUM)
+			uint16_t binaryNumber;
+			if (logBinaryParseName(fno.fname, "bin", &binaryNumber) && endFileIndex < FILENUMBER_NUM)
 			{
-				// 同番号のbin/旧CSVは一覧へ一度だけ登録する。
-                bool duplicate = false;
-                for (int16_t i = 0; i < endFileIndex; i++) {
-                    if (fileNumbers[i] == (int16_t)csvNumber) { duplicate = true; break; }
-                }
-                if (duplicate) continue;
-				fileNumbers[endFileIndex] = (int16_t)csvNumber;
+				// 機体から解析できる現行binだけを選択対象とする。
+				fileNumbers[endFileIndex] = (int16_t)binaryNumber;
 				endFileIndex++;
 			}
 		} while (fno.fname[0] != 0); // ファイルの有無を確認
@@ -1611,20 +1560,6 @@ int16_t getFileNumbers(void)
 	f_closedir(&dir); // directory close
 
 	return endFileIndex;
-}
-/////////////////////////////////////////////////////////////////////
-// モジュール名 setLogStr
-// 処理概要     ログCSVファイルのヘッダーとprintfのフォーマット文字列を生成
-// 引数         column: ヘッダー文字列 format: フォーマット文字列
-// 戻り値       なし
-/////////////////////////////////////////////////////////////////////
-void setLogStr(char *column, char *format)
-{
-	// 長い列名を一時バッファで切らず、区切りも独立して追加する。
-	strncat(columnTitle, column, sizeof(columnTitle) - strlen(columnTitle) - 1U);
-	strncat(columnTitle, ",", sizeof(columnTitle) - strlen(columnTitle) - 1U);
-	strncat(formatLog, format, sizeof(formatLog) - strlen(formatLog) - 1U);
-	strncat(formatLog, ",", sizeof(formatLog) - strlen(formatLog) - 1U);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 setLogHeaderStr
@@ -1830,29 +1765,15 @@ static float logReadF32(void)
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logReadRecord
 // 処理概要     LOG_FIELD_LISTの順で1レコードを復元する
-// 引数         rec: 復元先, schemaFormat: 現行定義（0）, profile: 1=通常/0=詳細
+// 引数         rec: 現行ビルドのレコード復元先
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-static void logReadRecord(LogRecord *rec, uint8_t schemaFormat, uint32_t profile)
+static void logReadRecord(LogRecord *rec)
 {
     memset(rec, 0, sizeof(*rec));
 #define LOG_READ_FIELD(type, name, fmt, expr) rec->name = logRead##type();
 #define LOG_READ_SKIP(type, name, fmt, expr)
-    (void)schemaFormat; (void)profile;
     LOG_FIELD_LIST(LOG_READ_FIELD, LOG_READ_SKIP)
 #undef LOG_READ_FIELD
 #undef LOG_READ_SKIP
-}
-/////////////////////////////////////////////////////////////////////
-// モジュール名 logBuildColumns
-// 処理概要     指定スキーマからCSVヘッダーとprintf形式を生成する
-// 引数         schemaFormat: 現行定義（0）, profile: 1=通常/0=詳細
-// 戻り値       なし
-/////////////////////////////////////////////////////////////////////
-static void logBuildColumns(uint8_t schemaFormat, uint32_t profile)
-{
-#define LOG_HEADER_FIELD(type, name, fmt, expr) setLogStr(#name, fmt);
-    (void)schemaFormat; (void)profile;
-    LOG_FIELD_LIST(LOG_HEADER_FIELD, LOG_HEADER_FIELD)
-#undef LOG_HEADER_FIELD
 }

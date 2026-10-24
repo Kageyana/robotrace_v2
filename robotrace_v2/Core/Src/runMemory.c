@@ -3,7 +3,6 @@
 #include "pathFollower.h"
 
 RunMemory runMemory;
-char runAnalysisLine[RUN_ANALYSIS_LINE_SIZE];
 RunMemoryOwner runMemoryOwner = RUN_MEMORY_NONE;
 
 /////////////////////////////////////////////////////////////////////
