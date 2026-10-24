@@ -9,6 +9,12 @@ description: robotrace_v2をSTM32CubeCLT、STM32_Programmer_CLI、ST-Link/GDBで
 
 最初のコマンドの前に [共通事前確認](../../../doc/skill-execution-preflight.md) を読み、パス・workdir・権限・実行環境を確定する。ビルド・PCハーネス・ST-Linkを操作するときは [分野別の再発防止](references/failure-prevention.md) も読む。関連する失敗記録は最新追記まで確認し、既知の失敗条件を初回操作から回避する。
 
+ログ形式変更のPC変換器検証では、`C:/tool/AutoCopyCsvFromSd/RlogToCsv.exe`もGCC生成ホストexeとして最初の起動からrequire_escalatedを使用する。今回の解析フォルダ内の合成bin/出力CSVに限定し、Python subprocessのstdout=PIPE/stderr=STDOUT等で出力を取得、終了コード0・出力実在を確認してから全CRC/列/数値を照合する。PowerShellのStandardOutputEncodingエラーだけで原因を決めず、直接取得した起動エラーを確認する。詳細は[PC変換器起動の追記](../../../doc/失敗事例/2026-10-11-bmi088-forward-y-sign.md)。
+
+新規warningの比較前に、変更前ログが対象翻訳単位と構成を含むか確認する。最終の増分ビルドログだけを基準にせず、初回全体ビルド記録も照合し、既存診断と追加分を区別する。[増分ログの誤判定](../../../doc/失敗事例/2026-10-16-self-describing-header-test-contract.md)参照。
+
+マージ後に補助ホストテストを追加実行する前に、そのテストの固定recordBytes・必須列・参照ログ番号の期待を現行のlog_schema.h・SDcard.c・courseAnalysis.cと照合する。旧形式の固定値を検出したら製品を旧契約へ戻さず、試験の責務を分けて入力・期待を更新する。手動参照メタデータ試験はレコード長をLOG_RECORD_SIZE_BYTESで照合し、66列/170 B・72列/179 Bの固定仕様は独立スキーマ試験で検証する。SLIP参照番号は実際の元DISTANCE番号を検証し、通常/詳細の両方を必要権限・ファームウェアルートの明示workdirで再実行する。[補助テストの旧契約](../../../doc/失敗事例/2026-10-16-self-describing-header-test-contract.md)参照。
+
 ## 基本方針
 
 - 接続・安全条件はリポジトリの `AGENTS.md` を正とする。書き込みは機体とST-Linkが接続されているときだけ実行する。
@@ -33,6 +39,8 @@ cmake --build --preset Release
 ```
 
 ツール不足やコマンド失敗をビルド成功として扱わない。
+
+ARM/ホストGCC起動前に`doc/失敗事例/2026-10-11-bmi088-forward-y-sign.md`のDLL再配置エラー事例を確認する。この環境で同じIllegal System DLL Relocationが出たらソース不良と判断せず、同一コマンドを承認された制限外環境で検証する。コンパイラ起動失敗とコンパイル診断を区別し、根本原因は未解決として扱う。
 
 ## 書き込み
 

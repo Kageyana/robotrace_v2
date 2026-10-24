@@ -12,11 +12,35 @@ tags:
 
 # PowerShellでUnix風globを前提にしたrg確認が失敗した
 
+## 2026-10-18 手動一次参照メタデータ調査での再発
+
+`Core/Src/path*.c`と`Core/Inc/path*.h`をrgのパス引数へ渡し、os error 123が再発した。既存の事前確認を読んでいたが、検索コマンドへ適用できなかった。同じシェル内の後続読込が成功して呼出し全体の終了コードは0となったため、検索自体の失敗を終了コードだけでは判別できなかった。原本・ファームウェアへの影響はない。
+
+ディレクトリを検索ルート、パターンを`-g`へ分けて所属ソースを取得した。再発防止として`analysis/script/search_firmware_sources.ps1`を追加した。検索ルートは実在するCore/SrcとCore/Incに固定し、パターンは常に`-g`へ渡す。rgの終了コード2以上は後続処理へ進まず例外にする。PowerShell用ファイルはUTF-8 BOM付きで保存する。
+
+確認は`powershell.exe -NoProfile -ExecutionPolicy Bypass -File analysis/script/search_firmware_sources.ps1 -Pattern 'routeBuildFromLog|pathRouteSourceLog' -FileGlob 'path*.c'`。実ソースの一致行と終了コード0、BOMを確認した。ビルド・デバッグSkillの調査前手順にもこの固定ルート検索を追加し、今回の回避策はresolved。全ソース検索の一般化やファームウェア変更はこの記録へ含めない。
+
 ## 2026-10-15 CSV変換中のモーター指令調査での再発
 
 `Core/Src/interrupt*`をrgのパスに渡してos error 123、存在未確認の`buzzer.c/.h`を指定してos error 2が発生した。既存の事前列挙対策を適用できていなかった。実在する`Core/Src`全体を検索し、1ms処理が`timer.c`、ホイールクリック出力が`setup.c`にあることを確認した。追加の予防手順として、モジュール名が不明な初回検索は必ず`rg -n '検索語' robotrace_v2/Core/Src -g '*.c'`とし、個別ファイルへ絞るのはその結果に実在パスが出た後だけとする。同形式で`void wheelClick`の検索と終了成功を確認したためresolvedを維持する。ファームウェアの変更・実機操作は行っていない。
 
 同日のSD高速化案調査でも、存在を確認せず`FATFS/App/ffconf.h`、`Core/Src/log.c`、`Core/Inc/log_buffer_writer.h`、直下`.vscode/tasks.json`を指定して読込・検索が失敗した。初回の事前列挙が徹底できていなかった。`rg --files`で実在する`FATFS/Target/ffconf.h`、`Core/Inc/logBufferWriter.h`を確認し、ログ実装は実在ディレクトリの検索から`SDcard.c`と特定、タスクは存在するファームウェア側`.vscode/tasks.json`を確認した。次回はツール呼出しを「一覧取得」「取得結果の実在パスによる読込」の2段階に分け、同一呼出し内で一覧を待たず推測パスを追加しない。実在パスでの設定・ログ実装取得に成功し、resolvedを維持する。
+
+## 2026-10-15 Fast単独版の実走確認での再発
+
+13248～13256の事例検索で`doc/失敗事例/2026-10-14-*.md`をパス引数へ渡し、os error 123が再発した。前回の注意事項だけでは初回呼出しへの反映が不十分だった。実在ルートと`-g '2026-10-14-*.md'`へ分離して関連記録を取得した。走行CSVの解析・原本には影響していない。
+
+追加対策として`analysis/script/search_failure_notes.ps1`を作成した。検索ルートを実在する失敗事例フォルダへ固定し、絞込み文字列を常に`-g`へ渡す。次回の事例検索は`powershell.exe -NoProfile -ExecutionPolicy Bypass -File analysis/script/search_failure_notes.ps1 -Pattern 'metadata|cntlog|直線' -FileGlob '2026-10-14-*.md'`を使う。上記コマンドで関連記録の取得と終了成功を確認し、resolvedを維持する。
+
+同補助スクリプトの初回実行は、日本語文字列を含むUTF-8 BOMなしの`.ps1`をWindows PowerShell 5.1が既定コードページで解釈し、引用符終端のParserErrorになった。UTF-8 BOM付きへ保存し直すと同じコマンドが成功した。このWindows PowerShell用補助はBOM付き保存を維持し、変更後は実際の`powershell.exe -File`で日本語パターンとワイルドカード絞込みの組合せを検証する。ファームウェアのCソースの文字コード規約は変更しない。
+
+## 2026-10-14 追加ログ解析での再発
+
+過去事例検索へ`doc/失敗事例/2026-10-14*`をパスとして渡し、os error 123が再発した。既存対策を初回呼出しへ適用できていなかった。`rg -n -g '2026-10-14*.md' 'メタデータ|小数|時刻|区間|閉路' doc/失敗事例`へ修正し、整数メタデータ・補正距離・マーカーの関連事例を取得できた。対処検証済みでresolvedを維持する。検索コマンドのパス引数は実在ルートだけとし、`*`を含む場合は実行前に必ず`-g`へ移す。同時に走行CSV探索は数値ファイル名だけを列挙する`check_additional_logs_13238_13247.py`の`discover()`へまとめ、型変換前に対象を選別する。
+
+## 2026-10-12 次作業提案時の再発
+
+SLIP関連の過去事例検索で、`doc/失敗事例/2026-10-*-*log*`等をrgのパス引数へ渡し、os error 123が再発した。既存対策を検索呼出しへ適用できていなかった。検索ルートを`doc/失敗事例`、絞込みを`-g '*log*.md' -g '*slip*.md'`へ変更し、関連事例を取得できた。対処検証済み、resolvedを維持する。次回はrg呼出し前にパス引数の`*`有無を確認し、存在するディレクトリと`-g`へ分離する。
 
 ## 2026-10-04 自動開始前校正調査での再発
 
@@ -78,3 +102,26 @@ yI検証で `rg ... robotrace_v2/Core/Inc/*h` を渡してos error 123が再発�
 ## 2026-10-03 IMU・距離・時刻切り分けでの再発
 
 Src/log*をパスに渡した検索でos error 123、推測したtim.cで存在しないエラーが再発した。既存対策が適用されていなかった。ディレクトリ＋-gによる検索でwriteLogBufferPutsがSDcard.c、割り込み優先度がstm32f4xx_hal_msp.c、TIM6呼出しがmain.cにあることを確認。ファイル名を推測する前に`rg --files robotrace_v2/Core/Src`で一覧を取得し、検索呼出しのパス引数にワイルドカードを含めないことを再確認した。対処検証済み。
+
+## 2026-10-13 ログ項目整理での推測ファイル名の再発
+
+ログ読込処理を調べる際、存在を確認せずlogReader.c/.hを検索対象へ指定し、os error 2となった。既存の事前列挙を適用できていなかった。`rg --files robotrace_v2/Core`で実在するcourseLogCsv.c/.h、logSource.h、logBinary.hを確認し、実読込がSDcard.cにあることも検索で確認した。次回は新しいモジュール名を検索パスへ追加する前に、必ずrg --filesの結果と照合する。対処検証済み、resolvedを維持する。
+
+## 2026-10-18 閾値再選定時の推測名の再発
+
+`reevaluate_xy_yband20_13472_13479.py`、`check_slip_lat_threshold_parity.py`、`reviewed_labels.json`等の推測名をGet-Contentへ渡し、存在しないエラーとなった。既存の事前列挙を適用できなかった。実在する`reevaluate_xy_y_band_13472_13479.py`、`run_slip_lat_video_threshold_tests.py`、`video_label_review.json`はrg --files/Get-ChildItemで確認してから読み直した。過去の解析フォルダごとに成果物名が異なり、別系列の同名ファイルを仮定しない。再発防止参照へ、履歴のパスも列挙結果と照合してから読む手順を追加した。正規パスでの読取と41走の解析・実C検証で対処確認済み、resolvedを維持する。
+
+
+## 2026-10-19 縦時間応答調査でのspi.c推測の再発
+
+対象タスクは縦スリップ残差のセンサー時間応答切り分け。未確認のrobotrace_v2/Core/Src/spi.cをrgの対象へ指定し、os error 2となった。iocの検索自体は成功したが、生成先の分割形式を名前から推測した点で既存対策を再適用できていなかった。解析値やファームウェアへの影響はない。
+
+対処はSrcディレクトリ＋-gへ限定した検索で、main.c:469のMX_SPI2_Init、同487の8分周とiocの5.625MHzを確認した。ペリフェラル初期化の調査では、CubeMXの分割生成を仮定してspi.c/tim.cを検索パスへ指定しない。最初に `rg -n "MX_SPI2_Init|BaudRatePrescaler" robotrace_v2/Core/Src -g "*.c"` のように実在ディレクトリを検索し、結果に出たファイルだけを読む。このプロジェクトのSPI2初期化はmain.cに存在する。
+
+ログ解析Skillの実行前確認と再発防止参照へ同じ入口を追加する。指定した正規検索は終了コード0、main.cの実在と定義・分周行を確認済み。Skill/参照の既存内容を保持した追記を検証する。検索手順の対処はresolved。内部センサー応答・実縦滑りの未確定事項とは別である。
+
+## 2026-10-21 V2移行調査での過去スキーマ名の再発
+
+旧資料の`Core/Inc/log_schema_candidate_v1.h`を現チェックアウトにあると仮定してrgへ渡し、os error 2となった。現行の`log_schema.h`, `logBinary.h`, `logSource.h`は`rg --files robotrace_v2/Core/Inc -g "log*"`で列挙して存在を確認できた。ファームウェアや解析値への影響はない。
+
+過去資料に記載された凍結スキーマ名も存在確認の対象とし、ログ解析Skillの再発防止参照へ入口の列挙コマンドを追記した。新しいV2のみのコードは現行スキーマを正とする。列挙成功と現行ファイルの参照、全構成ビルド・通常/詳細ホスト計画検証を確認し、検索手順の修正はresolvedとする。

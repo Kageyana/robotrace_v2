@@ -4,6 +4,7 @@
 // インクルード
 //====================================//
 #include <stdint.h>
+#include "slipDetection.h"
 #include "SDcard.h"
 #include "battery.h"
 #include "motor.h"
@@ -36,8 +37,6 @@
 	DERIVED(F32, ROC, "%f", log_roc) \
 	STORED(U8, targetSpeed, "%d", targetSpeed) \
 	STORED(U16, optimalIndex, "%d", (uint16_t)optimalIndex) \
-	STORED(U8, slipFlag, "%d", (uint8_t)getSlipFlag()) \
-	STORED(U8, slipFlagLat, "%d", (uint8_t)getSlipFlagLat()) \
 	STORED(S16, lineTraceCtrl, "%d", (int16_t)lineTraceOmegaFBCtrl.pwm) \
 	STORED(S16, targetAngularvelo, "%d", (int16_t)log_targetAngularVelocity) \
 	STORED(U16, batteryVoltage_mV, "%d", (uint16_t)(batteryVoltage_V * 1000.0f)) \
@@ -62,19 +61,10 @@
 	STORED(U8, sgMarkerCount, "%d", (uint8_t)SGmarker) \
 	STORED(U32, encRightMarker_p, "%d", (uint32_t)encRightMarker) \
 	STORED(U8, patternTrace, "%d", (uint8_t)patternTrace) \
-	STORED(F32, slipRatio, "%f", getSlipIndicatorRaw()) \
-	STORED(F32, slipRatioLat, "%f", getSlipIndicatorFiltered()) \
 	STORED(F32, motorCurrentL, "%f", motorCurrentL) \
 	STORED(F32, motorCurrentR, "%f", motorCurrentR) \
 	STORED(U8, straightPendingAttempt, "%d", (uint8_t)straightMarkerPendingLog) \
-	STORED(U8, lineTraceOmegaFBCtrlkp, "%d", (uint8_t)lineTraceOmegaFBCtrl.kp) \
-	STORED(U8, slipLatEnabled, "%d", (uint8_t)getSlipLatEnabled()) \
-	STORED(U8, slipLatOnCountEnabled, "%d", (uint8_t)getSlipLatOnCountEnabled()) \
-	STORED(U16, slipISumOkCount, "%d", getSlipISumOkCount()) \
-	STORED(F32, slipPwmSumF, "%f", getSlipPwmSumF()) \
-	STORED(F32, slipISumF, "%f", getSlipISumF()) \
-	STORED(F32, slipEncAyF, "%f", getSlipEncAyF()) \
-	STORED(F32, slipImuAyF, "%f", getSlipImuAyF())
+	STORED(U8, lineTraceOmegaFBCtrlkp, "%d", (uint8_t)lineTraceOmegaFBCtrl.kp)
 
 // 通常ログの既存列順を保つため末尾へ追加する。詳細ログでは既存の電流列を使用する。
 // 電流[A]はADC移動平均・ゼロ点校正後の最新値を保存する。
@@ -93,21 +83,53 @@
 	STORED(F32, imuAngle_Z, "%f", imuVal.angle.z)
 
 #if LOG_SCHEMA_PROFILE_LIGHT
-#define LOG_FIELD_LIST(STORED, DERIVED) \
+#define LOG_BASE_FIELD_LIST(STORED, DERIVED) \
 	LOG_FIELD_LIST_CORE(STORED, DERIVED) \
 	LOG_FIELD_LIST_IMU(STORED, DERIVED) \
 	LOG_FIELD_LIST_CURRENT(STORED, DERIVED)
 #else
-#define LOG_FIELD_LIST(STORED, DERIVED) \
+#define LOG_BASE_FIELD_LIST(STORED, DERIVED) \
 	LOG_FIELD_LIST_CORE(STORED, DERIVED) \
 	LOG_FIELD_LIST_DEBUG(STORED, DERIVED) \
 	LOG_FIELD_LIST_IMU(STORED, DERIVED)
 #endif
-// 詳細デバッグ列の追加候補:
-// STORED(F32, slipDistScaleF, "%f", Control_GetSlipDistScale())
-// STORED(U32, distEncRaw_p, "%d", (uint32_t)Control_GetDistEncRaw_p())
-// STORED(U32, distCorr_p, "%d", (uint32_t)Control_GetDistCorr_p())
-// STORED(U32, distSlipLoss_p, "%d", (uint32_t)Control_GetDistSlipLoss_p())
+// V2の採用判定と1ms区間統計を通常・詳細の両方へ保存する。
+#define LOG_FIELD_LIST_V2(STORED, DERIVED) \
+    STORED(F32, slipV2LongFast, "%f", slipV2.result.longFast) \
+    STORED(F32, slipV2LongSlow, "%f", slipV2.result.longSlow) \
+    STORED(F32, slipV2Lat, "%f", slipV2.result.lateral) \
+    STORED(F32, slipV2YawDps, "%f", slipV2.result.yawDps) \
+    STORED(U8, slipV2Flags, "%d", slipV2.result.flags) \
+    STORED(U8, slipV2Valid, "%d", slipV2.result.valid) \
+    STORED(U16, slipV2Reason, "%d", slipV2.result.reason) \
+    STORED(U8, slipV2CurrentValid, "%d", slipV2.result.currentValid) \
+    STORED(U16, slipV2CurrentHighSamples, "%d", slipV2.result.currentHighSamples) \
+    STORED(U16, slipV2PwmSum, "%d", slipV2.result.pwmSum) \
+    STORED(F32, slipV2PeakLong, "%f", slipV2.interval.peakLong) \
+    STORED(F32, slipV2PeakLat, "%f", slipV2.interval.peakLat) \
+    STORED(F32, slipV2PeakYawDps, "%f", slipV2.interval.peakYawDps) \
+    STORED(U16, slipV2OnLongMs, "%d", slipV2.interval.onLongMs) \
+    STORED(U16, slipV2OnLatMs, "%d", slipV2.interval.onLatMs) \
+    STORED(U16, slipV2OnYawMs, "%d", slipV2.interval.onYawMs) \
+    STORED(U16, slipV2ValidMs, "%d", slipV2.interval.validMs) \
+    STORED(U16, slipV2TotalMs, "%d", slipV2.interval.totalMs) \
+    STORED(U16, slipV2IntervalReason, "%d", slipV2.interval.invalidReason)
+
+// 採用横の独立した有効性・理由を保持する。残差・フラグ・ピーク・ON時間はV2共通列へ統合する。
+#define LOG_FIELD_LIST_LAT_DIAGNOSTICS(STORED, DERIVED) \
+    STORED(U8, slipV2LatValid, "%d", slipV2.lateralCandidate.result.valid) \
+    STORED(U16, slipV2LatReason, "%d", slipV2.lateralCandidate.result.reason) \
+    STORED(U16, slipV2LatValidMs, "%d", slipV2.lateralCandidate.interval.validMs) \
+    STORED(U16, slipV2LatIntervalReason, "%d", slipV2.lateralCandidate.interval.invalidReason) \
+    STORED(F32, imuYawAlphaFiltered, "%f", slipV2.lateralCandidate.result.alphaRadps2) \
+    STORED(F32, imuLatTangentialApplied, "%f", slipV2.lateralCandidate.result.tangentialAppliedXMps2)
+
+// 通常66列・170 B、詳細72列・179 B。診断25列を両プロファイルへ記録する。
+#define LOG_FIELD_LIST(STORED, DERIVED) \
+    LOG_BASE_FIELD_LIST(STORED, DERIVED) \
+    LOG_FIELD_LIST_V2(STORED, DERIVED) \
+    LOG_FIELD_LIST_LAT_DIAGNOSTICS(STORED, DERIVED)
+
 // バイナリログで保存する型の対応表。
 #define LOG_CTYPE_U8  uint8_t
 #define LOG_CTYPE_U16 uint16_t

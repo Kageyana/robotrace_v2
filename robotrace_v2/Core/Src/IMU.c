@@ -24,6 +24,7 @@ float imuTempEnd_C = BMI088_TEMP_INVALID_C;
 static float imuTempCalibrationSum_C = 0.0F;
 static uint16_t imuTempCalibrationAttempts = 0U;
 volatile IMUval imuVal = {0};	// IMUの実行時変数（加速度、角速度、角度などを保持）
+static ImuTangentialSample tangentialSample;
 float angleOffset[3] = {0.0F, 0.0F, 0.0F};	// ジャイロオフセット[deg/s]（calibrationIMU()で算出される）
 #ifdef USE_ACCELE
 float acceleOffset[3] = {0.0F, 0.0F, 0.0F};	// 加速度オフセット[g]（calibrationIMU()で算出される）
@@ -83,6 +84,10 @@ static void applyRotCenterCorrectionIMU(void)
 	// 接線加速度項(α×r)と向心加速度項(ω×(ω×r))を2Dで合成する
 	corrX_mps2 = alphaZFiltered * IMU_OFFSET_Y_M + omegaZ * omegaZ * IMU_OFFSET_X_M;
 	corrY_mps2 = -alphaZFiltered * IMU_OFFSET_X_M + omegaZ * omegaZ * IMU_OFFSET_Y_M;
+	// 共通の補正式を維持し、実際に加えた接線項を診断側へ渡す。
+	tangentialSample.alphaRadps2 = alphaZFiltered;
+	tangentialSample.appliedXMps2 = alphaZFiltered * IMU_OFFSET_Y_M;
+	tangentialSample.valid = isfinite(alphaZFiltered) && isfinite(tangentialSample.appliedXMps2);
 
 	// [m/s^2]から[g]へ戻してimuValの加速度x/yへ反映する（zは補正しない）
 	imuVal.accele.x += corrX_mps2 / GRAVITY_MPS2;
@@ -207,6 +212,16 @@ float IMU_GetLinearAccelerationXMps2(void)
 #endif
 }
 /////////////////////////////////////////////////////////////////////
+// モジュール名 IMU_GetTangentialSample
+// 処理概要     共通IMUへ適用済みの接線項と同じLPF後角加速度を取得する
+// 引数         なし
+// 戻り値       接線項[m/s^2]、角加速度[rad/s^2]と利用可否
+/////////////////////////////////////////////////////////////////////
+ImuTangentialSample IMU_GetTangentialSample(void)
+{
+    return tangentialSample;
+}
+/////////////////////////////////////////////////////////////////////
 // モジュール名 IMU_GetLinearAccelerationYMps2
 // 処理概要     静止時重力基準を除去した機体Y軸線形加速度を取得する
 // 引数         なし
@@ -252,6 +267,7 @@ float IMU_GetForwardAccelerationMps2(void)
 /////////////////////////////////////////////////////////////////////
 void clearIMUval(void)
 {
+    tangentialSample = (ImuTangentialSample){0};
 	imuVal.accele.x = 0.0F;
 	imuVal.accele.y = 0.0F;
 	imuVal.accele.z = 0.0F;
@@ -492,6 +508,7 @@ void calibrationIMU(void)
 /////////////////////////////////////////////////////////////////////
 void IMU_StartCalibration(void)
 {
+    tangentialSample = (ImuTangentialSample){0};
 	imuCalibrationReady = false;
 	imuCalibrationSamples = 0U;
 	imuCalibrationReadErrors = 0U;

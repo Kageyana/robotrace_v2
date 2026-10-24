@@ -45,3 +45,7 @@ tags:
 RAM共通化ブランチのコミット依頼で、通常権限のgit addとgit commitがindex.lock作成権限拒否で失敗した。既存の「初回からrequire_escalated」の対策を適用しなかったため再発した。対象11ファイルを限定した昇格付きgit addで索引更新成功を確認した。索引更新に失敗した場合は後続のcommitを実行せず、まず昇格付きaddの成功を確認してからcommitする。次回のコミット作業では、索引更新前に本記録を確認し、環境の.gitが読取専用なら初回から昇格付きで実行する。
 
 - `doc/失敗事例/2026-08-11-git-index-lock-sandbox-permission.md`
+
+## 2026-10-12のブランチ作成での再発
+
+新規ブランチ作成を通常権限で試し、.git/refs/heads/codex/slip-detector-v2.lockの作成が拒否された。対象を限定した同じgit switch -cをrequire_escalatedで実行して成功した。対策の対象はindex更新だけでなくrefs更新（switch -c、branch等）も含む。次回は.gitへの書込みを伴う操作を分類して初回から適切な権限で実行する。git branch --show-currentでcodex/slip-detector-v2を確認済み。

@@ -18,3 +18,29 @@ task: 自己記述RLOG v2への移行
 ファームの相対パスを含む読取とPCツールのGit状態確認を同じ呼出しへまとめ、workdirをPCツール側へ指定したため、Get-Content/rgが存在しないパスとして失敗した。同じ取り違えが最終確認でも再発した。ファイル変更は発生していない。既存の「各workdirを明示する」だけでは、コマンド本文と外側のworkdirの不一致を防げなかった。
 
 読取をファームのルートで再実行して実在ソースを取得し、以後の複数リポジトリ読取は絶対パス、Gitは`git -C`へ限定する。共通事前確認と書込み・ビルドSkillの実行前手順へ、workdir確定後のパス組立て・Test-Pathによる照合を追加する。ビルドは別呼出しで正しいファームルートを使い、Debug/Release×通常/詳細の4構成が成功した。対象ソース読取と別リポジトリGit状態の再確認をもってこの対処はresolved。実機精度の確認とは分ける。
+
+## 2026-10-21 実ログ解析でのprofile値の取り違え
+
+正式V2初回ログ13571〜13577の読取解析で、軽量ログをprofile=0と仮定したassertが停止した。実ヘッダはprofile=1、181 B/行、70列で、現行log_schema.hのLOG_SCHEMA_PROFILE_LIGHT=1と一致していた。CSV・元bin・製品ソースは変更していない。解析側のprofile定義確認不足が原因であり、ログ破損ではない。
+
+解析スクリプトの期待値を現行定義のprofile=1へ修正。7本でヘッダ・データ・列定義・メタデータのCRC、実長、行数、CSVとの番号/データCRC/スキーマCRC対応に成功した。軽量/詳細の名前から数値を推測せず、解析前にlog_schema.hの定義、ヘッダ実値、列数・recordBytesを同時照合する手順をログ解析Skillの実行前へ追加した。
+
+検証: analysis/script/evaluate_active_v2_13571_13577.py再実行がexit=0。analysis/slip_active_v2_13571_13577/validation.jsonに7本の検証値とハッシュを保存した。この解析側の前提修正はresolved。13574の終端不整合や物理滑りの検証は別問題であり、解決済みとはしない。
+
+## 2026-10-21 増分ログだけによる新規warning誤判定
+
+横ログ重複整理の4構成ビルドは成功したが、集計スクリプトが変更前のfinal-buildログだけを警告基準にしたため、Release詳細の既存vsprintf宣言不足を新規warningと判定して停止した。final-buildは増分で、該当SSD1306ソースが再コンパイルされておらず、以前の全体build-Release/DebugMarkerログには同じ診断が存在した。ssd1306.c自体の差分はない。
+
+基準を変更前の初回ビルド記録も含む警告集合へ修正し、同じ検証を再実行して成功した。警告を消す目的で製品コードを変更せず、既存警告の内容と構成をvalidation.jsonへ保存した。新規warning検査を最終増分ログだけで行わず、比較元の翻訳単位/構成の被覆を先に確認する手順をflash-debug Skillへ追加した。対処と再実行確認はresolved。既存警告自体の修正は今回の対象外。
+
+## 2026-10-24 V2のmainマージ検証：手動参照テストの旧契約
+
+対象は`codex/slip-detector-v2`のmainへのマージ。4構成ARMビルド、V2判定、通常/詳細スキーマ、保存・CRC・故障注入・計画一致、XY回帰は成功したが、追加した`run_manual_primary_metadata_tests.py`が`h.recordBytes == (LOG_SCHEMA_PROFILE_LIGHT ? 183U : 220U)`で停止した。製品は現行の170/179 Bで保存しており、補助テストだけが旧SHADOW形式を期待していた。テストのSLIP保存後の参照番号も旧期待0のままだった。
+
+原因は形式変更時の既存対策が主要な保存回帰までに限られ、今回追加実行した手動参照テストの固定値とメタデータ契約を事前照合しなかったこと。製品ソースにマージ元ブランチからの差分はなく、製品を旧形式へ戻していない。
+
+対処はローカルの`tests/manual_primary_metadata_test.c`でレコード長を`LOG_RECORD_SIZE_BYTES`と照合し、元DISTANCEログ2から作ったSLIPの`slipSourceLogNumber`を2と検証すること。形式の固定サイズ66列/170 B・72列/179 Bは独立した`run_log_schema_tests.ps1`で検証する。テストは既存Git除外方針を維持し、変更箇所を本記録へ残す。
+
+再発防止としてflash-debug Skillの実行前へ、追加する補助テストの固定サイズ・必須列・参照番号を現行ソースと照合し、旧契約なら製品ではなくテスト入力・期待を修正する手順を追加した。
+
+確認はファームウェアルートの明示workdir・必要権限付きで`python tests/run_manual_primary_metadata_tests.py`を再実行し、通常/詳細とも実DISTANCE/SLIP/PATH解析、開始時スナップショット、欠落・失敗計画、全自動方式がPASS。ログは`robotrace_v2/build/merge-slip-v2-validation/manual-primary.log`。今回のテスト契約修正はresolved。実走行・割り込み最大時間・検出精度は今回未確認。

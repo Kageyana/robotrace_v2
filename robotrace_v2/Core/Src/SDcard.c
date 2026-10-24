@@ -43,6 +43,8 @@ char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE] = "", formatLog[LOG_FORMAT_BUFFER
 _Static_assert(BUFFER_SIZE_LOG == LOG_BUFFER_SIZE_BYTES, "log buffer size mismatch");
 _Static_assert((BUFFER_SIZE_LOG % LOG_BUFFER_SECTOR_SIZE_BYTES) == 0U, "log buffer must be sector aligned");
 _Static_assert(LOG_RECORD_SIZE_BYTES <= LOG_BUFFER_SIZE_BYTES, "log record must fit in one log buffer");
+_Static_assert(SLIP_LAT_CANDIDATE_LPF_COEF == IMU_ALPHA_LPF_COEF,
+    "lateral candidate LPF must match the applied angular acceleration LPF");
 enum { LOG_READ_RECORD_BYTES = LOG_RECORD_SIZE_BYTES };
 // 列定義はFlashへ一度だけ生成し、停止時に記録部とメタデータの間へ保存する。
 #define LOG_SCHEMA_STORED(type, name, fmt, expr) "S," #type "," #name "," fmt "\n"
@@ -189,10 +191,13 @@ static bool lastPrimaryRouteValid = false;
 static bool runImuCalibrationValid = false;
 static uint16_t runImuCalibrationSamples = 0U;
 static uint16_t runImuCalibrationReadErrors = 0U;
-// 走行開始時の校正値を保持し、停止後の保存時に別走行の値を混ぜない。
+// 校正完了後、走行開始時点の値を保持し、後続走行の再校正から分離する。
 static uint16_t runLineSensorMax[NUM_SENSORS];
 static uint16_t runLineSensorMin[NUM_SENSORS];
 static bool runLineSensorCalibrationValid = false;
+// 手動走行の開始時点で固定した計画元。停止後の解析番号変更をログへ混入させない。
+static int16_t runPrimaryLogNumber = 0;
+static int16_t runSlipSourceLogNumber = 0;
 
 typedef struct
 {
@@ -226,8 +231,8 @@ static uint32_t logReadU32(void);
 static int32_t logReadS32(void);
 static float logReadF32(void);
 
-static void logReadRecord(LogRecord *rec);
-static void logBuildColumns(void);
+static void logReadRecord(LogRecord *rec, uint8_t schemaFormat, uint32_t profile);
+static void logBuildColumns(uint8_t schemaFormat, uint32_t profile);
 static uint32_t logBinarySchema(void);
 static void logConversionNotify(LogConversionStage stage, uint32_t rows);
 static bool readSavedLogNumber(int16_t *outNumber);
@@ -697,6 +702,42 @@ static void logBuildMetadata(void)
 	setLogHeaderStrS("buildDate", BUILD_DATE);
 	setLogHeaderStrS("buildTime", BUILD_TIME);
 	setLogHeaderStrS("branch", GIT_BRANCH);
+	// 正式採用したV2の方式・閾値と、SLIP計画が使用する統計の意味を保存する。
+	setLogHeaderStr("slipDetectorVersion", SLIP_V2_VERSION);
+    setLogHeaderStrS("slipLongPolicy", SLIP_V2_LONG_POLICY);
+	setLogHeaderStrS("slipDetectorMode", "ACTIVE_V2");
+	setLogHeaderStrS("slipLatPolicy", SLIP_V2_LAT_POLICY);
+	setLogHeaderStr("slipPlannerVersion", 2);
+	setLogHeaderStr("slipLatCandidateVersion", SLIP_LAT_CANDIDATE_VERSION);
+	setLogHeaderStrFPrecision("slipLatCandidateOn_mps2", SLIP_LAT_CANDIDATE_ON, 9U);
+	setLogHeaderStrFPrecision("slipLatCandidateOff_mps2", SLIP_LAT_CANDIDATE_OFF, 9U);
+	setLogHeaderStrS("slipLatCandidateFormula", "lpf_neutral_minus_windowed_tangent_X");
+	setLogHeaderStrFPrecision("slipLatCandidateLpf", SLIP_LAT_CANDIDATE_LPF_COEF, 6U);
+	setLogHeaderStrS("slipLatCandidateLpfInit", "first_valid_neutral_reset_on_invalid");
+	setLogHeaderStrS("slipLatCandidateAxes", "Xright_Yforward_CWpositive_unverified");
+	setLogHeaderStrFPrecision("slipLatOffsetX_m", IMU_OFFSET_X_M, 8U);
+	setLogHeaderStrFPrecision("slipLatOffsetY_m", IMU_OFFSET_Y_M, 8U);
+	setLogHeaderStrFPrecision("slipLatAlphaLpf", IMU_ALPHA_LPF_COEF, 6U);
+	setLogHeaderStrS("slipLatAlphaUnit", "rad/s2");
+	setLogHeaderStrS("slipLatTangentUnit", "m/s2");
+	setLogHeaderStr("slipFastMs", SLIP_V2_FAST_MS);
+	setLogHeaderStr("slipSlowMs", SLIP_V2_SLOW_MS);
+	setLogHeaderStr("slipFilterMs", SLIP_V2_FILTER_MS);
+	setLogHeaderStr("slipAccelDelayMs", SLIP_V2_ACCEL_DELAY_MS);
+	setLogHeaderStr("slipGyroDelayMs", SLIP_V2_GYRO_DELAY_MS);
+	setLogHeaderStr("slipYawEncDelayMs", SLIP_V2_ENCODER_YAW_DELAY_MS);
+	setLogHeaderStr("slipOnMs", SLIP_V2_ON_MS);
+	setLogHeaderStr("slipOffMs", SLIP_V2_OFF_MS);
+	setLogHeaderStrFPrecision("slipLongOn_mps2", SLIP_V2_LONG_ON, 9U);
+	setLogHeaderStrFPrecision("slipLongOff_mps2", SLIP_V2_LONG_OFF, 9U);
+	setLogHeaderStrFPrecision("slipLatOn_mps2", SLIP_LAT_CANDIDATE_ON, 9U);
+	setLogHeaderStrFPrecision("slipLatOff_mps2", SLIP_LAT_CANDIDATE_OFF, 9U);
+	setLogHeaderStrFPrecision("slipYawOn_dps", SLIP_V2_YAW_ON_DPS, 9U);
+	setLogHeaderStrFPrecision("slipYawOff_dps", SLIP_V2_YAW_OFF_DPS, 9U);
+	setLogHeaderStrFPrecision("slipYawWidth_m", SLIP_V2_YAW_WIDTH_M, 9U);
+	setLogHeaderStrFPrecision("slipYawOffset_mps", SLIP_V2_YAW_OFFSET_MPS, 9U);
+	setLogHeaderStrFPrecision("slipYawScaleDiff", SLIP_V2_YAW_SCALE_DIFF, 9U);
+	setLogHeaderStrS("slipYawCalibration", "13074-13083_empirical");
 	setLogHeaderStrFPrecision("gyroScaleCoeff", COEFF_DPD, 6U);
 	setLogHeaderStr("imuTempCalibrationValid", imuTempCalibrationValid ? 1 : 0);
 	setLogHeaderStrFPrecision("imuTempCalibrationStart_C", imuTempCalibrationStart_C, 3U);
@@ -748,8 +789,8 @@ static void logBuildMetadata(void)
 	{
 		setLogHeaderStr("autoRunNumber", 0);
 		setLogHeaderStrS("requestedMode", "MANUAL");
-		setLogHeaderStr("primaryLogNumber", 0);
-		setLogHeaderStr("slipSourceLogNumber", 0);
+		setLogHeaderStr("primaryLogNumber", runPrimaryLogNumber);
+		setLogHeaderStr("slipSourceLogNumber", runSlipSourceLogNumber);
 	}
 	// ゴール誤検出調査用。行ログが終了直前で途切れても累積値を確認できる。
 	setLogHeaderStr("sgMarkerAtLogEnd", (int32_t)SGmarker);
@@ -806,6 +847,20 @@ void initLog(void)
 	memcpy(runLineSensorMax, lSensorMax, sizeof(runLineSensorMax));
 	memcpy(runLineSensorMin, lSensorMin, sizeof(runLineSensorMin));
 	runLineSensorCalibrationValid = isLineSensorCalibrationValid();
+	runPrimaryLogNumber = 0;
+	runSlipSourceLogNumber = 0;
+	if (optimalTrace == BOOST_DISTANCE && runMemoryOwner == RUN_MEMORY_DISTANCE &&
+		numPPADarry > 0 && numPPADarry <= OPT_BUFF_SIZE && analyzedNumber > 0)
+	{
+		// SLIPも同じ距離計画を使い、analyzedNumberは元の一次ログ番号を保持する。
+		runPrimaryLogNumber = analyzedNumber;
+		runSlipSourceLogNumber = analyzedSlipSourceNumber;
+	}
+	else if ((optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT) &&
+		runMemoryOwner == RUN_MEMORY_PATH && pathRouteCount() > 1U && pathRouteSourceLog() > 0)
+	{
+		runPrimaryLogNumber = pathRouteSourceLog();
+	}
 	primaryRouteValidation = (PrimaryRouteValidation){false, false, false, 0, 0, 0.0F, 1U};
 	// CSV変換ループの実行回数を走行ごとに正しく制御するため送信カウンタをリセット
 	cntSend = 0;
@@ -854,27 +909,27 @@ void initLog(void)
 // モジュール名 writeLogBufferPuts
 // 処理概要     保存する変数をバッファに転送する
 // 引数         c:8bit変数の数s:16bit変数の数i:32bit変数の数f:float変数の数
-// 戻り値       なし
+// 戻り値       true: バッファへ1記録保存成功、false: 未保存
 /////////////////////////////////////////////////////////////////////
-void writeLogBufferPuts(void)
+bool writeLogBufferPuts(void)
 {
 	if (modeLOG)
 	{
 		if (sd_is_analysis_active())
 		{
-			return;
+			return false;
 		}
 		if (logBufferWriter.writeFailed || logBufferWriter.overflow || cntSend == UINT16_MAX)
 		{
 			if (cntSend == UINT16_MAX) logOverflow = true;
-			return;
+			return false;
 		}
 		// スキーマから固定レコードサイズを算出。
 		if (!logBufferWriterBeginRecord(&logBufferWriter, (uint32_t)LOG_RECORD_SIZE_BYTES))
 		{
 			logOverflow = true;
 			dbg_overflow++;
-			return;
+			return false;
 		}
 
 		// スキーマ順でバイナリ書き込みを展開。
@@ -899,6 +954,7 @@ void writeLogBufferPuts(void)
 		if (logBufferWriterEndRecord(&logBufferWriter))
 		{
 			cntSend++;
+			return true;
 		}
 		else
 		{
@@ -906,6 +962,7 @@ void writeLogBufferPuts(void)
 			dbg_overflow++;
 		}
 	}
+	return false;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -978,12 +1035,13 @@ void endTempFile(void)
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logScanRecords
 // 処理概要     記録のCRCとクロス区間を取得し、保存時は一次経路も検証する
-// 引数         file: 読込ファイル, rows: 行数, live: 走行終了時検証, dataCrc: CRC出力
+// 引数         file: 入力, rows: 行数, live: 終了検証, recordBytes: 記録長[B]
+//              schemaFormat: 現行定義（0）, profile: 通常/詳細, dataCrc: CRC出力
 // 戻り値       true: 読込成功 false: 読込失敗
 /////////////////////////////////////////////////////////////////////
-static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t *dataCrc)
+static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t recordBytes, uint8_t schemaFormat, uint32_t profile, uint32_t *dataCrc)
 {
-	uint8_t log[LOG_SIZE];
+	uint8_t log[LOG_READ_RECORD_BYTES];
 	LogRecord rec;
 	FRESULT fresult;
 	uint16_t j, time, beforeTime = 0, cross_count = 0;
@@ -1009,16 +1067,16 @@ static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t *dataCr
 	if (live) primaryRouteValidation.goalMarkerOnset_p = goalMarkerPulse;
 	for (j = 0; j < rows; j++)
 	{
-		fresult = logReadBuffered(file, log, LOG_SIZE, LOG_BINARY_HEADER_BYTES + (FSIZE_t)rows * LOG_SIZE);
+		fresult = logReadBuffered(file, log, recordBytes, LOG_BINARY_HEADER_BYTES + (FSIZE_t)rows * recordBytes);
 		if (fresult != FR_OK)
 		{
 			printf("f_read error in endLog\r\n");
 			return false;
 		}
-		crc = logBinaryCrcUpdate(crc, log, sizeof(log));
+		crc = logBinaryCrcUpdate(crc, log, recordBytes);
 		if (logProgressCallback != NULL) { conversionWorkDone++; logConversionNotify(LOG_CONVERT_SCAN, (uint32_t)j + 1U); }
 		logaddress = log;
-		logReadRecord(&rec);
+		logReadRecord(&rec, schemaFormat, profile);
 
 		time = rec.cntlog;
 		speed = (int16_t)rec.encCurrentN;
@@ -1191,7 +1249,7 @@ bool endLog(void)
         LOG_BINARY_COLUMNS, LOG_BINARY_DERIVED_VERSION};
 	FSIZE_t dataEnd = LOG_BINARY_HEADER_BYTES + (FSIZE_t)cntSend * LOG_SIZE;
 	if (f_lseek(&fil_W, dataEnd) != FR_OK || f_truncate(&fil_W) != FR_OK ||
-		f_sync(&fil_W) != FR_OK || !logScanRecords(&fil_W, cntSend, true, &savedDataCrc)) goto finish;
+		f_sync(&fil_W) != FR_OK || !logScanRecords(&fil_W, cntSend, true, LOG_SIZE, false, LOG_SCHEMA_PROFILE_LIGHT, &savedDataCrc)) goto finish;
 	logBuildMetadata();
 	header.metadataBytes = (uint32_t)strlen(columnTitle);
 	header.dataCrc = savedDataCrc;
@@ -1349,7 +1407,7 @@ FRESULT logSourceOpenFor(FIL *file, const char *csvName, BYTE mode, LogSourcePur
     if (columnTitle[header.metadataBytes - 1U] != '\n' ||
         memchr(columnTitle, '\0', header.metadataBytes) != NULL ||
         ~logBinaryCrcUpdate(UINT32_MAX, (const uint8_t *)columnTitle, header.metadataBytes) != header.metadataCrc ||
-        !logScanRecords(file, (uint16_t)header.rows, false, &crc) || crc != header.dataCrc ||
+        !logScanRecords(file, (uint16_t)header.rows, false, header.recordBytes, 0U, header.profile, &crc) || crc != header.dataCrc ||
         f_lseek(file, LOG_BINARY_HEADER_BYTES) != FR_OK) goto invalid;
     memset(&binarySource, 0, sizeof(binarySource));
     binarySource.file = file;
@@ -1425,7 +1483,7 @@ char *logSourceGets(char *line, int capacity, FIL *file)
     if (binarySource.headerStage < 2U) {
         if (binarySource.headerStage == 1U) {
             columnTitle[0] = formatLog[0] = '\0';
-            logBuildColumns();
+            logBuildColumns(0U, binarySource.header.profile);
             strncat(columnTitle, "\n", sizeof(columnTitle) - strlen(columnTitle) - 1U);
             strncat(formatLog, "\n", sizeof(formatLog) - strlen(formatLog) - 1U);
         }
@@ -1439,7 +1497,7 @@ char *logSourceGets(char *line, int capacity, FIL *file)
         if (~binarySource.crc != binarySource.header.dataCrc) binarySource.error = FR_INVALID_OBJECT;
         return NULL;
     }
-    uint8_t bytes[LOG_SIZE];
+    uint8_t bytes[LOG_READ_RECORD_BYTES];
     if (binarySource.row == 0U) { LOG_PERF_ADD(fullScans, 1U); }
     FRESULT result = logReadBuffered(file, bytes, binarySource.header.recordBytes,
         LOG_BINARY_HEADER_BYTES + (FSIZE_t)binarySource.header.rows * binarySource.header.recordBytes);
@@ -1447,9 +1505,9 @@ char *logSourceGets(char *line, int capacity, FIL *file)
         binarySource.error = result == FR_OK ? FR_DISK_ERR : result;
         return NULL;
     }
-    binarySource.crc = logBinaryCrcUpdate(binarySource.crc, bytes, sizeof(bytes));
+    binarySource.crc = logBinaryCrcUpdate(binarySource.crc, bytes, binarySource.header.recordBytes);
     logaddress = bytes;
-    logReadRecord(&binarySource.record);
+    logReadRecord(&binarySource.record, 0U, binarySource.header.profile);
     LOG_PERF_BEGIN(processTick);
     logProcessRecord();
     LOG_PERF_END(processMs, processTick);
@@ -1506,8 +1564,8 @@ bool logSourceSlipRow(FIL *file, const char *line, const CourseLogColumnMap *col
     if (!binarySource.rowReady) return false;
     LogRecord *r = &binarySource.record;
     *row = (CourseLogSlipRow){r->courseMarker, (int32_t)r->encTotalOptimal, binarySource.roc,
-        r->targetSpeed, r->optimalIndex, r->slipFlag, r->slipFlagLat};
-    return true;
+        r->targetSpeed, r->optimalIndex, r->slipV2TotalMs, r->slipV2ValidMs, r->slipV2OnLongMs, r->slipV2LatValidMs, r->slipV2OnLatMs, r->slipV2IntervalReason, r->slipV2LatIntervalReason};
+    return courseLogValidateSlipRow(row);
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -2070,26 +2128,29 @@ static float logReadF32(void)
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logReadRecord
 // 処理概要     LOG_FIELD_LISTの順で1レコードを復元する
-// 引数         rec: 復元先のレコード
+// 引数         rec: 復元先, schemaFormat: 現行定義（0）, profile: 1=通常/0=詳細
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-static void logReadRecord(LogRecord *rec)
+static void logReadRecord(LogRecord *rec, uint8_t schemaFormat, uint32_t profile)
 {
+    memset(rec, 0, sizeof(*rec));
 #define LOG_READ_FIELD(type, name, fmt, expr) rec->name = logRead##type();
 #define LOG_READ_SKIP(type, name, fmt, expr)
-	LOG_FIELD_LIST(LOG_READ_FIELD, LOG_READ_SKIP)
+    (void)schemaFormat; (void)profile;
+    LOG_FIELD_LIST(LOG_READ_FIELD, LOG_READ_SKIP)
 #undef LOG_READ_FIELD
 #undef LOG_READ_SKIP
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logBuildColumns
-// 処理概要     LOG_FIELD_LISTからCSVヘッダーとprintf形式を生成する
-// 引数         なし
+// 処理概要     指定スキーマからCSVヘッダーとprintf形式を生成する
+// 引数         schemaFormat: 現行定義（0）, profile: 1=通常/0=詳細
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-static void logBuildColumns(void)
+static void logBuildColumns(uint8_t schemaFormat, uint32_t profile)
 {
 #define LOG_HEADER_FIELD(type, name, fmt, expr) setLogStr(#name, fmt);
-	LOG_FIELD_LIST(LOG_HEADER_FIELD, LOG_HEADER_FIELD)
+    (void)schemaFormat; (void)profile;
+    LOG_FIELD_LIST(LOG_HEADER_FIELD, LOG_HEADER_FIELD)
 #undef LOG_HEADER_FIELD
 }

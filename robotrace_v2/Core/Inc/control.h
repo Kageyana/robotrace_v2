@@ -34,57 +34,6 @@
 
 #define PARAM_UP_STEP 1.02F
 
-// スリップ検出パラメータ（1ms割り込みで使用するのでマクロで管理）
-#define SLIP_WINDOW_SAMPLES		30U    // Δvを取る窓長[サンプル]（リングバッファ長）
-#define SLIP_SAMPLE_PERIOD_S	DEFF_TIME // サンプリング周期[s]（1ms）
-#define SLIP_SPEED_SKIP_MPS		0.1f	// 超低速時に判定をスキップする速度閾値[m/s]
-#define SLIP_MISMATCH_HIGH		10.0f   // [m/s^2]
-#define SLIP_MISMATCH_LOW		8.0f    // [m/s^2]
-// 旋回中だけ上げる閾値
-#define SLIP_MISMATCH_HIGH_TURN		2.2f 	// 係数倍
-#define SLIP_MISMATCH_LOW_TURN		2.2f	// 係数倍
-#define SLIP_HIGH_COUNT_REQ			8U		// 上側しきい値を超え続ける必要サンプル数
-#define SLIP_LOW_COUNT_REQ			6U		// 下側しきい値を下回り続ける必要サンプル数
-#define SLIP_LPF_COEF				0.015f	// スリップ指標に掛ける一次LPF係数
-#define SLIP_LPF_COEF_LAT			0.08f	// Lat指標は速め（~20ms程度を想定）
-#define SLIP_HIGH_COUNT_REQ_LAT		3U		// Lat ONは3ms連続で良い
-#define SLIP_LOW_COUNT_REQ_LAT		5U		// Lat OFFも5ms連続（まずは同じ）
-
-#define SLIP_ACC_BIAS_COEF		0.001f   // ≒ dt/1s（1秒時定数くらい）
-#define SLIP_ACC_LPF_COEF		0.03f    // ≒ 20ms前後のLPF
-
-#define SLIP_GYRO_ON_DPS		250.0f
-#define SLIP_GYRO_OFF_DPS		220.0f
-#define SLIP_GYRO_ON_RADS		(DPS2RADS(SLIP_GYRO_ON_DPS))
-#define SLIP_GYRO_OFF_RADS		(DPS2RADS(SLIP_GYRO_OFF_DPS))
-
-#define SLIP_LAT_HIGH			4.6f   // [m/s^2] 横滑りON
-#define SLIP_LAT_LOW			3.8f   // [m/s^2] 横滑りOFF（ヒステリシス）
-// 横滑り判定を有効にする最小の推定横加速度（encAy=wz*v、小さい旋回やノイズで反応しないため）
-#define SLIP_LAT_ENCAY_MIN		3.0f   // [m/s^2]
-// 横滑りの誤検知抑制用（PWM/電流で惰性を判定）
-#define SLIP_PWM_LAT_COUNT_MIN	150.0f // 横判定カウントを許可する最低PWM合計（LPF後）
-#define SLIP_PWM_COAST_MAX		150.0f // 惰性判定PWM合計（LPF後）
-#define SLIP_ISUM_COAST_MAX		0.12f  // 惰性判定電流合計[A]（LPF後）
-#define SLIP_ISUM_LAT_COUNT_MIN	0.60f  // [A] Lat ON判定に使うLPF後電流和の下限
-#define SLIP_ISUM_LAT_COUNT_N	3U     // [count] iSumが閾値以上である連続サンプル数（短スパイク除去）
-#define SLIP_LAT_CLEAR_COEF		0.10f  // 惰性時に横指標を0へ戻す係数（SLIP_LPF_COEFより強め）
-#define SLIP_PWM_LPF_COEF		0.02f  // PWM合計のLPF係数
-
-#define SLIP_CUR_ENABLE            1
-#define SLIP_CUR_LPF_COEF          0.05f   // 電流LPF（0〜1）
-#define SLIP_CUR_BASE_A            0.60f   // ここまでは補正しない基準電流[A]
-#define SLIP_CUR_K                 0.35f   // 補正ゲイン [1/A]
-#define SLIP_CUR_MAX_SCALE         1.25f   // 閾値スケール上限
-#define SLIP_CUR_MIN_A             0.10f   // ほぼ惰性/停止時は補正を無効化
-
-// スリップ距離補正パラメータ
-#define SLIP_DIST_CORRECTION_ENABLE	0		// encTotalOptimal補正の有効/無効
-#define SLIP_DIST_MIN_SCALE			0.8f	// 要調整
-#define SLIP_DIST_MIN_SCALE_LAT		0.9f	// 要調整
-#define SLIP_DIST_LPF_COEF_DOWN		0.15f	// 悪化追従
-#define SLIP_DIST_LPF_COEF_UP		0.06f	// 回復追従
-
 // ゴール
 #define COUNT_GOAL 6 // ゴールマーカーを読む回数
 
@@ -172,25 +121,7 @@ void setEncoderVal(void);
 void writeTgtspeeds(void);
 void readTgtspeeds(void);
 void checkCrossLine(void);
-void updateSlipDetection(void);
 void Control_ApplyMarkerCorrection_p(int32_t diff_p);
-float getSlipIndicatorRaw(void);
-float getSlipIndicatorFiltered(void);
-bool getSlipFlag(void);
-bool getSlipFlagLat(void);
-bool getSlipLatEnabled(void);
-bool getSlipLatOnCountEnabled(void);
-uint16_t getSlipISumOkCount(void);
-float getSlipPwmSumF(void);
-float getSlipISumF(void);
-float getSlipEncAyF(void);
-float getSlipImuAyF(void);
-// スリップ距離補正（パルス版）
 int32_t Control_GetEncCurrentCorr_p(void);
-int32_t Control_GetDistEncRaw_p(void);
-int32_t Control_GetDistCorr_p(void);
-int32_t Control_GetDistSlipLoss_p(void);
-float Control_GetSlipDistScale(void);
-float Control_GetSlipDistScaleRaw(void);
 
 #endif // CONTROL_H_

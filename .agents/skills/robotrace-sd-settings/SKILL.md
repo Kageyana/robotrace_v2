@@ -9,6 +9,17 @@ description: robotrace_v2のSDカード内設定ファイルを読む、書く�
 
 最初のコマンドの前に [共通事前確認](../../../doc/skill-execution-preflight.md) を読み、パス・workdir・権限・実行環境を確定する。SD設定・保存・復旧・CSV形式を扱うときは [分野別の再発防止](references/failure-prevention.md) も読む。関連する失敗記録は最新追記まで確認し、既知の失敗条件を初回操作から回避する。
 
+
+ログ形式変更のPC変換器検証では、`C:/tool/AutoCopyCsvFromSd/RlogToCsv.exe`もGCC生成ホストexeとして最初の起動からrequire_escalatedを使用する。今回の解析フォルダ内の合成bin/出力CSVに限定し、Python subprocessのstdout=PIPE/stderr=STDOUT等で出力を取得、終了コード0・出力実在を確認してから全CRC/列/数値を照合する。PowerShellのStandardOutputEncodingエラーだけで原因を決めず、直接取得した起動エラーを確認する。詳細は[PC変換器起動の追記](../../../doc/失敗事例/2026-10-11-bmi088-forward-y-sign.md)。
+
+## 2026-10-21：V2正式採用後の現行仕様
+
+ユーザー指示によりV1互換・SHADOW切替を削除した。縦はFast単独10/8m/s²・3/5ms、横はLatCandidate版5の6.7/4.5m/s²・3/5ms・LPF0.8を使用する（初回ON6.5、2026-10-24の既存変更でON6.7）。保存検出器版4、`slipDetectorMode=ACTIVE_V2`、`slipLatPolicy=matched_candidate_v5`。通常66列/170B、詳細72列/179B（重複整理前の正式採用ログ13571～13577は70列/181B）。旧slipFlag/slipFlagLatと旧詳細診断9列は存在しない。slipV2Flagsの横bitとslipV2Lat/PeakLat/OnLatMsも採用横と同じ意味へ変更した。以下のSHADOW・旧サイズ・旧制御維持の記述は導入時の履歴として扱い、現行は[正式採用とSLIP走行](../../../doc/slip-v2-active.md)を優先する。
+
+横ログは`slipV2Lat/Flags横bit/PeakLat/OnLatMs`へ統一し、`slipV2LatCandidate*`列を廃止した。横独自の有効性は`slipV2LatValid/Reason/ValidMs/IntervalReason`へ改名し、横ON率は`slipV2OnLatMs / slipV2LatValidMs`を使う。横の理由256・再充填で共通有効性と異なるため共通ValidMsへ代用しない。SLIP読込も新列名だけを使い、更新後は新しい一次とDISTANCEを取得する。判定式・閾値・検出器版4・計画版2は維持し、列定義CRCで保存形式を識別する。
+
+SLIPは同じ一次参照・正常ゴールのDISTANCEログから軸別の有効ms/ON msを集計する。不正・飽和・未観測を滑りなしへ置換しない。毎回一次計画から再生成し、DISTANCE→SLIPのオートスタート接続を確認する。未検証の滑り距離推定は制御へ入れない。最初の新形式実機ログと10本以上の実走行再現性は別に確認する。
+
 ## Overview
 
 Use this skill when editing or reviewing SD-card setting file behavior. Treat `AGENTS.md` as the source for high-level precedence and safety policy.
@@ -122,6 +133,12 @@ File: `lsval.txt`
 - New CSV metadata includes `binaryLogNumber`, `binaryDataCrc`, and `binarySchema`; CRC values use signed 32-bit text but represent CRC bit patterns. CSV data columns and the existing big-endian record encoding are unchanged.
 - Run `robotrace_v2/tests/run_log_deferred_tests.ps1` for both profiles and the existing PC/schema/XY tests. Check actual on-device stop/save/recovery/progress behavior before claiming hardware validation.
 
+### Slip diagnostic schema compatibility
+
+- On 2026-10-14 the user requested restoring light to 72 columns/183 B; debug retains 87 columns/220 B. SHADOW and lateral-candidate diagnostics are again recorded in both profiles. The temporary light43/108 B logs remain readable without adding missing diagnostics. Keep old field lists immutable: pre-SHADOW light108/debug145 B in `log_schema_legacy.h`; initial SHADOW light157/debug194 B in `log_schema_shadow_v2.h`; lateral candidate light183/debug220 B in `log_schema_candidate_v1.h`.
+- Identify profile, schema CRC and record size as one tuple; never infer a format from record size alone. All six supported formats are readable by either current build profile. Current light72/debug87 reuse the corresponding frozen lateral-candidate schemas because their names, types, order and meaning match. Allocate read buffers for at least 220 B even in the 183 B light build.
+- Converting old logs preserves their original columns. Missing diagnostics mean unrecorded. Reject unknown schema, CRC/size/profile errors and retain originals until CSV commit succeeds. Run `tests/run_slip_log_compat_tests.ps1` in addition to existing storage tests; it exercises both reader profiles and all three historical generations, plans, recovery and failure retention.
+
 ### Analysis and Log Numbers
 
 File: `analysis.txt`
@@ -158,3 +175,7 @@ File: `boost_%05d.csv`
 - Repair corrupted files by overwriting with defaults or valid values.
 - Prohibit running if `lsval.txt` is corrupt.
 - Parser changes must preserve partial reflection, out-of-range defaulting, repair behavior, and `lsval.txt` run prohibition.
+
+## CSV header generation validation
+
+When adding a column, test the actual `logBuildColumns()`/`setLogStr()` path in both profiles. Compare all column names and separators with the schema and check the numeric row count; macro-only schema counts or substring checks are insufficient. The former 30-byte name buffer truncated the 33-character candidate interval-reason name and removed its separator in logs 13130–13144. Append full names and separators directly to the sufficiently sized aggregate buffer. This fix preserves binary schema/record length. Keep affected originals and restore only explicitly validated known-schema copies as described by the log-analysis skill; confirm the first real log after any future format fix. For this fix, all 11 physical CSVs 13145–13155 have the complete 72-column header and matching data rows; detailed physical CSV and boot recovery were not independently revalidated in this batch.

@@ -34,6 +34,7 @@ int16_t pathedMarker = 0;
 float boostSpeed;
 int32_t DistanceOptimal = 0; // 2次走行用の目標走行距離[pulse]
 int16_t analyzedNumber = 0;	 // 前回解析したログ番号
+int16_t analyzedSlipSourceNumber = 0; // 現在のSLIP計画へ反映したDISTANCEログ番号（通常計画は0）
 int32_t encTotalOptimal = 0; // 2次走行用の補正済み走行距離[pulse]
 float xydegz = 0;
 static int64_t xyPreviousTotalPulseSum = 0;
@@ -672,6 +673,7 @@ cleanup_read:
 		// 正常終了時だけ解析済み情報を更新する
 		saveLogNumber(logNumber);
 		analyzedNumber = logNumber;
+		analyzedSlipSourceNumber = 0;
 
 		// 距離基準2次走行モードを設定する
 		optimalTrace = BOOST_DISTANCE;
@@ -703,26 +705,35 @@ int16_t readLogDistance(int logNumber)
 // 戻り値       true: 解析成功, false: 解析失敗または値が範囲外
 /////////////////////////////////////////////////////////////////////
 static bool parseSecondLogLine(FIL *file, const char *line, const SecondLogColumnMap *map,
-		uint8_t *courseMarker, int32_t *encTotal, int16_t *roc,
-		float *targetSpeedLog, int16_t *optimalIdx, uint8_t *slipLong, uint8_t *slipLat)
+        CourseLogSlipRow *row)
 {
-	CourseLogSlipRow row;
-	if (!logSourceSlipRow(file, line, map, &row) ||
-		row.courseMarker < 0 || row.courseMarker > UINT8_MAX ||
-		row.optimalIndex < INT16_MIN || row.optimalIndex > INT16_MAX ||
-		row.slipFlag < 0 || row.slipFlag > UINT8_MAX ||
-		row.slipFlagLat < 0 || row.slipFlagLat > UINT8_MAX)
-	{
-		return false;
-	}
-	*courseMarker = (uint8_t)row.courseMarker;
-	*encTotal = row.encTotalOptimal;
-	*roc = (int16_t)lroundf(row.ROC);
-	*targetSpeedLog = row.targetSpeed;
-	*optimalIdx = (int16_t)row.optimalIndex;
-	*slipLong = (uint8_t)row.slipFlag;
-	*slipLat = (uint8_t)row.slipFlagLat;
-	return true;
+    return logSourceSlipRow(file, line, map, row) && courseLogValidateSlipRow(row);
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 readSlipMetadataInt
+// 処理概要     SLIP解析元のメタデータから整数相当の値を取得する
+// 引数         line: メタデータ行, key: 項目名, value: 取得先
+// 戻り値       true: 正常 false: 欠落・重複・不正値
+/////////////////////////////////////////////////////////////////////
+static bool readSlipMetadataInt(const char *line, const char *key, int32_t *value)
+{
+    size_t length = strlen(key);
+    bool found = false;
+    for (const char *field = line; field != NULL && *field != '\0'; ) {
+        if (strncmp(field, key, length) == 0 && field[length] == '=') {
+            char *end;
+            double v = strtod(field + length + 1U, &end);
+            if (found || end == field + length + 1U ||
+                (*end != ',' && *end != '\r' && *end != '\n' && *end != '\0') ||
+                !isfinite(v) || v < INT32_MIN || v > INT32_MAX || v != trunc(v)) return false;
+            *value = (int32_t)v;
+            found = true;
+        }
+        const char *next = strchr(field, ',');
+        field = next != NULL ? next + 1 : NULL;
+    }
+    return found;
 }
 static void logReadSlipIoError(int logNumber, UINT lineNo, FIL *fil, const char *tag)
 {
@@ -752,22 +763,9 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
 	{
 		return -4;
 	}
-	// 直前DISTANCE走行の計画が同じ一次ログを元にしていれば再利用する。
-	// 計画が無い場合だけ一次ログを読み直す。
-	if (runMemoryOwner == RUN_MEMORY_DISTANCE && optimalTrace == BOOST_DISTANCE && analyzedNumber == baseLogNumber &&
-		numPPADarry > 0 && numPPADarry <= OPT_BUFF_SIZE)
-	{
-		if (progress) progress("Base cached", (uint32_t)numPPADarry);
-	}
-	else
-	{
-		if (progress) progress("Base", 0U);
-		int16_t baseRet = readLogDistanceProgress(baseLogNumber, progress);
-		if (baseRet < 0)
-		{
-			return baseRet;
-		}
-	}
+    if (progress) progress("Base", 0U);
+    int16_t baseRet = readLogDistanceProgress(baseLogNumber, progress);
+    if (baseRet < 0) return baseRet;
 	int16_t baseCount = numPPADarry;
 	if (baseCount <= 0)
 	{
@@ -779,6 +777,7 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
 	FRESULT fresult;
 	char fileName[16];
 	int16_t ret = 0;
+	int32_t expectedRows = 0;
 	int16_t maxOptimalIndex = -1; // open失敗でcleanupへ進んでも初期化済みにする。
 	bool lock_acquired = sd_fatfs_lock(200);
 	bool fileOpened = false;
@@ -792,12 +791,13 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
 	sd_set_analysis_active(true);
 
 	// 解析用配列を静的領域に確保し、スタック使用量を抑える
-	uint16_t *sampleCnt = runMemory.distance.slip.sampleCnt;
+	uint16_t *validLongMs = runMemory.distance.slip.validLongMs;
+	uint16_t *validLatMs = runMemory.distance.slip.validLatMs;
 	float *v2Max = runMemory.distance.slip.v2Max;
 	float *rocAbsSum = runMemory.distance.slip.rocAbsSum;
 	uint16_t *rocCnt = runMemory.distance.slip.rocCnt;
-	uint16_t *slipLongCnt = runMemory.distance.slip.slipLongCnt;
-	uint16_t *slipLatCnt = runMemory.distance.slip.slipLatCnt;
+	uint16_t *longOnMs = runMemory.distance.slip.longOnMs;
+	uint16_t *latOnMs = runMemory.distance.slip.latOnMs;
 	float *risk = runMemory.distance.slip.risk;
 	float *riskExpanded = runMemory.distance.slip.riskExpanded;
 	float *v3 = runMemory.distance.slip.v3;
@@ -824,12 +824,13 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
 	}
 	fileOpened = true;
 
-	memset(sampleCnt, 0, sizeof(runMemory.distance.slip.sampleCnt));
+	memset(validLongMs, 0, sizeof(runMemory.distance.slip.validLongMs));
+	memset(validLatMs, 0, sizeof(runMemory.distance.slip.validLatMs));
 	memset(v2Max, 0, sizeof(runMemory.distance.slip.v2Max));
 	memset(rocAbsSum, 0, sizeof(runMemory.distance.slip.rocAbsSum));
 	memset(rocCnt, 0, sizeof(runMemory.distance.slip.rocCnt));
-	memset(slipLongCnt, 0, sizeof(runMemory.distance.slip.slipLongCnt));
-	memset(slipLatCnt, 0, sizeof(runMemory.distance.slip.slipLatCnt));
+	memset(longOnMs, 0, sizeof(runMemory.distance.slip.longOnMs));
+	memset(latOnMs, 0, sizeof(runMemory.distance.slip.latOnMs));
 	memset(risk, 0, sizeof(runMemory.distance.slip.risk));
 	memset(riskExpanded, 0, sizeof(runMemory.distance.slip.riskExpanded));
 	memset(v3, 0, sizeof(runMemory.distance.slip.v3));
@@ -859,6 +860,17 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
 		}
 		goto cleanup;
 	}
+    // 正常終了した同じ一次参照のDISTANCEログだけを解析元とする。
+    int32_t sourceMode, sourcePrimary, sourceSlip, sourceStop, sourceGoal;
+    if (!readSlipMetadataInt(header, "optimalTrace", &sourceMode) || sourceMode != BOOST_DISTANCE ||
+        !readSlipMetadataInt(header, "primaryLogNumber", &sourcePrimary) || sourcePrimary != baseLogNumber ||
+        !readSlipMetadataInt(header, "slipSourceLogNumber", &sourceSlip) || sourceSlip != 0 ||
+        !readSlipMetadataInt(header, "emcStop", &sourceStop) || sourceStop != 0 ||
+        !readSlipMetadataInt(header, "sgMarkerAtLogEnd", &sourceGoal) || sourceGoal != COUNT_GOAL ||
+        !readSlipMetadataInt(header, "logExpectedRows", &expectedRows) || expectedRows <= 0 || expectedRows > (int32_t)UINT16_MAX) {
+        ret = -7;
+        goto cleanup;
+    }
 	if (!parseSecondLogHeader((const char *)header, &secondLogColumns) &&
 		(logSourceGets(log, log_len, &fil_Read) == NULL ||
 		 !parseSecondLogHeader((const char *)log, &secondLogColumns)))
@@ -868,6 +880,7 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
 	}
 
 	UINT lineNo = 0;
+	uint32_t observedLongMs = 0U, observedLatMs = 0U;
 	bool fgets_null = false;
 	if (progress) progress("Slip read", 0U);
 
@@ -888,42 +901,28 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
 			break;
 		}
 
-		uint8_t courseMarker = 0;
-		int32_t encTotal = 0;
-		int16_t roc = 0;
-		float targetSpeedLog = 0.0f;
-		int16_t optimalIdx = 0;
-		uint8_t slipLong = 0;
-		uint8_t slipLat = 0;
-
-		if (!parseSecondLogLine(&fil_Read, (const char *)log, &secondLogColumns,
-				&courseMarker, &encTotal, &roc,
-				&targetSpeedLog, &optimalIdx, &slipLong, &slipLat))
-		{
-			continue;	// 解析できない行を読み飛ばす
-		}
-		if (optimalIdx < 0 || optimalIdx >= baseCount)
-		{
-			ret = -1;	// 解析用配列の有効範囲外
-			break;
-		}
-
-		// 区間ごとのサンプル数、曲率半径の絶対値、スリップ回数を集計する
-		(void)courseMarker;
-		(void)targetSpeedLog;
-		(void)encTotal;
-
-		sampleCnt[optimalIdx]++;
-		rocAbsSum[optimalIdx] += fabsf((float)roc);
-		rocCnt[optimalIdx]++;
-		if (slipLong > 0)
-		{
-			slipLongCnt[optimalIdx]++;
-		}
-		if (slipLat > 0)
-		{
-			slipLatCnt[optimalIdx]++;
-		}
+        CourseLogSlipRow row;
+        if (!parseSecondLogLine(&fil_Read, (const char *)log, &secondLogColumns, &row)) {
+            ret = -7; // 不正行を滑りなしとして読み飛ばさない。
+            break;
+        }
+        int16_t optimalIdx = (int16_t)row.optimalIndex;
+        if (optimalIdx >= baseCount) { ret = -1; break; }
+        // 混合有効区間はON位置が不明なので、その軸のリスク集計には含めない。
+        uint16_t longValid = row.slipV2IntervalReason == 0 && row.slipV2ValidMs == row.slipV2TotalMs ? (uint16_t)row.slipV2ValidMs : 0U;
+        uint16_t latValid = row.slipV2LatIntervalReason == 0 && row.slipV2LatValidMs == row.slipV2TotalMs ? (uint16_t)row.slipV2LatValidMs : 0U;
+        if (longValid > UINT16_MAX - validLongMs[optimalIdx] || latValid > UINT16_MAX - validLatMs[optimalIdx] || rocCnt[optimalIdx] == UINT16_MAX) {
+            ret = -7; // 停止中の解析配列でも時間カウンタの折返しを許さない。
+            break;
+        }
+        validLongMs[optimalIdx] += longValid;
+        validLatMs[optimalIdx] += latValid;
+        observedLongMs += longValid;
+        observedLatMs += latValid;
+        if (longValid != 0U) longOnMs[optimalIdx] += (uint16_t)row.slipV2OnLongMs;
+        if (latValid != 0U) latOnMs[optimalIdx] += (uint16_t)row.slipV2OnLatMs;
+        rocAbsSum[optimalIdx] += fabsf(row.ROC);
+        rocCnt[optimalIdx]++;
 
 		if (optimalIdx > maxOptimalIndex)
 		{
@@ -942,6 +941,8 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
 			logReadSlipIoError(slipLogNumber, lineNo, &fil_Read, "io_fail");
 		}
 	}
+
+    if (ret == 0 && ((int32_t)lineNo != expectedRows || observedLongMs == 0U || observedLatMs == 0U)) ret = -7;
 
 	if (ret == -5 && !retried)
 	{
@@ -981,7 +982,7 @@ cleanup:
 	// サンプルのない区間の曲率半径集計を直前の値で補う
 	for (int16_t i = 0; i <= maxOptimalIndex; i++)
 	{
-		if (sampleCnt[i] == 0 && i > 0)
+		if (rocCnt[i] == 0 && i > 0)
 		{
 			rocAbsSum[i] = rocAbsSum[i - 1];	// 平均曲率半径の計算用に直前の合計値を引き継ぐ
 			rocCnt[i] = rocCnt[i - 1];			// 平均曲率半径の計算用に直前の件数を引き継ぐ
@@ -991,15 +992,15 @@ cleanup:
 	// スリップ割合からリスク値（0.0～1.0）を求める
 	for (int16_t i = 0; i <= maxOptimalIndex; i++)
 	{
-		if (sampleCnt[i] == 0)
+		if (validLongMs[i] == 0 && validLatMs[i] == 0)
 		{
 			risk[i] = 0.0f;
 			continue;
 		}
-		uint16_t longCnt = (slipLongCnt[i] >= CA_SLIP_CNT_MIN) ? slipLongCnt[i] : 0;
-		uint16_t latCnt = (slipLatCnt[i] >= CA_SLIP_CNT_MIN) ? slipLatCnt[i] : 0;
-		float fracLong = (float)longCnt / (float)sampleCnt[i];
-		float fracLat = (float)latCnt / (float)sampleCnt[i];
+		uint16_t longCnt = (longOnMs[i] >= CA_SLIP_ON_MIN_MS) ? longOnMs[i] : 0;
+		uint16_t latCnt = (latOnMs[i] >= CA_SLIP_ON_MIN_MS) ? latOnMs[i] : 0;
+		float fracLong = validLongMs[i] != 0U ? (float)longCnt / (float)validLongMs[i] : 0.0F;
+		float fracLat = validLatMs[i] != 0U ? (float)latCnt / (float)validLatMs[i] : 0.0F;
 		float riskLong = fracLong / CA_SLIP_FRAC_FULL;
 		float riskLat = fracLat / CA_SLIP_FRAC_FULL;
 		if (riskLong > 1.0f)
@@ -1059,11 +1060,11 @@ cleanup:
 		if (riskExpanded[i] > 0.0f)
 		{
 			float scale = 1.0f - (CA_SLIP_DOWN_RISK * riskExpanded[i]);
-			if (slipLongCnt[i] >= CA_SLIP_CNT_MIN)
+			if (longOnMs[i] >= CA_SLIP_ON_MIN_MS)
 			{
 				scale -= CA_SLIP_DOWN_LONG_EXTRA;
 			}
-			if (slipLatCnt[i] >= CA_SLIP_CNT_MIN)
+			if (latOnMs[i] >= CA_SLIP_ON_MIN_MS)
 			{
 				scale -= CA_SLIP_DOWN_LAT_EXTRA;
 			}
@@ -1077,8 +1078,9 @@ cleanup:
 		{
 			float avgRoc = (rocCnt[i] > 0) ? (rocAbsSum[i] / (float)rocCnt[i]) : ROC_STRAIGHT_TH;
 			float up = (avgRoc >= ROC_STRAIGHT_TH) ? CA_SLIP_UP_STRAIGHT : CA_SLIP_UP_CURVE;
-			v3[i] = v * (1.0f + up);
+			v3[i] = (validLongMs[i] != 0U && validLatMs[i] != 0U) ? v * (1.0f + up) : v;
 		}
+		v3[i] = fminf(fmaxf(v3[i], 0.0F), CA_SLIP_MAX_SPEED_MPS);
 	}
 
 	// 前後方向の走査で、元の速度計画の速度変化量以内に制限する
@@ -1144,6 +1146,7 @@ cleanup:
 
 	// 距離基準2次走行モードを設定する
 	optimalTrace = BOOST_DISTANCE;
+	analyzedSlipSourceNumber = slipLogNumber;
 
 	return ret;
 }

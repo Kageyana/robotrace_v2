@@ -63,6 +63,12 @@ bool IMU_CalibrationReady(void);
 uint16_t IMU_CalibrationSamples(void);
 uint16_t IMU_CalibrationReadErrors(void);
 float IMU_GetLinearAccelerationXMps2(void);
+// 同じ1ms処理で適用した接線項の診断用スナップショット。
+typedef struct {
+    float alphaRadps2, appliedXMps2;
+    bool valid;
+} ImuTangentialSample;
+ImuTangentialSample IMU_GetTangentialSample(void);
 float IMU_GetLinearAccelerationYMps2(void);
 float IMU_GetLinearAccelerationZMps2(void);
 float IMU_GetForwardAccelerationMps2(void);

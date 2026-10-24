@@ -123,24 +123,24 @@ Gitのネットワーク制限とOAuth workflow権限不足は異なる原因と
 | firmware | [2026-10-11-bmi088-forward-y-sign.md](失敗事例/2026-10-11-bmi088-forward-y-sign.md) | H |
 | firmware | [2026-10-11-sd-pending-csv-recovery.md](失敗事例/2026-10-11-sd-pending-csv-recovery.md) | S |
 | firmware | [2026-10-11-yaw-fusion-reference-and-convergence.md](失敗事例/2026-10-11-yaw-fusion-reference-and-convergence.md) | A |
-| firmware | [2026-10-12-csv-long-column-name-truncation.md](https://github.com/Kageyana/robotrace_v2/blob/e9903ca/doc/%E5%A4%B1%E6%95%97%E4%BA%8B%E4%BE%8B/2026-10-12-csv-long-column-name-truncation.md) | A, S |
+| firmware | [2026-10-12-csv-long-column-name-truncation.md](失敗事例/2026-10-12-csv-long-column-name-truncation.md) | A, S |
 | firmware | [2026-10-12-fatfs-exfat-uninitialized-fragment.md](失敗事例/2026-10-12-fatfs-exfat-uninitialized-fragment.md) | S |
-| firmware | [2026-10-12-geometry-source-preflight.md](https://github.com/Kageyana/robotrace_v2/blob/e9903ca/doc/%E5%A4%B1%E6%95%97%E4%BA%8B%E4%BE%8B/2026-10-12-geometry-source-preflight.md) | H |
-| firmware | [2026-10-12-host-float-snapshot-comparison.md](https://github.com/Kageyana/robotrace_v2/blob/e9903ca/doc/%E5%A4%B1%E6%95%97%E4%BA%8B%E4%BE%8B/2026-10-12-host-float-snapshot-comparison.md) | F |
+| firmware | [2026-10-12-geometry-source-preflight.md](失敗事例/2026-10-12-geometry-source-preflight.md) | H |
+| firmware | [2026-10-12-host-float-snapshot-comparison.md](失敗事例/2026-10-12-host-float-snapshot-comparison.md) | F |
 | firmware | [2026-10-12-sd-csv-recovery-disk-full.md](失敗事例/2026-10-12-sd-csv-recovery-disk-full.md) | S |
-| firmware | [2026-10-12-slip-current-readiness-assumption.md](https://github.com/Kageyana/robotrace_v2/blob/e9903ca/doc/%E5%A4%B1%E6%95%97%E4%BA%8B%E4%BE%8B/2026-10-12-slip-current-readiness-assumption.md) | T |
-| firmware | [2026-10-12-slip-lateral-tangential-contamination.md](https://github.com/Kageyana/robotrace_v2/blob/e9903ca/doc/%E5%A4%B1%E6%95%97%E4%BA%8B%E4%BE%8B/2026-10-12-slip-lateral-tangential-contamination.md) | T, H |
+| firmware | [2026-10-12-slip-current-readiness-assumption.md](失敗事例/2026-10-12-slip-current-readiness-assumption.md) | T |
+| firmware | [2026-10-12-slip-lateral-tangential-contamination.md](失敗事例/2026-10-12-slip-lateral-tangential-contamination.md) | T, H |
 | firmware | [2026-10-13-adc-host-fixture-contract.md](失敗事例/2026-10-13-adc-host-fixture-contract.md) | H, F |
 | firmware | [2026-10-13-line-sensor-periodic-skip-starvation.md](失敗事例/2026-10-13-line-sensor-periodic-skip-starvation.md) | H |
 | firmware | [2026-10-13-stlink-adc-debug-observation.md](失敗事例/2026-10-13-stlink-adc-debug-observation.md) | F |
-| firmware | [2026-10-14-empty-analysis-stratum.md](https://github.com/Kageyana/robotrace_v2/blob/e9903ca/doc/%E5%A4%B1%E6%95%97%E4%BA%8B%E4%BE%8B/2026-10-14-empty-analysis-stratum.md) | A |
+| firmware | [2026-10-14-empty-analysis-stratum.md](失敗事例/2026-10-14-empty-analysis-stratum.md) | A |
 | firmware | [2026-10-14-line-omega-low-gain-curve-understeer.md](失敗事例/2026-10-14-line-omega-low-gain-curve-understeer.md) | T |
 | firmware | [2026-10-14-log-corrected-distance-monotonic-assumption.md](失敗事例/2026-10-14-log-corrected-distance-monotonic-assumption.md) | A |
-| firmware | [2026-10-14-log-discovery-nonnumeric-csv.md](https://github.com/Kageyana/robotrace_v2/blob/e9903ca/doc/%E5%A4%B1%E6%95%97%E4%BA%8B%E4%BE%8B/2026-10-14-log-discovery-nonnumeric-csv.md) | A |
-| firmware | [2026-10-14-log-metadata-integer-decimal-format.md](https://github.com/Kageyana/robotrace_v2/blob/e9903ca/doc/%E5%A4%B1%E6%95%97%E4%BA%8B%E4%BE%8B/2026-10-14-log-metadata-integer-decimal-format.md) | A |
-| firmware | [2026-10-14-right-marker-goal-assumption.md](https://github.com/Kageyana/robotrace_v2/blob/e9903ca/doc/%E5%A4%B1%E6%95%97%E4%BA%8B%E4%BE%8B/2026-10-14-right-marker-goal-assumption.md) | A |
-| firmware | [2026-10-14-slip-postprocessing-gain-assumption.md](https://github.com/Kageyana/robotrace_v2/blob/e9903ca/doc/%E5%A4%B1%E6%95%97%E4%BA%8B%E4%BE%8B/2026-10-14-slip-postprocessing-gain-assumption.md) | T |
-| firmware | [2026-10-14-straight-wobble-selection-bias.md](https://github.com/Kageyana/robotrace_v2/blob/e9903ca/doc/%E5%A4%B1%E6%95%97%E4%BA%8B%E4%BE%8B/2026-10-14-straight-wobble-selection-bias.md) | A |
+| firmware | [2026-10-14-log-discovery-nonnumeric-csv.md](失敗事例/2026-10-14-log-discovery-nonnumeric-csv.md) | A |
+| firmware | [2026-10-14-log-metadata-integer-decimal-format.md](失敗事例/2026-10-14-log-metadata-integer-decimal-format.md) | A |
+| firmware | [2026-10-14-right-marker-goal-assumption.md](失敗事例/2026-10-14-right-marker-goal-assumption.md) | A |
+| firmware | [2026-10-14-slip-postprocessing-gain-assumption.md](失敗事例/2026-10-14-slip-postprocessing-gain-assumption.md) | T |
+| firmware | [2026-10-14-straight-wobble-selection-bias.md](失敗事例/2026-10-14-straight-wobble-selection-bias.md) | A |
 | viewer | [2026-10-01-log-viewer-git-dubious-ownership.md](F:/Dropbox/Document/robotrace/Log/log/doc/失敗事例/2026-10-01-log-viewer-git-dubious-ownership.md) | V |
 | viewer | [2026-10-01-matlab-uiaxes-currentpoint-readonly.md](F:/Dropbox/Document/robotrace/Log/log/doc/失敗事例/2026-10-01-matlab-uiaxes-currentpoint-readonly.md) | V |
 | viewer | [2026-10-01-matlab-viewer-validation-types.md](F:/Dropbox/Document/robotrace/Log/log/doc/失敗事例/2026-10-01-matlab-viewer-validation-types.md) | V |

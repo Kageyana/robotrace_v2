@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "timer.h"
+#include "slipDetection.h"
 #include "BMI088.h"
 #include "PIDcontrol.h"
 #include "battery.h"
@@ -22,6 +23,29 @@ int32_t cnt10 = 0;
 int32_t encPulse5ms = 0; // 5ms間のエンコーダパルスを累積
 float bootTime;
 static volatile bool logWriteReq = false;
+static uint32_t slipGyroTime, slipAccelTime, slipCurrentTime, slipCurrentSequence;
+static bool slipWasRunning, slipCurrentCalibrated;
+/////////////////////////////////////////////////////////////////////
+// モジュール名 updateSlipCurrentSample
+// 処理概要     10ms電流取得の更新番号と校正完了を診断用に追跡する
+// 引数         nowMs: 制御時刻[ms]
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void updateSlipCurrentSample(uint32_t nowMs)
+{
+    if (calibrateMotorCurrent) {
+        slipCurrentCalibrated = false;
+        calibrationMotorCurrent();
+        if (!calibrateMotorCurrent) {
+            slipCurrentCalibrated = true;
+            slipCurrentSequence = 0U; // 校正後の新しい取得まで有効にしない。
+        }
+    } else {
+        getMotorCurrent();
+        slipCurrentTime = nowMs;
+        ++slipCurrentSequence;
+    }
+}
 #if defined(ROBOTRACE_ISR_TIMING) && ROBOTRACE_ISR_TIMING
 volatile IsrTimingStats isrTimingStats[ISR_TIMING_MODE_COUNT] = {0};
 _Static_assert(BOOST_NONE == 0 && BOOST_MARKER == 1 && BOOST_DISTANCE == 2 &&
@@ -83,19 +107,17 @@ void Interrupt1ms(void)
 	encPulse5ms += encCurrentN; // 5ms間のエンコーダパルスを累積
 
 	// IMU処理
+	bool slipGyroOk = false, slipAccelOk = false;
 	if (initIMU)
 	{
 		if (!calibratIMU)
 		{
-			BMI088getGyro();	// 角速度取得
-			BMI088getAccele();	// 加速度取得
+			slipGyroOk = BMI088getGyro();	// 角速度取得
+			if (slipGyroOk) slipGyroTime = cntRun;
+			slipAccelOk = BMI088getAccele();	// 加速度取得
+			if (slipAccelOk) slipAccelTime = cntRun;
 			calcDegrees();		// コンプリメンタリフィルタで角度算出
 			calcVelocity();		// 加速度から速度算出
-			// スリップ距離補正（パルス版）
-			if (patternTrace >= 12 && patternTrace < 100)
-			{
-				updateSlipDetection(); // スリップ検出（Δv比率とフラグ更新を1msで実行）
-			}
 			// motorControlYawRate();	// 角速度制御
 		}
 		else
@@ -103,6 +125,26 @@ void Interrupt1ms(void)
 			calibrationIMU();
 		}
 	}
+
+	// V2だけを1msごとに更新し、採用した縦横判定をログと次走SLIP計画へ渡す。
+	ImuTangentialSample tangential = IMU_GetTangentialSample();
+	SlipDetectionInput slipInput = {
+		.pulseL = encCurrentL, .pulseR = encCurrentR,
+		.pwmL = motorpwmL, .pwmR = motorpwmR,
+		.forwardMps2 = IMU_GetForwardAccelerationMps2(),
+		.lateralMps2 = IMU_GetLinearAccelerationXMps2(), .yawDps = imuVal.gyro.z,
+		.currentL = motorCurrentL, .currentR = motorCurrentR,
+		.timeMs = cntRun, .gyroTimeMs = slipGyroTime, .accelTimeMs = slipAccelTime,
+		.currentTimeMs = slipCurrentTime, .currentSequence = slipCurrentSequence,
+		.running = patternTrace >= 12 && patternTrace < 100,
+		.calibrating = calibratIMU, .gyroOk = slipGyroOk, .accelOk = slipAccelOk,
+		.currentOk = slipCurrentCalibrated && !calibrateMotorCurrent && slipCurrentSequence != 0U,
+		.yawAlphaRadps2 = tangential.alphaRadps2,
+		.tangentialAppliedXMps2 = tangential.appliedXMps2, .tangentialOk = tangential.valid
+	};
+	if (slipInput.running && !slipWasRunning) SlipDetection_Reset(&slipV2);
+	slipWasRunning = slipInput.running;
+	SlipDetection_Update(&slipV2, &slipInput);
 
 	// 経路モードは平均速度PIDとヨーレートPIDを使用する。
 	bool pathModeActive = (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT);
@@ -217,7 +259,7 @@ void Interrupt1ms(void)
 			if (modeLOG)
 			{
 				// 目標距離間隔ごとにログを保存
-				writeLogBufferPuts();
+				if (writeLogBufferPuts()) SlipDetection_ResetInterval(&slipV2);
 				courseMarkerLog = 0; // ログ用マーカー状態をリセット
 				straightMarkerPendingLog = 0;
 				cntLog = 0;
@@ -266,14 +308,7 @@ void Interrupt1ms(void)
 	switch (cnt10)
 	{
 	case 1:
-		if(!calibrateMotorCurrent)
-		{
-			getMotorCurrent();
-		}
-		else
-		{
-			calibrationMotorCurrent();
-		}
+		updateSlipCurrentSample(cntRun);
 		break;
 	case 2:
 		getVref();

@@ -86,7 +86,7 @@ Codex は主にファームウェア開発に使用します。必要に応じ�
 
 ### `Machine/`
 
-`Machine/` には機体の 3D 機械設計データを保存しています。現在の機体 STEP モデルは `Machine/robotrace_v2 v86.step` です。機体寸法、基板配置、センサー位置、クリアランス、重心や搭載スペースを確認するときに参照します。
+`Machine/` には機体の 3D 機械設計データを保存しています。2026-10-12時点のチェックアウトには `Machine/robotrace_v3.STEP` が存在し、以前の参照 `Machine/robotrace_v2 v86.step` は存在しません。存在するモデルを確認して機体寸法、基板配置、センサー位置、クリアランス、重心や搭載スペースを調べます。CADと現在の実機の一致は別途確認し、未確認の寸法をコードへ転記しません。
 
 ### `Circuit/`
 
@@ -160,7 +160,7 @@ Codex は主にファームウェア開発に使用します。必要に応じ�
 
 ハードウェアについて推測する前に、以下のファイルを確認します。
 
-- `Machine/robotrace_v2 v86.step`: 機体モデル。
+- `Machine/robotrace_v3.STEP`: 現在のチェックアウトに存在する機体モデル。旧参照v86は欠落しており、現在の実機との一致は未確認。
 - `Circuit/robotrace_v2_main_v2/`: メイン基板の KiCad プロジェクトと回路図 PDF。
 - `Circuit/robotrace_v2_Linesensor/`: ラインセンサー基板の KiCad プロジェクトと回路図 PDF。
 - `Circuit/robotrace_v2_Sidemarker/`: サイドマーカー基板の KiCad プロジェクトと回路図 PDF。
@@ -402,7 +402,7 @@ cmake --build --preset Release
 
 ### ラインセンサー校正手順
 
-- オートスタート選択時は、保存済み校正値の有効性によらず1走目前に超信地旋回で再校正する。校正旋回-800 deg/sで3/4回転(-270 deg)に到達したらRAMの全10センサーを検証して校正を終了し、以後の復帰では固定した校正値を使用する。無効な校正値では復帰制御を行わず停止する。白線捕捉前は最大300 deg/sで元姿勢(-360 deg)へ戻り、元姿勢±30 degで角速度150 deg/sの局所探索を行う。中央左センサー4の正規化値2000以上かつ細い白線候補の検出で、既存motorControlTraceのラインPIDへ切り替える。平均前進速度は0のまま左右差出力で中央へ向け、角速度PIDと重ねない。追従にはlineTraceCtrlの既存ゲイン(line.txt)を使い、専用の位置ゲイン・PWM補償・位置合わせ角速度下限は持たない。白線候補は最大最小差500以上かつ半値を超える連続1～4個の明部で重心を求める。偏差0.35センサー間隔以内で角速度0のPIDによる制動へ移り、制動解除幅は1からこの偏差を引いた0.65とする。捕捉後の白線消失・捕捉角度±60 deg逸脱時は停止する。制動状態で角速度上限250 deg/s以内が50ms連続したら停止出力へ移る。この上限は実機調整値を維持したもので静止を保証しない。500ms停止待機後、全センサー校正値と明暗差・幅・偏差0.65以内を再確認する。5秒以内に復帰しなければ停止して開始禁止、2～5走目は再校正しない。9個の校正調整項目と通常ラインPIDの設定を使用し、校正値は1走目のカウントダウン・IMU/電流校正完了後にSDへ保存する。
+- オートスタート選択時は、保存済み校正値の有効性によらず1走目前に超信地旋回で再校正する。校正旋回-500 deg/sで3/4回転(-270 deg)に到達したらRAMの全10センサーを検証して校正を終了し、以後の復帰では固定した校正値を使用する。無効な校正値では復帰制御を行わず停止する。白線捕捉前は最大300 deg/sで元姿勢(-360 deg)へ戻り、元姿勢±30 degで角速度150 deg/sの局所探索を行う。中央左センサー4の正規化値2000以上かつ細い白線候補の検出で、既存motorControlTraceのラインPIDへ切り替える。平均前進速度は0のまま左右差出力で中央へ向け、角速度PIDと重ねない。追従にはlineTraceCtrlの既存ゲイン(line.txt)を使い、専用の位置ゲイン・PWM補償・位置合わせ角速度下限は持たない。白線候補は最大最小差500以上かつ半値を超える連続1～4個の明部で重心を求める。偏差0.35センサー間隔以内で角速度0のPIDによる制動へ移り、制動解除幅は1からこの偏差を引いた0.65とする。捕捉後の白線消失・捕捉角度±60 deg逸脱時は停止する。制動状態で角速度上限250 deg/s以内が50ms連続したら停止出力へ移る。この上限は実機調整値を維持したもので静止を保証しない。500ms停止待機後、全センサー校正値と明暗差・幅・偏差0.65以内を再確認する。5秒以内に復帰しなければ停止して開始禁止、2～5走目は再校正しない。9個の校正調整項目と通常ラインPIDの設定を使用し、校正値は1走目のカウントダウン・IMU/電流校正完了後にSDへ保存する。
 - UI校正の完了時にRAM内の全センサー校正値を検証し、SD保存とは独立して走行許可へ反映する。SDなしでも有効な校正後は手動走行可能とする。SDなしでは校正値を永続保存できないため、再起動後に再校正する。
 - `lsval.txt` が存在しない場合は走行前に校正する。校正時は超信地旋回を 1 回転行い、ラインを通過させる。
 - 校正値は走行前のパラメータ保存タイミングで保存する。全センサーの校正値が `0` または最大値の場合は異常として扱う。
@@ -470,8 +470,10 @@ cmake --build --preset Release
 
 ### スリップ判定とチューニング
 
+- オフライン検証では、まず基準一次走行に対する始終点X差と1周目/最終周の最大Y差（ともに絶対値。X差は一次以下、最大Y差は一次の最大Y差に対して±20mm以内の両条件で滑りなし）で判定し、その後動画を確認する。動画が明確なら動画、動画が不確定ならXY判定を閾値調整の正として使う。XYはマーカー補正前の生左右平均距離を使用する。判定・採用根拠と走行単位/局所区間を分けて記録し、解析のみの回はファームウェア・設定を変更しない。詳細は[スリップ評価の優先順](doc/slip-evaluation-policy.md)と該当Skillを参照する。
+
 - スリップ判定は `1 ms` 周期で、`patternTrace >= 12 && patternTrace < 100` の走行中に実行する。`encSpeed < 0.1 m/s` では判定をスキップする。
-- `slipFlag` は縦スリップ、`slipFlagLat` は横スリップの判定フラグとする。
+- 2026-10-21からスリップV2を正式採用し、V1の計算・フラグ・距離スケール補正を削除する。縦はLongFast（10/8m/s²・3/5ms）、横は時間整合したLatCandidate版5（6.5/4.5m/s²・3/5ms・LPF0.8）。`slipV2Flags`のbit0=縦、bit1=採用横、bit2=Yaw不整合。保存検出器版4、`slipDetectorMode=ACTIVE_V2`。詳細は[正式採用とSLIP走行](doc/slip-v2-active.md)。
 - 性能改善の優先順位は、再現性、完走率、ラップタイム短縮の順とする。
 - 1 回の走行で変更してよいパラメータ数は最大 2 個までとする。
 - PID、速度フィードフォワード、スリップ判定、速度・加速度の調整手順は `.agents/skills/robotrace-tuning/SKILL.md` を使う。
@@ -487,6 +489,7 @@ cmake --build --preset Release
 - バイナリは自己記述RLOG v2とし、512 Bヘッダ・記録・列定義・メタデータを保存する。列名・型・S/D種別・数値書式・順序を`log_schema.h`から自動生成する。形式バージョン、列定義CRC、レコードサイズ、行数、データ/メタデータ/ヘッダCRC、実長を検証する。旧v1・不正binはCSVへフォールバックせず原本を保持する。未確定 `.tmp` は保持して警告し、自動昇格しない。
 - 通常のCSV変換はPC側で行い、型・列順のスキーマCRCと全記録CRCを検証する。機体側の旧変換APIは互換検証用に残すが通常経路から呼び出さない。採番は既存の `.csv` / `.bin` / `.tmp` / `.part` の予約番号を引き続き考慮する。詳細は`doc/pc-binary-log-import.md`を参照する。
 - CSVメタデータの `binaryLogNumber` は予約番号、`binaryDataCrc` は記録部CRC32/IEEE、`binarySchema` はスキーマ識別CRC32/IEEEを表す。CRCは既存整数書式に合わせた符号付き32bit表示で、ビット列として扱う。CSVデータ列・単位・100/145 Bの記録部は変更しない。
+- ラインセンサー校正完了後のログ初期化時に最大・最小値と有効状態を走行別に保持し、メタデータへ `lSensorMax0`～`lSensorMax9`、`lSensorMin0`～`lSensorMin9`、`lineSensorCalibrationValid`（有効=1）として保存する。最大・最小は正規化前のLED点灯・消灯差分AD値（0～4095）、添字0は左端。遅延CSV変換・起動時復旧でも保存済みの値を使用し、CSVデータ列・記録レコードの形式は変更しない。旧ログの項目欠落は未記録と扱う。
 - ログファイル名は通し番号を使う。
 - ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。旧形式ログも列名で解決する。
 - 1行目のパラメータは `パラメータ名=value` 形式で記載される。IMU温度校正・補正状態、温度係数、エンコーダ換算値も残す。
@@ -494,7 +497,7 @@ cmake --build --preset Release
 - 一次ログの1行目には `pathSourceFormatVersion=1`, `closureValid`, `closureReason`, `logExpectedRows`, `imuCalibrationValid`, `imuCalibrationSamples`, `imuCalibrationReadErrors`, `distanceScaleVerified`, `distanceScalePulsePerMeter`, `distanceScaleError_p` を記録する。PATH経路元には、正常終了かつ閉路有効・行数一致・IMU校正成功・距離換算検証成功のログだけを使う。保存済み旧形式ログはPATH経路元として受け付けない。これらはCSV列およびバイナリレコード構成を変更しない。
 - ログ取得の目標距離間隔は `robotrace_v2/Core/Inc/SDcard.h` の `LOG_DISTANCE_MM=5` を正とする。センサー値は1 ms周期で更新するため、高速時は実際のログ行間隔が5 mmを超えることがある。実間隔は `encTotalOptimal` の差で評価する。
 - `goalMarkerOnset_p` は幅を確認したゴールマーカーの検出開始位置とする。`distanceScaleError_p` はログ行間の経過msを掛けて積算した `encCurrentCorr_p` と最終 `encTotalOptimal` の差とする。オートスタートが一次走行後に止まったら、まず `closureReason` とログ最終行の距離を確認する。
-- `courseAnalysis.c` の2次ログ再解析は、`courseMarker`, `encTotalOptimal`, `ROC`, `targetSpeed`, `optimalIndex`, `slipFlag`, `slipFlagLat` をCSVヘッダ名から解決する。ログ列追加時に固定列番号へ依存しない。
+- `courseAnalysis.c`のSLIP解析は、V2の縦・横それぞれの区間有効ms/ON msと無効理由をCSV列名で解決し、`optimalIndex`別の時間率を次走計画へ反映する。旧`slipFlag`/`slipFlagLat`だけのログは拒否する。正常終了・同じ一次参照・DISTANCE・行数一致を確認し、一次計画を毎回再生成して二重補正を防ぐ。無効/未観測を滑りなしとして増速しない。
 - 共通ログ読込は `.bin` 優先、欠落時だけ従来CSVを使用する。バイナリでは値を直接復元し、曲率・クロス前後100 mm直線化・XY計算をCSV出力と共用する。CSV経由では引き続き列名を解決する。共通読込は停止中・FatFsロック下で1ファイルずつ実行する。
 - DISTANCE/SLIPの読込は不要なXY計算を省く。PATHの初回生成は検証・クロス抽出と経路検証・生成の2走査とする。同一連続走行内のPATH/SHORTCUTは延長前基準経路を再利用できるが、再利用時も元binの全件CRC検証を行う。元ログ・生成設定・系列世代・共有RAMの使用先が変わった場合や失敗時は無効化し、ゴール延長と速度計画は毎回作り直す。詳細と実測結果は`doc/log-processing-performance.md`を参照する。
 - 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_MARKER`, `BOOST_DISTANCE`, `BOOST_SHORTCUT`, `BOOST_PATH_REPLAY` を正とする。
@@ -505,6 +508,7 @@ cmake --build --preset Release
 - ログ解析では、ラップタイム、速度追従、角速度、スリップを重視する。
 - バッテリー状態はログ内パラメータ `batteryVoltage_V` を参照する。単位は `[V]`。
 - オートスタートログは `autoRunNumber`, `requestedMode`, `primaryLogNumber`, `slipSourceLogNumber` を1行目に記録する。`requestedMode` は要求方式、`optimalTrace` は実際の走行モードであり、DISTANCEとSLIPを区別するときは両方を参照する。
+- 手動解析後のDISTANCE/SLIP/PATH/SHORTCUTも、実際に保持している有効な計画の一次ログ番号を走行開始時に固定し、既存`primaryLogNumber`へ保存する。`autoRunNumber=0,requestedMode=MANUAL`は維持し、系列所属は一次番号だけで自動走行と推定しない。手動一次・計画なし・参照未取得は0とし、設定ファイルの解析番号だけで参照を補わない。列数・レコード長は変更しない。
 - `batteryVoltage_mV` は走行中にLPF更新したバッテリー電圧 `[mV]`、`motorVoltageCmdL_mV`, `motorVoltageCmdR_mV` はバッテリー電圧で割る前の左右モーター指令電圧 `[mV]` とする。
 - 左右実DUTYの `motorpwmL`, `motorpwmR` は通常・詳細ともにログへ出力しない。
 - 通常・詳細ログに左右個別の `encCurrentL`, `encCurrentR`（符号付き16bit、1 msあたりのパルス数 `[pulse/ms]`）と `encTotalL`, `encTotalR`（符号付き32bit、スタートマーカー基準の累積パルス数 `[pulse]`）を出力する。前進を正とし、累積値はスタートマーカー通過時だけ0へリセットする。停止時には保持し、ログ先頭はマーカー通過後なので0とは限らない。12878までのログは電源投入からの累積値だった。走行中の距離は開始付近の値との差で確認する。速度 `[m/s]` は `encCurrentL/R / PULSE_MILLIMETER`、距離 `[mm]` は累積パルス差 `/ PULSE_MILLIMETER` で換算する。左右個別値は診断用であり、距離換算の実測検証は左右平均を対象とする。
@@ -516,12 +520,23 @@ cmake --build --preset Release
 - 通常・詳細ログに3軸加速度 `acceleVal_X`, `acceleVal_Y`, `acceleVal_Z` をfloatで出力する。値は `imuVal.accele.x/y/z`、単位は `[g]`（`m/s^2`への換算は `GRAVITY_MPS2` を掛ける）。IMUオフセット校正後の値で重力成分を含み、X・Yには既存の旋回中心補正を適用する。
 - 2026-10-11のBMI088生Y反転削除以降、`acceleVal_Y`は前方加速度が正。修正前ログ（13059～13073を含む）は生Yを反転してから既存の旋回中心補正を加算しており、修正後との比較でY列全体を単純に符号反転しない。ログヘッダのGit情報・ビルド日時と対応ソースで修正前後を区別する。列名・保存形式・単位は変更しない。
 - 通常・詳細ログの既存列の末尾に `imuTemp_C`（最新IMU温度 `[°C]`、5 ms周期取得、無効時 `-999`）、`gyroVal_X`, `gyroVal_Y`（オフセット・方向係数補正済み角速度 `[deg/s]`）、`imuAngle_X`, `imuAngle_Y`, `imuAngle_Z`（既存 `imuVal.angle.x/y/z` の角度 `[deg]`）をfloatで出力する。X・Yは既存の加速度融合済み姿勢角、Zは温度補正済みジャイロ角速度の1 ms積算角度で360°で折り返さない。スタートマーカー通過時の既存 `clearIMUval()` でXYZとも0へ初期化する。通常41列・100バイト/レコード、詳細58列・145バイト/レコード（CSV末尾空列は列数から除く）。形式変更後最初の実機ログで列数、cntlog、温度更新、角度値を確認する。
-- 左右電流 `motorCurrentL`, `motorCurrentR` は通常・詳細ともfloatの `[A]` で出力する。32サンプルADC移動平均と走行前ゼロ点校正後の最新値（10 ms周期更新）を保存する。通常ログではIMU列の後ろに追加し、詳細ログの既存電流列位置は維持する。現在は通常43列・108バイト/レコード、詳細58列・145バイト/レコード（上記41列・100バイトはIMU列追加時点）。変更後最初の実機ログで列数、電流、cntlog、overflowと走行への負荷を確認する。
+- 左右電流 `motorCurrentL`, `motorCurrentR` は通常・詳細ともfloatの `[A]` で出力する。32サンプルADC移動平均と走行前ゼロ点校正後の最新値（10 ms周期更新）を保存する。通常ログではIMU列の後ろに追加し、詳細ログの既存電流列位置は維持する。電流追加時点では通常43列・108バイト/レコード、詳細58列・145バイト/レコード（上記41列・100バイトはIMU列追加時点）。現在の詳細ログは下記診断29列を含む87列・220 B。変更後最初の実機ログで列数、電流、cntlog、overflowと走行への負荷を確認する。
+- 2026-10-12のスリップ並行評価版は、`ROBOTRACE_SLIP_DETECTOR=SHADOW`を既定、`LEGACY`を診断無効とする。両モードとも従来の`slipFlag`、`slipFlagLat`、SLIP次走計画、PATHを含む距離補正の入力を維持する。新判定は制御へ反映しない。
+- 初回SHADOWは通常62列・157 B／詳細77列・194 B、横接線補正候補追加時は通常72列・183 B／詳細87列・220 Bだった。2026-10-13に通常ログを43列・108 Bへ整理した後、2026-10-14のユーザー指示で診断29列を戻し、現行は通常72列・183 B／詳細87列・220 Bとする。既存43列の型・順序・意味と新検出器の計算・制御接続は変更しない。以下の新診断列は通常・詳細の双方に記録する。43列で保存されたログは引き続き新診断を「未記録」と扱う。`slipV2LongFast/LongSlow/Lat`と`slipV2PeakLong/PeakLat`はm/s²、`slipV2YawDps/PeakYawDps`はdeg/s。`slipV2Flags`は縦=1、横=2、旋回不整合=4のビット和で、物理スリップ量を意味しない。
+- 2026-10-14の縦判定比較版は`slipDetectorVersion=3`、`slipLongPolicy=fast_only`とする。`slipV2Flags`の縦ビットは`abs(slipV2LongFast)>10 m/s²`が3ms連続でON、`abs(slipV2LongFast)<8 m/s²`が5ms連続でOFF。版2のFast/Slow両窓条件をON・OFFとも外す。閾値・継続時間・窓充填・残差計算・横/旋回/候補判定は維持し、LongSlowは診断として計算・記録を続ける。`slipV2OnLongMs`は新条件のON時間となるが、`slipV2PeakLong`は従来どおり両窓の最大絶対値。列数・型・順序・スキーマCRCは変えず、同じ列の旧ログとメタデータで判定規則を区別する。版/方針不明のログでFast単独と推定しない。従来制御・距離補正・SLIP次走計画へは適用しない。詳細は`doc/slip-long-fast-only.md`。
+- `slipV2Valid`は窓・入力の有効性、`slipV2Reason`は現在の無効理由（無効モード=1、走行外=2、校正中=4、IMU通信/受信時刻異常=8、非有限=16、低速=32、窓充填=64、制御時刻飛び=128）。`slipV2IntervalReason`は記録区間内の無効理由のORで、一時的な異常も保持する。無効時の残差0・フラグ0を正常判定として集計しない。
+- `slipV2OnLongMs/OnLatMs/OnYawMs/ValidMs/TotalMs`は記録区間の1ms処理回数をmsとして累積し、65535で飽和する。未観測の時刻飛びは補間しない。最大絶対残差と区間統計は、1ms側でログバッファへの保存成功後にだけクリアする。
+- `slipV2CurrentValid`は校正完了後の取得・有限値・20ms以内の受信を確認した電流の有効性。`slipV2CurrentHighSamples`は電流絶対値和0.60 A超の連続取得回数で、10msの取得更新単位で数え65535で飽和する。`slipV2PwmSum`は左右PWM絶対値和（0～2000）。低電流・低PWMで新横判定を抑制しない。未更新の`initCurrent`は有効性に使用しない。
+- 新検出器は5ms移動平均、10/30ms縦残差、30ms横・旋回残差を用いる。走行中の加速度バイアス学習は行わず、IMUの静止重力基準除去APIを使用する。位置補正は二重適用しない。加速度・ジャイロの追加時間補正は根拠未確定のため0で固定し、非0の変更には整列処理の実装・検証が必要。旋回整合の8ms遅延・実効幅は13074～13083の経験モデルで、機体寸法の正へ転記しない。
+- 横接線補正候補の10列を通常・詳細ログの初回SHADOW診断の末尾へ追加する。`slipV2LatCandidate/Peak`は瞬時候補残差/区間最大絶対残差[m/s²]、`slipV2LatCandidateFlag`はON=1の独立フラグ、`slipV2LatCandidateValid/Reason`は有効性/現在無効理由。`slipV2LatCandidateOnMs/ValidMs`は区間ON/有効時間[ms]（65535で飽和）、`slipV2LatCandidateIntervalReason`は無効理由OR。`imuYawAlphaFiltered`は現行補正に使った角加速度[rad/s²]、`imuLatTangentialApplied`は現行で加算したX接線項[m/s²]の瞬時値。候補理由は共通ビットに256=接線項未取得を追加し、初回SHADOWの有効性とは分ける。候補ON率の分母は候補ValidMsとし、欠測・飽和を報告する。
+- 横接線補正候補版5は、同じ5/30ms窓の共通残差R0と従来の符号置換残差UからRn=(R0+U)/2、Tbar=(R0-U)/2を分離し、F=0.8*Fprev+0.2*Rn、候補残差=F-Tbarとして角加速度補正との応答をそろえる。候補内だけの追加LPFで、共通IMU・初回SHADOW・縦判定・従来制御・距離補正・次走計画は維持する。ON6.5/OFF4.5m/s²、3/5ms、43サンプル充填。ON6.5はユーザー指定で、今回テスト・ビルド未実施。最初の有効Rnで初期化し、無効時にLPFを消去、区間統計リセットでは保持する。候補残差/Peak/フラグ/ON時間は整合後の値となる。版5の記録R0と候補残差から(R0±Rc)/2で接線項を逆算しない。メタデータはslipLatCandidateVersion=5、slipLatCandidateFormula=lpf_neutral_minus_windowed_tangent_X、slipLatCandidateLpf=0.8、slipLatCandidateLpfInit=first_valid_neutral_reset_on_invalidを保存し、係数がIMU角加速度LPFと一致することをビルドで検査する。既存のslipLatAlphaLpfはIMU側、slipLatCandidateOn_mps2/Off_mps2は候補、slipLatOn_mps2/Off_mps2は初回SHADOW横4.6/3.8を表す。検出器版3/fast_only、通常72列/183B・詳細87列/220B、右X・前Y・CW正の軸仮定（生Xは実機未確認）を維持する。旧ON5.2での既知16陽性窓を用いた近似選定は、現行ON6.5の検出保持を保証しない。不要ONと短い滑りの減衰・検出遅延の確認は残る。ユーザー指定によりモータ指令上限が同じ走行は電圧差のみで除外せず、速度等の差を記録する。詳細はdoc/slip-lateral-candidate.md。
 - 保存列の追加・削除・順序変更ではPC変換器を更新しない。U8/U16/S16/U32/S32/F32と対応書式の範囲で、ファイル内の列定義から汎用変換する。計算列ROC/x/yはderivedVersion=2とし、XYの距離入力は`encTotalL`/`encTotalR`（S32）を使う。計算式・必須入力・保存型の追加時はPC変換器を更新する。ユーザー指定により旧計算版1および旧6形式の互換読込は行わず、原本を保持して拒否する。機体の解析元は同一ビルドの列定義を要求する。詳細と上限は`doc/self-describing-log.md`を参照する。
+- 設定・制約・検証手順は`doc/slip-detector-v2.md`に記載する。DWT実測は今回の検証対象外とし、実機採用には初回ログ確認と最低10本の比較を別途行う。
 - ログ初期化時にラインセンサー全10個の最大・最小値と校正有効状態を走行別に保持し、停止時のメタデータへ`lSensorMax0`～`lSensorMax9`、`lSensorMin0`～`lSensorMin9`、`lineSensorCalibrationValid`として保存する。値はLED点灯・消灯差分AD値（0～4095）、添字0は左端。CSV列と制御は変更しない。
 - スリップ内部量などの詳細デバッグ列が必要な場合は、ビルド定義で `LOG_SCHEMA_PROFILE_LIGHT=0` にして一時的に出力する。
 - ログ同士を比較する場合は、`batteryVoltage_V` の差を考慮する。電圧差によるモーター出力、速度追従、加速性能、スリップ傾向の変化を無視しない。
 - ログ形式を安易に変更しない。形式変更が必要な場合は、スキーマまたはドキュメントも合わせて更新する。
+- CSV列追加時は実際のヘッダ生成経路で全列名・区切り・データ列数の一致を通常/詳細で検証する。13130～13144のCSVは30 Bの列名一時バッファによる切詰めで、末尾の`slipV2LatCandidateIntervalReason`と`imuYawAlphaFiltered`が連結している。既知スキーマ・全行の列数・切詰め再現を照合した解析用コピーだけで列名を復元し、原本を保持する。2026-10-12の生成修正版は保存スキーマとレコード長を変えない。詳細は`doc/失敗事例/2026-10-12-csv-long-column-name-truncation.md`。
 - 詳細な解析手順は `.agents/skills/robotrace-log-analysis/SKILL.md` を使う。
 
 ### ログ解析、比較、出力
@@ -534,6 +549,21 @@ cmake --build --preset Release
 - 解析スクリプトは `analysis/script/` に置く。Python などの使用は可能。
 - 解析グラフ、表、比較結果は `analysis/` に保存する。パラメータ変更内容はログヘッダには記載しない。
 - ログには `fwVersion`, `gitCommit`, `buildDate`, `buildTime`, `branch` を残す。`fwVersion` は手動定義、その他はビルド時の自動埋め込みとする。
+
+
+### 2026-10-21以降のV2正式採用ログ
+
+- 2026-10-24の現行横ON閾値は6.7 m/s²、OFFは4.5 m/s²。正式採用直後のON6.5とはログメタデータで区別する。窓・LPF・3/5ms継続・検出器版4は維持する。
+
+- 横ログ重複整理後は通常66列/170 B、詳細72列/179 B。正式採用直後の13571～13577は通常70列/181 Bであり、保存スキーマで区別する。以下のSHADOW時代の列数・意味は履歴であり、新規ログでは本節を優先する。
+- 旧`slipFlag`, `slipFlagLat`, `slipRatio`, `slipRatioLat`, `slipLatEnabled`, `slipLatOnCountEnabled`, `slipISumOkCount`, `slipPwmSumF`, `slipISumF`, `slipEncAyF`, `slipImuAyF`を削除する。
+- `slipV2Lat`, `slipV2Flags`の横bit、`slipV2PeakLat`, `slipV2OnLatMs`は採用横（LatCandidate版5）の残差・フラグ・ピーク・ON時間を表し、重複する`slipV2LatCandidate/Flag/Peak/OnMs`列は保存しない。
+- 横独自の有効性は`slipV2LatValid`、現在無効理由は`slipV2LatReason`、区間有効時間[ms]は`slipV2LatValidMs`、区間無効理由ORは`slipV2LatIntervalReason`へ改名して保存する。接線項未取得は理由256で、共通の`slipV2Valid/ValidMs`へ代用しない。横ON率は`slipV2OnLatMs / slipV2LatValidMs`で求める。
+- SLIP読込は`slipV2OnLatMs/slipV2LatValidMs/slipV2LatIntervalReason`を使う。旧Candidate列名へのフォールバックは設けない。判定式・閾値・検出器版4・計画版2は変更せず、形式変更は自己記述スキーマで識別する。
+- SLIP解析用共有RAMは縦/横それぞれの有効msとON msを保持し、横有効ms配列2 KiBを追加する。最小反映ON時間3ms、速度計画の各倍率・先行減速・速度差制限は維持する。
+- 手動SLIP計画も`slipSourceLogNumber`へ元DISTANCE番号を走行開始時に固定して保存する。通常DISTANCEは0。`primaryLogNumber`は元の一次番号を維持する。
+- V1互換・SHADOW切替は不要。更新後は新しい一次とDISTANCEのログを取得し、既存オートスタートのDISTANCE→SLIPへ進む。機体bin解析は現行スキーマ一致のみ、PCの自己記述変換とCRC検証は維持する。
+- 距離/速度制御/PATHの入力は生エンコーダのままとし、未検証の滑り距離モデルによる補正は行わない。最初の新形式実機ログと実走行の再現性は別途検証する。
 
 ## 14. 方針と現行コードの差分管理
 
