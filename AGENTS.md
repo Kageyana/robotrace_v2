@@ -473,7 +473,7 @@ cmake --build --preset Release
 - オフライン検証では、まず基準一次走行に対する始終点X差と1周目/最終周の最大Y差（ともに絶対値。X差は一次以下、最大Y差は一次の最大Y差に対して±20mm以内の両条件で滑りなし）で判定し、その後動画を確認する。動画が明確なら動画、動画が不確定ならXY判定を閾値調整の正として使う。XYはマーカー補正前の生左右平均距離を使用する。判定・採用根拠と走行単位/局所区間を分けて記録し、解析のみの回はファームウェア・設定を変更しない。詳細は[スリップ評価の優先順](doc/slip-evaluation-policy.md)と該当Skillを参照する。
 
 - スリップ判定は `1 ms` 周期で、`patternTrace >= 12 && patternTrace < 100` の走行中に実行する。`encSpeed < 0.1 m/s` では判定をスキップする。
-- `slipFlag` は縦スリップ、`slipFlagLat` は横スリップの判定フラグとする。
+- 2026-10-21からスリップV2を正式採用し、V1の計算・フラグ・距離スケール補正を削除する。縦はLongFast（10/8m/s²・3/5ms）、横は時間整合したLatCandidate版5（6.5/4.5m/s²・3/5ms・LPF0.8）。`slipV2Flags`のbit0=縦、bit1=採用横、bit2=Yaw不整合。保存検出器版4、`slipDetectorMode=ACTIVE_V2`。詳細は[正式採用とSLIP走行](doc/slip-v2-active.md)。
 - 性能改善の優先順位は、再現性、完走率、ラップタイム短縮の順とする。
 - 1 回の走行で変更してよいパラメータ数は最大 2 個までとする。
 - PID、速度フィードフォワード、スリップ判定、速度・加速度の調整手順は `.agents/skills/robotrace-tuning/SKILL.md` を使う。
@@ -497,7 +497,7 @@ cmake --build --preset Release
 - 一次ログの1行目には `pathSourceFormatVersion=1`, `closureValid`, `closureReason`, `logExpectedRows`, `imuCalibrationValid`, `imuCalibrationSamples`, `imuCalibrationReadErrors`, `distanceScaleVerified`, `distanceScalePulsePerMeter`, `distanceScaleError_p` を記録する。PATH経路元には、正常終了かつ閉路有効・行数一致・IMU校正成功・距離換算検証成功のログだけを使う。保存済み旧形式ログはPATH経路元として受け付けない。これらはCSV列およびバイナリレコード構成を変更しない。
 - ログ取得の目標距離間隔は `robotrace_v2/Core/Inc/SDcard.h` の `LOG_DISTANCE_MM=5` を正とする。センサー値は1 ms周期で更新するため、高速時は実際のログ行間隔が5 mmを超えることがある。実間隔は `encTotalOptimal` の差で評価する。
 - `goalMarkerOnset_p` は幅を確認したゴールマーカーの検出開始位置とする。`distanceScaleError_p` はログ行間の経過msを掛けて積算した `encCurrentCorr_p` と最終 `encTotalOptimal` の差とする。オートスタートが一次走行後に止まったら、まず `closureReason` とログ最終行の距離を確認する。
-- `courseAnalysis.c` の2次ログ再解析は、`courseMarker`, `encTotalOptimal`, `ROC`, `targetSpeed`, `optimalIndex`, `slipFlag`, `slipFlagLat` をCSVヘッダ名から解決する。ログ列追加時に固定列番号へ依存しない。
+- `courseAnalysis.c`のSLIP解析は、V2の縦・横それぞれの区間有効ms/ON msと無効理由をCSV列名で解決し、`optimalIndex`別の時間率を次走計画へ反映する。旧`slipFlag`/`slipFlagLat`だけのログは拒否する。正常終了・同じ一次参照・DISTANCE・行数一致を確認し、一次計画を毎回再生成して二重補正を防ぐ。無効/未観測を滑りなしとして増速しない。
 - 共通ログ読込は `.bin` 優先、欠落時だけ従来CSVを使用する。バイナリでは値を直接復元し、曲率・クロス前後100 mm直線化・XY計算をCSV出力と共用する。CSV経由では引き続き列名を解決する。共通読込は停止中・FatFsロック下で1ファイルずつ実行する。
 - DISTANCE/SLIPの読込は不要なXY計算を省く。PATHの初回生成は検証・クロス抽出と経路検証・生成の2走査とする。同一連続走行内のPATH/SHORTCUTは延長前基準経路を再利用できるが、再利用時も元binの全件CRC検証を行う。元ログ・生成設定・系列世代・共有RAMの使用先が変わった場合や失敗時は無効化し、ゴール延長と速度計画は毎回作り直す。詳細と実測結果は`doc/log-processing-performance.md`を参照する。
 - 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_MARKER`, `BOOST_DISTANCE`, `BOOST_SHORTCUT`, `BOOST_PATH_REPLAY` を正とする。
@@ -548,6 +548,17 @@ cmake --build --preset Release
 - 解析スクリプトは `analysis/script/` に置く。Python などの使用は可能。
 - 解析グラフ、表、比較結果は `analysis/` に保存する。パラメータ変更内容はログヘッダには記載しない。
 - ログには `fwVersion`, `gitCommit`, `buildDate`, `buildTime`, `branch` を残す。`fwVersion` は手動定義、その他はビルド時の自動埋め込みとする。
+
+
+### 2026-10-21以降のV2正式採用ログ
+
+- 通常70列/181 B、詳細76列/190 B。以下のSHADOW時代の列数・意味は履歴であり、新規ログでは本節を優先する。
+- 旧`slipFlag`, `slipFlagLat`, `slipRatio`, `slipRatioLat`, `slipLatEnabled`, `slipLatOnCountEnabled`, `slipISumOkCount`, `slipPwmSumF`, `slipISumF`, `slipEncAyF`, `slipImuAyF`を削除する。
+- `slipV2Lat`, `slipV2Flags`の横bit、`slipV2PeakLat`, `slipV2OnLatMs`は採用横（LatCandidate版5）と同じ判定を表す。`slipV2LatCandidate*`は横独自の有効性・理由と統計のため維持する。
+- SLIP解析用共有RAMは縦/横それぞれの有効msとON msを保持し、横有効ms配列2 KiBを追加する。最小反映ON時間3ms、速度計画の各倍率・先行減速・速度差制限は維持する。
+- 手動SLIP計画も`slipSourceLogNumber`へ元DISTANCE番号を走行開始時に固定して保存する。通常DISTANCEは0。`primaryLogNumber`は元の一次番号を維持する。
+- V1互換・SHADOW切替は不要。更新後は新しい一次とDISTANCEのログを取得し、既存オートスタートのDISTANCE→SLIPへ進む。機体bin解析は現行スキーマ一致のみ、PCの自己記述変換とCRC検証は維持する。
+- 距離/速度制御/PATHの入力は生エンコーダのままとし、未検証の滑り距離モデルによる補正は行わない。最初の新形式実機ログと実走行の再現性は別途検証する。
 
 ## 14. 方針と現行コードの差分管理
 

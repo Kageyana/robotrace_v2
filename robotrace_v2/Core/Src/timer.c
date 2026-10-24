@@ -118,11 +118,6 @@ void Interrupt1ms(void)
 			if (slipAccelOk) slipAccelTime = cntRun;
 			calcDegrees();		// コンプリメンタリフィルタで角度算出
 			calcVelocity();		// 加速度から速度算出
-			// スリップ距離補正（パルス版）
-			if (patternTrace >= 12 && patternTrace < 100)
-			{
-				updateSlipDetection(); // スリップ検出（Δv比率とフラグ更新を1msで実行）
-			}
 			// motorControlYawRate();	// 角速度制御
 		}
 		else
@@ -131,7 +126,7 @@ void Interrupt1ms(void)
 		}
 	}
 
-	// 新判定は診断専用。従来フラグと距離補正へ接続しない。
+	// V2だけを1msごとに更新し、採用した縦横判定をログと次走SLIP計画へ渡す。
 	ImuTangentialSample tangential = IMU_GetTangentialSample();
 	SlipDetectionInput slipInput = {
 		.pulseL = encCurrentL, .pulseR = encCurrentR,
@@ -147,9 +142,9 @@ void Interrupt1ms(void)
 		.yawAlphaRadps2 = tangential.alphaRadps2,
 		.tangentialAppliedXMps2 = tangential.appliedXMps2, .tangentialOk = tangential.valid
 	};
-	if (slipInput.running && !slipWasRunning) SlipDetection_Reset(&slipShadow);
+	if (slipInput.running && !slipWasRunning) SlipDetection_Reset(&slipV2);
 	slipWasRunning = slipInput.running;
-	SlipDetection_Update(&slipShadow, &slipInput);
+	SlipDetection_Update(&slipV2, &slipInput);
 
 	// 経路モードは平均速度PIDとヨーレートPIDを使用する。
 	bool pathModeActive = (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT);
@@ -264,7 +259,7 @@ void Interrupt1ms(void)
 			if (modeLOG)
 			{
 				// 目標距離間隔ごとにログを保存
-				if (writeLogBufferPuts()) SlipDetection_ResetInterval(&slipShadow);
+				if (writeLogBufferPuts()) SlipDetection_ResetInterval(&slipV2);
 				courseMarkerLog = 0; // ログ用マーカー状態をリセット
 				straightMarkerPendingLog = 0;
 				cntLog = 0;

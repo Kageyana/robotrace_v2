@@ -197,6 +197,7 @@ static uint16_t runLineSensorMin[NUM_SENSORS];
 static bool runLineSensorCalibrationValid = false;
 // 手動走行の開始時点で固定した計画元。停止後の解析番号変更をログへ混入させない。
 static int16_t runPrimaryLogNumber = 0;
+static int16_t runSlipSourceLogNumber = 0;
 
 typedef struct
 {
@@ -701,10 +702,12 @@ static void logBuildMetadata(void)
 	setLogHeaderStrS("buildDate", BUILD_DATE);
 	setLogHeaderStrS("buildTime", BUILD_TIME);
 	setLogHeaderStrS("branch", GIT_BRANCH);
-	// SHADOWの設定を保存し、従来判定のフラグと区別する。
+	// 正式採用したV2の方式・閾値と、SLIP計画が使用する統計の意味を保存する。
 	setLogHeaderStr("slipDetectorVersion", SLIP_V2_VERSION);
     setLogHeaderStrS("slipLongPolicy", SLIP_V2_LONG_POLICY);
-	setLogHeaderStr("slipDetectorMode", ROBOTRACE_SLIP_DETECTOR);
+	setLogHeaderStrS("slipDetectorMode", "ACTIVE_V2");
+	setLogHeaderStrS("slipLatPolicy", SLIP_V2_LAT_POLICY);
+	setLogHeaderStr("slipPlannerVersion", 2);
 	setLogHeaderStr("slipLatCandidateVersion", SLIP_LAT_CANDIDATE_VERSION);
 	setLogHeaderStrFPrecision("slipLatCandidateOn_mps2", SLIP_LAT_CANDIDATE_ON, 9U);
 	setLogHeaderStrFPrecision("slipLatCandidateOff_mps2", SLIP_LAT_CANDIDATE_OFF, 9U);
@@ -727,8 +730,8 @@ static void logBuildMetadata(void)
 	setLogHeaderStr("slipOffMs", SLIP_V2_OFF_MS);
 	setLogHeaderStrFPrecision("slipLongOn_mps2", SLIP_V2_LONG_ON, 9U);
 	setLogHeaderStrFPrecision("slipLongOff_mps2", SLIP_V2_LONG_OFF, 9U);
-	setLogHeaderStrFPrecision("slipLatOn_mps2", SLIP_V2_LAT_ON, 9U);
-	setLogHeaderStrFPrecision("slipLatOff_mps2", SLIP_V2_LAT_OFF, 9U);
+	setLogHeaderStrFPrecision("slipLatOn_mps2", SLIP_LAT_CANDIDATE_ON, 9U);
+	setLogHeaderStrFPrecision("slipLatOff_mps2", SLIP_LAT_CANDIDATE_OFF, 9U);
 	setLogHeaderStrFPrecision("slipYawOn_dps", SLIP_V2_YAW_ON_DPS, 9U);
 	setLogHeaderStrFPrecision("slipYawOff_dps", SLIP_V2_YAW_OFF_DPS, 9U);
 	setLogHeaderStrFPrecision("slipYawWidth_m", SLIP_V2_YAW_WIDTH_M, 9U);
@@ -787,7 +790,7 @@ static void logBuildMetadata(void)
 		setLogHeaderStr("autoRunNumber", 0);
 		setLogHeaderStrS("requestedMode", "MANUAL");
 		setLogHeaderStr("primaryLogNumber", runPrimaryLogNumber);
-		setLogHeaderStr("slipSourceLogNumber", 0);
+		setLogHeaderStr("slipSourceLogNumber", runSlipSourceLogNumber);
 	}
 	// ゴール誤検出調査用。行ログが終了直前で途切れても累積値を確認できる。
 	setLogHeaderStr("sgMarkerAtLogEnd", (int32_t)SGmarker);
@@ -845,11 +848,13 @@ void initLog(void)
 	memcpy(runLineSensorMin, lSensorMin, sizeof(runLineSensorMin));
 	runLineSensorCalibrationValid = isLineSensorCalibrationValid();
 	runPrimaryLogNumber = 0;
+	runSlipSourceLogNumber = 0;
 	if (optimalTrace == BOOST_DISTANCE && runMemoryOwner == RUN_MEMORY_DISTANCE &&
 		numPPADarry > 0 && numPPADarry <= OPT_BUFF_SIZE && analyzedNumber > 0)
 	{
 		// SLIPも同じ距離計画を使い、analyzedNumberは元の一次ログ番号を保持する。
 		runPrimaryLogNumber = analyzedNumber;
+		runSlipSourceLogNumber = analyzedSlipSourceNumber;
 	}
 	else if ((optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT) &&
 		runMemoryOwner == RUN_MEMORY_PATH && pathRouteCount() > 1U && pathRouteSourceLog() > 0)
@@ -1559,8 +1564,8 @@ bool logSourceSlipRow(FIL *file, const char *line, const CourseLogColumnMap *col
     if (!binarySource.rowReady) return false;
     LogRecord *r = &binarySource.record;
     *row = (CourseLogSlipRow){r->courseMarker, (int32_t)r->encTotalOptimal, binarySource.roc,
-        r->targetSpeed, r->optimalIndex, r->slipFlag, r->slipFlagLat};
-    return true;
+        r->targetSpeed, r->optimalIndex, r->slipV2TotalMs, r->slipV2ValidMs, r->slipV2OnLongMs, r->slipV2LatCandidateValidMs, r->slipV2LatCandidateOnMs, r->slipV2IntervalReason, r->slipV2LatCandidateIntervalReason};
+    return courseLogValidateSlipRow(row);
 }
 
 /////////////////////////////////////////////////////////////////////

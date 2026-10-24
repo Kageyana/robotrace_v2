@@ -3,13 +3,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define SLIP_DETECTOR_LEGACY 0
-#define SLIP_DETECTOR_SHADOW 1
-#ifndef ROBOTRACE_SLIP_DETECTOR
-#define ROBOTRACE_SLIP_DETECTOR SLIP_DETECTOR_SHADOW
-#endif
-#define SLIP_V2_VERSION 3U
+#define SLIP_V2_VERSION 4U
 #define SLIP_V2_LONG_POLICY "fast_only"
+#define SLIP_V2_LAT_POLICY "matched_candidate_v5"
 #define SLIP_LAT_CANDIDATE_VERSION 5U
 #define SLIP_LAT_CANDIDATE_LPF_COEF 0.8F
 #define SLIP_V2_READY_SAMPLES (SLIP_V2_FILTER_MS + SLIP_V2_SLOW_MS + SLIP_V2_ENCODER_YAW_DELAY_MS)
@@ -23,10 +19,8 @@
 #define SLIP_V2_PULSE_PER_METER 58019.0F
 #define SLIP_V2_LONG_ON 10.0F
 #define SLIP_V2_LONG_OFF 8.0F
-#define SLIP_V2_LAT_ON 4.6F
-#define SLIP_V2_LAT_OFF 3.8F
 // 角加速度LPFと応答をそろえた残差に対するユーザー指定の暫定閾値[m/s^2]。
-// 初回SHADOW横の閾値とは分離し、制御へは接続しない。
+// V2の正式な横判定とSLIP速度計画に使用する。
 #define SLIP_LAT_CANDIDATE_ON 6.5F
 #define SLIP_LAT_CANDIDATE_OFF 4.5F
 #define SLIP_V2_YAW_ON_DPS 60.0F
@@ -98,7 +92,7 @@ typedef struct {
     SlipLateralCandidateState lateralCandidate;
 } SlipDetectionState;
 
-extern SlipDetectionState slipShadow;
+extern SlipDetectionState slipV2;
 void SlipDetection_Reset(SlipDetectionState *state);
 void SlipDetection_Update(SlipDetectionState *state, const SlipDetectionInput *input);
 void SlipDetection_ResetInterval(SlipDetectionState *state);

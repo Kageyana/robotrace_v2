@@ -32,12 +32,13 @@ _Static_assert(sizeof(RoutePoint) == 8U, "RoutePoint must remain 8 bytes");
 
 typedef struct
 {
-	uint16_t sampleCnt[OPT_BUFF_SIZE];
+	uint16_t validLongMs[OPT_BUFF_SIZE];
+	uint16_t validLatMs[OPT_BUFF_SIZE];
 	float v2Max[OPT_BUFF_SIZE];
 	float rocAbsSum[OPT_BUFF_SIZE];
 	uint16_t rocCnt[OPT_BUFF_SIZE];
-	uint16_t slipLongCnt[OPT_BUFF_SIZE];
-	uint16_t slipLatCnt[OPT_BUFF_SIZE];
+	uint16_t longOnMs[OPT_BUFF_SIZE];
+	uint16_t latOnMs[OPT_BUFF_SIZE];
 	float risk[OPT_BUFF_SIZE];
 	float riskExpanded[OPT_BUFF_SIZE];
 	float v3[OPT_BUFF_SIZE];

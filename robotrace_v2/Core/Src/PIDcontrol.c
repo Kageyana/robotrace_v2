@@ -343,11 +343,7 @@ void motorControlSpeed(void)
 	int32_t dEncSpeed_p;
 
 	// 駆動モーター用PWM値計算
-#if SLIP_DIST_CORRECTION_ENABLE
-	dEncSpeed_p = Control_GetEncCurrentCorr_p();
-#else
-	dEncSpeed_p = encCurrentN;
-#endif
+dEncSpeed_p = encCurrentN; // 速度制御は生エンコーダを使用する。
 	Dev = (int16_t)targetSpeed - dEncSpeed_p; // 偏差
 	// 目標値を変更したタイミングで積分項リセットとフィードフォワード更新を同時に実施
 	if (targetSpeed != speedTargetBefore)

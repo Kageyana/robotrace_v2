@@ -2,9 +2,7 @@
 #include <math.h>
 #include <string.h>
 
-SlipDetectionState slipShadow;
-_Static_assert(ROBOTRACE_SLIP_DETECTOR == SLIP_DETECTOR_LEGACY ||
-    ROBOTRACE_SLIP_DETECTOR == SLIP_DETECTOR_SHADOW, "unsupported slip detector mode");
+SlipDetectionState slipV2;
 _Static_assert(SLIP_V2_SLOW_MS + SLIP_V2_ENCODER_YAW_DELAY_MS < SLIP_V2_HISTORY,
     "slip history must include delayed windows");
 _Static_assert(SLIP_V2_ACCEL_DELAY_MS == 0U && SLIP_V2_GYRO_DELAY_MS == 0U,
@@ -23,8 +21,7 @@ _Static_assert(SLIP_LAT_CANDIDATE_LPF_COEF >= 0.0F && SLIP_LAT_CANDIDATE_LPF_COE
 void SlipDetection_Reset(SlipDetectionState *state)
 {
     memset(state, 0, sizeof(*state));
-    state->result.reason = ROBOTRACE_SLIP_DETECTOR == SLIP_DETECTOR_LEGACY ?
-        SLIP_V2_DISABLED : SLIP_V2_WARMUP;
+    state->result.reason = SLIP_V2_WARMUP;
     state->lateralCandidate.result.reason = state->result.reason;
 }
 
@@ -232,7 +229,6 @@ void SlipDetection_Update(SlipDetectionState *state, const SlipDetectionInput *i
     state->timeStarted = true;
     float v = ((float)input->pulseL + (float)input->pulseR) * 500.0F / SLIP_V2_PULSE_PER_METER;
     uint16_t reason = 0U;
-    if (ROBOTRACE_SLIP_DETECTOR == SLIP_DETECTOR_LEGACY) reason |= SLIP_V2_DISABLED;
     if (!input->running) reason |= SLIP_V2_NOT_RUNNING;
     if (input->calibrating) reason |= SLIP_V2_CALIBRATING;
     if (!input->gyroOk || !input->accelOk || input->timeMs - input->gyroTimeMs > 1U ||
@@ -328,7 +324,10 @@ void SlipDetection_Update(SlipDetectionState *state, const SlipDetectionInput *i
     // 縦判定は10ms窓だけで継続判定し、30ms窓は比較診断として計算・記録を続ける。
     updateFlag(state, 0U, fabsf(r->longFast) > SLIP_V2_LONG_ON,
         fabsf(r->longFast) < SLIP_V2_LONG_OFF);
-    updateFlag(state, 1U, fabsf(r->lateral) > SLIP_V2_LAT_ON, fabsf(r->lateral) < SLIP_V2_LAT_OFF);
+    // 横は時間応答を整合した候補版5を正式採用する。基準残差はfinishCandidateの内部計算まで使用する。
+    r->lateral = state->lateralCandidate.result.valid ? state->lateralCandidate.result.residual : 0.0F;
+    r->flags &= (uint8_t)~SLIP_V2_LAT;
+    if (state->lateralCandidate.result.valid && state->lateralCandidate.result.flag) r->flags |= SLIP_V2_LAT;
     updateFlag(state, 2U, fabsf(r->yawDps) > SLIP_V2_YAW_ON_DPS, fabsf(r->yawDps) < SLIP_V2_YAW_OFF_DPS);
     state->interval.peakLong = fmaxf(state->interval.peakLong, fmaxf(fabsf(r->longFast), fabsf(r->longSlow)));
     state->interval.peakLat = fmaxf(state->interval.peakLat, fabsf(r->lateral));
