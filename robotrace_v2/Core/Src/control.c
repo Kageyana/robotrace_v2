@@ -15,8 +15,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define DISPLAY_INIT_DMA_TIMEOUT_MS 200U
-
 //====================================//
 // グローバル変数の宣言、定義
 //====================================//

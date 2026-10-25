@@ -19,67 +19,8 @@
 #include <string.h>
 
 #define PATH_SETTING_FILE                    "./setting/shortcut.txt"
-#define PATH_DEFAULT_MAX_LEVEL               1U
-#define PATH_DEFAULT_LOOKAHEAD_BASE_MM        80U
-#define PATH_DEFAULT_LOOKAHEAD_PER_MPS_MM     40U
-#define PATH_DEFAULT_KLATERAL_X100            3000U
-#define PATH_DEFAULT_KHEADING_X100            600U
-#define PATH_DEFAULT_LINE_ALPHA_X1000         10U
-#define PATH_DEFAULT_LINE_THETA_GAIN_X1E9      0U
-
-#define PATH_LEVEL_MAX                        1U // 初期実機検証はLevel 1だけを許可する
-#define PATH_LOOKAHEAD_BASE_MIN_MM            40U
-#define PATH_LOOKAHEAD_BASE_MAX_MM            300U
-#define PATH_LOOKAHEAD_SPEED_MAX_MM            200U
-#define PATH_KLATERAL_MAX_X100                10000U
-#define PATH_KHEADING_MAX_X100                3000U
-#define PATH_LINE_ALPHA_MAX_X1000             100U
-#define PATH_LINE_THETA_GAIN_MAX_X1E9         1000U
 
 #define PATH_CSV_LINE_SIZE                    RUN_ANALYSIS_LINE_SIZE
-#define PATH_CORRIDOR_MIN_SPAN_POINTS         15U   // 600mm
-#define PATH_CORRIDOR_MAX_SPAN_POINTS         40U   // 1600mm
-#define PATH_CORRIDOR_TRANSITION_POINTS       3U    // 120mm
-#define PATH_CORRIDOR_END_GUARD_POINTS        4U
-#define PATH_CORRIDOR_OVERLAP_GUARD_POINTS    5U
-#define PATH_CORRIDOR_MAX_COUNT               16U
-#define PATH_CORRIDOR_HEADING_LIMIT_DEG       12.0f
-#define PATH_CORRIDOR_TURN_THRESHOLD_DEG      2.0f
-#define PATH_CORRIDOR_MIN_SIGN_CHANGES        3U
-#define PATH_CORRIDOR_MAX_OFFSET_MM           34.0f
-#define PATH_CORRIDOR_OFFSET_TOLERANCE_MM     0.5f
-#define PATH_CORRIDOR_MIN_PROJECTION          -0.02f
-#define PATH_CORRIDOR_MAX_PROJECTION          1.02f
-#define PATH_CORRIDOR_MIN_SAVING_MM           5.0f
-
-// 寸法入力値はすべて[mm]。機体座標原点は前車軸中心と後車軸中心の中点とし、
-// 上面から見て右を+X、左を-X、前方を+Y、後方を-Yとする。
-#define PATH_TRACKING_ERROR_BUDGET_MM         15.0f
-#define PATH_LINE_HALF_WIDTH_MM               9.5f   // コースライン実幅の1/2
-#define PATH_OCCUPIED_HALF_WIDTH_MM           65.0f  // 車軸中心から左右投影端までの短い側の距離
-#define PATH_OUTER_RADIUS_MM                  100.0f  // 車軸中心から全投影外形の最遠点までの距離
-#define PATH_BOARD_CLEARANCE_MM               200.0f // コース中心線から走行可能領域端までの最小距離
-#define PATH_LEGAL_RESERVE_MM                 10.0f
-#define PATH_LOST_DISTANCE_MM                 80.0f
-#define PATH_REJOIN_DISTANCE_MM               35.0f
-#define PATH_LOST_HEADING_DEG                 60.0f
-#define PATH_REJOIN_HEADING_DEG               30.0f
-#define PATH_LOST_COUNT_5MS                   20U
-#define PATH_REJOIN_COUNT_5MS                 40U
-#define PATH_LINE_LOST_COUNT_5MS              20U
-#define PATH_ASSOCIATION_PROGRESS_MARGIN_MM   120.0f
-#define PATH_ASSOCIATION_HEADING_MAX_DEG      60.0f
-#define PATH_GOAL_RESERVED_POINTS             13U  // 終端から原点まで1040mm以下なら延長点を確保
-#define PATH_REJOIN_BLEND_STEP                50U
-#define PATH_SENSOR_ACTIVE_TH                 800U
-#define PATH_SENSOR_MIN_SUM                   1200U
-#define PATH_SENSOR_MAX_CLUSTER_WIDTH         3U
-#define PATH_SENSOR_FOV_MM                    35.0f  // ライン位置補正を許可する予測横偏差範囲
-#define PATH_LINE_MATCH_BACK_POINTS           2U
-#define PATH_LINE_MATCH_FORWARD_POINTS        4U
-#define PATH_LINE_MATCH_RESIDUAL_MAX_MM        30.0f
-#define PATH_LINE_POSITION_CORRECTION_MAX_MM    1.0f
-#define PATH_LINE_HEADING_CORRECTION_MAX_DEG    0.1f
 
 #define PATH_FLAG_CORRIDOR_RESERVED           0x01U
 #define PATH_FLAG_CORRIDOR_APPLIED            0x02U

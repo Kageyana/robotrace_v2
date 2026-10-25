@@ -52,6 +52,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'D:\robotrace\robotrace_
 ## Git連携と変更範囲
 
 - 通常の`git diff --check`は未追跡ファイルを検査しない。新規ファイルはステージ前に`git diff --no-index --check -- NUL <実在ファイル>`で個別検査し、終了コード0/1かつエラー出力なしを確認する。末尾の余分な空行も対象とし、ステージ後の`git diff --cached --check`を省略しない。[新規ファイルの検査漏れ](失敗事例/2026-10-25-staged-snapshot-whitespace.md)参照。
+- 作業ツリーの空白検査では既存の改行正規化設定を維持する。`-c core.autocrlf=false`はLF正規化済みの比較用コピーに限り、LF/CRLFの予告警告を抑える目的で作業ツリーへ指定しない。CRLFを保持した未追跡ファイルの個別検査では`git -c core.whitespace=cr-at-eol diff --no-index --check -- NUL <実在ファイル>`でCRを改行として扱い、実際の空白エラー出力と終了コードを確認する。[正規化設定の誤用](失敗事例/2026-10-25-staged-snapshot-whitespace.md)参照。
 - 段階的コミットでは、最初のindex更新前に全段階の隣接ソースを`git diff --no-index --check`で比較する。最終状態だけの空白チェックや中間ビルド成功で代用しない。no-indexの終了コード1は通常の差分でも返るため、0/1かつ空白エラー出力なしを成功条件とする。空白エラーがあれば中間ペイロードだけを修正し、全段階の成功を確認してから対象パスを限定してステージする。中間内容の修正後はGitの改行正規化後のオブジェクトを親と比較し、変更のない対象を予定一覧から除く。開始HEAD・元のステージ状態・作業ファイルのハッシュを記録し、失敗後は自分が追加したステージだけを戻す。詳細は[分割スナップショットの空白検証](失敗事例/2026-10-25-staged-snapshot-whitespace.md)。
 - pushが依頼されたときはstatus/branch/remoteと送信差分を確認する。既知のsandbox HTTPS制限下では初回から必要なネットワーク権限で実行する。port 443接続失敗と認証拒否を分ける。workflow更新を含む場合は使用認証の権限を確認し、without workflow scope拒否はサンドボックス昇格で直ると仮定しない。認可変更や秘密の提示を自動実行せず、必要な認証の更新を案内する。
 - 制御API・ログ・設定を統合するときはmotor/PID/FF/保存形式の境界を照合する。競合で片側を丸ごと採用せず、旧PWM出力APIの残存、ログ既存列の意味・順序、両構成ビルドと初回実ログを確認する。

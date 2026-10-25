@@ -35,11 +35,6 @@ static int16_t speedEncoderBefore = 0;	// 速度PID用の前回偏差
 
 int32_t log_targetAngularVelocity; // ログ用目標角速度
 
-#define PID_GAIN_MIN 0
-#define PID_GAIN_MAX 255
-#define SPEED_FF_GAIN_MIN 0
-#define SPEED_FF_GAIN_MAX 255
-
 //====================================//
 // プロトタイプ宣言
 //====================================//

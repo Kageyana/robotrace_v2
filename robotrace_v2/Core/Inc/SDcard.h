@@ -20,12 +20,18 @@ bool logHasIncompleteTemp(void);
 
 #define BUFFER_SIZE_LOG 2048U
 #define LOG_SIZE LOG_RECORD_SIZE_BYTES // スキーマ由来のレコードサイズ。
-#define LOG_DISTANCE_MM 5U // ログ取得の目標距離間隔[mm]
 
 #define BUFFER_SIZE_MARKER 500
 #define FILENUMBER_NUM 1000		// ログファイルナンバーの上限
 #define FILENUMBER_ALARM 50	// 書き込み不備を警告する数
 
+//====================================//
+// 調整パラメータ
+//====================================//
+#define LOG_TEMP_PREALLOC_BYTES (2UL * 1024UL * 1024UL) // 走行前に一時ログへ連続領域を事前確保する容量[byte]。
+#define LOG_DISTANCE_MM 5U // ログ取得の目標距離間隔[mm]。
+
+// 保存先・ファイル名。
 #define PATH_SETTING "./setting/"
 #define FILENAME_LOGNUMBER "lognum"	// 保存ログ番号ファイル名(拡張子なし)
 #define FILENAME_AUTORUN "./setting/auto_run.txt"

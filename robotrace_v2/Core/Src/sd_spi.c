@@ -31,21 +31,11 @@ extern volatile int g_sd_last_read_multi_status;
  * You are free to edit anything below this line
  ***************************************************************/
 
-#define USE_DMA 1
-#define SD_DMA_WAIT_TIMEOUT_MS 50U
-#define SD_SPI_BYTE_TIMEOUT_MS 20U
-
 // extern SPI_HandleTypeDef hspi3;
 #define SD_SPI_HANDLE hspi3
 
 #define SD_CS_LOW()     HAL_GPIO_WritePin(CS_MSD_GPIO_Port, CS_MSD_Pin, GPIO_PIN_RESET)
 #define SD_CS_HIGH()    HAL_GPIO_WritePin(CS_MSD_GPIO_Port, CS_MSD_Pin, GPIO_PIN_SET)
-
-#ifndef SD_SPI_CRC_CHECK
-#define SD_SPI_CRC_CHECK 0
-#endif
-#define SD_SPI_PRESCALER_FAST SPI_BAUDRATEPRESCALER_2
-#define SD_SPI_PRESCALER_SLOW SPI_BAUDRATEPRESCALER_8
 
 /***************************************************************
  * 🚫 DO NOT MODIFY BELOW THIS LINE
@@ -152,7 +142,6 @@ static uint16_t SD_CalcCrc16(const uint8_t *data, uint16_t len) {
     return crc;
 }
 #endif
-
 
 bool SD_SetSpiPrescaler(uint32_t prescaler) {
     bool ok = false;

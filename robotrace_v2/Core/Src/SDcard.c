@@ -27,7 +27,6 @@ FIL fil_R;
 
 // ログヘッダー
 // 走行ごとのメタデータを保存・検証する共通領域。
-#define LOG_TEMP_PREALLOC_BYTES (2UL * 1024UL * 1024UL)
 char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE] = "";
 
 // ログバッファ

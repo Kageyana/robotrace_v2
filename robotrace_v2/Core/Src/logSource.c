@@ -16,9 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define CROSS_STRAIGHT_MM 100.0f
 #define CROSSSEG_MAX 128
-#define PRIMARY_ROUTE_GOAL_X_LIMIT_MM 60.0F
 #define logBuffers (logIoMemory.logging)
 enum { LOG_READ_RECORD_BYTES = LOG_RECORD_SIZE_BYTES };
 //====================================//
@@ -596,7 +594,6 @@ bool logSourceValidateSlipRow(const LogSourceRow *row)
 		row->slipV2IntervalReason >= 0 && row->slipV2IntervalReason <= 511 &&
 		row->slipV2LatIntervalReason >= 0 && row->slipV2LatIntervalReason <= 511;
 }
-
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logMetadataReadInt
