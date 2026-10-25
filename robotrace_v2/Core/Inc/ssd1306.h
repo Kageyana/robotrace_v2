@@ -8,6 +8,9 @@
 #ifndef __SSD1306_H__
 #define __SSD1306_H__
 
+//====================================//
+// インクルード
+//====================================//
 #include <stddef.h>
 #include <stdarg.h>
 
@@ -92,6 +95,9 @@
 
 /* ^^^ SPI config ^^^ */
 
+//====================================//
+// グローバル変数の宣言、定義
+//====================================//
 #if defined(SSD1306_USE_I2C)
 extern I2C_HandleTypeDef SSD1306_I2C_PORT;
 #elif defined(SSD1306_USE_SPI)
@@ -141,6 +147,10 @@ typedef struct {
 } SSD1306_VERTEX;
 
 // Procedure definitions
+//====================================//
+// プロトタイプ宣言
+//====================================//
+
 void ssd1306_Init(void);
 void ssd1306_Fill(SSD1306_COLOR color);
 void ssd1306_UpdateScreen(void);

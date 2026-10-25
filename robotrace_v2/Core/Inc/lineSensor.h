@@ -25,7 +25,7 @@
 // ファイル名
 #define FILENAME_LS_VAL "lsval"
 //====================================//
-// グローバル変数の宣言
+// グローバル変数の宣言、定義
 //====================================//
 extern uint16_t lSensor[NUM_SENSORS];
 extern float angleSensor;

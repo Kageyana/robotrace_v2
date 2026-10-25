@@ -14,17 +14,27 @@
  ******************************************************************************/
 
 
+//====================================//
+// インクルード
+//====================================//
 #include "diskio.h"
 #include "sd_spi.h"
 #include "logPerformance.h"
 #include "ff_gen_drv.h"
 // Debug: last SD read request/status for f_gets error logs
+//====================================//
+// グローバル変数の宣言、定義
+//====================================//
 volatile DWORD g_sd_last_read_sector = 0;
 volatile UINT g_sd_last_read_count = 0;
 volatile int g_sd_last_read_blocks_status = -1;
 volatile int g_sd_last_read_multi_status = -1;
 static DWORD sd_cached_sector_count = 0;
 static uint8_t sd_sector_count_valid = 0;
+
+//====================================//
+// プロトタイプ宣言
+//====================================//
 
 DSTATUS SD_disk_status(BYTE drv) {
     if (drv != 0)

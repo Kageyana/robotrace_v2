@@ -16,18 +16,28 @@
 #ifndef __SD_DISKIO_SPI_H__
 #define __SD_DISKIO_SPI_H__
 
+//====================================//
+// インクルード
+//====================================//
 #include "diskio.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+//====================================//
+// グローバル変数の宣言、定義
+//====================================//
 extern const Diskio_drvTypeDef SD_Driver;
 // Debug: last SD read request/status for f_gets error logs
 extern volatile DWORD g_sd_last_read_sector;
 extern volatile UINT g_sd_last_read_count;
 extern volatile int g_sd_last_read_blocks_status;
 extern volatile int g_sd_last_read_multi_status;
+//====================================//
+// プロトタイプ宣言
+//====================================//
+
 DSTATUS SD_disk_status(BYTE drv);
 DSTATUS SD_disk_initialize(BYTE drv);
 DRESULT SD_disk_read(BYTE pdrv, BYTE *buff, DWORD sector, UINT count);

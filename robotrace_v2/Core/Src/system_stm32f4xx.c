@@ -45,6 +45,9 @@
   */
 
 
+//====================================//
+// インクルード
+//====================================//
 #include "stm32f4xx.h"
 
 #if !defined  (HSE_VALUE) 
@@ -134,6 +137,9 @@
                is no need to call the 2 first functions listed above, since SystemCoreClock
                variable is updated automatically.
   */
+//====================================//
+// グローバル変数の宣言、定義
+//====================================//
 uint32_t SystemCoreClock = 16000000;
 const uint8_t AHBPrescTable[16] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 6, 7, 8, 9};
 const uint8_t APBPrescTable[8]  = {0, 0, 0, 0, 1, 2, 3, 4};
@@ -156,6 +162,10 @@ const uint8_t APBPrescTable[8]  = {0, 0, 0, 0, 1, 2, 3, 4};
 /** @addtogroup STM32F4xx_System_Private_Functions
   * @{
   */
+
+//====================================//
+// プロトタイプ宣言
+//====================================//
 
 /**
   * @brief  Setup the microcontroller system

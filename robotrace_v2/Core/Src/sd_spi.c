@@ -13,11 +13,17 @@
  *    You are free to use and modify it for learning and development.
  ******************************************************************************/
 
+//====================================//
+// インクルード
+//====================================//
 #include "sd_spi.h"
 #include "main.h"
 #include <string.h>
 #include <stdio.h>
 
+//====================================//
+// グローバル変数の宣言、定義
+//====================================//
 extern volatile int g_sd_last_read_multi_status;
 
 /***************************************************************
@@ -49,6 +55,10 @@ extern volatile int g_sd_last_read_multi_status;
 #if USE_DMA
 volatile int dma_tx_done = 0;
 volatile int dma_rx_done = 0;
+
+//====================================//
+// プロトタイプ宣言
+//====================================//
 
 void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi) {
 	if (hspi == &SD_SPI_HANDLE) dma_tx_done = 1;

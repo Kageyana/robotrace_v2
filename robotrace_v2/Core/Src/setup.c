@@ -6,7 +6,7 @@
 #include "motor.h"
 #include <stdint.h>
 //====================================//
-// グローバル変数の宣言
+// グローバル変数の宣言、定義
 //====================================//
 SetupFlags setupFlags = {0}; // セットアップ状態を管理
 
@@ -63,9 +63,9 @@ static bool autoStartCalibrationStopping = false; // 中央捕捉後は許容範
 // パラメータ関連
 int16_t motorTestPwm = 200;
 int32_t encClick = 0;
-//======================================//
+//====================================//
 // プロトタイプ宣言
-//======================================//
+//====================================//
 static void setup_sensors(void); 		// センサ表示とテストメニューを制御する処理
 static void setup_pid(pidParam *pid, bool speedTest);
 static void setup_start(void);			// スタート待ち画面とキャリブレーションを制御する処理

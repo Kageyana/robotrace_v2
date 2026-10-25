@@ -1,6 +1,9 @@
 #ifndef LOG_PERFORMANCE_H_
 #define LOG_PERFORMANCE_H_
 
+//====================================//
+// インクルード
+//====================================//
 #include <stdint.h>
 
 #ifndef ROBOTRACE_LOG_PERFORMANCE
@@ -17,6 +20,9 @@ typedef struct {
     uint64_t diskReadBytes, diskWriteBytes;
 } LogPerformanceStats;
 
+//====================================//
+// グローバル変数の宣言、定義
+//====================================//
 #if ROBOTRACE_LOG_PERFORMANCE
 extern volatile LogPerformanceStats logPerformanceStats;
 #define LOG_PERF_BEGIN(name) uint32_t name = HAL_GetTick()
@@ -27,5 +33,9 @@ extern volatile LogPerformanceStats logPerformanceStats;
 #define LOG_PERF_END(field, name) ((void)0)
 #define LOG_PERF_ADD(field, value) ((void)0)
 #endif
+
+//====================================//
+// プロトタイプ宣言
+//====================================//
 
 #endif

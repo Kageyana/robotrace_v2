@@ -1,3 +1,6 @@
+//====================================//
+// インクルード
+//====================================//
 #include <stdint.h>
 
 #ifndef __SSD1306_FONTS_H__
@@ -11,6 +14,9 @@ typedef struct {
 	const uint16_t *data; /*!< Pointer to data font data array */
 } FontDef;
 
+//====================================//
+// グローバル変数の宣言、定義
+//====================================//
 #ifdef SSD1306_INCLUDE_FONT_6x8
 extern FontDef Font_6x8;
 #endif
@@ -26,4 +32,8 @@ extern FontDef Font_16x26;
 #ifdef SSD1306_INCLUDE_FONT_16x24
 extern FontDef Font_16x24;
 #endif
+//====================================//
+// プロトタイプ宣言
+//====================================//
+
 #endif // __SSD1306_FONTS_H__

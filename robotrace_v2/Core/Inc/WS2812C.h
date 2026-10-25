@@ -19,7 +19,7 @@ typedef struct
 	int8_t b;
 } RGBLED;
 //====================================//
-// グローバル変数の宣言
+// グローバル変数の宣言、定義
 //====================================//
 extern bool datasentflag;
 extern bool lineflag;

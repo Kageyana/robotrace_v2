@@ -1,7 +1,13 @@
+//====================================//
+// インクルード
+//====================================//
 #include "slipDetection.h"
 #include <math.h>
 #include <string.h>
 
+//====================================//
+// グローバル変数の宣言、定義
+//====================================//
 SlipDetectionState slipV2;
 _Static_assert(SLIP_V2_SLOW_MS + SLIP_V2_ENCODER_YAW_DELAY_MS < SLIP_V2_HISTORY,
     "slip history must include delayed windows");
@@ -11,6 +17,10 @@ _Static_assert(SLIP_LAT_CANDIDATE_ON > SLIP_LAT_CANDIDATE_OFF && SLIP_LAT_CANDID
     "candidate hysteresis thresholds must be positive and ordered");
 _Static_assert(SLIP_LAT_CANDIDATE_LPF_COEF >= 0.0F && SLIP_LAT_CANDIDATE_LPF_COEF < 1.0F,
     "candidate LPF coefficient must be stable");
+
+//====================================//
+// プロトタイプ宣言
+//====================================//
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 SlipDetection_Reset

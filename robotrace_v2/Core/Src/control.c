@@ -18,7 +18,7 @@
 #define DISPLAY_INIT_DMA_TIMEOUT_MS 200U
 
 //====================================//
-// グローバル変数の宣言
+// グローバル変数の宣言、定義
 //====================================//
 // モード関連
 uint8_t patternTrace = 0;
@@ -49,6 +49,10 @@ speedParam tgtParam = {
 };
 // 経路追従へ渡す1msの生エンコーダ増分。未検証の滑り距離補正は行わない。
 static int32_t encCurrentCorr_p = 0;
+//====================================//
+// プロトタイプ宣言
+//====================================//
+
 static const char *getRunStartBlockReason(void);
 static bool isRunStartAllowed(void);
 static void showRunStartBlocked(const char *reason);

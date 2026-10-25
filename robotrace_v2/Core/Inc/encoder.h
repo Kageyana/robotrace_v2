@@ -17,7 +17,7 @@
 #define ENC_TIM_R TIM8
 #define ENC_TIM_L TIM4
 //====================================//
-// グローバル変数の宣言
+// グローバル変数の宣言、定義
 //====================================//
 extern int16_t encCurrentR;
 extern int16_t encCurrentL;

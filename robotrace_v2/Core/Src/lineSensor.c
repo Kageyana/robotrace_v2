@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 //====================================//
-// グローバル変数の宣言
+// グローバル変数の宣言、定義
 //====================================//
 
 // ラインセンサ関連
@@ -46,6 +46,10 @@ static uint16_t pairSample[2][NUM_SENSORS];
 static uint8_t completedPairCount;
 static uint32_t oldestPairTimeMs;
 static uint8_t readyMask;
+//====================================//
+// プロトタイプ宣言
+//====================================//
+
 static void normalizeLineSensor(const uint16_t *raw, uint16_t *normalized);
 
 _Static_assert(LS_AVERAGE_SAMPLES == 2U, "Line sensor averaging must retain two samples");

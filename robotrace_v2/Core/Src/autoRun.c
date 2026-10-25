@@ -1,8 +1,14 @@
+//====================================//
+// インクルード
+//====================================//
 #include "autoRun.h"
 
 #include <stdio.h>
 #include <string.h>
 
+//====================================//
+// グローバル変数の宣言、定義
+//====================================//
 AutoRunState autoRunState = {0};
 static uint32_t autoRunSeriesEpoch;
 
@@ -12,6 +18,10 @@ static const AutoRunMode defaultModes[AUTO_RUN_CONFIG_SLOT_COUNT] = {
 	AUTO_RUN_MODE_PATH,
 	AUTO_RUN_MODE_SHORTCUT
 };
+
+//====================================//
+// プロトタイプ宣言
+//====================================//
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 resetSeriesState

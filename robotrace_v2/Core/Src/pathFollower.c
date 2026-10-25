@@ -1,3 +1,6 @@
+//====================================//
+// インクルード
+//====================================//
 #include "pathFollower.h"
 #include "logSource.h"
 #include "logPerformance.h"
@@ -111,6 +114,9 @@ typedef struct
 #define driveRoute (runMemory.path.drive)
 #define driveRouteArcMm (runMemory.path.arcMm)
 #define routeFlags (runMemory.path.flags)
+//====================================//
+// グローバル変数の宣言、定義
+//====================================//
 // キャッシュは共有RAM上の延長前基準経路だけ。走行メタデータは従来どおり別保持。
 static struct {
     bool valid;
@@ -119,6 +125,10 @@ static struct {
     LogBinaryHeader source;
     ShortcutSettings settings;
 } routeCache;
+
+//====================================//
+// プロトタイプ宣言
+//====================================//
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathPolicyAssociationAllowed

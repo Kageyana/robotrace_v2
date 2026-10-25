@@ -24,17 +24,16 @@
 #define AD_VBAT_DIVIDER ((VBAT_R1 + VBAT_R2) / VBAT_R2) // 分圧比
 #define AD2VOLTAGE(ad) ((float)(ad)*adcVref / ADC_MAX * AD_VBAT_DIVIDER) // 電圧に変換
 //====================================//
-// グローバル変数の宣言
+// グローバル変数の宣言、定義
 //====================================//
 extern uint16_t batteryAD;		// バッテリ残量(AD値)
 extern uint8_t batteryLevel;	// バッテリ残量レベル
 extern float adcVref;			// ADC基準電圧[V]
+extern float batteryVoltage_V;	// バッテリ電圧[V]
+extern bool batteryVoltageValid;	// バッテリ電圧が有効範囲内で初期化済みか
 //====================================//
 // プロトタイプ宣言
 //====================================//
-extern float batteryVoltage_V;	// バッテリ電圧[V]
-extern bool batteryVoltageValid;	// バッテリ電圧が有効範囲内で初期化済みか
-
 void getBatteryAD(uint16_t ad);
 void SchmittBatery(void);
 void showBattery(void);

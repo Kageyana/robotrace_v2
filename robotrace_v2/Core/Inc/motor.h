@@ -25,7 +25,7 @@
 #error "MOTOR_AD_WINDOW must be a power of two"
 #endif
 //====================================//
-// グローバル変数の宣言
+// グローバル変数の宣言、定義
 //====================================//
 extern int16_t motorpwmL, motorpwmR;
 extern float motorVoltageCmdL_V, motorVoltageCmdR_V;

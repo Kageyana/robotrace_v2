@@ -21,13 +21,23 @@
  */
 
 /* Includes */
+//====================================//
+// インクルード
+//====================================//
 #include <errno.h>
 #include <stdint.h>
 
 /**
  * Pointer to the current high watermark of the heap usage
  */
+//====================================//
+// グローバル変数の宣言、定義
+//====================================//
 static uint8_t *__sbrk_heap_end = NULL;
+
+//====================================//
+// プロトタイプ宣言
+//====================================//
 
 /**
  * @brief _sbrk() allocates memory to the newlib heap and is used by malloc

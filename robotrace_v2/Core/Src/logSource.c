@@ -1,5 +1,8 @@
 // 現行binの検証・型付き読込・メタデータ解析を担当する。
 // 保存時の全件検証も同じ読込処理を使用し、I/O領域はSDcard.cと共有する。
+//====================================//
+// インクルード
+//====================================//
 #include "logSource.h"
 #include "logStorageInternal.h"
 #include "SDcard.h"
@@ -18,6 +21,9 @@
 #define PRIMARY_ROUTE_GOAL_X_LIMIT_MM 60.0F
 #define logBuffers (logIoMemory.logging)
 enum { LOG_READ_RECORD_BYTES = LOG_RECORD_SIZE_BYTES };
+//====================================//
+// グローバル変数の宣言、定義
+//====================================//
 static const uint8_t *logaddress;
 static float cross_start_mm[CROSSSEG_MAX];
 static float cross_end_mm[CROSSSEG_MAX];
@@ -33,6 +39,10 @@ typedef struct
 #undef LOG_STRUCT_FIELD
 #undef LOG_STRUCT_SKIP
 } LogRecord;
+
+//====================================//
+// プロトタイプ宣言
+//====================================//
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logReadU8

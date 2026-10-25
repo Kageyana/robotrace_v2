@@ -22,7 +22,7 @@ static bool sd_remount_for_analysis(void)
 	return (sd_remount() == FR_OK);
 }
 //====================================//
-// グローバル変数の宣言
+// グローバル変数の宣言、定義
 //====================================//
 uint8_t optimalTrace = 0;
 uint16_t optimalIndex;
@@ -45,6 +45,10 @@ uint8_t straightMarkerPendingLog;
 static uint8_t missedCorrections = 0;	// 連続補正失敗回数
 static bool failSafeActive = false;	// フェイルセーフ動作中フラグ
 static int16_t lastCorrectedMarker = 0;	// 直前に補正したマーカーインデックス
+
+//====================================//
+// プロトタイプ宣言
+//====================================//
 
 static void logReadSlipIoError(int logNumber, UINT lineNo, FIL *fil, const char *tag);
 static float calcDecelLeadMmByRoc(int16_t rocPrev, int16_t rocNow);

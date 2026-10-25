@@ -1,6 +1,9 @@
 #ifndef RUN_MEMORY_H_
 #define RUN_MEMORY_H_
 
+//====================================//
+// インクルード
+//====================================//
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -68,10 +71,16 @@ typedef enum
 	RUN_MEMORY_PATH
 } RunMemoryOwner;
 
+//====================================//
+// グローバル変数の宣言、定義
+//====================================//
 extern RunMemory runMemory;
 // 解析元は型付きbin読込とし、CSV行バッファは持たない。
 extern RunMemoryOwner runMemoryOwner;
 
+//====================================//
+// プロトタイプ宣言
+//====================================//
 bool runMemoryPrepare(RunMemoryOwner owner);
 
 #endif

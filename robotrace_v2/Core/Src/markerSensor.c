@@ -7,7 +7,7 @@
 #include "encoder.h"
 #include <stdint.h>
 //====================================//
-// グローバル変数の宣言
+// グローバル変数の宣言、定義
 //====================================//
 uint8_t markerSensor = 0;
 uint8_t SGmarker = 0;
@@ -17,6 +17,10 @@ static int32_t rightMarkerCandidate_p = 0;
 static int32_t rightMarkerQualified_p = 0;
 static uint8_t rightMarkerQualified = 0U;
 static int32_t encMarkerL = PULSE_METER/10, encMarkerR = (PULSE_METER/10) + 1;
+//====================================//
+// プロトタイプ宣言
+//====================================//
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getMarksensor
 // 処理概要     マーカーセンサの値を取得

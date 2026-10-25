@@ -31,7 +31,7 @@ bool logHasIncompleteTemp(void);
 #define FILENAME_AUTORUN "./setting/auto_run.txt"
 
 //====================================//
-// グローバル変数の宣言
+// グローバル変数の宣言、定義
 //====================================//
 extern int16_t fileNumbers[1000],fileIndexLog, endFileIndex;
 extern uint8_t cntLog;

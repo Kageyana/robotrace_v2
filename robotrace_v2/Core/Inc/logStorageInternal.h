@@ -3,6 +3,9 @@
 
 // SDcard.cとlogSource.c専用の内部ヘッダ。
 // 保存と読込だけで共有する停止時検証・作業領域の契約。外部モジュールから使用しない。
+//====================================//
+// インクルード
+//====================================//
 #include "logBinary.h"
 #include "log_schema.h"
 #include "ff.h"
@@ -17,6 +20,9 @@ typedef union {
     uint8_t logging[LOG_BUFFER_COUNT][LOG_BUFFER_SIZE_BYTES];
     struct { uint8_t input[4096]; } stopped;
 } LogIoMemory;
+//====================================//
+// グローバル変数の宣言、定義
+//====================================//
 extern LogIoMemory logIoMemory;
 extern char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE];
 
@@ -48,6 +54,9 @@ typedef struct {
     uint16_t imuCalibrationSamples, imuCalibrationReadErrors;
 } LogSaveCheck;
 
+//====================================//
+// プロトタイプ宣言
+//====================================//
 bool logStorageCanRead(void);
 uint32_t logStorageSchemaCrc(void);
 bool logStorageReadContainerHeader(FIL *file, uint16_t number, LogBinaryHeader *header);

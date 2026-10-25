@@ -16,6 +16,9 @@
 #ifndef __SD_SPI_H__
 #define __SD_SPI_H__
 
+//====================================//
+// インクルード
+//====================================//
 #include "main.h"  // or your specific STM32 family header
 #include <stdint.h>
 
@@ -36,8 +39,14 @@ typedef enum {
     SD_ERROR
 } SD_Status;
 
+//====================================//
+// グローバル変数の宣言、定義
+//====================================//
 extern uint8_t card_initialized;
 
+//====================================//
+// プロトタイプ宣言
+//====================================//
 SD_Status SD_SPI_Init(void);
 SD_Status SD_ReadBlocks(uint8_t *buff, uint32_t sector, uint32_t count);
 SD_Status SD_WriteBlocks(const uint8_t *buff, uint32_t sector, uint32_t count);

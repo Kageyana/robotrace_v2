@@ -73,7 +73,7 @@ typedef struct {
 } pidParam;
 
 //====================================//
-// グローバル変数の宣言
+// グローバル変数の宣言、定義
 //====================================//
 extern uint8_t	targetSpeed;	// 目標速度
 extern float	targetSpeedCommand_m_s;	// setTargetSpeedで指定した速度指令値[m/s]

@@ -1,6 +1,9 @@
 #ifndef PATH_FOLLOWER_H_
 #define PATH_FOLLOWER_H_
 
+//====================================//
+// インクルード
+//====================================//
 #include "runMemory.h"
 #include "main.h"
 #include <stdbool.h>
@@ -46,6 +49,9 @@ typedef enum
 	PATH_SHORTCUT_BUILD_INSUFFICIENT_REDUCTION = 7
 } PathShortcutBuildStatus;
 
+//====================================//
+// グローバル変数の宣言、定義
+//====================================//
 extern ShortcutSettings shortcutSettings;
 extern float pathLogLinePointX_mm;
 extern float pathLogLinePointY_mm;
@@ -57,6 +63,10 @@ extern float pathLogLegalMargin_mm;
 extern float pathLogLineMatchResidual_mm;
 extern uint16_t pathLogPoseCorrection_um;
 extern int16_t pathLogPoseCorrectionHeading_cdeg;
+
+//====================================//
+// プロトタイプ宣言
+//====================================//
 
 int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel);
 bool routeGenerateShortcut(uint8_t shortcutLevel);

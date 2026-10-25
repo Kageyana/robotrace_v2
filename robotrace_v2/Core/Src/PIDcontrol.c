@@ -12,7 +12,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 //====================================//
-// グローバル変数の宣言
+// グローバル変数の宣言、定義
 //====================================//
 pidParam lineTraceCtrl = {"line", KP1, KI1, KD1, 0, 0};
 pidParam lineTraceOmegaFBCtrl = {"lineomega", KP6, KI6, KD6, 0, 0};
@@ -39,6 +39,10 @@ int32_t log_targetAngularVelocity; // ログ用目標角速度
 #define PID_GAIN_MAX 255
 #define SPEED_FF_GAIN_MIN 0
 #define SPEED_FF_GAIN_MAX 255
+
+//====================================//
+// プロトタイプ宣言
+//====================================//
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 applyLineTraceOmegaCurveFeedForward

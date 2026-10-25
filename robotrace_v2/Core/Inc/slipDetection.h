@@ -1,5 +1,8 @@
 #ifndef SLIP_DETECTION_H_
 #define SLIP_DETECTION_H_
+//====================================//
+// インクルード
+//====================================//
 #include <stdbool.h>
 #include "calibrationConstants.h"
 #include <stdint.h>
@@ -93,7 +96,13 @@ typedef struct {
     SlipLateralCandidateState lateralCandidate;
 } SlipDetectionState;
 
+//====================================//
+// グローバル変数の宣言、定義
+//====================================//
 extern SlipDetectionState slipV2;
+//====================================//
+// プロトタイプ宣言
+//====================================//
 void SlipDetection_Reset(SlipDetectionState *state);
 void SlipDetection_Update(SlipDetectionState *state, const SlipDetectionInput *input);
 void SlipDetection_ResetInterval(SlipDetectionState *state);

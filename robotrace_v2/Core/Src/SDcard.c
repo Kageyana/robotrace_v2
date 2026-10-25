@@ -19,7 +19,7 @@
 #include <stdlib.h>
 #include <limits.h>
 //====================================//
-// グローバル変数の宣言
+// グローバル変数の宣言、定義
 //====================================//
 // MicroSD
 FIL fil_W;
@@ -107,6 +107,10 @@ static int16_t runPrimaryLogNumber = 0;
 static int16_t runSlipSourceLogNumber = 0;
 
 static PrimaryRouteValidation primaryRouteValidation = {false, false, false, 0, 0, 0.0F, 1U};
+
+//====================================//
+// プロトタイプ宣言
+//====================================//
 
 // スキーマ関連のヘルパー宣言。
 static void logSendFloat(float value);

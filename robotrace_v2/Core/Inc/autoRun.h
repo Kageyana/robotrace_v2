@@ -1,6 +1,9 @@
 #ifndef AUTORUN_H_
 #define AUTORUN_H_
 
+//====================================//
+// インクルード
+//====================================//
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -61,8 +64,14 @@ typedef enum
 typedef AutoRunConfigReadResult (*AutoRunConfigRead)(void *context, char *buffer, size_t capacity, size_t *length);
 typedef bool (*AutoRunConfigWrite)(void *context, const char *text, size_t length);
 
+//====================================//
+// グローバル変数の宣言、定義
+//====================================//
 extern AutoRunState autoRunState;
 
+//====================================//
+// プロトタイプ宣言
+//====================================//
 void autoRunSetDefaults(AutoRunMode modes[AUTO_RUN_CONFIG_SLOT_COUNT]);
 bool autoRunParseConfig(const char *text, AutoRunMode modes[AUTO_RUN_CONFIG_SLOT_COUNT]);
 bool autoRunFormatConfig(const AutoRunMode modes[AUTO_RUN_CONFIG_SLOT_COUNT], char *buffer, size_t capacity, size_t *length);

@@ -33,7 +33,7 @@
 #define DPS2RADS(dps) ((dps) * DEG2RAD)	// deg/s → rad/s
 #define IMU_ALPHA_LPF_COEF 0.8F			// 角加速度のLPF係数（大きいほどノイズが減るが遅れる。0.8で約20ms程度の時定数）	
 //====================================//
-// グローバル変数の宣言
+// グローバル変数の宣言、定義
 //====================================//
 extern bool calibratIMU;		// IMUキャリブレーション中フラグ
 extern volatile IMUval imuVal;	// IMUの実行時変数

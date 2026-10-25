@@ -21,7 +21,7 @@
 #define SidesensorL_Pin SIDEMARKER_L_Pin
 #define SidesensorR_Pin SIDEMARKER_R_Pin
 //====================================//
-// グローバル変数の宣言
+// グローバル変数の宣言、定義
 //====================================//
 extern uint8_t  markerSensor;
 extern uint8_t  SGmarker;

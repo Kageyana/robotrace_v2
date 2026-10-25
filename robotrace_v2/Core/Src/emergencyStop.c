@@ -3,7 +3,7 @@
 //====================================//
 #include "emergencyStop.h"
 //====================================//
-// グローバル変数の宣言
+// グローバル変数の宣言、定義
 //====================================//
 uint8_t emcStop = 0;
 static uint16_t cntAngleX = 0;
@@ -12,6 +12,10 @@ static uint16_t cntEncStop = 0;
 static uint16_t cntLineSensorBright = 0;
 static uint16_t cntLineSensorUnbright = 0;
 static uint16_t cntOverSpeed = 0;
+//====================================//
+// プロトタイプ宣言
+//====================================//
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 cntEmcStopAngleX
 // 処理概要     緊急停止要因のカウント x軸角速度異常

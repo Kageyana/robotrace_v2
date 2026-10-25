@@ -16,7 +16,7 @@
 #include <stdint.h>
 #define STRAIGHT_STATE_THRESHOLD_MM	70	// 直線判定の距離閾値[mm]
 //====================================//
-// グローバル変数の宣
+// グローバル変数の宣言、定義
 //====================================//
 int32_t cnt5 = 0;
 int32_t cnt10 = 0;
@@ -25,6 +25,10 @@ float bootTime;
 static volatile bool logWriteReq = false;
 static uint32_t slipGyroTime, slipAccelTime, slipCurrentTime, slipCurrentSequence;
 static bool slipWasRunning, slipCurrentCalibrated;
+//====================================//
+// プロトタイプ宣言
+//====================================//
+
 /////////////////////////////////////////////////////////////////////
 // モジュール名 updateSlipCurrentSample
 // 処理概要     10ms電流取得の更新番号と校正完了を診断用に追跡する

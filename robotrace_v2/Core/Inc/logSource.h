@@ -1,5 +1,8 @@
 #ifndef LOG_SOURCE_H_
 #define LOG_SOURCE_H_
+//====================================//
+// インクルード
+//====================================//
 #include <stdbool.h>
 #include <stdint.h>
 #include "ff.h"
@@ -20,6 +23,13 @@ typedef struct {
     float x, y;
 } LogSourceRow;
 
+//====================================//
+// グローバル変数の宣言、定義
+//====================================//
+
+//====================================//
+// プロトタイプ宣言
+//====================================//
 // 停止中・FatFsロック下で1ファイルずつ使用する。開く時に全CRCを検証する。
 FRESULT logSourceOpen(FIL *file, int logNumber, LogSourcePurpose purpose);
 bool logSourceInfo(FIL *file, LogBinaryHeader *header);

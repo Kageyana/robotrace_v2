@@ -5,7 +5,7 @@
 #include <math.h>
 #include <string.h>
 //====================================//
-// グローバル変数の定義
+// グローバル変数の宣言、定義
 //====================================//
 bool calibratIMU = false;		// IMUキャリブレーション中フラグ
 static volatile bool imuCalibrationResetRequested = false;
@@ -41,6 +41,10 @@ static bool gyroZInitialized = false;	// ジャイロzの初期化フラグ
 //====================================//
 #ifdef USE_ACCELE
 #ifdef USE_IMU_ROT_CENTER_CORRECTION
+//====================================//
+// プロトタイプ宣言
+//====================================//
+
 static void applyRotCenterCorrectionIMU(void);
 #endif
 #endif
