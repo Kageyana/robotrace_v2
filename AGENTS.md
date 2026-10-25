@@ -342,7 +342,7 @@ cmake --build --preset Release
 
 速度、制御、センサー、緊急停止に関わる変更では、まず以下を確認します。
 
-- 速度・加速度: `robotrace_v2/Core/Inc/speedParameters.h` の `SPEED_PARAM_FIELDS`を構造体・既定値・保存順・調整範囲・UIの共通定義とする。既定値定数は`control.h`と`courseAnalysis.h`、読み書きは`control.c`、UIは`setup.c`、実機値は`./setting/targetSpeeds.txt`を参照する。
+- 速度・加速度: `robotrace_v2/Core/Inc/speedParameters.h` の `SPEED_PARAM_FIELDS`を構造体・既定値・保存順・調整範囲・UI・ログ出力対象の共通定義とする。末尾のメタデータ出力フラグ0/1で既存15項目を選び、項目名・順序・数値書式を維持する。SD保存は全19項目を使用する。既定値定数は`control.h`と`courseAnalysis.h`、読み書きは`control.c`、UIは`setup.c`、実機値は`./setting/targetSpeeds.txt`を参照する。
 - PID ゲイン、速度フィードフォワード: `robotrace_v2/Core/Inc/PIDcontrol.h`, `robotrace_v2/Core/Src/PIDcontrol.c`, `robotrace_v2/Core/Src/setup.c`, `./setting/line.txt`, `lineomega.txt`, `speed.txt`, `yawRate.txt`, `speed_ff.txt`
 - ラインセンサー校正・閾値: `robotrace_v2/Core/Inc/lineSensor.h`, `robotrace_v2/Core/Src/lineSensor.c`, `./setting/lsval.txt`
 - スリップ判定、クロスライン検出、走行中ゲイン変更: `robotrace_v2/Core/Inc/control.h`, `robotrace_v2/Core/Src/control.c`
@@ -355,6 +355,8 @@ cmake --build --preset Release
 ### エンコーダ・距離換算の正
 
 - `robotrace_v2/Core/Inc/encoder.h` の `PULSE_METER = 58019`, `PULSE_MILLIMETER = PULSE_METER / 1000.0F` を正とする。動力1 mを5走した実測平均値である。
+- 検証済み距離換算とIMU校正サンプル数は`calibrationConstants.h`の`CALIBRATED_ENCODER_PULSE_PER_METER=58019`、`CALIBRATED_IMU_SAMPLE_COUNT=100U`へ集約する。実機側の`PULSE_METER`と`IMU_CALIBRATION_SAMPLE_COUNT`はこの基準の別名とし、スリップ換算・一次ログ検証・PATH元の受入条件も同じ基準を参照する。実機設定だけが基準と異なる場合は経路元として拒否し、基準値の変更には実測校正とログ受入条件の再検証を伴う。
+- `bst500`の初期値は`PARAM_BOOST_500=1.5F`を使用する。SD上の有効な値を優先し、保存済みの値は初期値変更を理由に書き換えない。
 - `encCurrentN` は左右エンコーダの平均で、1 ms あたりのパルス数とする。距離、速度、XY 座標、速度計画で距離換算を使う場合はこの換算値を基準にする。
 - BMI088のジャイロZ温度補正係数はSDの `./setting/imu_temp.txt` に `deg/s/°C × 1000000` の整数で保存する。範囲は -100000〜100000、欠落・破損時は0で作成・修復する。温度読取異常時はその走行の温度補正を停止する。
 

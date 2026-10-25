@@ -117,7 +117,7 @@ typedef struct
 
 // 速度パラメータの一覧テーブル
 static const SpeedParamInfo speedParamTable[] = {
-#define SPEED_PARAM_UI(member, initial, label, step, minimum, maximum, unit) \
+#define SPEED_PARAM_UI(member, initial, label, step, minimum, maximum, unit, metadata) \
     {label, &tgtParam.member, step, minimum, maximum, unit},
     SPEED_PARAM_FIELDS(SPEED_PARAM_UI)
 #undef SPEED_PARAM_UI

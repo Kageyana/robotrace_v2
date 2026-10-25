@@ -67,3 +67,23 @@ Debug、DebugMarker、Release、ReleaseDetail、CleanupDiagnosticsの5構成が�
 センサー角度を含むADC、PID画面・速度設定・メタデータ、通常/詳細の保存とCRC/I/O異常、PC変換も成功した。変更前と通常/詳細×直線/閉路カーブを比較し、記録・列定義の全バイト、型付き読込結果、DISTANCE/SLIP/PATH/SHORTCUTの計画が一致した。比較結果は`build/remaining-cleanup-20261025/comparison/validation.json`、制御式・割込み経路・未使用APIの監査は`verification.json`へ保存した。変更前スナップショットなしの通常回帰実行も成功した。
 
 今回も実機書き込み・走行・ISR最大時間の測定は未実施。前述の13614〜13623は今回の実装より前のログであり、今回の実機確認には数えない。新ビルドでは左右速度追従と横フラグ・ON時間・有効時間、DISTANCE→SLIPの計画と停止保存を確認し、ISR最大時間を別途測定する。
+
+## 校正基準・速度メタデータ・未使用定数の整理（2026-10-25）
+
+- `calibrationConstants.h`へ検証済みの距離換算58019 pulse/mとIMU校正100サンプルを集約した。`PULSE_METER`と`IMU_CALIBRATION_SAMPLE_COUNT`は実機側の別名とし、スリップ換算・一次ログ検証・PATH受入条件も共通基準を使う。実機設定と検証済み基準の照合は維持し、実機側だけを変更した未検証設定では経路元を無効にする。
+- `SPEED_PARAM_FIELDS`の末尾へメタデータ出力フラグ0/1を追加し、SDcard.cの手作業の速度項目列挙を共通定義からの展開へ変更した。既存15項目の名前・順序・数値書式だけを出力し、SD保存は従来どおり全19項目・95Bとする。構造体の並び、UI調整幅、上下限、旧18項目や途中欠落の修復も維持する。
+- 未使用の`PARAM_BOOST_500`を削除した。`bst500`の既定値は`PARAM_BOOST_600`による1.6 m/sを維持し、SD実機値を変更していない。
+
+ローカルの`validation/constants_metadata/run.py`で20,001通りの距離換算をO0/O2の保存ビット列で確認し、通常/詳細各128ケースで実メタデータ全体が変更前とバイト一致した。実機側だけを58020 pulse/mまたは101サンプルにした隔離コピーでは、一次ログが理由10/9で拒否された。ビルド日時だけを固定し、負値と丸め境界も確認した。結果は`build/constants-metadata-validation/validation.json`。
+
+設定178ケース、PID画面、左右PID64,000周期、スリップ104,000周期、全256モード、ADC・センサー角度、保存CRC/I/O異常、PC変換も成功した。通常/詳細×直線/閉路カーブの記録・列定義の全バイト、型付き行、DISTANCE/SLIP/PATH/SHORTCUT計画も変更前と一致した。`build/constants-metadata-20261025/comparison/validation.json`と`verification.json`へ保存した。validationはユーザー指定どおりローカル専用でGit管理対象外。
+
+Debug、DebugMarker、Release、ReleaseDetail、CleanupDiagnosticsの5構成が成功し、新規warningなし。FLASH・RAM使用量は直前の整理後と同じ。制御式、割込み経路、モード番号、ログスキーマを変更していない。実機書き込み・走行・新ビルドの最初のログ確認は未実施。今回の結果は新しい物理校正値を実測したものではない。
+
+試験側で発生した拒否理由番号の誤認と、比較元構造体の版の取り違えは、[既存の失敗記録](失敗事例/2026-10-24-cleanup-host-fixture-contract.md)へ追記した。修正後に通常/詳細と横統計統合前/後の両比較元で検証し、sd-settingsとflash-debugの実行前手順も更新した。
+
+### bst500初期値の追加指示
+
+ユーザーの追加指示で`PARAM_BOOST_500=1.5F`を復活させ、`SPEED_PARAM_FIELDS`の`bst500`初期値に指定した。既定値は1.6から1.5 m/sへ変わる。SD上の有効な既存値は引き続き優先し、保存済みの1.6等を自動で1.5へ置換しない。設定ファイル欠落時は19項目・95Bで作成し、10項目目を`0150,`として保存する。
+
+O0/O2の速度設定180ケースで初期値・欠落作成・既存SD値優先を確認し、PID画面とメタデータも成功した。変更前比較はbst500初期値1.6→1.5だけを意図した差とした。Debug/Releaseビルドも成功し、実機・実SDは操作していない。試験側の小数定数比較は[保存型比較の再発記録](失敗事例/2026-10-12-host-float-snapshot-comparison.md)とSD設定Skillの事前手順へ反映した。

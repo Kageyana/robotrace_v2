@@ -2,6 +2,7 @@
 #define PATH_POLICY_H_
 
 #include <math.h>
+#include "calibrationConstants.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -55,7 +56,8 @@ static inline bool pathPolicySourceMetadataValid(bool versionSupported,
 	uint32_t imuCalibrationReadErrors, bool distanceScaleVerified, uint32_t expectedRows)
 {
 	return versionSupported && closureValid && closureReason == 0U && primaryMode && normalStop &&
-		pulsePerMeter == 58019U && imuCalibrationValid && imuCalibrationSamples == 100U &&
+		pulsePerMeter == (uint32_t)CALIBRATED_ENCODER_PULSE_PER_METER && imuCalibrationValid &&
+		imuCalibrationSamples == CALIBRATED_IMU_SAMPLE_COUNT &&
 		imuCalibrationReadErrors == 0U && distanceScaleVerified && expectedRows > 0U;
 }
 

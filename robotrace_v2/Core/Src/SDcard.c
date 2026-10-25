@@ -8,6 +8,7 @@
 #include "courseAnalysis.h"
 #include "firmware_version.h"
 #include "IMU.h"
+#include "calibrationConstants.h"
 #include "lineSensor.h"
 #include "logBufferWriter.h"
 #include "logPerformance.h"
@@ -711,21 +712,15 @@ static void logBuildMetadata(void)
 	setLogHeaderStr("routeSourceLog", pathRouteSourceLog());
 	setLogHeaderStr("shortcutLevel", pathRouteShortcutLevel());
 
-	setLogHeaderStrF("tgtParam.bstStraight", tgtParam.bstStraight);
-	setLogHeaderStrF("tgtParam.bst1500", tgtParam.bst1500);
-	setLogHeaderStrF("tgtParam.bst1300", tgtParam.bst1300);
-	setLogHeaderStrF("tgtParam.bst1000", tgtParam.bst1000);
-	setLogHeaderStrF("tgtParam.bst800", tgtParam.bst800);
-	setLogHeaderStrF("tgtParam.bst700", tgtParam.bst700);
-	setLogHeaderStrF("tgtParam.bst600", tgtParam.bst600);
-	setLogHeaderStrF("tgtParam.bst500", tgtParam.bst500);
-	setLogHeaderStrF("tgtParam.bst400", tgtParam.bst400);
-	setLogHeaderStrF("tgtParam.bst300", tgtParam.bst300);
-	setLogHeaderStrF("tgtParam.bst200", tgtParam.bst200);
-	setLogHeaderStrF("tgtParam.bst100", tgtParam.bst100);
-	setLogHeaderStrF("tgtParam.acceleF", tgtParam.acceleF);
-	setLogHeaderStrF("tgtParam.acceleD", tgtParam.acceleD);
-	setLogHeaderStrF("tgtParam.decelLeadMm", tgtParam.decelLeadMm);
+    // 共通定義の出力対象だけを保存順で出力し、既存15項目の名前と書式を維持する。
+#define SPEED_PARAM_LOG_0(member)
+#define SPEED_PARAM_LOG_1(member) setLogHeaderStrF("tgtParam." #member, tgtParam.member);
+#define SPEED_PARAM_LOG(member, initial, label, step, minimum, maximum, unit, metadata) \
+    SPEED_PARAM_LOG_##metadata(member)
+    SPEED_PARAM_FIELDS(SPEED_PARAM_LOG)
+#undef SPEED_PARAM_LOG
+#undef SPEED_PARAM_LOG_1
+#undef SPEED_PARAM_LOG_0
 
 	setLogHeaderStrF("lineTraceCtrl.kp", lineTraceCtrl.kp);
 	setLogHeaderStrF("lineTraceCtrl.ki", lineTraceCtrl.ki);
@@ -1067,7 +1062,7 @@ static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t *dataCr
 			primaryRouteValidation.reason = 3U;
 		}
 		else if (!runImuCalibrationValid ||
-			runImuCalibrationSamples != IMU_CALIBRATION_SAMPLE_COUNT ||
+			runImuCalibrationSamples != CALIBRATED_IMU_SAMPLE_COUNT ||
 			runImuCalibrationReadErrors != 0U)
 		{
 			primaryRouteValidation.reason = 9U;
@@ -1087,7 +1082,7 @@ static bool logScanRecords(FIL *file, uint16_t rows, bool live, uint32_t *dataCr
 			primaryRouteValidation.distanceScaleError_p = (int32_t)scaleError;
 			primaryRouteValidation.distanceScaleVerified =
 				totalPulseMonotonic && previousTotalPulse > 0 && scaleErrorAbs <= scaleTolerance &&
-				PULSE_METER == 58019;
+				PULSE_METER == CALIBRATED_ENCODER_PULSE_PER_METER;
 			if (!primaryRouteValidation.distanceScaleVerified)
 			{
 				primaryRouteValidation.reason = 10U;

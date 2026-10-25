@@ -44,7 +44,7 @@ uint16_t analogVal2[4];			  // ADC結果格納配列
 
 // 速度パラメータ関連
 speedParam tgtParam = {
-#define SPEED_PARAM_DEFAULT(member, initial, label, step, minimum, maximum, unit) initial,
+#define SPEED_PARAM_DEFAULT(member, initial, label, step, minimum, maximum, unit, metadata) initial,
     SPEED_PARAM_FIELDS(SPEED_PARAM_DEFAULT)
 #undef SPEED_PARAM_DEFAULT
 };
@@ -1283,7 +1283,7 @@ static void applyTargetSpeedStoredValue(int16_t index, int16_t value)
     const float converted = (float)value / SPEED_PARAM_STORAGE_SCALE;
     switch (index)
     {
-#define SPEED_PARAM_APPLY(member, initial, label, step, minimum, maximum, unit) \
+#define SPEED_PARAM_APPLY(member, initial, label, step, minimum, maximum, unit, metadata) \
         case SPEED_PARAM_##member: tgtParam.member = converted; break;
         SPEED_PARAM_FIELDS(SPEED_PARAM_APPLY)
 #undef SPEED_PARAM_APPLY
@@ -1324,8 +1324,8 @@ void writeTgtspeeds(void)
     strcat(fileName, ".txt");
     if (f_open(&fil, fileName, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
     {
-#define SPEED_PARAM_FORMAT(member, initial, label, step, minimum, maximum, unit) SPEED_PARAM_STORAGE_FORMAT
-#define SPEED_PARAM_VALUE(member, initial, label, step, minimum, maximum, unit) \
+#define SPEED_PARAM_FORMAT(member, initial, label, step, minimum, maximum, unit, metadata) SPEED_PARAM_STORAGE_FORMAT
+#define SPEED_PARAM_VALUE(member, initial, label, step, minimum, maximum, unit, metadata) \
         , (int32_t)roundf(tgtParam.member * SPEED_PARAM_STORAGE_SCALE)
         f_printf(&fil, SPEED_PARAM_FIELDS(SPEED_PARAM_FORMAT) SPEED_PARAM_FIELDS(SPEED_PARAM_VALUE));
 #undef SPEED_PARAM_FORMAT
@@ -1348,19 +1348,19 @@ void readTgtspeeds(void)
 	int values[TARGET_SPEED_PARAM_COUNT] = {0};
 	int defaults[TARGET_SPEED_PARAM_COUNT];
 	int minimums[TARGET_SPEED_PARAM_COUNT] = {
-#define SPEED_PARAM_MIN(member, initial, label, step, minimum, maximum, unit) (int)((minimum) * SPEED_PARAM_STORAGE_SCALE),
+#define SPEED_PARAM_MIN(member, initial, label, step, minimum, maximum, unit, metadata) (int)((minimum) * SPEED_PARAM_STORAGE_SCALE),
         SPEED_PARAM_FIELDS(SPEED_PARAM_MIN)
 #undef SPEED_PARAM_MIN
     };
     int maximums[TARGET_SPEED_PARAM_COUNT] = {
-#define SPEED_PARAM_MAX(member, initial, label, step, minimum, maximum, unit) (int)((maximum) * SPEED_PARAM_STORAGE_SCALE),
+#define SPEED_PARAM_MAX(member, initial, label, step, minimum, maximum, unit, metadata) (int)((maximum) * SPEED_PARAM_STORAGE_SCALE),
         SPEED_PARAM_FIELDS(SPEED_PARAM_MAX)
 #undef SPEED_PARAM_MAX
     };
 	bool present[TARGET_SPEED_PARAM_COUNT] = {false};
 	bool repair = false;
     const float defaultSpeedValues[TARGET_SPEED_PARAM_COUNT] = {
-#define SPEED_PARAM_CURRENT(member, initial, label, step, minimum, maximum, unit) tgtParam.member,
+#define SPEED_PARAM_CURRENT(member, initial, label, step, minimum, maximum, unit, metadata) tgtParam.member,
         SPEED_PARAM_FIELDS(SPEED_PARAM_CURRENT)
 #undef SPEED_PARAM_CURRENT
     };

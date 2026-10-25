@@ -1,6 +1,7 @@
 #ifndef SLIP_DETECTION_H_
 #define SLIP_DETECTION_H_
 #include <stdbool.h>
+#include "calibrationConstants.h"
 #include <stdint.h>
 
 #define SLIP_V2_VERSION 4U
@@ -16,7 +17,7 @@
 #define SLIP_V2_GYRO_DELAY_MS 0U
 #define SLIP_V2_ENCODER_YAW_DELAY_MS 8U
 #define SLIP_V2_HISTORY 64U
-#define SLIP_V2_PULSE_PER_METER 58019.0F
+#define SLIP_V2_PULSE_PER_METER ((float)CALIBRATED_ENCODER_PULSE_PER_METER)
 #define SLIP_V2_LONG_ON 10.0F
 #define SLIP_V2_LONG_OFF 8.0F
 // 角加速度LPFと応答をそろえた残差に対するユーザー指定の暫定閾値[m/s^2]。

@@ -71,6 +71,7 @@ File: `speed_ff.txt`
 File: `targetSpeeds.txt`
 
 - Implementation: `control.c`, `writeTgtspeeds()`, `readTgtspeeds()`. Structure, default order, UI ranges and storage order share `Core/Inc/speedParameters.h` / `SPEED_PARAM_FIELDS`; preserve the 19-field format when editing this list.
+- `SPEED_PARAM_FIELDS` has a final metadata-output flag (0/1). The existing 15 speed metadata keys are emitted from this list in order; keep their names, formatting and selection unchanged. SD storage still uses all 19 fields. The `bst500` default uses `PARAM_BOOST_500` (1.5 m/s), restored by user instruction. Valid existing SD values remain authoritative.
 - Format: 19 fixed-width comma-separated fields.
 - Write format: each item `%04d,`
 - Read format: each item `%04hd,`
