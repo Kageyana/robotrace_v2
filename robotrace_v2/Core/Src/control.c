@@ -368,6 +368,7 @@ void initSystem(void)
 ///////////////////////////////////////////////////////////////////////////
 static const char *getRunStartBlockReason(void)
 {
+	if (!isSupportedRunMode(optimalTrace)) return "MODE invalid";
 	if (insertSD() && !logRecoveryIsReady()) return "BIN storage failed";
 	if (!initIMU)
 	{

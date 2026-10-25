@@ -69,8 +69,8 @@ typedef struct {
     uint16_t reason;
 } SlipLateralCandidateResult;
 typedef struct {
-    float peak;
-    uint16_t onMs, validMs, invalidReason;
+    // 横のピーク値とON時間はSlipDetectionIntervalのpeakLat/onLatMsへ集約する。
+    uint16_t validMs, invalidReason;
 } SlipLateralCandidateInterval;
 typedef struct {
     float filter[SLIP_V2_FILTER_MS], history[SLIP_V2_SLOW_MS];

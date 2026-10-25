@@ -14,7 +14,7 @@
 //====================================//
 extern float bootTime;
 #if defined(ROBOTRACE_ISR_TIMING) && ROBOTRACE_ISR_TIMING
-// BOOST_NONE/MARKER/DISTANCE/SHORTCUT/PATH_REPLAYの順。起動からの累積値。
+// モード番号0/予約1/2/3/4の順。廃止した番号1は記録せず、他の添字を維持する。
 #define ISR_TIMING_MODE_COUNT 5U
 typedef struct
 {

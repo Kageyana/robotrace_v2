@@ -447,10 +447,10 @@ cmake --build --preset Release
 走行モードは `optimalTrace` で区別し、定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_*` を正とします。
 
 - `BOOST_NONE`: 1次走行。距離、角速度、マーカー、曲率半径を記録し、2次走行用のログを取る。
-- `BOOST_MARKER`: マーカー位置によって区間速度を決定するモード。現在は使用していない。
 - `BOOST_DISTANCE`: 1次走行の走行距離と比較し、現在の走行位置と曲率半径から速度を決定して走行する。
 - `BOOST_SHORTCUT`: `BOOST_PATH_REPLAY` の経路にLevel 1の直線回廊短縮を適用し、合法余裕を確認してヨーレート制御で走行する。
 - `BOOST_PATH_REPLAY`: 条件を満たす現行binの `x`, `y`, `encTotalOptimal` を型付きAPIで復元し、40 mm間隔に再標本化した経路を走行する。ラインセンサーは限定的な実座標姿勢補正とロスト時フォールバックに使う。Level 0専用速度は `targetSpeeds.txt` の `pathReplay` とする。
+- 現行番号は一次=0、DISTANCE=2、SHORTCUT=3、PATH REPLAY=4を維持する。旧`BOOST_MARKER`の番号1は廃止・再利用禁止とし、未定義値とともに走行開始を拒否する。ISR診断配列も添字1を空け、既存の他モードの添字を維持する。
 - PATH REPLAY / SHORTCUT は一次経路の終端から原点までの距離の半分だけ経路を延長し、その延長点をゴールとする。経路延長不能、配列容量超過、無効な経路元は生成エラーとして走行開始を禁止する。自己位置喪失時の停止を維持する。
 
 ### 速度計画と確認観点
@@ -501,7 +501,7 @@ cmake --build --preset Release
 - 共通ログ読込は現行スキーマの `.bin` のみとし、`logSource.h`のメタデータ取得・型付き次行取得を使用する。曲率・クロス前後100 mm直線化・XY計算は維持し、機体側のCSVヘッダ生成・CSV行読込・数値解析は行わない。停止中・FatFsロック下で1ファイルずつ実行する。
 - SLIP/PATHの整数メタデータ取得は`logMetadataReadInt()`へ統一する。カンマ区切りの完全一致キーと有限なint32整数相当値を使用し、`0`と`0.00`は同値として読む。欠落・重複・非有限値・端数・範囲外を拒否する。各方式の解析元条件とCRC検証は維持する。
 - DISTANCE/SLIPの読込は不要なXY計算を省く。PATHの初回生成は検証・クロス抽出と経路検証・生成の2走査とする。同一連続走行内のPATH/SHORTCUTは延長前基準経路を再利用できるが、再利用時も元binの全件CRC検証を行う。元ログ・生成設定・系列世代・共有RAMの使用先が変わった場合や失敗時は無効化し、ゴール延長と速度計画は毎回作り直す。詳細と実測結果は`doc/log-processing-performance.md`を参照する。
-- 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_MARKER`, `BOOST_DISTANCE`, `BOOST_SHORTCUT`, `BOOST_PATH_REPLAY` を正とする。
+- 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_DISTANCE`, `BOOST_SHORTCUT`, `BOOST_PATH_REPLAY` を正とする。
 - 新しい走行モードを追加する場合は、`robotrace_v2/Core/Inc/courseAnalysis.h` に定義を追加する。
 - `emcStop` が 0 以外の場合は緊急停止しており、ゴールしていない走行として扱う。
 - 緊急停止条件は `robotrace_v2/Core/Inc/emergencyStop.h` の定義を正とする。経路追従中に自己位置を喪失し、ライン追従へ移行できない場合は `STOP_LOCALIZATION` とする。
@@ -512,6 +512,8 @@ cmake --build --preset Release
 - 手動解析後のDISTANCE/SLIP/PATH/SHORTCUTも、実際に保持している有効な計画の一次ログ番号を走行開始時に固定し、既存`primaryLogNumber`へ保存する。`autoRunNumber=0,requestedMode=MANUAL`は維持し、系列所属は一次番号だけで自動走行と推定しない。手動一次・計画なし・参照未取得は0とし、設定ファイルの解析番号だけで参照を補わない。列数・レコード長は変更しない。
 - `batteryVoltage_mV` は走行中にLPF更新したバッテリー電圧 `[mV]`、`motorVoltageCmdL_mV`, `motorVoltageCmdR_mV` はバッテリー電圧で割る前の左右モーター指令電圧 `[mV]` とする。
 - 左右実DUTYの `motorpwmL`, `motorpwmR` は通常・詳細ともにログへ出力しない。
+- 左右速度PIDは`PIDcontrol.c`の`updateWheelSpeedPID()`を共通処理とし、左右の積分値・偏差履歴・前回目標・FF保持値を独立させる。目標変更時の積分リセットとFF更新、未飽和時だけの積分、±10000の積分制限、±1000の出力制限を維持する。平均速度PIDとの条件差も維持する。
+- 横スリップの区間ピーク値・ON時間は`SlipDetectionInterval.peakLat/onLatMs`だけへ保存する。横独自の有効時間・無効理由は`lateralCandidate.interval.validMs/invalidReason`に保持し、共通側の値へ代用しない。ログ列・保存型・検出器版・閾値・計画式は変更しない。
 - 通常・詳細ログに左右個別の `encCurrentL`, `encCurrentR`（符号付き16bit、1 msあたりのパルス数 `[pulse/ms]`）と `encTotalL`, `encTotalR`（符号付き32bit、スタートマーカー基準の累積パルス数 `[pulse]`）を出力する。前進を正とし、累積値はスタートマーカー通過時だけ0へリセットする。停止時には保持し、ログ先頭はマーカー通過後なので0とは限らない。12878までのログは電源投入からの累積値だった。走行中の距離は開始付近の値との差で確認する。速度 `[m/s]` は `encCurrentL/R / PULSE_MILLIMETER`、距離 `[mm]` は累積パルス差 `/ PULSE_MILLIMETER` で換算する。左右個別値は診断用であり、距離換算の実測検証は左右平均を対象とする。
 - 通常・詳細ログに `lSensorCari0`～`lSensorCari9` を出力する。`lSensorCari[0]`～`[9]` の校正済み正規化値（0～4095、無次元）で、0は左端、9は右端。ログ取得時点の最新値を保存する。
 - `LOG_SCHEMA_PROFILE_LIGHT=0` のデバッグログでは `markerSensor`（LED差分から得たマーカー状態）、`sgMarkerCount`（スタート・ゴールマーカー累積数）、`encRightMarker_p`（右マーカーからの補正後エンコーダパルス）、`patternTrace`（走行状態）を追加出力する。ログヘッダには終了時の `sgMarkerAtLogEnd` と `encRightMarkerAtLogEnd_p` も出力する。

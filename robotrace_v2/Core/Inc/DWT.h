@@ -22,7 +22,6 @@
 #define getCycleCounter() \
 	DWT->CYCCNT;
 
-float getTimeUs(uint32_t count);
 float getTimeMs(uint32_t count);
 
 #endif /* INC_DWT_H_ */

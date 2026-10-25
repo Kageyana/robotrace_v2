@@ -184,16 +184,6 @@ void finishLineSensorCalibration(void)
 }
 
 /////////////////////////////////////////////////////////////////////
-// モジュール名 isLineSensorSettingCorrupt
-// 処理概要     ラインセンサ設定ファイルの破損検出状態を取得する
-// 引数         なし
-// 戻り値       true:破損検出あり false:破損検出なし
-/////////////////////////////////////////////////////////////////////
-bool isLineSensorSettingCorrupt(void)
-{
-	return lineSensorSettingCorrupt;
-}
-/////////////////////////////////////////////////////////////////////
 // モジュール名 powerLineSensors
 // 処理概要  	ラインセンサのON/OFF処理
 // 引数     	0:OFF 1:ON

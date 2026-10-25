@@ -207,11 +207,6 @@ uint8_t sd_is_sdhc(void) {
     return sdhc;
 }
 
-SD_Status SD_WaitReadyMs(uint32_t timeout_ms) {
-    sd_byte_io_failed = 0;
-    return SD_WaitReadyInternal(timeout_ms);
-}
-
 SD_Status SD_Sync(uint32_t timeout_ms) {
     sd_byte_io_failed = 0;
     SD_CS_LOW();

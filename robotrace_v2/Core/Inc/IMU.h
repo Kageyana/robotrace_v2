@@ -70,7 +70,5 @@ typedef struct {
 } ImuTangentialSample;
 ImuTangentialSample IMU_GetTangentialSample(void);
 float IMU_GetLinearAccelerationYMps2(void);
-float IMU_GetLinearAccelerationZMps2(void);
-float IMU_GetForwardAccelerationMps2(void);
 
 #endif // IMU_H_

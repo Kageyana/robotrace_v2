@@ -154,9 +154,7 @@ static void finishCandidate(SlipDetectionState *state)
         c->lowMs = magnitude < SLIP_LAT_CANDIDATE_OFF ? (uint8_t)(c->lowMs + 1U) : 0U;
         if (c->lowMs >= SLIP_V2_OFF_MS) { c->result.flag = 0U; c->lowMs = 0U; }
     }
-    c->interval.peak = fmaxf(c->interval.peak, magnitude);
     incrementSaturated(&c->interval.validMs);
-    if (c->result.flag) incrementSaturated(&c->interval.onMs);
 }
 
 /////////////////////////////////////////////////////////////////////

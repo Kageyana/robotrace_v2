@@ -8,6 +8,7 @@
 #include "encoder.h"
 #include "stdlib.h"
 #include "math.h"
+#include <stdbool.h>
 //====================================//
 // シンボル定義
 //====================================//
@@ -16,10 +17,22 @@
 #define MACHINEDECREACE 3.0F		// 減速度[m/s^2]
 
 #define BOOST_NONE 0				// 1次走行
-#define BOOST_MARKER 1				// マーカー基準2次走行
+// モード番号1は廃止済み。既存ログの他モード番号を変えないため再利用しない。
 #define BOOST_DISTANCE 2			// 距離基準2次走行
 #define BOOST_SHORTCUT 3			// ショートカット2次走行
 #define BOOST_PATH_REPLAY 4			// 一次走行経路のセンサレス再走行
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 isSupportedRunMode
+// 処理概要     廃止した番号と未定義値を除き現行の走行モードか判定する
+// 引数         mode: 走行モード番号
+// 戻り値       true: 現行モード false: 廃止または未定義
+/////////////////////////////////////////////////////////////////////
+static inline bool isSupportedRunMode(uint8_t mode)
+{
+    return mode == BOOST_NONE || mode == BOOST_DISTANCE ||
+        mode == BOOST_SHORTCUT || mode == BOOST_PATH_REPLAY;
+}
 
 #define SEARCHRANGE 150				// 距離補正時の距離検索範囲[mm]
 

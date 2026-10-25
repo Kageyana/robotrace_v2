@@ -48,7 +48,7 @@ static void updateSlipCurrentSample(uint32_t nowMs)
 }
 #if defined(ROBOTRACE_ISR_TIMING) && ROBOTRACE_ISR_TIMING
 volatile IsrTimingStats isrTimingStats[ISR_TIMING_MODE_COUNT] = {0};
-_Static_assert(BOOST_NONE == 0 && BOOST_MARKER == 1 && BOOST_DISTANCE == 2 &&
+_Static_assert(BOOST_NONE == 0 && BOOST_DISTANCE == 2 &&
 	BOOST_SHORTCUT == 3 && BOOST_PATH_REPLAY == 4, "ISR timing mode order changed");
 /////////////////////////////////////////////////////////////////////
 // モジュール名 recordIsrTiming
@@ -58,7 +58,7 @@ _Static_assert(BOOST_NONE == 0 && BOOST_MARKER == 1 && BOOST_DISTANCE == 2 &&
 /////////////////////////////////////////////////////////////////////
 static void recordIsrTiming(uint32_t mode, uint32_t cycles)
 {
-	if (mode >= ISR_TIMING_MODE_COUNT) return;
+	if (mode >= ISR_TIMING_MODE_COUNT || !isSupportedRunMode((uint8_t)mode)) return;
 	volatile IsrTimingStats *stats = &isrTimingStats[mode];
 	// サンプル数上限では集計を止め、合計と平均の整合を維持する。
 	if (stats->samples == UINT32_MAX) return;
@@ -131,7 +131,7 @@ void Interrupt1ms(void)
 	SlipDetectionInput slipInput = {
 		.pulseL = encCurrentL, .pulseR = encCurrentR,
 		.pwmL = motorpwmL, .pwmR = motorpwmR,
-		.forwardMps2 = IMU_GetForwardAccelerationMps2(),
+		.forwardMps2 = IMU_GetLinearAccelerationYMps2(),
 		.lateralMps2 = IMU_GetLinearAccelerationXMps2(), .yawDps = imuVal.gyro.z,
 		.currentL = motorCurrentL, .currentR = motorCurrentR,
 		.timeMs = cntRun, .gyroTimeMs = slipGyroTime, .accelTimeMs = slipAccelTime,

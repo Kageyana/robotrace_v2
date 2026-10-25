@@ -66,6 +66,5 @@ void finishLineSensorCalibration(void);
 void writeLinesenval(void);
 void readLinesenval(void);
 bool isLineSensorCalibrationValid(void);
-bool isLineSensorSettingCorrupt(void);
 
 #endif // LINESENSOR_H_

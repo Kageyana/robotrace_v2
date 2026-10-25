@@ -1167,12 +1167,11 @@ static int16_t clampMarkerIndex(int16_t idx)
 /////////////////////////////////////////////////////////////////////
 // ローカル関数 isStraightBeforeMarker
 // 処理概要     直前の直線走行距離が評価窓の所定割合以上か判定する
-// 引数         encNow: 現在距離[pulse]（未使用）, window_mm: 評価窓[mm], ratio_threshold: 直線率閾値
+// 引数         window_mm: 評価窓[mm], ratio_threshold: 直線率閾値
 // 戻り値       true: 直線率が閾値以上, false: 閾値未満
 /////////////////////////////////////////////////////////////////////
-static bool isStraightBeforeMarker(int32_t encNow, int16_t window_mm, float ratio_threshold)
+static bool isStraightBeforeMarker(int16_t window_mm, float ratio_threshold)
 {
-	(void)encNow;
 	int32_t straightDistance = straightMeter;	// 直前に直線と判定した走行距離[mm]
 	int32_t ratioScaled = (int32_t)(ratio_threshold * 1000.0f); // 直線率閾値を1000倍の整数へ変換する
 	int32_t lhs = straightDistance * 1000;	// 直線走行距離を1000倍して比較する
@@ -1280,7 +1279,7 @@ void processMarkerEvent(void) {
 		if (optimalTrace == BOOST_DISTANCE) {
 			if (numPPAMarry > 0) {
 				bool isCross = (courseMarker == CROSSLINE);	// クロスラインなら距離誤差の閾値判定を省く
-				bool straightLike = isStraightBeforeMarker(encTotalOptimal, STRAIGHT_WINDOW_MM, STRAIGHT_RATIO_THRESHOLD);	// 直前区間の直線率を判定する
+				bool straightLike = isStraightBeforeMarker(STRAIGHT_WINDOW_MM, STRAIGHT_RATIO_THRESHOLD);	// 直前区間の直線率を判定する
 				bool straightPending = straightMarkerPending;	// first marker after straight detection
 				bool usedStraightPending = straightPending;
 				if (straightLike || isCross || straightPending) {

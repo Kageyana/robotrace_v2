@@ -830,9 +830,6 @@ static void setup_start(void)
 		case BOOST_NONE:
 			ssd1306_printf(Font_6x8, "BOOST NONE");
 			break;
-		case BOOST_MARKER:
-			ssd1306_printf(Font_6x8, "BOOST MARKER");
-			break;
 		case BOOST_DISTANCE:
 			ssd1306_printf(Font_6x8, "BOOST DISTANCE");
 			break;

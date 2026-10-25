@@ -386,87 +386,54 @@ dEncSpeed_p = encCurrentN; // 速度制御は生エンコーダを使用する�
 	speedTargetBefore = targetSpeed; // 前回の目標値を記録
 }
 ///////////////////////////////////////////////////////////////////////////
+// モジュール名 updateWheelSpeedPID
+// 処理概要     片輪の速度PIDと目標変更時のFF更新を行い、輪ごとの状態を保持する
+// 引数         pid: 対象PID, targetEnc/currentEnc: 目標/現在速度[pulse/ms]
+//              previousTarget: 前回目標, previousError: 前回偏差[pulse/ms]
+//              feedForward: 保持するFF指令, crr: 転がり抵抗係数
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+static void updateWheelSpeedPID(pidParam *pid, int16_t targetEnc, int16_t currentEnc,
+    int16_t *previousTarget, int16_t *previousError, int16_t *feedForward, float crr)
+{
+    int32_t dev = (int32_t)targetEnc - (int32_t)currentEnc;
+    if (targetEnc != *previousTarget)
+    {
+        pid->Int = 0.0f;
+        float target_mm_s = ((float)targetEnc / PULSE_MILLIMETER) * 1000.0f;
+        *feedForward = calcSpeedFeedForward(target_mm_s,
+            SPEED_FEEDFORWARD_PWM_MAX_DEFAULT, crr);
+    }
+    // 飽和していないときだけ積分する既存の左右速度PID条件を維持する。
+    if (pid->pwm < 1000 && pid->pwm > -1000)
+        pid->Int += (float)dev * 0.001f;
+    if (pid->Int > 10000.0f) pid->Int = 10000.0f;
+    if (pid->Int < -10000.0f) pid->Int = -10000.0f;
+
+    int32_t dif = dev - *previousError;
+    int32_t iP = pid->kp * dev;
+    int32_t iI = (int32_t)(pid->ki * pid->Int);
+    int32_t iD = pid->kd * dif;
+    int32_t output = iP + iI + iD + *feedForward;
+    if (output > 1000) output = 1000;
+    if (output < -1000) output = -1000;
+    pid->pwm = output;
+    *previousError = (int16_t)dev;
+    *previousTarget = targetEnc;
+}
+///////////////////////////////////////////////////////////////////////////
 // モジュール名 motorControlSpeedLR
-// 処理概要     モーターの制御量の計算(左右独立）
-// 引数         targetEncL:左モーター目標エンコーダ値
-//              targetEncR:右モーター目標エンコーダ値
+// 処理概要     左右独立の速度PIDを同じ処理で更新する
+// 引数         targetEncL: 左目標速度, targetEncR: 右目標速度[pulse/ms]
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
 void motorControlSpeedLR(int16_t targetEncL, int16_t targetEncR)
 {
-	float crr = (float)speedFeedForwardGain * SPEED_FEEDFORWARD_CRR_SCALE;
-
-	// --- Left ---
-	int32_t devL = (int32_t)targetEncL - (int32_t)encCurrentL;
-
-	if (targetEncL != speedTargetBeforeL){
-		veloCtrlL.Int = 0.0f;
-
-		// targetEncL[count/ms] -> mm/s
-		float target_mm_s_L = ((float)targetEncL / PULSE_MILLIMETER) * 1000.0f;
-		feedForwardPwmL = calcSpeedFeedForward(target_mm_s_L,
-			SPEED_FEEDFORWARD_PWM_MAX_DEFAULT, crr);
-	}
-
-	// アンチワインドアップ（※本当に止めたいなら「未飽和時のみ積分」にする）
-	if (veloCtrlL.pwm < 1000 && veloCtrlL.pwm > -1000){
-		veloCtrlL.Int += (float)devL * 0.001f;
-	}
-	if (veloCtrlL.Int > 10000.0f) veloCtrlL.Int = 10000.0f;
-	if (veloCtrlL.Int < -10000.0f) veloCtrlL.Int = -10000.0f;
-
-	int32_t difL = devL - speedEncoderBeforeL;
-
-	int32_t iPL = veloCtrlL.kp * devL;
-	int32_t iIL = (int32_t)(veloCtrlL.ki * veloCtrlL.Int);
-	int32_t iDL = veloCtrlL.kd * difL;
-	int32_t iRetL = iPL + iIL + iDL + feedForwardPwmL;
-
-  	
-	if (iRetL > 1000)
-		iRetL = 1000;
-	if (iRetL < -1000)
-		iRetL = -1000;
-
-	veloCtrlL.pwm = iRetL;
-
-	speedEncoderBeforeL = (int16_t)devL;
-	speedTargetBeforeL  = targetEncL;
-
-	// --- Right ---
-	int32_t devR = (int32_t)targetEncR - (int32_t)encCurrentR;
-
-	if (targetEncR != speedTargetBeforeR){
-		veloCtrlR.Int = 0.0f;
-
-		float target_mm_s_R = ((float)targetEncR / PULSE_MILLIMETER) * 1000.0f;
-		feedForwardPwmR = calcSpeedFeedForward(target_mm_s_R,
-			SPEED_FEEDFORWARD_PWM_MAX_DEFAULT, crr);
-	}
-
-	if (veloCtrlR.pwm < 1000 && veloCtrlR.pwm > -1000){
-		veloCtrlR.Int += (float)devR * 0.001f;
-	}
-	if (veloCtrlR.Int > 10000.0f) veloCtrlR.Int = 10000.0f;
-	if (veloCtrlR.Int < -10000.0f) veloCtrlR.Int = -10000.0f;
-
-	int32_t difR = devR - speedEncoderBeforeR;
-
-	int32_t iPR = veloCtrlR.kp * devR;
-	int32_t iIR = (int32_t)(veloCtrlR.ki * veloCtrlR.Int);
-	int32_t iDR = veloCtrlR.kd * difR;
-	int32_t iRetR = iPR + iIR + iDR + feedForwardPwmR;
-
-	// PWMの上限の設定
-	if (iRetR > 1000)
-		iRetR = 1000;
-	if (iRetR < -1000)
-		iRetR = -1000;
-
-	veloCtrlR.pwm = iRetR;
-
-	speedEncoderBeforeR = (int16_t)devR;
-	speedTargetBeforeR  = targetEncR;
+    float crr = (float)speedFeedForwardGain * SPEED_FEEDFORWARD_CRR_SCALE;
+    updateWheelSpeedPID(&veloCtrlL, targetEncL, encCurrentL,
+        &speedTargetBeforeL, &speedEncoderBeforeL, &feedForwardPwmL, crr);
+    updateWheelSpeedPID(&veloCtrlR, targetEncR, encCurrentR,
+        &speedTargetBeforeR, &speedEncoderBeforeR, &feedForwardPwmR, crr);
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 motorControlYawRate
