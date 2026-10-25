@@ -9,6 +9,7 @@ robotrace_v2/build/
 
 # ローカル検証用テストは管理対象外とする
 tests/
+/validation/
 
 #cmake
 CMakeLists.txt.user
