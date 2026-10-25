@@ -6,6 +6,10 @@ PC変換器へ渡すbinは初回からASCII連番名とヘッダ番号の一致�
 
 ## 成果物・PC検証
 
+- 新しいビルド集計スクリプトを作るときも、警告比較前に現在のCore/Srcコンパイル単位が比較元のログで被覆されることをassertする。直前増分だけを基準にせず、変更前の全体ログと必要な増分を併用する。今回のコマンドは`python build/path-1ms-validation/finalize.py`、実行はリポジトリルート。未被覆なら新規警告の判定前に停止する。[増分基準の再発](../../../../doc/失敗事例/2026-10-16-self-describing-header-test-contract.md)参照。
+
+- 白線を使う単独ハーネスは初回から校正有効・クロスライン外・連続明部を明示し、実pathSenseLineの成功を状態遷移の前に確認する。中央素子の重心を0mmと仮定せず、実観測のlateral/forwardから期待値を求める。必要権限・リポジトリルートの`python validation/log_storage/run.py --converter C:/tool/AutoCopyCsvFromSd/RlogToCsv.exe`で1msの待ち時間・補正換算と保存を両構成で検証する。[白線入力前提の事例](../../../../doc/失敗事例/2026-10-24-cleanup-host-fixture-contract.md)参照。
+
 - 公開ヘッダだけを読む単独ホスト試験でも、初回コンパイル前にFatFs→Windows→CMSISの推移依存を確認する。ファイルAPIが不要な行検証は、実ヘッダの型と実ソースの関数だけを一意性検査付きで抽出する。警告を緩めたり製品ヘッダを変更して回避しない。必要権限・リポジトリルートで`python validation/log_storage/run.py --converter C:/tool/AutoCopyCsvFromSd/RlogToCsv.exe`を実行し、O0/O2・Wall/Wextra/Werror、通常/詳細の統合保存・PC変換まで通す。[単独ヘッダ読込の再発](../../../../doc/失敗事例/2026-10-04-fatfs-log-reader-header-cycle.md)参照。
 
 - このWindows制限環境ではST-LINK_gdbserver、Programmer CLI、GDB等のCubeCLT同梱exeにもDLL再配置エラーがある。GNUツールだけに限定せず、help/版表示を含め初回から許可された制限外環境で実行する。再発記録は[2026-10-11事例の2026-10-21追記](../../../../doc/失敗事例/2026-10-11-bmi088-forward-y-sign.md)を確認する。

@@ -157,6 +157,8 @@ void Interrupt1ms(void)
 	if (pathModeActive && patternTrace >= 12 && patternTrace < 100)
 	{
 		pathFollowerUpdatePose1ms(Control_GetEncCurrentCorr_p(), imuVal.gyro.z);
+		// 最新の自己位置から経路と補正を更新し、同じ1ms周期の制御へ反映する。
+		pathFollowerUpdateTarget1ms();
 		motorControlTraceOmegaFB();
 		motorControlSpeed();
 		log_targetAngularVelocity = (int32_t)targetAngularVelocity;
@@ -281,11 +283,6 @@ void Interrupt1ms(void)
 	switch (cnt5)
 	{
 	case 1:
-		// 経路投影と目標更新は5ms周期で実行し、1ms割り込み負荷を抑える。
-		if (pathModeActive && patternTrace >= 12 && patternTrace < 100)
-		{
-			pathFollowerUpdateTarget5ms();
-		}
 		encPulse5ms = 0; // 累積値をリセット
 		break;
 	case 2:

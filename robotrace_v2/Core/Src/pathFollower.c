@@ -1163,12 +1163,12 @@ void pathFollowerUpdatePose1ms(int32_t encoderPulse, float gyroDegPerSec)
 }
 
 /////////////////////////////////////////////////////////////////////
-// モジュール名 pathFollowerUpdateTarget5ms
-// 処理概要     近傍経路を投影し、速度と角速度目標を5ms周期で更新する
+// モジュール名 pathFollowerUpdateTarget1ms
+// 処理概要     近傍経路を投影し、自己位置補正と速度・角速度目標を1ms周期で更新する
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-void pathFollowerUpdateTarget5ms(void)
+void pathFollowerUpdateTarget1ms(void)
 {
 	if (routeCount < 2U || followerState == PATH_STATE_INACTIVE || followerState == PATH_STATE_LOCALIZATION_LOST) return;
 	const ShortcutSettings *activeSettings = runStartSettingsValid ? &runStartSettings : &shortcutSettings;
@@ -1230,7 +1230,8 @@ void pathFollowerUpdateTarget5ms(void)
 		{
 			float residualX = sensorX - lineMatch.x_mm;
 			float residualY = sensorY - lineMatch.y_mm;
-			float alpha = (float)activeSettings->lineAlpha_x1000 * 0.001f;
+			// SDの5ms基準の補正係数を、今回の1ms更新へ時間換算する。
+			float alpha = (float)activeSettings->lineAlpha_x1000 * 0.001f * 0.2f;
 			float correctionX = -alpha * residualX;
 			float correctionY = -alpha * residualY;
 			float correctionDistance = sqrtf((correctionX * correctionX) +
@@ -1241,7 +1242,7 @@ void pathFollowerUpdateTarget5ms(void)
 				(observation.forward_mm * headingSin);
 			float thetaGradient = (residualX * sensorDerivativeX) +
 				(residualY * sensorDerivativeY);
-			float thetaGain = (float)activeSettings->lineThetaGain_x1e9 * 1.0e-9f;
+			float thetaGain = (float)activeSettings->lineThetaGain_x1e9 * 1.0e-9f * 0.2f;
 			float headingCorrectionDeg = (-thetaGain * thetaGradient) * RAD2DEG;
 			if (pathPolicyPoseCorrectionAllowed(correctionDistance, headingCorrectionDeg,
 				PATH_LINE_POSITION_CORRECTION_MAX_MM, PATH_LINE_HEADING_CORRECTION_MAX_DEG))
@@ -1309,7 +1310,7 @@ void pathFollowerUpdateTarget5ms(void)
 	{
 		lostCount = 0U;
 	}
-	if (followerState == PATH_STATE_TRACKING && lostCount >= PATH_LOST_COUNT_5MS)
+	if (followerState == PATH_STATE_TRACKING && lostCount >= PATH_LOST_TIME_MS)
 	{
 		if (currentLineValid)
 		{
@@ -1327,7 +1328,7 @@ void pathFollowerUpdateTarget5ms(void)
 		if (!currentLineValid)
 		{
 			if (lineLostCount < UINT16_MAX) lineLostCount++;
-			if (lineLostCount >= PATH_LINE_LOST_COUNT_5MS) followerState = PATH_STATE_LOCALIZATION_LOST;
+			if (lineLostCount >= PATH_LINE_LOST_TIME_MS) followerState = PATH_STATE_LOCALIZATION_LOST;
 		}
 		else
 		{
@@ -1335,7 +1336,7 @@ void pathFollowerUpdateTarget5ms(void)
 			if (nearestDistance < PATH_REJOIN_DISTANCE_MM && fabsf(nearestHeadingError) < PATH_REJOIN_HEADING_DEG)
 			{
 				if (rejoinCount < UINT16_MAX) rejoinCount++;
-				if (rejoinCount >= PATH_REJOIN_COUNT_5MS)
+				if (rejoinCount >= PATH_REJOIN_TIME_MS)
 				{
 					followerState = PATH_STATE_REJOIN;
 					pathBlendPermille = 0U;

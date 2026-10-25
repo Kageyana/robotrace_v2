@@ -23,8 +23,8 @@
 #define PATH_DEFAULT_LOOKAHEAD_PER_MPS_MM     40U // 速度1m/sあたりの先読み距離加算量の既定値[mm/(m/s)]。
 #define PATH_DEFAULT_KLATERAL_X100            3000U // 横偏差ゲインの既定値[(deg/s)/mm ×100]。
 #define PATH_DEFAULT_KHEADING_X100            600U // 方位偏差ゲインの既定値[(deg/s)/deg ×100]。
-#define PATH_DEFAULT_LINE_ALPHA_X1000         10U // ライン観測による位置補正率の既定値[無次元 ×1000]。
-#define PATH_DEFAULT_LINE_THETA_GAIN_X1E9      0U // ライン観測による方位補正ゲインの既定値[1/mm^2 ×10^9]。0で補正なし。
+#define PATH_DEFAULT_LINE_ALPHA_X1000         10U // 5ms基準の位置補正率の既定値[無次元 ×1000]。1ms更新では1/5を適用。
+#define PATH_DEFAULT_LINE_THETA_GAIN_X1E9      0U // 5ms基準の方位補正ゲインの既定値[1/mm^2 ×10^9]。1ms更新では1/5、0で補正なし。
 
 // SD設定の許容範囲。範囲外の項目は既定値で修復する。
 #define PATH_LEVEL_MAX                        1U // 許可するショートカットレベルの上限[段階]。初期実機検証はLevel 1まで。
@@ -61,20 +61,20 @@
 #define PATH_BOARD_CLEARANCE_MM               200.0f // コース中心線から走行可能領域端までの最小距離[mm]。
 #define PATH_LEGAL_RESERVE_MM                 10.0f // 合法横変位の算出で追加確保する余裕[mm]。
 
-// 経路逸脱・ライン追従への退避・経路復帰。判定周期は5ms。
+// 経路逸脱・ライン追従への退避・経路復帰。判定周期は1ms。
 #define PATH_LOST_DISTANCE_MM                 80.0f // ライン追従への退避を判定する経路からの距離上限[mm]。
 #define PATH_REJOIN_DISTANCE_MM               35.0f // 経路復帰を許可する経路からの距離上限[mm]。
 #define PATH_LOST_HEADING_DEG                 60.0f // ライン追従への退避を判定する方位偏差上限[deg]。
 #define PATH_REJOIN_HEADING_DEG               30.0f // 経路復帰を許可する方位偏差上限[deg]。
-#define PATH_LOST_COUNT_5MS                   20U // 退避判定の連続成立回数[5ms単位]。20で100ms。
-#define PATH_REJOIN_COUNT_5MS                 40U // 復帰条件の連続成立回数[5ms単位]。40で200ms。
-#define PATH_LINE_LOST_COUNT_5MS              20U // 退避中に自己位置喪失とするライン未検出の連続回数[5ms単位]。
+#define PATH_LOST_TIME_MS                     100U // 経路逸脱から退避を判定する連続時間[ms]。
+#define PATH_REJOIN_TIME_MS                   200U // 復帰条件の連続成立時間[ms]。
+#define PATH_LINE_LOST_TIME_MS                100U // 退避中に自己位置喪失とするライン未検出の連続時間[ms]。
 #define PATH_ASSOCIATION_PROGRESS_MARGIN_MM   120.0f // 走行積算距離より先の経路候補を許可する余裕[mm]。
 #define PATH_ASSOCIATION_HEADING_MAX_DEG      60.0f // 経路候補と機体の方位差の許容上限[deg]。
 #define PATH_GOAL_RESERVED_POINTS             13U // 終端から原点方向への延長用に確保する点数[点]。40mm間隔で最大520mmの延長分。
-#define PATH_REJOIN_BLEND_STEP                50U // 復帰中に5msごとに増やす経路操舵の混合率[permille/更新]。
+#define PATH_REJOIN_BLEND_STEP                10U // 復帰中に1msごとに増やす経路操舵の混合率[permille/更新]。100msで0→1000。
 
-// ライン観測と自己位置補正。補正の判定周期は5ms。
+// ライン観測と自己位置補正。判定周期は1ms。SDの補正係数は従来の5ms基準を維持する。
 #define PATH_SENSOR_ACTIVE_TH                 800U // 明部として数える各ラインセンサーの閾値[正規化AD値]。
 #define PATH_SENSOR_MIN_SUM                   1200U // ライン観測を有効とする全センサー値の合計下限[正規化AD値の合計]。
 #define PATH_SENSOR_MAX_CLUSTER_WIDTH         3U // 単一ラインとして許可する連続した明部の最大幅[センサー数]。
@@ -82,13 +82,13 @@
 #define PATH_LINE_MATCH_BACK_POINTS           2U // ライン観測と照合する最近傍点より後方の探索幅[点数]。
 #define PATH_LINE_MATCH_FORWARD_POINTS        4U // ライン観測と照合する最近傍点より前方の探索幅[点数]。
 #define PATH_LINE_MATCH_RESIDUAL_MAX_MM        30.0f // 自己位置補正を許可するライン観測残差の上限[mm]。
-#define PATH_LINE_POSITION_CORRECTION_MAX_MM    1.0f // 1回の自己位置補正を許可する移動量上限[mm/更新]。
-#define PATH_LINE_HEADING_CORRECTION_MAX_DEG    0.1f // 1回の方位補正を許可する絶対値上限[deg/更新]。
+#define PATH_LINE_POSITION_CORRECTION_MAX_MM    0.2f // 1msあたりの位置補正上限[mm/更新]。従来の1mm/5ms相当。
+#define PATH_LINE_HEADING_CORRECTION_MAX_DEG    0.02f // 1msあたりの方位補正上限[deg/更新]。従来の0.1deg/5ms相当。
 
 //====================================//
 // シンボル定義
 //====================================//
-#define PATH_ROUTE_CONTROLLER_VERSION      17U
+#define PATH_ROUTE_CONTROLLER_VERSION      18U
 #define PATH_SOURCE_FORMAT_VERSION          1U
 
 typedef struct
@@ -98,8 +98,8 @@ typedef struct
 	uint16_t lookaheadPerMpsMm; // 速度に応じた先読み距離加算係数[mm/(m/s)]。
 	uint16_t kLateral_x100; // 横偏差ゲイン[(deg/s)/mm ×100]。
 	uint16_t kHeading_x100; // 方位偏差ゲイン[(deg/s)/deg ×100]。
-	uint16_t lineAlpha_x1000; // ライン観測による位置補正率[無次元 ×1000]。
-	uint16_t lineThetaGain_x1e9; // ライン観測による方位補正ゲイン[1/mm^2 ×10^9]。
+	uint16_t lineAlpha_x1000; // 5ms基準の位置補正率[無次元 ×1000]。1ms更新では1/5を適用。
+	uint16_t lineThetaGain_x1e9; // 5ms基準の方位補正ゲイン[1/mm^2 ×10^9]。1ms更新では1/5を適用。
 } ShortcutSettings;
 
 typedef enum
@@ -170,7 +170,7 @@ uint32_t pathRunRouteGeometryCrc32(void);
 void pathFollowerInvalidateRoute(void);
 void pathFollowerReset(void);
 void pathFollowerUpdatePose1ms(int32_t encoderPulse, float gyroDegPerSec);
-void pathFollowerUpdateTarget5ms(void);
+void pathFollowerUpdateTarget1ms(void);
 PathFollowerState pathFollowerGetStatus(void);
 uint16_t pathFollowerGetPathBlendPermille(void);
 float pathFollowerGetTargetSpeedMps(void);

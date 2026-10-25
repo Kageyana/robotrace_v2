@@ -108,7 +108,7 @@
     STORED(F32, imuYawAlphaFiltered, "%f", slipV2.lateralCandidate.result.alphaRadps2) \
     STORED(F32, imuLatTangentialApplied, "%f", slipV2.lateralCandidate.result.tangentialAppliedXMps2)
 
-// PATH/SHORTCUTの5ms周期診断。経路モード以外は0を保存する。
+// PATH/SHORTCUTの1ms周期診断。経路モード以外は0を保存する。
 // 方位偏差は最近傍経路接線に対する差[0.01deg]、操舵3成分は符号付きの飽和前指令[deg/s]。
 #define LOG_FIELD_LIST_PATH(STORED, DERIVED) \
     STORED(F32, pathErrorY_mm, "%f", ((optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT) ? pathLogErrorY_mm : 0.0f)) \
