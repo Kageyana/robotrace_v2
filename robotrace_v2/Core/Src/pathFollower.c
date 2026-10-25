@@ -1,9 +1,8 @@
 #include "pathFollower.h"
 #include "logSource.h"
-#include "logMetadata.h"
 #include "logPerformance.h"
 #include "autoRun.h"
-#include "pathPolicy.h"
+#include "calibrationConstants.h"
 #include "PIDcontrol.h"
 #include "SDcard.h"
 #include "control.h"
@@ -120,6 +119,103 @@ static struct {
     LogBinaryHeader source;
     ShortcutSettings settings;
 } routeCache;
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathPolicyAssociationAllowed
+// 処理概要     経路候補の弧長と向きの許容範囲を判定する
+// 引数         candidateArcMm/maximumArcMm: 候補弧長と上限[mm]
+//              headingErrorDeg/maximumHeadingErrorDeg: 方位差と上限[deg]
+// 戻り値       true: 条件成立 false: 条件不成立
+/////////////////////////////////////////////////////////////////////
+static bool pathPolicyAssociationAllowed(float candidateArcMm,
+	float maximumArcMm, float headingErrorDeg, float maximumHeadingErrorDeg)
+{
+	return isfinite(candidateArcMm) && isfinite(maximumArcMm) &&
+		isfinite(headingErrorDeg) && candidateArcMm <= maximumArcMm &&
+		fabsf(headingErrorDeg) <= maximumHeadingErrorDeg;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathPolicyPoseCorrectionAllowed
+// 処理概要     位置と姿勢の補正量が許容範囲内か判定する
+// 引数         positionCorrectionMm/maximumPositionCorrectionMm: 位置補正量と上限[mm]
+//              headingCorrectionDeg/maximumHeadingCorrectionDeg: 角度補正量と上限[deg]
+// 戻り値       true: 条件成立 false: 条件不成立
+/////////////////////////////////////////////////////////////////////
+static bool pathPolicyPoseCorrectionAllowed(float positionCorrectionMm,
+	float headingCorrectionDeg, float maximumPositionCorrectionMm,
+	float maximumHeadingCorrectionDeg)
+{
+	return isfinite(positionCorrectionMm) && isfinite(headingCorrectionDeg) &&
+		positionCorrectionMm >= 0.0F && maximumPositionCorrectionMm >= 0.0F &&
+		fabsf(headingCorrectionDeg) <= maximumHeadingCorrectionDeg &&
+		positionCorrectionMm <= maximumPositionCorrectionMm;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathPolicyComputeGoalExtension
+// 処理概要     原点方向へのゴール延長点と必要点数を計算する
+// 引数         endXmm/endYmm: 経路終端[mm], spacingMm: 点間隔[mm], availablePoints: 空き点数
+//              goalXmm/goalYmm/extensionMm: 延長結果[mm], appendCount: 追加点数
+// 戻り値       true: 条件成立 false: 条件不成立
+/////////////////////////////////////////////////////////////////////
+static bool pathPolicyComputeGoalExtension(float endXmm, float endYmm,
+	float spacingMm, uint16_t availablePoints, float *goalXmm, float *goalYmm,
+	float *extensionMm, uint16_t *appendCount)
+{
+	if (goalXmm == NULL || goalYmm == NULL || extensionMm == NULL || appendCount == NULL ||
+		!isfinite(endXmm) || !isfinite(endYmm) || !isfinite(spacingMm) || spacingMm <= 0.0F)
+	{
+		return false;
+	}
+	float distanceToOriginMm = hypotf(endXmm, endYmm);
+	float requiredExtensionMm = distanceToOriginMm * 0.5F;
+	if (!isfinite(requiredExtensionMm) || requiredExtensionMm < 1.0F) return false;
+	float requiredPointsF = ceilf(requiredExtensionMm / spacingMm);
+	if (!isfinite(requiredPointsF) || requiredPointsF < 1.0F || requiredPointsF > availablePoints ||
+		requiredPointsF > UINT16_MAX)
+	{
+		return false;
+	}
+	*goalXmm = endXmm * 0.5F;
+	*goalYmm = endYmm * 0.5F;
+	*extensionMm = requiredExtensionMm;
+	*appendCount = (uint16_t)requiredPointsF;
+	return true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathPolicySourceMetadataValid
+// 処理概要     一次経路元の終了状態と校正条件を検証する
+// 引数         versionSupported/closureValid/primaryMode/normalStop: 形式・終了状態
+//              closureReason: 閉路理由, pulsePerMeter: 距離換算[pulse/m]
+//              imuCalibrationValid/imuCalibrationSamples/imuCalibrationReadErrors: 校正状態
+//              distanceScaleVerified: 距離検証, expectedRows: 行数
+// 戻り値       true: 条件成立 false: 条件不成立
+/////////////////////////////////////////////////////////////////////
+static bool pathPolicySourceMetadataValid(bool versionSupported,
+	bool closureValid, uint32_t closureReason, bool primaryMode, bool normalStop,
+	uint32_t pulsePerMeter, bool imuCalibrationValid, uint32_t imuCalibrationSamples,
+	uint32_t imuCalibrationReadErrors, bool distanceScaleVerified, uint32_t expectedRows)
+{
+	return versionSupported && closureValid && closureReason == 0U && primaryMode && normalStop &&
+		pulsePerMeter == (uint32_t)CALIBRATED_ENCODER_PULSE_PER_METER && imuCalibrationValid &&
+		imuCalibrationSamples == CALIBRATED_IMU_SAMPLE_COUNT &&
+		imuCalibrationReadErrors == 0U && distanceScaleVerified && expectedRows > 0U;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathPolicyGoalReached
+// 処理概要     有効な経路終端の弧長へ到達したか判定する
+// 引数         goalValid: 終端の有効性, routeIndex/routeCount: 経路位置と点数
+//              currentArcMm/goalArcMm: 現在とゴールの弧長[mm]
+// 戻り値       true: 条件成立 false: 条件不成立
+/////////////////////////////////////////////////////////////////////
+static bool pathPolicyGoalReached(bool goalValid, uint16_t routeIndex,
+	uint16_t routeCount, uint16_t currentArcMm, uint16_t goalArcMm)
+{
+	return goalValid && routeIndex < routeCount && currentArcMm >= goalArcMm;
+}
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathCacheMatches
@@ -1579,7 +1675,7 @@ void readShortcutSettings(void)
 
 	bool present[7];
 	for (uint8_t i = 0U; i < 7U; i++) present[i] = (int)i < parsed;
-	repair = pathPolicyMergeSparseSettings(values, present, defaults,
+	repair = sdRepairSparseSettings(values, present, defaults,
 		minimums, maximums, 7U) || repair;
 	shortcutSettings.maxLevel = (uint8_t)values[0];
 	shortcutSettings.lookaheadBaseMm = (uint16_t)values[1];

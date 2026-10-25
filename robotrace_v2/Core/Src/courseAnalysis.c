@@ -3,7 +3,6 @@
 //====================================//
 #include "courseAnalysis.h"
 #include "logSource.h"
-#include "logMetadata.h"
 #include "logPerformance.h"
 #include "control.h"
 #include "fatfs.h"

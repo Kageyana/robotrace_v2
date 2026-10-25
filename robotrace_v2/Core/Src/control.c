@@ -4,7 +4,6 @@
 #include "control.h"
 #include "slipDetection.h"
 #include "autoRun.h"
-#include "pathPolicy.h"
 #include "pathFollower.h"
 #include "BMI088.h"
 #include "PIDcontrol.h"
@@ -515,11 +514,11 @@ void loopSystem(void)
 				break;
 			case AUTO_RUN_MODE_PATH:
 				ret = routeBuildFromLog(autoRunCurrentPlan.primaryLogNumber,
-					pathPolicyGenerationLevel(false, shortcutSettings.maxLevel));
+					0U);
 				break;
 			case AUTO_RUN_MODE_SHORTCUT:
 				ret = routeBuildFromLog(autoRunCurrentPlan.primaryLogNumber,
-					pathPolicyGenerationLevel(true, shortcutSettings.maxLevel));
+					shortcutSettings.maxLevel);
 				break;
 			default:
 				ret = -1;
@@ -805,8 +804,7 @@ void loopSystem(void)
 
 		// 通常走行はゴールマーカー、PATH系は中間延長点の経路弧長をゴールとする。
 		bool pathGoalMode = (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT);
-		if (pathPolicyGoalRequest(pathGoalMode, SGmarker >= COUNT_GOAL,
-			pathGoalMode && pathFollowerGoalReached()))
+		if (pathGoalMode ? pathFollowerGoalReached() : SGmarker >= COUNT_GOAL)
 		{
 			goalTime = cntRun;
 			enc1 = 0;
@@ -1401,7 +1399,7 @@ void readTgtspeeds(void)
 		repair = true;
 	}
 
-	repair = pathPolicyMergeSparseSettings(values, present, defaults,
+	repair = sdRepairSparseSettings(values, present, defaults,
 		minimums, maximums, TARGET_SPEED_PARAM_COUNT) || repair;
 	for (int16_t i = 0; i < TARGET_SPEED_PARAM_COUNT; i++)
 	{

@@ -6,6 +6,7 @@
 #include "main.h"
 #include "autoRun.h"
 #include <stdint.h>
+#include <stddef.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -70,4 +71,7 @@ bool sd_fatfs_is_locked(void);
 bool sd_fatfs_try_lock(void);
 void sd_set_analysis_active(bool active);
 bool sd_is_analysis_active(void);
+// 部分読込した設定の欠落・範囲外項目を既定値で補修する。
+bool sdRepairSparseSettings(int *values, const bool *present, const int *defaults,
+    const int *minimums, const int *maximums, size_t count);
 #endif // SDCARD_H_

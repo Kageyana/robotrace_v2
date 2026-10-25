@@ -87,3 +87,21 @@ Debug、DebugMarker、Release、ReleaseDetail、CleanupDiagnosticsの5構成が�
 ユーザーの追加指示で`PARAM_BOOST_500=1.5F`を復活させ、`SPEED_PARAM_FIELDS`の`bst500`初期値に指定した。既定値は1.6から1.5 m/sへ変わる。SD上の有効な既存値は引き続き優先し、保存済みの1.6等を自動で1.5へ置換しない。設定ファイル欠落時は19項目・95Bで作成し、10項目目を`0150,`として保存する。
 
 O0/O2の速度設定180ケースで初期値・欠落作成・既存SD値優先を確認し、PID画面とメタデータも成功した。変更前比較はbst500初期値1.6→1.5だけを意図した差とした。Debug/Releaseビルドも成功し、実機・実SDは操作していない。試験側の小数定数比較は[保存型比較の再発記録](失敗事例/2026-10-12-host-float-snapshot-comparison.md)とSD設定Skillの事前手順へ反映した。
+
+
+## ログ読込とPATH補助処理の所属整理（2026-10-25）
+
+読込APIの宣言と実装を`logSource.h/.c`へ揃えた。従来`SDcard.c`に置かれていた先読み・レコード復元・CRC検証・型付き解析行の生成を移し、`logMetadata.c/.h`の整数メタデータ解析も同じモジュールへ統合した。`SDcard.c`は保存・確定・復旧・設定I/Oを担当する。
+
+保存時の全件検証と読込は同じスキャンを使用する。保存時に固定したIMU校正状態と書込成否を非公開の引数で渡す。共有I/O 6 KiB、メタデータ4 KiB、Flash上の列定義はそれぞれ一つのまま保持し、保存キュー排出・停止中・FatFsロック下という切替条件を維持する。二つの実装間だけの契約は、プロジェクトのヘッダ配置に合わせて`Core/Inc/logStorageInternal.h`へ置く。`SDcard.c`と`logSource.c`専用と明記し、他のヘッダから共有領域を参照させない。
+
+`pathPolicy.h`のPATH専用判定5関数は`pathFollower.c`のstatic関数へ移した。PATH/SHORTCUTの生成レベルとゴール選択の単純なラッパーは`control.c`の分岐へ戻した。速度・SHORTCUT設定で共通使用する欠落／範囲外項目の修復は、`SDcard.c/.h`の`sdRepairSparseSettings()`へ移した。`pathPolicy.h`と`logMetadata.c/.h`は削除した。
+
+確認結果:
+
+- Debug、DebugMarker、Release、ReleaseDetail、CleanupDiagnosticsの5構成でビルド成功。各構成の既存warning 6件と照合し、新規warningなし。
+- 通常／詳細ログの保存・読込、CRC・I/O異常、DISTANCE／SLIP／PATH／SHORTCUTの計画生成、PC変換値の検証が成功。
+- 作業前スナップショットと通常／詳細×直線／閉路カーブを比較し、全記録・列定義バイト、型付き解析行、4方式の計画結果が一致。メタデータも各128ケースで全バイト一致。
+- 設定180ケースとメタデータ35ケースをO0/O2で確認し、部分反映・旧形式修復・不正値拒否を維持。移動した実関数の本体も比較した。
+
+結果はローカル専用の`build/log-path-ownership-20261025/`へ保存した。`validation/`は引き続きGit管理対象外。ログ形式・制御式・安全条件は変更していない。書き込み・実機確認は未実施であり、新ビルドで停止時保存と次走解析、再起動後の読込、PATH／SHORTCUT走行を確認する。

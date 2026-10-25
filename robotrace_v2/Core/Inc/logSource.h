@@ -30,4 +30,6 @@ FRESULT logSourceClose(FIL *file);
 int logSourceError(FIL *file);
 int logSourceEof(FIL *file);
 bool logSourceValidateSlipRow(const LogSourceRow *row);
+// メタデータから重複のない整数相当値を範囲検証して取得する。
+bool logMetadataReadInt(const char *line, const char *key, int32_t *value);
 #endif

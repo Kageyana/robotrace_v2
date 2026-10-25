@@ -81,7 +81,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 	${CMAKE_SOURCE_DIR}/Core/Src/autoRun.c
 	${CMAKE_SOURCE_DIR}/Core/Src/runMemory.c
 	${CMAKE_SOURCE_DIR}/Core/Src/courseAnalysis.c
-	${CMAKE_SOURCE_DIR}/Core/Src/logMetadata.c
+	${CMAKE_SOURCE_DIR}/Core/Src/logSource.c
 	${CMAKE_SOURCE_DIR}/Core/Src/pathFollower.c
 	${CMAKE_SOURCE_DIR}/Core/Src/DWT.c
 	${CMAKE_SOURCE_DIR}/Core/Src/emergencyStop.c
