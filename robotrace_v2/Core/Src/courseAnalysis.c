@@ -724,13 +724,11 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
 	sd_set_analysis_active(true);
 
 	// 解析用配列を静的領域に確保し、スタック使用量を抑える
-	uint16_t *validLongMs = runMemory.distance.slip.validLongMs;
-	uint16_t *validLatMs = runMemory.distance.slip.validLatMs;
 	float *v2Max = runMemory.distance.slip.v2Max;
 	float *rocAbsSum = runMemory.distance.slip.rocAbsSum;
 	uint16_t *rocCnt = runMemory.distance.slip.rocCnt;
-	uint16_t *longOnMs = runMemory.distance.slip.longOnMs;
-	uint16_t *latOnMs = runMemory.distance.slip.latOnMs;
+	uint16_t *longOnCount = runMemory.distance.slip.longOnCount;
+	uint16_t *latOnCount = runMemory.distance.slip.latOnCount;
 	float *risk = runMemory.distance.slip.risk;
 	float *riskExpanded = runMemory.distance.slip.riskExpanded;
 	float *v3 = runMemory.distance.slip.v3;
@@ -755,13 +753,11 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
 	}
 	fileOpened = true;
 
-	memset(validLongMs, 0, sizeof(runMemory.distance.slip.validLongMs));
-	memset(validLatMs, 0, sizeof(runMemory.distance.slip.validLatMs));
 	memset(v2Max, 0, sizeof(runMemory.distance.slip.v2Max));
 	memset(rocAbsSum, 0, sizeof(runMemory.distance.slip.rocAbsSum));
 	memset(rocCnt, 0, sizeof(runMemory.distance.slip.rocCnt));
-	memset(longOnMs, 0, sizeof(runMemory.distance.slip.longOnMs));
-	memset(latOnMs, 0, sizeof(runMemory.distance.slip.latOnMs));
+	memset(longOnCount, 0, sizeof(runMemory.distance.slip.longOnCount));
+	memset(latOnCount, 0, sizeof(runMemory.distance.slip.latOnCount));
 	memset(risk, 0, sizeof(runMemory.distance.slip.risk));
 	memset(riskExpanded, 0, sizeof(runMemory.distance.slip.riskExpanded));
 	memset(v3, 0, sizeof(runMemory.distance.slip.v3));
@@ -784,7 +780,6 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
         goto cleanup;
     }
 	UINT lineNo = 0;
-	uint32_t observedLongMs = 0U, observedLatMs = 0U;
 	bool sourceEnded = false;
 	if (progress) progress("Slip read", 0U);
 
@@ -811,19 +806,13 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
         }
         int16_t optimalIdx = (int16_t)row.optimalIndex;
         if (optimalIdx >= baseCount) { ret = -1; break; }
-        // 混合有効区間はON位置が不明なので、その軸のリスク集計には含めない。
-        uint16_t longValid = row.slipV2IntervalReason == 0 && row.slipV2ValidMs == row.slipV2TotalMs ? (uint16_t)row.slipV2ValidMs : 0U;
-        uint16_t latValid = row.slipV2LatIntervalReason == 0 && row.slipV2LatValidMs == row.slipV2TotalMs ? (uint16_t)row.slipV2LatValidMs : 0U;
-        if (longValid > UINT16_MAX - validLongMs[optimalIdx] || latValid > UINT16_MAX - validLatMs[optimalIdx] || rocCnt[optimalIdx] == UINT16_MAX) {
-            ret = -7; // 停止中の解析配列でも時間カウンタの折返しを許さない。
+        // 距離基準の各記録を1件として数える。Yaw不整合bitは速度計画に使用しない。
+        if (rocCnt[optimalIdx] == UINT16_MAX) {
+            ret = -7; // ON件数は全件数以下となるため、共通の上限で折返しを防ぐ。
             break;
         }
-        validLongMs[optimalIdx] += longValid;
-        validLatMs[optimalIdx] += latValid;
-        observedLongMs += longValid;
-        observedLatMs += latValid;
-        if (longValid != 0U) longOnMs[optimalIdx] += (uint16_t)row.slipV2OnLongMs;
-        if (latValid != 0U) latOnMs[optimalIdx] += (uint16_t)row.slipV2OnLatMs;
+        if (row.slipV2Flags & SLIP_V2_LONG) longOnCount[optimalIdx]++;
+        if (row.slipV2Flags & SLIP_V2_LAT) latOnCount[optimalIdx]++;
         rocAbsSum[optimalIdx] += fabsf(row.ROC);
         rocCnt[optimalIdx]++;
 
@@ -845,7 +834,7 @@ static int16_t readLogDistanceSlipImpl(int16_t baseLogNumber, int16_t slipLogNum
 		}
 	}
 
-    if (ret == 0 && ((int32_t)lineNo != expectedRows || observedLongMs == 0U || observedLatMs == 0U)) ret = -7;
+    if (ret == 0 && (int32_t)lineNo != expectedRows) ret = -7;
 
 	if (ret == -5 && !retried)
 	{
@@ -882,28 +871,18 @@ cleanup:
 		return -2;	// 解析対象がない
 	}
 
-	// サンプルのない区間の曲率半径集計を直前の値で補う
+	// フラグON件数の割合からリスク値（0.0～1.0）を求める。未観測区間の件数は補完しない。
 	for (int16_t i = 0; i <= maxOptimalIndex; i++)
 	{
-		if (rocCnt[i] == 0 && i > 0)
-		{
-			rocAbsSum[i] = rocAbsSum[i - 1];	// 平均曲率半径の計算用に直前の合計値を引き継ぐ
-			rocCnt[i] = rocCnt[i - 1];			// 平均曲率半径の計算用に直前の件数を引き継ぐ
-		}
-	}
-
-	// スリップ割合からリスク値（0.0～1.0）を求める
-	for (int16_t i = 0; i <= maxOptimalIndex; i++)
-	{
-		if (validLongMs[i] == 0 && validLatMs[i] == 0)
+		if (rocCnt[i] == 0U)
 		{
 			risk[i] = 0.0f;
 			continue;
 		}
-		uint16_t longCnt = (longOnMs[i] >= CA_SLIP_ON_MIN_MS) ? longOnMs[i] : 0;
-		uint16_t latCnt = (latOnMs[i] >= CA_SLIP_ON_MIN_MS) ? latOnMs[i] : 0;
-		float fracLong = validLongMs[i] != 0U ? (float)longCnt / (float)validLongMs[i] : 0.0F;
-		float fracLat = validLatMs[i] != 0U ? (float)latCnt / (float)validLatMs[i] : 0.0F;
+		uint16_t longCnt = (longOnCount[i] >= CA_SLIP_ON_MIN_SAMPLES) ? longOnCount[i] : 0U;
+		uint16_t latCnt = (latOnCount[i] >= CA_SLIP_ON_MIN_SAMPLES) ? latOnCount[i] : 0U;
+		float fracLong = (float)longCnt / (float)rocCnt[i];
+		float fracLat = (float)latCnt / (float)rocCnt[i];
 		float riskLong = fracLong / CA_SLIP_FRAC_FULL;
 		float riskLat = fracLat / CA_SLIP_FRAC_FULL;
 		if (riskLong > 1.0f)
@@ -963,11 +942,11 @@ cleanup:
 		if (riskExpanded[i] > 0.0f)
 		{
 			float scale = 1.0f - (CA_SLIP_DOWN_RISK * riskExpanded[i]);
-			if (longOnMs[i] >= CA_SLIP_ON_MIN_MS)
+			if (longOnCount[i] >= CA_SLIP_ON_MIN_SAMPLES)
 			{
 				scale -= CA_SLIP_DOWN_LONG_EXTRA;
 			}
-			if (latOnMs[i] >= CA_SLIP_ON_MIN_MS)
+			if (latOnCount[i] >= CA_SLIP_ON_MIN_SAMPLES)
 			{
 				scale -= CA_SLIP_DOWN_LAT_EXTRA;
 			}
@@ -981,7 +960,7 @@ cleanup:
 		{
 			float avgRoc = (rocCnt[i] > 0) ? (rocAbsSum[i] / (float)rocCnt[i]) : ROC_STRAIGHT_TH;
 			float up = (avgRoc >= ROC_STRAIGHT_TH) ? CA_SLIP_UP_STRAIGHT : CA_SLIP_UP_CURVE;
-			v3[i] = (validLongMs[i] != 0U && validLatMs[i] != 0U) ? v * (1.0f + up) : v;
+			v3[i] = rocCnt[i] != 0U ? v * (1.0f + up) : v;
 		}
 		v3[i] = fminf(fmaxf(v3[i], 0.0F), CA_SLIP_MAX_SPEED_MPS);
 	}

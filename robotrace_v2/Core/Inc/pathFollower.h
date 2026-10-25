@@ -133,6 +133,10 @@ extern uint8_t pathLogLineValid;
 extern float pathLogErrorY_mm;
 extern int16_t pathLogErrorHeading_cdeg;
 extern uint8_t pathLogState;
+// 経路操舵の角速度指令成分[deg/s]。符号付き、合計の±1800deg/s制限前。
+extern float pathLogYawFF_dps;
+extern float pathLogYawLateralFB_dps;
+extern float pathLogYawHeadingFB_dps;
 extern float pathLogLegalMargin_mm;
 extern float pathLogLineMatchResidual_mm;
 extern uint16_t pathLogPoseCorrection_um;

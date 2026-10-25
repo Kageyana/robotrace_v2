@@ -93,42 +93,37 @@
 	LOG_FIELD_LIST_DEBUG(STORED, DERIVED) \
 	LOG_FIELD_LIST_IMU(STORED, DERIVED)
 #endif
-// V2の採用判定と1ms区間統計を通常・詳細の両方へ保存する。
+// V2の瞬時残差・判定フラグと補助診断を通常・詳細の両方へ保存する。
 #define LOG_FIELD_LIST_V2(STORED, DERIVED) \
     STORED(F32, slipV2LongFast, "%f", slipV2.result.longFast) \
     STORED(F32, slipV2LongSlow, "%f", slipV2.result.longSlow) \
     STORED(F32, slipV2Lat, "%f", slipV2.result.lateral) \
     STORED(F32, slipV2YawDps, "%f", slipV2.result.yawDps) \
     STORED(U8, slipV2Flags, "%d", slipV2.result.flags) \
-    STORED(U8, slipV2Valid, "%d", slipV2.result.valid) \
-    STORED(U16, slipV2Reason, "%d", slipV2.result.reason) \
-    STORED(U8, slipV2CurrentValid, "%d", slipV2.result.currentValid) \
     STORED(U16, slipV2CurrentHighSamples, "%d", slipV2.result.currentHighSamples) \
-    STORED(U16, slipV2PwmSum, "%d", slipV2.result.pwmSum) \
-    STORED(F32, slipV2PeakLong, "%f", slipV2.interval.peakLong) \
-    STORED(F32, slipV2PeakLat, "%f", slipV2.interval.peakLat) \
-    STORED(F32, slipV2PeakYawDps, "%f", slipV2.interval.peakYawDps) \
-    STORED(U16, slipV2OnLongMs, "%d", slipV2.interval.onLongMs) \
-    STORED(U16, slipV2OnLatMs, "%d", slipV2.interval.onLatMs) \
-    STORED(U16, slipV2OnYawMs, "%d", slipV2.interval.onYawMs) \
-    STORED(U16, slipV2ValidMs, "%d", slipV2.interval.validMs) \
-    STORED(U16, slipV2TotalMs, "%d", slipV2.interval.totalMs) \
-    STORED(U16, slipV2IntervalReason, "%d", slipV2.interval.invalidReason)
+    STORED(U16, slipV2PwmSum, "%d", slipV2.result.pwmSum)
 
-// 採用横の独立した有効性・理由を保持する。残差・フラグ・ピーク・ON時間はV2共通列へ統合する。
+// 横補正に使用した瞬時値を保存する。有効性・無効理由・区間統計は保存しない。
 #define LOG_FIELD_LIST_LAT_DIAGNOSTICS(STORED, DERIVED) \
-    STORED(U8, slipV2LatValid, "%d", slipV2.lateralCandidate.result.valid) \
-    STORED(U16, slipV2LatReason, "%d", slipV2.lateralCandidate.result.reason) \
-    STORED(U16, slipV2LatValidMs, "%d", slipV2.lateralCandidate.interval.validMs) \
-    STORED(U16, slipV2LatIntervalReason, "%d", slipV2.lateralCandidate.interval.invalidReason) \
     STORED(F32, imuYawAlphaFiltered, "%f", slipV2.lateralCandidate.result.alphaRadps2) \
     STORED(F32, imuLatTangentialApplied, "%f", slipV2.lateralCandidate.result.tangentialAppliedXMps2)
 
-// 通常66列・170 B、詳細72列・179 B。診断25列を両プロファイルへ記録する。
+// PATH/SHORTCUTの5ms周期診断。経路モード以外は0を保存する。
+// 方位偏差は最近傍経路接線に対する差[0.01deg]、操舵3成分は符号付きの飽和前指令[deg/s]。
+#define LOG_FIELD_LIST_PATH(STORED, DERIVED) \
+    STORED(F32, pathErrorY_mm, "%f", ((optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT) ? pathLogErrorY_mm : 0.0f)) \
+    STORED(S16, pathErrorHeading_cdeg, "%d", ((optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT) ? pathLogErrorHeading_cdeg : 0)) \
+    STORED(U8, pathState, "%d", ((optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT) ? pathLogState : PATH_STATE_INACTIVE)) \
+    STORED(F32, pathYawFF_dps, "%f", ((optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT) ? pathLogYawFF_dps : 0.0f)) \
+    STORED(F32, pathYawLateralFB_dps, "%f", ((optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT) ? pathLogYawLateralFB_dps : 0.0f)) \
+    STORED(F32, pathYawHeadingFB_dps, "%f", ((optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT) ? pathLogYawHeadingFB_dps : 0.0f))
+
+// 通常56列・154 B、詳細62列・163 B。既存列の末尾へ経路診断6列を追加する。
 #define LOG_FIELD_LIST(STORED, DERIVED) \
     LOG_BASE_FIELD_LIST(STORED, DERIVED) \
     LOG_FIELD_LIST_V2(STORED, DERIVED) \
-    LOG_FIELD_LIST_LAT_DIAGNOSTICS(STORED, DERIVED)
+    LOG_FIELD_LIST_LAT_DIAGNOSTICS(STORED, DERIVED) \
+    LOG_FIELD_LIST_PATH(STORED, DERIVED)
 
 // バイナリログで保存する型の対応表。
 #define LOG_CTYPE_U8  uint8_t

@@ -42,7 +42,7 @@ static inline bool isSupportedRunMode(uint8_t mode)
 #define ROC_STRAIGHT_MAX 3000.0F		// 直線とみなす曲率半径の閾値[mm]
 
 // 3次走行用スリップ解析(2次ログ)の調整用定数
-#define CA_SLIP_ON_MIN_MS 3U			// 区間リスクへ反映するV2の最小ON時間[ms]
+#define CA_SLIP_ON_MIN_SAMPLES 1U		// 区間リスクへ反映する最小フラグON記録数[件]。ログは距離基準で時間率ではない。
 #define CA_SLIP_MAX_SPEED_MPS 10.0F	// 既定の機体安全上限[m/s]をSLIP増速後にも適用する
 #define CA_SLIP_FRAC_FULL 0.60f			// risk=1.0とみなすスリップ割合(値↑でフルリスク到達しにくく減速弱、例:0.60→0.70)
 #define CA_SLIP_EXPAND_1 0.50f			// 近傍拡張係数(±1)(値↑で周辺にもリスク拡散→減速範囲広、例:0.25→0.40)

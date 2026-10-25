@@ -23,9 +23,7 @@ typedef struct {
     int32_t courseMarker, encTotalOptimal;
     float ROC, targetSpeed;
     int32_t optimalIndex;
-    int32_t slipV2TotalMs, slipV2ValidMs, slipV2OnLongMs;
-    int32_t slipV2LatValidMs, slipV2OnLatMs;
-    int32_t slipV2IntervalReason, slipV2LatIntervalReason;
+    int32_t slipV2Flags;
     float x, y;
 } LogSourceRow;
 

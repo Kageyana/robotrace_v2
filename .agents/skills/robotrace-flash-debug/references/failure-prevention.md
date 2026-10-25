@@ -1,6 +1,12 @@
 # ビルド・デバッグの追加再発防止
 
+## PC変換フィクスチャ名の事前確認（2026-10-25）
+
+PC変換器へ渡すbinは初回からASCII連番名とヘッダ番号の一致を確認する。検証ケース名は親ディレクトリへ付け、例は`profile1/path-diagnostics/1.bin`とする。生成前に親フォルダを作り、古いCSVを除いてから変換する。必要権限・リポジトリルートで`python validation/log_storage/run.py --converter C:/tool/AutoCopyCsvFromSd/RlogToCsv.exe`を実行し、両構成の全6値まで照合する。[番号照合の失敗記録](../../../../doc/失敗事例/2026-10-25-pc-converter-fixture-filename.md)参照。
+
 ## 成果物・PC検証
+
+- 公開ヘッダだけを読む単独ホスト試験でも、初回コンパイル前にFatFs→Windows→CMSISの推移依存を確認する。ファイルAPIが不要な行検証は、実ヘッダの型と実ソースの関数だけを一意性検査付きで抽出する。警告を緩めたり製品ヘッダを変更して回避しない。必要権限・リポジトリルートで`python validation/log_storage/run.py --converter C:/tool/AutoCopyCsvFromSd/RlogToCsv.exe`を実行し、O0/O2・Wall/Wextra/Werror、通常/詳細の統合保存・PC変換まで通す。[単独ヘッダ読込の再発](../../../../doc/失敗事例/2026-10-04-fatfs-log-reader-header-cycle.md)参照。
 
 - このWindows制限環境ではST-LINK_gdbserver、Programmer CLI、GDB等のCubeCLT同梱exeにもDLL再配置エラーがある。GNUツールだけに限定せず、help/版表示を含め初回から許可された制限外環境で実行する。再発記録は[2026-10-11事例の2026-10-21追記](../../../../doc/失敗事例/2026-10-11-bmi088-forward-y-sign.md)を確認する。
 - PowerShellでファイルパスを含むCMakeの-Dを使う場合、引数全体を単一引用符で囲む。独自構成では存在確認したツールチェーン/Ninja絶対パスを使用し、configure終了コード0を確認してからbuildする。通常は既存presetを使う。[分割失敗](../../../../doc/失敗事例/2026-10-21-cmake-toolchain-argument-split.md)を参照。

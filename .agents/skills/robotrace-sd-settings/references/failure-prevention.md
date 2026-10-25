@@ -1,5 +1,9 @@
 # SD・保存形式の再発防止
 
+## PC変換フィクスチャ名の事前確認（2026-10-25）
+
+PC変換器へ渡すbinは初回からASCII連番名とヘッダ番号の一致を確認する。検証ケース名は親ディレクトリへ付け、例は`profile1/path-diagnostics/1.bin`とする。生成前に親フォルダを作り、古いCSVを除いてから変換する。必要権限・リポジトリルートで`python validation/log_storage/run.py --converter C:/tool/AutoCopyCsvFromSd/RlogToCsv.exe`を実行し、両構成の全6値まで照合する。[番号照合の失敗記録](../../../../doc/失敗事例/2026-10-25-pc-converter-fixture-filename.md)参照。
+
 ## SD接続・設定
 
 - PCのドライブ文字G:/H:を固定しない。Get-PSDriveで候補を列挙し、setting内の実ファイルでカードを確認する。現permission profileで対象ドライブが未許可なら、初回の読書きからカード限定の昇格を使う。Get-Volume/CIMが拒否済みなら同じ照会を反復しない。

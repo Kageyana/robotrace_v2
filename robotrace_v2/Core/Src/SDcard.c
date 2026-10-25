@@ -857,12 +857,13 @@ static void logBuildMetadata(void)
 	setLogHeaderStrS("buildDate", BUILD_DATE);
 	setLogHeaderStrS("buildTime", BUILD_TIME);
 	setLogHeaderStrS("branch", GIT_BRANCH);
-	// 正式採用したV2の方式・閾値と、SLIP計画が使用する統計の意味を保存する。
+	// 正式採用したV2の方式・閾値と、SLIP計画のフラグ集計方式を保存する。
 	setLogHeaderStr("slipDetectorVersion", SLIP_V2_VERSION);
     setLogHeaderStrS("slipLongPolicy", SLIP_V2_LONG_POLICY);
 	setLogHeaderStrS("slipDetectorMode", "ACTIVE_V2");
 	setLogHeaderStrS("slipLatPolicy", SLIP_V2_LAT_POLICY);
-	setLogHeaderStr("slipPlannerVersion", 2);
+	setLogHeaderStr("slipPlannerVersion", 3);
+	setLogHeaderStrS("slipPlannerPolicy", "flag_sample_fraction");
 	setLogHeaderStr("slipLatCandidateVersion", SLIP_LAT_CANDIDATE_VERSION);
 	setLogHeaderStrFPrecision("slipLatCandidateOn_mps2", SLIP_LAT_CANDIDATE_ON, 9U);
 	setLogHeaderStrFPrecision("slipLatCandidateOff_mps2", SLIP_LAT_CANDIDATE_OFF, 9U);

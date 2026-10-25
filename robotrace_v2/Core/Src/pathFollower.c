@@ -295,6 +295,9 @@ uint8_t pathLogLineValid = 0U;
 float pathLogErrorY_mm = 0.0f;
 int16_t pathLogErrorHeading_cdeg = 0;
 uint8_t pathLogState = PATH_STATE_INACTIVE;
+float pathLogYawFF_dps = 0.0f;
+float pathLogYawLateralFB_dps = 0.0f;
+float pathLogYawHeadingFB_dps = 0.0f;
 float pathLogLegalMargin_mm = 0.0f;
 float pathLogLineMatchResidual_mm = 0.0f;
 uint16_t pathLogPoseCorrection_um = 0U;
@@ -1098,6 +1101,11 @@ void pathFollowerInvalidateRoute(void)
 	followerState = PATH_STATE_INACTIVE;
 	targetSpeedMps = 0.0f;
 	pathLogState = PATH_STATE_INACTIVE;
+	pathLogErrorY_mm = 0.0f;
+	pathLogErrorHeading_cdeg = 0;
+	pathLogYawFF_dps = 0.0f;
+	pathLogYawLateralFB_dps = 0.0f;
+	pathLogYawHeadingFB_dps = 0.0f;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -1129,6 +1137,9 @@ void pathFollowerReset(void)
 	pathLogErrorHeading_cdeg = 0;
 	pathLogState = (uint8_t)followerState;
 	pathLogLegalMargin_mm = PATH_LINE_HALF_WIDTH_MM + PATH_OCCUPIED_HALF_WIDTH_MM;
+	pathLogYawFF_dps = 0.0f;
+	pathLogYawLateralFB_dps = 0.0f;
+	pathLogYawHeadingFB_dps = 0.0f;
 	pathLogLineMatchResidual_mm = 0.0f;
 	pathLogPoseCorrection_um = 0U;
 	pathLogPoseCorrectionHeading_cdeg = 0;
@@ -1275,6 +1286,10 @@ void pathFollowerUpdateTarget5ms(void)
 	float kLateral = (float)activeSettings->kLateral_x100 * 0.01f;
 	float kHeading = (float)activeSettings->kHeading_x100 * 0.01f;
 	float targetYawRate = feedForwardDegPerSec - (kLateral * lateralError) + (kHeading * nearestHeadingError);
+	// 操舵式は維持し、同じ周期の符号付き成分を飽和前の診断値として保持する。
+	pathLogYawFF_dps = feedForwardDegPerSec;
+	pathLogYawLateralFB_dps = -(kLateral * lateralError);
+	pathLogYawHeadingFB_dps = kHeading * nearestHeadingError;
 	if (targetYawRate > 1800.0f) targetYawRate = 1800.0f;
 	if (targetYawRate < -1800.0f) targetYawRate = -1800.0f;
 	setTargetAngularVelocity(targetYawRate);

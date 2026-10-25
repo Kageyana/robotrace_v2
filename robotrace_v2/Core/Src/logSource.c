@@ -565,10 +565,7 @@ bool logSourceNext(FIL *file, LogSourceRow *row)
         .cntlog = r->cntlog, .encCurrentN = r->encCurrentN, .gyroValZ = r->gyroVal_Z,
         .courseMarker = r->courseMarker, .encTotalOptimal = (int32_t)r->encTotalOptimal,
         .ROC = binarySource.roc, .targetSpeed = r->targetSpeed, .optimalIndex = r->optimalIndex,
-        .slipV2TotalMs = r->slipV2TotalMs, .slipV2ValidMs = r->slipV2ValidMs,
-        .slipV2OnLongMs = r->slipV2OnLongMs, .slipV2LatValidMs = r->slipV2LatValidMs,
-        .slipV2OnLatMs = r->slipV2OnLatMs, .slipV2IntervalReason = r->slipV2IntervalReason,
-        .slipV2LatIntervalReason = r->slipV2LatIntervalReason,
+        .slipV2Flags = r->slipV2Flags,
         .x = binarySource.x, .y = binarySource.y
     };
     return true;
@@ -576,9 +573,9 @@ bool logSourceNext(FIL *file, LogSourceRow *row)
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logSourceValidateSlipRow
-// 処理概要     V2の区間時間・ON時間と解析値の範囲を検証する
+// 処理概要     V2判定フラグの定義ビットと解析値の範囲を検証する
 // 引数         row: 現行binから復元した行
-// 戻り値       true: 正常 false: 不正または区間カウンタ飽和
+// 戻り値       true: 正常 false: 不正
 /////////////////////////////////////////////////////////////////////
 bool logSourceValidateSlipRow(const LogSourceRow *row)
 {
@@ -586,13 +583,8 @@ bool logSourceValidateSlipRow(const LogSourceRow *row)
 		row->optimalIndex >= 0 && row->optimalIndex <= INT16_MAX &&
 		isfinite(row->ROC) && fabsf(row->ROC) <= INT16_MAX &&
 		isfinite(row->targetSpeed) && row->targetSpeed >= 0.0F && row->targetSpeed <= UINT8_MAX &&
-		row->slipV2TotalMs > 0 && row->slipV2TotalMs < (int32_t)UINT16_MAX &&
-		row->slipV2ValidMs >= 0 && row->slipV2ValidMs <= row->slipV2TotalMs &&
-		row->slipV2OnLongMs >= 0 && row->slipV2OnLongMs <= row->slipV2ValidMs &&
-		row->slipV2LatValidMs >= 0 && row->slipV2LatValidMs <= row->slipV2TotalMs &&
-		row->slipV2OnLatMs >= 0 && row->slipV2OnLatMs <= row->slipV2LatValidMs &&
-		row->slipV2IntervalReason >= 0 && row->slipV2IntervalReason <= 511 &&
-		row->slipV2LatIntervalReason >= 0 && row->slipV2LatIntervalReason <= 511;
+		row->slipV2Flags >= 0 &&
+		(row->slipV2Flags & ~(int32_t)(SLIP_V2_LONG | SLIP_V2_LAT | SLIP_V2_YAW)) == 0;
 }
 
 /////////////////////////////////////////////////////////////////////

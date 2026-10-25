@@ -522,7 +522,7 @@ Shortcut画面は入場・項目変更時に本文を描画し、値だけの変
 - 一次ログの1行目には `pathSourceFormatVersion=1`, `closureValid`, `closureReason`, `logExpectedRows`, `imuCalibrationValid`, `imuCalibrationSamples`, `imuCalibrationReadErrors`, `distanceScaleVerified`, `distanceScalePulsePerMeter`, `distanceScaleError_p` を記録する。PATH経路元には、正常終了かつ閉路有効・行数一致・IMU校正成功・距離換算検証成功のログだけを使う。保存済み旧形式ログはPATH経路元として受け付けない。これらはCSV列およびバイナリレコード構成を変更しない。
 - ログ取得の目標距離間隔は `robotrace_v2/Core/Inc/SDcard.h` の `LOG_DISTANCE_MM=5` を正とする。センサー値は1 ms周期で更新するため、高速時は実際のログ行間隔が5 mmを超えることがある。実間隔は `encTotalOptimal` の差で評価する。
 - `goalMarkerOnset_p` は幅を確認したゴールマーカーの検出開始位置とする。`distanceScaleError_p` はログ行間の経過msを掛けて積算した `encCurrentCorr_p` と最終 `encTotalOptimal` の差とする。オートスタートが一次走行後に止まったら、まず `closureReason` とログ最終行の距離を確認する。
-- `courseAnalysis.c`のSLIP解析は、V2の縦・横それぞれの区間有効ms/ON msと無効理由を型付き`LogSourceRow`から取得し、`optimalIndex`別の時間率を次走計画へ反映する。旧スキーマのログは拒否する。正常終了・同じ一次参照・DISTANCE・行数一致を確認し、一次計画を毎回再生成して二重補正を防ぐ。無効/未観測を滑りなしとして増速しない。
+- `courseAnalysis.c`のSLIP解析は、型付き`LogSourceRow`の`slipV2Flags`を使用し、`optimalIndex`別に縦/横のON記録数を全記録数で割った割合を次走計画へ反映する。時間率ではない。旧スキーマのログは拒否する。正常終了・同じ一次参照・DISTANCE・行数一致を確認し、一次計画を毎回再生成して二重補正を防ぐ。未観測区間は増速しない。有効性を保存しないため、無効時のフラグ0と正常OFFはログ上で区別できない。
 - 共通ログ読込は現行スキーマの `.bin` のみとし、`logSource.h`のメタデータ取得・型付き次行取得を使用する。曲率・クロス前後100 mm直線化・XY計算は維持し、機体側のCSVヘッダ生成・CSV行読込・数値解析は行わない。停止中・FatFsロック下で1ファイルずつ実行する。
 - SLIP/PATHの整数メタデータ取得は`logMetadataReadInt()`へ統一する。カンマ区切りの完全一致キーと有限なint32整数相当値を使用し、`0`と`0.00`は同値として読む。欠落・重複・非有限値・端数・範囲外を拒否する。各方式の解析元条件とCRC検証は維持する。
 - DISTANCE/SLIPの読込は不要なXY計算を省く。PATHの初回生成は検証・クロス抽出と経路検証・生成の2走査とする。同一連続走行内のPATH/SHORTCUTは延長前基準経路を再利用できるが、再利用時も元binの全件CRC検証を行う。元ログ・生成設定・系列世代・共有RAMの使用先が変わった場合や失敗時は無効化し、ゴール延長と速度計画は毎回作り直す。詳細と実測結果は`doc/log-processing-performance.md`を参照する。
@@ -579,7 +579,18 @@ Shortcut画面は入場・項目変更時に本文を描画し、値だけの変
 - ログには `fwVersion`, `gitCommit`, `buildDate`, `buildTime`, `branch` を残す。`fwVersion` は手動定義、その他はビルド時の自動埋め込みとする。
 
 
-### 2026-10-21以降のV2正式採用ログ
+### 2026-10-25以降のV2フラグログとSLIP計画
+
+- ユーザー指定で、有効性・無効理由（電流の有効性を含む）と記録間隔内の統計をbin/CSVから削除する。削除対象は`slipV2Valid/Reason/CurrentValid`、`slipV2LatValid/LatReason/LatValidMs/LatIntervalReason`、`slipV2PeakLong/PeakLat/PeakYawDps/OnLongMs/OnLatMs/OnYawMs/ValidMs/TotalMs/IntervalReason`の16列。
+- V2整理だけの時点は通常50列/135 B、詳細56列/144 B。その後の経路診断6列追加後は通常56列/154 B、詳細62列/163 B。残すV2関連9列は`slipV2LongFast/LongSlow/Lat/YawDps/Flags/CurrentHighSamples/PwmSum`と`imuYawAlphaFiltered/imuLatTangentialApplied`。瞬時フラグはbit0=縦、bit1=採用横、bit2=Yaw不整合。内部の判定有効性・区間統計の計算は維持し、保存しない。
+- PATH/SHORTCUT用の経路診断は既存列の末尾へ`pathErrorY_mm`（F32・横偏差mm）、`pathErrorHeading_cdeg`（S16・最近傍経路接線方位−機体方位、0.01deg単位）、`pathState`（U8・0無効/1経路追従/2ライン退避/3再合流/4自己位置喪失）、`pathYawFF_dps`、`pathYawLateralFB_dps`、`pathYawHeadingFB_dps`（各F32・符号付きdeg/s）の順で保存する。5ms更新の最新値を従来の距離間隔で記録し、経路モード以外は全6列を0とする。操舵3成分はFF、`-Klateral×横偏差`、`Kheading×方位偏差`で、合計を±1800deg/sへ制限する前の値。制御式・ゲイン・更新順序は維持する。
+- `slipPlannerVersion=3`、`slipPlannerPolicy=flag_sample_fraction`。50mmごとの`optimalIndex`別に各記録を1件とし、縦/横それぞれのON件数/全件数を使用する。1件以上のONで反映し、Yaw bitは計画へ使わない。従来の最小ON時間3msは廃止し、検出器自体の3/5ms継続判定は維持する。
+- リスク閾値0.60、近傍拡張、減速/増速倍率、先行減速、速度変化制限、10m/s上限は維持する。件数0の区間は補完せず増速しない。無効期間や記録間で終了した短いスリップは新ログから識別できない。
+- 共有RAMの有効時間配列2本を削除し、ON時間配列はON件数へ変更する。集計は停止中・ログ非記録中・FatFsロック下で行う。1ms検出器・割り込み内SD書込禁止は維持する。
+- 変更後は新しい一次とDISTANCEログを取得する。機体は旧スキーマのbinを解析元として拒否する。PC側の自己記述変換・全CRC検証を維持し、過去ログを書き換えない。最初の実機ログとDISTANCE→SLIP走行の確認は別途必要。
+- 以下の2026-10-21の記述は当時の履歴とし、保存列とSLIP計画の現行仕様は本節を優先する。
+
+### 2026-10-21以降のV2正式採用ログ（変更履歴）
 
 - 2026-10-24の現行横ON閾値は6.7 m/s²、OFFは4.5 m/s²。正式採用直後のON6.5とはログメタデータで区別する。窓・LPF・3/5ms継続・検出器版4は維持する。
 
