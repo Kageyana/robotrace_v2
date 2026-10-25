@@ -105,3 +105,13 @@ O0/O2の速度設定180ケースで初期値・欠落作成・既存SD値優先�
 - 設定180ケースとメタデータ35ケースをO0/O2で確認し、部分反映・旧形式修復・不正値拒否を維持。移動した実関数の本体も比較した。
 
 結果はローカル専用の`build/log-path-ownership-20261025/`へ保存した。`validation/`は引き続きGit管理対象外。ログ形式・制御式・安全条件は変更していない。書き込み・実機確認は未実施であり、新ビルドで停止時保存と次走解析、再起動後の読込、PATH／SHORTCUT走行を確認する。
+
+## ログ書込バッファの実装統合（2026-10-25）
+
+`SDcard.c`だけが使っていた`logBufferWriter.h`の状態構造体と12関数を、同ファイルの内部処理へ移した。関数本体、static inline指定、volatile指定、バッファ切替順序と失敗時処理は維持する。保存・読込で共有する512 Bセクタ、2 KiBバッファ、3本という定数は`logStorageInternal.h`へ移し、共有I/O領域は6 KiBのままとした。`logBufferWriter.h`を削除し、ログ関係の対象6ヘッダを5ヘッダへ整理した。
+
+残るヘッダは、列定義の`log_schema.h`、PC変換器とも共有する形式定義の`logBinary.h`、複数モジュールが使う診断の`logPerformance.h`、読込APIの`logSource.h`、保存・読込間の内部定義の`logStorageInternal.h`とする。書込キューの実装を公開ヘッダから取り込む必要はなくなった。
+
+Debug、DebugMarker、Release、ReleaseDetail、CleanupDiagnosticsの5構成でビルド成功。統合前と各構成の既存warningおよびRAM・FLASH使用量が一致した。通常／詳細の保存・CRC・I/O故障・PC変換検証も成功し、統合前の実ソースと直線／閉路カーブの全記録・列定義バイト、型付き解析行、DISTANCE／SLIP／PATH／SHORTCUTの計画が一致した。移動した全12関数・状態構造体・定数の一致と、それ以外の`SDcard.c`処理が変わっていないことも確認した。
+
+確認結果は`build/log-buffer-integration-20261025/`へ保存した。ログ形式・制御経路・安全条件の変更はない。実機への書き込みと実SDでの停止時保存・次走読込は未実施。

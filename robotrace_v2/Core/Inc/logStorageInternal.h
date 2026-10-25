@@ -4,9 +4,13 @@
 // SDcard.cとlogSource.c専用の内部ヘッダ。
 // 保存と読込だけで共有する停止時検証・作業領域の契約。外部モジュールから使用しない。
 #include "logBinary.h"
-#include "logBufferWriter.h"
 #include "log_schema.h"
 #include "ff.h"
+
+// 保存と停止中読込で共用するI/O領域の寸法。書込キューの実装はSDcard.c内に置く。
+#define LOG_BUFFER_SECTOR_SIZE_BYTES 512U
+#define LOG_BUFFER_SIZE_BYTES (4U * LOG_BUFFER_SECTOR_SIZE_BYTES)
+#define LOG_BUFFER_COUNT 3U
 
 #define LOG_COLUMN_TITLE_BUFFER_SIZE 4096U
 typedef union {
