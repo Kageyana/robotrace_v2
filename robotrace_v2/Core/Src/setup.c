@@ -4,6 +4,7 @@
 #include "setup.h"
 #include "battery.h"
 #include "motor.h"
+#include "pathFollower.h"
 #include <stdint.h>
 //====================================//
 // グローバル変数の宣言、定義
@@ -73,6 +74,7 @@ static bool calibrationLinePosition(float *position);
 static void setup_log(void);			// ログ解析と表示を制御
 static void setup_calibration(void);	// キャリブレーション(ラインセンサ)
 static void setup_speed_param(void);	// 速度パラメータ調整
+static void setup_shortcut_param(void); // ショートカット設定調整
 static void test_motor(void);			// モータテスト
 static void test_imu_deg(void);			// IMU角度表示
 static void test_imu_accel(void);		// IMU加速度表示
@@ -122,6 +124,84 @@ static const SpeedParamInfo speedParamTable[] = {
     SPEED_PARAM_FIELDS(SPEED_PARAM_UI)
 #undef SPEED_PARAM_UI
 }; // 速度パラメータの対応テーブル
+
+// maxLevelだけuint8_tのためvalueをNULLとし、一時int16_tを介して編集する。
+typedef struct
+{
+	const char *label; // 表示項目名
+	uint16_t *value; // uint16_t設定値。maxLevelはNULL
+	int16_t step; // SD保存整数での変更量
+	int16_t min; // SD設定と共通の下限
+	int16_t max; // SD設定と共通の上限
+	float scale; // 表示値へ戻す倍率
+	uint8_t decimals; // 表示小数桁数
+	const char *unit; // 表示単位
+} ShortcutParamInfo;
+
+static const ShortcutParamInfo shortcutParamTable[] = {
+	{"Max level", NULL, 1, 0, PATH_LEVEL_MAX, 1.0F, 0U, "level"},
+	{"Lookahead base", &shortcutSettings.lookaheadBaseMm, SHORTCUT_UI_LOOKAHEAD_BASE_STEP_MM,
+		PATH_LOOKAHEAD_BASE_MIN_MM, PATH_LOOKAHEAD_BASE_MAX_MM, 1.0F, 0U, "mm"},
+	{"Lookahead speed", &shortcutSettings.lookaheadPerMpsMm, SHORTCUT_UI_LOOKAHEAD_SPEED_STEP_MM,
+		0, PATH_LOOKAHEAD_SPEED_MAX_MM, 1.0F, 0U, "mm/(m/s)"},
+	{"K lateral", &shortcutSettings.kLateral_x100, SHORTCUT_UI_GAIN_STEP_X100,
+		0, PATH_KLATERAL_MAX_X100, 0.01F, 2U, "(deg/s)/mm"},
+	{"K heading", &shortcutSettings.kHeading_x100, SHORTCUT_UI_GAIN_STEP_X100,
+		0, PATH_KHEADING_MAX_X100, 0.01F, 2U, "(deg/s)/deg"},
+	{"Line alpha", &shortcutSettings.lineAlpha_x1000, SHORTCUT_UI_LINE_ALPHA_STEP_X1000,
+		0, PATH_LINE_ALPHA_MAX_X1000, 0.001F, 3U, "ratio"},
+	{"Line theta gain", &shortcutSettings.lineThetaGain_x1e9, SHORTCUT_UI_LINE_THETA_STEP_X1E9,
+		0, PATH_LINE_THETA_GAIN_MAX_X1E9, 1.0F, 0U, "x1e-9 /mm^2"}
+};
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 setup_shortcut_param
+// 処理概要     左右で7設定を選び、上下で許容範囲内の実設定値を調整する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void setup_shortcut_param(void)
+{
+	static int16_t previousItem = 0;
+	static int16_t previousValue = 0;
+	const bool pageChanged = pattern.display != pattern.beforeHex;
+	const int16_t count = (int16_t)(sizeof(shortcutParamTable) / sizeof(shortcutParamTable[0]));
+	if (pageChanged)
+		ssd1306_printf(Font_6x8, "Shortcut");
+	if (pattern.parameter2 < 1 || pattern.parameter2 > count) pattern.parameter2 = 1;
+	dataTuningLR(&pattern.parameter2, 1, 1, count);
+	const ShortcutParamInfo *info = &shortcutParamTable[pattern.parameter2 - 1];
+	uint16_t raw = info->value != NULL ? *info->value : shortcutSettings.maxLevel;
+	if (raw < (uint16_t)info->min) raw = (uint16_t)info->min;
+	if (raw > (uint16_t)info->max) raw = (uint16_t)info->max;
+	int16_t value = (int16_t)raw;
+	dataTuningUD(&value, info->step, info->min, info->max);
+	if (info->value != NULL)
+		*info->value = (uint16_t)value;
+	else
+		shortcutSettings.maxLevel = (uint8_t)value;
+
+	// 連続DMAはこのバッファを直接読むため、無変更時は消去も再描画もしない。
+	const bool itemChanged = pageChanged || previousItem != pattern.parameter2;
+	if (itemChanged)
+	{
+		ssd1306_FillRectangle(0, 16, 127, 63, Black);
+		ssd1306_SetCursor(0, 18);
+		ssd1306_printf(Font_6x8, "%d/%d %s", pattern.parameter2, count, info->label);
+		ssd1306_SetCursor(0, 42);
+		ssd1306_printf(Font_6x8, "%s", info->unit);
+		ssd1306_SetCursor(0, 54);
+		ssd1306_printf(Font_6x8, "L/R:item U/D:value");
+	}
+	if (itemChanged || previousValue != value)
+	{
+		// 短い数値へ変わった際の残像は空白で消し、本文全体を消去しない。
+		ssd1306_SetCursor(0, 30);
+		ssd1306_printf(Font_6x8, "%-21.*f", info->decimals, (double)((float)value * info->scale));
+	}
+	previousItem = pattern.parameter2;
+	previousValue = value;
+}
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_speed_param
 // 処理概要     速度パラメータ調整
@@ -1227,10 +1307,10 @@ void setup(void)
 				setupFlags.clickStart = -1;
 			}
 
-			if (pattern.display > HEX_PID_SPEED)
+			if (pattern.display > HEX_SHORTCUT_PARAM)
 				pattern.display = 0;
 			else if (pattern.display < 0)
-				pattern.display = HEX_PID_SPEED;
+				pattern.display = HEX_SHORTCUT_PARAM;
 			encClick = 0;
 		}
 	}
@@ -1276,6 +1356,14 @@ void setup(void)
 	case HEX_SPEED_PARAM:
 	{
 		setup_speed_param(); // 速度パラメータ調整
+		break;
+	}
+	//------------------------------------------------------------------
+	// ショートカット設定調整
+	//------------------------------------------------------------------
+	case HEX_SHORTCUT_PARAM:
+	{
+		setup_shortcut_param();
 		break;
 	}
 	//------------------------------------------------------------------
@@ -1346,9 +1434,9 @@ void setup(void)
 		sendLED();
 	}
 
-	if (!testFlags.trace_test && !calibratIMU)
+	if (!testFlags.trace_test && !calibratIMU && !ssd1306_IsDMARunning())
 	{
-		ssd1306_UpdateScreen(); // グラフィック液晶更新
+		ssd1306_UpdateScreen(); // 連続DMA停止中だけ同期転送する
 	}
 }
 ///////////////////////////////////////////////////////////////////////////////////////

@@ -55,6 +55,8 @@
 
 ## 共通UI・設定定義のホスト比較（2026-10-25）
 
+- UI変更のホスト検証前に、実ssd1306の描画バッファとDMA開始・停止・完了処理、同期転送の呼出元を確認する。表示文字列だけでなく、無変更1000周期で再描画ゼロ・値変更時に本文全消去なし・再入場時の再描画・DMA中の同期転送ゼロと停止中の転送を模擬する。リポジトリルートの明示workdir・初回から必要権限で `python validation/shortcut_ui/run.py` を実行し、O0/O2・Wall/Wextra/Werrorと全条件が通るまで確認完了にしない。ホスト成功と修正後の実機ちらつき確認は分ける。[Shortcut画面のちらつき](../../../../doc/失敗事例/2026-10-25-shortcut-ui-continuous-redraw.md)を参照。
+
 - 共通ループの追加前に、UI選択値・配列添字・sizeof・unsigned接尾辞を含む比較式の型を確認する。整数上限マクロだけを対象にしない。変換値が対象型の範囲に収まることを確かめて同符号へ明示変換し、実関数をO0/O2・Wall/Wextra/Werrorでコンパイルする。詳細は[符号比較の再発追記](../../../../doc/失敗事例/2026-10-21-slip-v2-host-signed-bounds.md)。
 - 変更前スナップショットを比較参照へ追加する場合は、参照側の既存warningを先に識別する。許容が必要な既存診断だけを参照ブロック内のdiagnostic push/popで囲み、理由を記載する。現行コードのWerrorを弱めない。詳細は[参照実装の警告契約](../../../../doc/失敗事例/2026-10-24-cleanup-host-fixture-contract.md)。
 - リポジトリルートを明示workdirとして、最初から必要権限で`python validation/control_refactor/run.py`を実行する。任意の作業前Coreがある場合のみ`--baseline build/main-refactor-20261025/before`を付ける。通常実行にスナップショットを必須としない。失敗時は実機検証へ進めず、ビルド診断とアサートを区別して対処する。

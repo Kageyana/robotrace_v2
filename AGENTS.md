@@ -380,6 +380,10 @@ cmake --build --preset Release
 
 `setup.c` の `yawRate` PID 調整画面は表示切替ケースがコメントアウトされており、通常メニューから到達しません。角度・距離PIDは未使用のため削除済みで、`yaw.txt` と `dist.txt` は読み書きしません。
 
+ショートカット設定はUIの `No.8 Shortcut` で7項目を調整する。左右で項目を選択し、上下で値を変更する。許容範囲は `pathFollower.h` のSD設定範囲と共通で、上下端は既存UIと同じく折り返す。先読み距離と速度加算係数は5刻み、横・方位偏差ゲインは実値0.1刻み、位置補正率は0.001刻み、方位補正ゲインは `1e-9 /mm^2` 刻みとする。K lateral/K headingは倍率を戻した値、Line theta gainは `x1e-9 /mm^2` 単位の整数で表示する。変更はRAMへ即時反映し、SDがある場合は手動走行または自動1走目の開始前に `shortcut.txt` へ保存する。開始前に電源を切ると未保存のUI変更は失われる。SDなしではRAM内だけで使用する。
+
+Shortcut画面は入場・項目変更時に本文を描画し、値だけの変更時は数値行だけを空白埋めして更新する。無変更時に消去・再描画しない。連続DMAは描画バッファを直接読むため、`setup()`からの同期画面転送は連続DMA停止中だけ行う。ホストUI検証では値・表示幅だけでなく、無変更時の描画回数とDMA転送中の同期転送禁止を確認する。
+
 ### チューニングパラメータ方針
 
 - チューニングパラメータは見つけやすい場所に置き、意図が明らかでない変更には理由と単位を残す。
@@ -510,6 +514,7 @@ cmake --build --preset Release
 - 通常のCSV変換はPC側で行い、型・列順のスキーマCRCと全記録CRCを検証する。機体側のCSV変換APIは削除済み。機体の解析元と選択一覧は現行binだけとし、旧CSVへのフォールバックは行わない。採番は既存の `.csv` / `.bin` / `.tmp` / `.part` の予約番号を引き続き考慮する。詳細は`doc/pc-binary-log-import.md`を参照する。
 - CSVメタデータの `binaryLogNumber` は予約番号、`binaryDataCrc` は記録部CRC32/IEEE、`binarySchema` はスキーマ識別CRC32/IEEEを表す。CRCは既存整数書式に合わせた符号付き32bit表示で、ビット列として扱う。CSVデータ列・単位・100/145 Bの記録部は変更しない。
 - ラインセンサー校正完了後のログ初期化時に最大・最小値と有効状態を走行別に保持し、メタデータへ `lSensorMax0`～`lSensorMax9`、`lSensorMin0`～`lSensorMin9`、`lineSensorCalibrationValid`（有効=1）として保存する。最大・最小は正規化前のLED点灯・消灯差分AD値（0～4095）、添字0は左端。遅延CSV変換・起動時復旧でも保存済みの値を使用し、CSVデータ列・記録レコードの形式は変更しない。旧ログの項目欠落は未記録と扱う。
+- ログ初期化時にショートカット設定7項目の実設定値を走行別に保持し、全走行のメタデータへ `shortcutSettings.maxLevel`、`shortcutSettings.lookaheadBaseMm`、`shortcutSettings.lookaheadPerMpsMm`、`shortcutSettings.kLateral_x100`、`shortcutSettings.kHeading_x100`、`shortcutSettings.lineAlpha_x1000`、`shortcutSettings.lineThetaGain_x1e9` を整数で保存する。有効なSD設定を反映した開始時点の値を使用し、距離単位・数値倍率は `ShortcutSettings` と同じとする。`shortcutLevel` は実適用レベルであり、設定上限の `shortcutSettings.maxLevel` と区別する。旧ログの欠落は未記録と扱い、既定値を推定しない。CSVデータ列・記録レコードの形式は変更しない。
 - ログファイル名は通し番号を使う。
 - ログスキーマは `robotrace_v2/Core/Inc/log_schema.h` を正とする。旧形式ログも列名で解決する。
 - 1行目のパラメータは `パラメータ名=value` 形式で記載される。IMU温度校正・補正状態、温度係数、エンコーダ換算値も残す。

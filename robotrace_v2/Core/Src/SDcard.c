@@ -12,6 +12,7 @@
 #include "lineSensor.h"
 #include "logPerformance.h"
 #include "markerSensor.h"
+#include "pathFollower.h"
 #include "sd_functions.h"
 #include "stdio.h"
 #include <math.h>
@@ -101,6 +102,8 @@ static uint16_t runImuCalibrationReadErrors = 0U;
 static uint16_t runLineSensorMax[NUM_SENSORS];
 static uint16_t runLineSensorMin[NUM_SENSORS];
 static bool runLineSensorCalibrationValid = false;
+// ログ用に走行開始時の実設定値を保持し、停止後の設定変更を混入させない。
+static ShortcutSettings runShortcutSettings;
 // 手動走行の開始時点で固定した計画元。停止後の解析番号変更をログへ混入させない。
 static int16_t runPrimaryLogNumber = 0;
 static int16_t runSlipSourceLogNumber = 0;
@@ -950,6 +953,13 @@ static void logBuildMetadata(void)
 	setLogHeaderStr("routeControllerVersion", PATH_ROUTE_CONTROLLER_VERSION);
 	setLogHeaderStr("routeSourceLog", pathRouteSourceLog());
 	setLogHeaderStr("shortcutLevel", pathRouteShortcutLevel());
+	setLogHeaderStr("shortcutSettings.maxLevel", runShortcutSettings.maxLevel);
+	setLogHeaderStr("shortcutSettings.lookaheadBaseMm", runShortcutSettings.lookaheadBaseMm);
+	setLogHeaderStr("shortcutSettings.lookaheadPerMpsMm", runShortcutSettings.lookaheadPerMpsMm);
+	setLogHeaderStr("shortcutSettings.kLateral_x100", runShortcutSettings.kLateral_x100);
+	setLogHeaderStr("shortcutSettings.kHeading_x100", runShortcutSettings.kHeading_x100);
+	setLogHeaderStr("shortcutSettings.lineAlpha_x1000", runShortcutSettings.lineAlpha_x1000);
+	setLogHeaderStr("shortcutSettings.lineThetaGain_x1e9", runShortcutSettings.lineThetaGain_x1e9);
 
     // 共通定義の出力対象だけを保存順で出力し、既存15項目の名前と書式を維持する。
 #define SPEED_PARAM_LOG_0(member)
@@ -993,6 +1003,7 @@ void initLog(void)
 	memcpy(runLineSensorMax, lSensorMax, sizeof(runLineSensorMax));
 	memcpy(runLineSensorMin, lSensorMin, sizeof(runLineSensorMin));
 	runLineSensorCalibrationValid = isLineSensorCalibrationValid();
+	runShortcutSettings = shortcutSettings;
 	runPrimaryLogNumber = 0;
 	runSlipSourceLogNumber = 0;
 	if (optimalTrace == BOOST_DISTANCE && runMemoryOwner == RUN_MEMORY_DISTANCE &&

@@ -15,6 +15,16 @@
 #define PUSHTIME 5 // 長押し判定時間[x50ms]
 #define WHEEL_CLICK 800 // ホイールクリックのパルス数
 
+//====================================//
+// 調整パラメータ
+//====================================//
+// ショートカット設定画面の1操作あたりの変更量。許容範囲はpathFollower.hに従う。
+#define SHORTCUT_UI_LOOKAHEAD_BASE_STEP_MM 5 // 基本先読み距離の変更量[mm]。
+#define SHORTCUT_UI_LOOKAHEAD_SPEED_STEP_MM 5 // 速度による先読み加算係数の変更量[mm/(m/s)]。
+#define SHORTCUT_UI_GAIN_STEP_X100 10 // 横・方位偏差ゲインの変更量[各ゲイン単位 ×100]。実ゲインでは0.1。
+#define SHORTCUT_UI_LINE_ALPHA_STEP_X1000 1 // ライン位置補正率の変更量[無次元 ×1000]。実補正率では0.001。
+#define SHORTCUT_UI_LINE_THETA_STEP_X1E9 1 // ライン方位補正ゲインの変更量[1/mm^2 ×10^9]。
+
 // 校正の調整項目。復帰は既存ラインPIDを使用し、探索速度・制動解除幅は算出する。
 #define CALIBRATIONSPEED -500.0F // 校正旋回の角速度[deg/s]
 #define AUTO_CALIBRATION_RETURN_SPEED -300.0F // 白線捕捉前の復帰最大角速度[deg/s]、負値で指定
@@ -34,7 +44,7 @@
 #define HEX_PID_TRACE 0x5
 #define HEX_PID_TRACE_OMEGA 0x6
 #define HEX_PID_SPEED 0x7
-#define HEX_PID_ANGULAR 0x8
+#define HEX_SHORTCUT_PARAM 0x8
 
 // センサテストを表す列挙体
 typedef enum
@@ -61,7 +71,7 @@ typedef struct
 	int16_t sensorAccele;           // 加速度センサ項目
 	int16_t sensorGyro;             // ジャイロセンサ項目
 	int16_t parameter1;             // パラメータ1
-	int16_t parameter2;             // パラメータ2
+	int16_t parameter2;             // ショートカット設定の選択項目[1～7]
 	int16_t parameter3;             // パラメータ3
 	int16_t parameter4;             // パラメータ4
 	int16_t gain;                   // ゲイン選択

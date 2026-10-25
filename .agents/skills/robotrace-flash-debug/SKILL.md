@@ -9,6 +9,8 @@ description: robotrace_v2をSTM32CubeCLT、STM32_Programmer_CLI、ST-Link/GDBで
 
 最初のコマンドの前に [共通事前確認](../../../doc/skill-execution-preflight.md) を読み、パス・workdir・権限・実行環境を確定する。ビルド・PCハーネス・ST-Linkを操作するときは [分野別の再発防止](references/failure-prevention.md) も読む。関連する失敗記録は最新追記まで確認し、既知の失敗条件を初回操作から回避する。
 
+binメタデータとPC変換CSVの1行目を比較する前に、両形式の改行規約と実バイトを確認する。binはLF、PC変換CSVはCRLFのため、内容照合では行末だけを正規化し、項目名・順序・値を含む他の全バイトは維持する。無変換コピーのバイト一致契約と混同しない。実行はリポジトリルートの明示workdir・必要権限で `python validation/log_storage/run.py --converter C:/tool/AutoCopyCsvFromSd/RlogToCsv.exe` とし、両プロファイルの全メタデータ内容・CRC・CSV値一致が通るまで完了としない。[bin/CSV改行差の事例](../../../doc/失敗事例/2026-10-17-shared-header-line-ending-check.md)を参照する。
+
 ログ形式変更のPC変換器検証では、`C:/tool/AutoCopyCsvFromSd/RlogToCsv.exe`もGCC生成ホストexeとして最初の起動からrequire_escalatedを使用する。今回の解析フォルダ内の合成bin/出力CSVに限定し、Python subprocessのstdout=PIPE/stderr=STDOUT等で出力を取得、終了コード0・出力実在を確認してから全CRC/列/数値を照合する。PowerShellのStandardOutputEncodingエラーだけで原因を決めず、直接取得した起動エラーを確認する。詳細は[PC変換器起動の追記](../../../doc/失敗事例/2026-10-11-bmi088-forward-y-sign.md)。
 
 新規warningの比較前に、変更前ログが対象翻訳単位と構成を含むか確認する。最終の増分ビルドログだけを基準にせず、初回全体ビルド記録も照合し、既存診断と追加分を区別する。[増分ログの誤判定](../../../doc/失敗事例/2026-10-16-self-describing-header-test-contract.md)参照。

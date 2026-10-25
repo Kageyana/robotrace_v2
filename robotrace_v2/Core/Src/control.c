@@ -644,6 +644,7 @@ void loopSystem(void)
 				writePIDparameters(&yawRateCtrl);
 
 				writeTgtspeeds();  // 目標速度を保存
+				if (initMSD) writeShortcutSettings(); // 手動走行・自動1走目前にUI変更値を保存
 			}
 
 			if (initMSD)
