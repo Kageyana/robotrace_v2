@@ -139,3 +139,7 @@ Src/log*をパスに渡した検索でos error 123、推測したtim.cで存在�
 対象タスクはmainの不要機能・統合候補の静的調査。共通事前確認を読んだ後にも、`robotrace_v2/tests/run*`と`robotrace_v2/tests/slip*`をrgのパス引数へ渡し、os error 123が発生した。また、最初の一覧取得では存在未確認の`shared`を検索パスへ追加し、os error 2が発生した。原因は既存のディレクトリ確認・glob分離ルールを初回コマンドへ適用できなかったこと。ファームウェア・設定・ログ原本の変更はない。
 
 対処は実在する`robotrace_v2/tests`をルートとし、`-g 'run*' -g 'slip*'`へ分離して検索した。終了コード0と旧検出器テストの一致行を確認した。再発防止は、複数検索を組み立てる前にすべての検索ルートへ`Test-Path -LiteralPath ... -PathType Container`を実行し、パス引数の`*`・`?`を除去して`-g`へ渡すこと。再検索の実行結果を個別に確認し、後続の成功で検索失敗を見落とさない。今回の修正コマンドは検証済みのためresolvedを維持する。Skill実行中の失敗ではなく一般のソース調査で発生したため、無関係なSkillへの手順追加は行わない。
+
+## 2026-10-25 PATH_CURVE調査での再発
+
+対象は新走行モードとLOG画面の実装調査。PowerShellへ`Core/Inc/{courseAnalysis,pathFollower,...}.h`を渡し、シェルの構文解析でMissing argumentとなり検索は実行されなかった。共通事前確認のBash展開禁止をコマンドへ反映できなかった再発である。修正は実在する`robotrace_v2/Core/Inc`を検索ルートにして`rg -n 'PATH|SHORTCUT|curvature|BOOST_' robotrace_v2/Core/Inc -g '*.h'`を使った。終了コード0と該当ヘッダの一致を確認した。今後は検索パスに`*`・`?`だけでなく波括弧もないことを組立時に確認し、ディレクトリと`-g`へ分ける。一般のソース調査で発生したため分野Skillへの変更は行わない。対処確認済み、resolvedを維持する。

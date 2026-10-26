@@ -110,13 +110,13 @@ File: `shortcut.txt`
 File: `auto_run.txt`
 
 - Implementation: `autoRun.c`, `SDcard.c`, and `control.c`.
-- Format: one row for each run number 2 through 5, `runNumber,mode`; modes are `DISTANCE`, `SLIP`, `PATH`, and `SHORTCUT`.
+- Format: one row for each run number 2 through 5, `runNumber,mode`; modes are `DISTANCE`, `SLIP`, `PATH`, `SHORTCUT`, and `PATH_CURVE`. `PATH_CURVE` replays the same virtual line as PATH using the shared DISTANCE curvature-speed table; it does not use the `pathReplay` or `shortCut` speed cap. Its mode number is `BOOST_PATH_CURVE=5`.
 - Default: `2,DISTANCE`, `3,SLIP`, `4,PATH`, `5,SHORTCUT`, one row per line.
 - Duplicate modes are allowed. `SLIP` is valid only when the immediately preceding run is configured as `DISTANCE`.
 - Missing, malformed, incomplete, duplicate-run, or dependency-invalid configuration is replaced as a whole with the default order. If repair cannot be saved, auto-start is blocked.
 - Only a missing-file result or invalid content triggers repair. Other SD open/read/close errors block auto-start without writing the file; the display distinguishes an SD read error from a repair failure.
 - Read during startup; reboot after editing the SD card file.
-- Run 1 is always the primary run. `DISTANCE`, `PATH`, and `SHORTCUT` use its log. `SLIP` uses the primary log for its distance plan and the immediately preceding successful `DISTANCE` log for slip data.
+- Run 1 is always the primary run. `DISTANCE`, `PATH`, `SHORTCUT`, and `PATH_CURVE` use its log. `SLIP` uses the primary log for its distance plan and the immediately preceding successful `DISTANCE` log for slip data.
 
 ### Line Sensor Calibration
 
@@ -137,7 +137,7 @@ File: `lsval.txt`
 - `logSource.h` exposes current-bin-only `logSourceOpen(file, number, purpose)`, `logSourceInfo`, `logSourceMetadata`, `logSourceNext` and close/error/EOF. Metadata is immutable while open; data rows are typed `LogSourceRow`. No generated CSV headers, column maps or CSV fallback are used.
 - The robot's selection list contains only bin files. Number allocation still reserves numeric `.csv`, `.bin`, `.tmp` and `.part` names. Keep tmp and all unimported originals. Boot validates headers/schema/length; opening an analysis source verifies every data and metadata CRC.
 - The PC converter continues to decode self-describing RLOG v2 and import old CSV files. Current normal/debug profiles are 66 columns/170 B and 72 columns/179 B. Stored fields, encoding, CRC and derivedVersion are unchanged by API cleanup.
-- Run `python validation/log_storage/run.py` from the repository root for both profiles, failure injection, current V2, auto-run configuration, source eligibility and all four plans. Add `--converter C:/tool/AutoCopyCsvFromSd/RlogToCsv.exe` to compare PC output values. Use permitted unrestricted execution for GCC and generated exe.
+- Run `python validation/log_storage/run.py` from the repository root for both profiles, failure injection, current V2, auto-run configuration, source eligibility and all five plans, including PATH_CURVE. Add `--converter C:/tool/AutoCopyCsvFromSd/RlogToCsv.exe` to compare PC output values. Use permitted unrestricted execution for GCC and generated exe.
 - Do not run removed `run_slip_log_compat_tests.ps1`, CSV-conversion performance runners or tests requiring pre-change snapshots. Check actual stop/save/reboot and the first real log separately.
 
 ### Analysis and Log Numbers

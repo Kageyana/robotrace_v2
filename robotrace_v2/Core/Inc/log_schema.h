@@ -108,15 +108,15 @@
     STORED(F32, imuYawAlphaFiltered, "%f", slipV2.lateralCandidate.result.alphaRadps2) \
     STORED(F32, imuLatTangentialApplied, "%f", slipV2.lateralCandidate.result.tangentialAppliedXMps2)
 
-// PATH/SHORTCUTの1ms周期診断。経路モード以外は0を保存する。
+// PATH/SHORTCUT/PATH_CURVEの1ms周期診断。経路モード以外は0を保存する。
 // 方位偏差は最近傍経路接線に対する差[0.01deg]、操舵3成分は符号付きの飽和前指令[deg/s]。
 #define LOG_FIELD_LIST_PATH(STORED, DERIVED) \
-    STORED(F32, pathErrorY_mm, "%f", ((optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT) ? pathLogErrorY_mm : 0.0f)) \
-    STORED(S16, pathErrorHeading_cdeg, "%d", ((optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT) ? pathLogErrorHeading_cdeg : 0)) \
-    STORED(U8, pathState, "%d", ((optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT) ? pathLogState : PATH_STATE_INACTIVE)) \
-    STORED(F32, pathYawFF_dps, "%f", ((optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT) ? pathLogYawFF_dps : 0.0f)) \
-    STORED(F32, pathYawLateralFB_dps, "%f", ((optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT) ? pathLogYawLateralFB_dps : 0.0f)) \
-    STORED(F32, pathYawHeadingFB_dps, "%f", ((optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT) ? pathLogYawHeadingFB_dps : 0.0f))
+    STORED(F32, pathErrorY_mm, "%f", (isPathRunMode(optimalTrace) ? pathLogErrorY_mm : 0.0f)) \
+    STORED(S16, pathErrorHeading_cdeg, "%d", (isPathRunMode(optimalTrace) ? pathLogErrorHeading_cdeg : 0)) \
+    STORED(U8, pathState, "%d", (isPathRunMode(optimalTrace) ? pathLogState : PATH_STATE_INACTIVE)) \
+    STORED(F32, pathYawFF_dps, "%f", (isPathRunMode(optimalTrace) ? pathLogYawFF_dps : 0.0f)) \
+    STORED(F32, pathYawLateralFB_dps, "%f", (isPathRunMode(optimalTrace) ? pathLogYawLateralFB_dps : 0.0f)) \
+    STORED(F32, pathYawHeadingFB_dps, "%f", (isPathRunMode(optimalTrace) ? pathLogYawHeadingFB_dps : 0.0f))
 
 // 通常56列・154 B、詳細62列・163 B。既存列の末尾へ経路診断6列を追加する。
 #define LOG_FIELD_LIST(STORED, DERIVED) \

@@ -52,7 +52,7 @@ static void updateSlipCurrentSample(uint32_t nowMs)
 #if defined(ROBOTRACE_ISR_TIMING) && ROBOTRACE_ISR_TIMING
 volatile IsrTimingStats isrTimingStats[ISR_TIMING_MODE_COUNT] = {0};
 _Static_assert(BOOST_NONE == 0 && BOOST_DISTANCE == 2 &&
-	BOOST_SHORTCUT == 3 && BOOST_PATH_REPLAY == 4, "ISR timing mode order changed");
+	BOOST_SHORTCUT == 3 && BOOST_PATH_REPLAY == 4 && BOOST_PATH_CURVE == 5, "ISR timing mode order changed");
 /////////////////////////////////////////////////////////////////////
 // モジュール名 recordIsrTiming
 // 処理概要     走行モード別に割り込み処理のサイクル数を整数で集計する
@@ -150,7 +150,7 @@ void Interrupt1ms(void)
 	SlipDetection_Update(&slipV2, &slipInput);
 
 	// 経路モードは平均速度PIDとヨーレートPIDを使用する。
-	bool pathModeActive = (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT);
+	bool pathModeActive = isPathRunMode(optimalTrace);
 	const bool pathSteeringActive = pathModeActive && patternTrace >= 12 && patternTrace < 100;
 	const PathFollowerState pathState = pathFollowerGetStatus();
 	monitorLineSensorUpdate1ms(!pathSteeringActive || pathState == PATH_STATE_LINE_FALLBACK || pathState == PATH_STATE_REJOIN);

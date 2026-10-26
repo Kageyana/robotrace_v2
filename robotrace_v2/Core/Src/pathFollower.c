@@ -457,16 +457,18 @@ static void pathComputeHeadings(RoutePoint *route, uint16_t count)
 // モジュール名 pathBuildSpeedProfile
 // 処理概要     曲率と加減速制約から経路速度を設定する
 // 引数         route: 経路点列, count: 経路点数, shortcutLevel: 短縮レベル
+//              curvatureSpeed: trueでDISTANCE共通の曲率別速度を使用
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-static void pathBuildSpeedProfile(RoutePoint *route, uint16_t count, uint8_t shortcutLevel)
+static void pathBuildSpeedProfile(RoutePoint *route, uint16_t count, uint8_t shortcutLevel, bool curvatureSpeed)
 {
 	if (count == 0U) return;
 	float speedCap = (shortcutLevel == 0U) ? tgtParam.pathReplay : tgtParam.shortCut;
 	if (speedCap <= 0.0f) speedCap = tgtParam.pathReplay;
+	if (curvatureSpeed) speedCap = PATH_CURVE_MAX_SPEED_MPS;
 	for (uint16_t i = 0U; i < count; i++)
 	{
-		float speed = speedCap;
+		float speed = curvatureSpeed ? fminf(speedCap, asignVelocity(INT16_MAX)) : speedCap;
 		if (i > 0U && i + 1U < count)
 		{
 			float h0 = (float)route[i - 1U].heading_cdeg * 0.01f;
@@ -478,10 +480,18 @@ static void pathBuildSpeedProfile(RoutePoint *route, uint16_t count, uint8_t sho
 			{
 				float radiusMm = dsMm / dHeadingRad;
 				float curveSpeed = asignVelocity(pathFloatToInt16(radiusMm));
-				if (curveSpeed < speed) speed = curveSpeed;
+				if (curvatureSpeed) speed = fminf(speedCap, curveSpeed);
+				else if (curveSpeed < speed) speed = curveSpeed;
 			}
 		}
 		route[i].speed_cms = (uint16_t)lroundf(fmaxf(0.0f, speed) * 100.0f);
+	}
+	if (curvatureSpeed)
+	{
+		// スタートマーカーまではsearch速度のため、先頭から加速制約を適用する。
+		uint16_t startSpeed = (uint16_t)lroundf(fminf(PATH_CURVE_MAX_SPEED_MPS,
+			fmaxf(0.0f, tgtParam.search)) * 100.0f);
+		if (route[0].speed_cms > startSpeed) route[0].speed_cms = startSpeed;
 	}
 
 	for (uint16_t i = 1U; i < count; i++)
@@ -490,7 +500,8 @@ static void pathBuildSpeedProfile(RoutePoint *route, uint16_t count, uint8_t sho
 		float dsM = pathPointDistance((float)route[i - 1U].x_mm, (float)route[i - 1U].y_mm,
 			(float)route[i].x_mm, (float)route[i].y_mm) * 0.001f;
 		float limit = sqrtf(fmaxf(0.0f, (previous * previous) + (2.0f * tgtParam.acceleF * dsM)));
-		if ((float)route[i].speed_cms * 0.01f > limit) route[i].speed_cms = (uint16_t)lroundf(limit * 100.0f);
+		if ((float)route[i].speed_cms * 0.01f > limit)
+			route[i].speed_cms = (uint16_t)(curvatureSpeed ? floorf(limit * 100.0f) : lroundf(limit * 100.0f));
 	}
 	for (int32_t i = (int32_t)count - 2; i >= 0; i--)
 	{
@@ -498,7 +509,8 @@ static void pathBuildSpeedProfile(RoutePoint *route, uint16_t count, uint8_t sho
 		float dsM = pathPointDistance((float)route[i].x_mm, (float)route[i].y_mm,
 			(float)route[i + 1].x_mm, (float)route[i + 1].y_mm) * 0.001f;
 		float limit = sqrtf(fmaxf(0.0f, (next * next) + (2.0f * tgtParam.acceleD * dsM)));
-		if ((float)route[i].speed_cms * 0.01f > limit) route[i].speed_cms = (uint16_t)lroundf(limit * 100.0f);
+		if ((float)route[i].speed_cms * 0.01f > limit)
+			route[i].speed_cms = (uint16_t)(curvatureSpeed ? floorf(limit * 100.0f) : lroundf(limit * 100.0f));
 	}
 }
 
@@ -506,9 +518,10 @@ static void pathBuildSpeedProfile(RoutePoint *route, uint16_t count, uint8_t sho
 // モジュール名 pathExtendDriveRouteTowardOrigin
 // 処理概要     一次走行終端と座標原点の中間点まで実走行経路を延長する
 // 引数         shortcutLevel: 実走行経路へ適用済みの短縮レベル
+//              curvatureSpeed: trueでDISTANCE共通の曲率別速度を使用
 // 戻り値       true:延長成功 false:延長不可
 /////////////////////////////////////////////////////////////////////
-static bool pathExtendDriveRouteTowardOrigin(uint8_t shortcutLevel)
+static bool pathExtendDriveRouteTowardOrigin(uint8_t shortcutLevel, bool curvatureSpeed)
 {
 	if (routeCount < 2U) return false;
 	float endX = (float)driveRoute[routeCount - 1U].x_mm;
@@ -544,7 +557,7 @@ static bool pathExtendDriveRouteTowardOrigin(uint8_t shortcutLevel)
 	}
 	pathComputeHeadings(lineRoute, routeCount);
 	pathComputeHeadings(driveRoute, routeCount);
-	pathBuildSpeedProfile(driveRoute, routeCount, shortcutLevel);
+	pathBuildSpeedProfile(driveRoute, routeCount, shortcutLevel, curvatureSpeed);
 	return true;
 }
 
@@ -854,7 +867,7 @@ bool routeGenerateShortcut(uint8_t shortcutLevel)
 		return false;
 	}
 	pathComputeHeadings(driveRoute, routeCount);
-	pathBuildSpeedProfile(driveRoute, routeCount, shortcutLevel);
+	pathBuildSpeedProfile(driveRoute, routeCount, shortcutLevel, false);
 	routeShortcutLevel = shortcutLevel;
 	routeShortcutBuildStatus = PATH_SHORTCUT_BUILD_SUCCESS;
 	return true;
@@ -865,9 +878,10 @@ bool routeGenerateShortcut(uint8_t shortcutLevel)
 // モジュール名 routeBuildFromLogImpl
 // 処理概要     一次走行ログから40mm間隔の再走行経路を生成する
 // 引数         logNumber:ログ番号, shortcutLevel:短縮レベル
+//              curvatureSpeed: trueで曲率別速度のPATH_CURVEを生成
 // 戻り値       経路点数、負値はエラー
 /////////////////////////////////////////////////////////////////////
-static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel)
+static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel, bool curvatureSpeed)
 {
     FIL file;
     RouteSourceInfo columns;
@@ -940,7 +954,7 @@ static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel)
     routeCache.epoch = autoRunSeriesGeneration();
     routeCache.baseCount = routeCount;
 	pathComputeHeadings(lineRoute, routeCount);
-	pathBuildSpeedProfile(lineRoute, routeCount, 0U);
+	pathBuildSpeedProfile(lineRoute, routeCount, 0U, false);
 	memcpy(driveRoute, lineRoute, sizeof(RoutePoint) * routeCount);
 	bool shortcutOk = false;
 	if (requestedShortcutLevel > 0U && generationSettings.maxLevel == 0U)
@@ -957,15 +971,15 @@ static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel)
 	}
 	if (!shortcutOk)
 	{
-		pathBuildSpeedProfile(driveRoute, routeCount, 0U);
+		pathBuildSpeedProfile(driveRoute, routeCount, 0U, false);
 	}
-	if (!pathExtendDriveRouteTowardOrigin(routeShortcutLevel)) { resultCode = -15; goto failed; }
+	if (!pathExtendDriveRouteTowardOrigin(routeShortcutLevel, curvatureSpeed)) { resultCode = -15; goto failed; }
 	pathBuildDriveRouteArcLength();
 	routeSourceLog = (int16_t)logNumber;
 	routeShortcutRequestedLevel = requestedShortcutLevel;
 	routeGenerationSettings = generationSettings;
 	routeGeometryCrc32 = pathComputeRouteGeometryCrc32();
-	optimalTrace = shortcutOk ? BOOST_SHORTCUT : BOOST_PATH_REPLAY;
+	optimalTrace = curvatureSpeed ? BOOST_PATH_CURVE : (shortcutOk ? BOOST_SHORTCUT : BOOST_PATH_REPLAY);
 	indexSC = (int16_t)routeCount;
 	optimalIndex = 0U;
 	sd_fatfs_unlock();
@@ -989,9 +1003,23 @@ failed:
 int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 {
     LOG_PERF_BEGIN(tick);
-    int16_t result = routeBuildFromLogImpl(logNumber, shortcutLevel);
+    int16_t result = routeBuildFromLogImpl(logNumber, shortcutLevel, false);
     if (shortcutLevel > 0U) { LOG_PERF_END(shortcutMs, tick); }
     else { LOG_PERF_END(pathMs, tick); }
+    return result;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 routeBuildCurvatureFromLog
+// 処理概要     PATHと同じ仮想ラインへDISTANCE共通の曲率別速度を設定する
+// 引数         logNumber: 一次ログ番号
+// 戻り値       経路点数、失敗時は負のエラーコード
+/////////////////////////////////////////////////////////////////////
+int16_t routeBuildCurvatureFromLog(int logNumber)
+{
+    LOG_PERF_BEGIN(tick);
+    int16_t result = routeBuildFromLogImpl(logNumber, 0U, true);
+    LOG_PERF_END(pathMs, tick);
     return result;
 }
 
@@ -1477,7 +1505,7 @@ void pathFollowerCaptureRunStartSettings(void)
 	runRouteCount = 0U;
 	runRouteGeometryCrc32 = 0U;
 	runGenerationSettings = (ShortcutSettings){0U, 0U, 0U, 0U, 0U, 0U, 0U};
-	if (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT)
+	if (isPathRunMode(optimalTrace))
 	{
 		runRouteSourceLog = routeSourceLog;
 		runRouteRequestedLevel = routeShortcutRequestedLevel;

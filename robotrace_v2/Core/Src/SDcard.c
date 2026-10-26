@@ -1014,7 +1014,7 @@ void initLog(void)
 		runPrimaryLogNumber = analyzedNumber;
 		runSlipSourceLogNumber = analyzedSlipSourceNumber;
 	}
-	else if ((optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT) &&
+	else if (isPathRunMode(optimalTrace) &&
 		runMemoryOwner == RUN_MEMORY_PATH && pathRouteCount() > 1U && pathRouteSourceLog() > 0)
 	{
 		runPrimaryLogNumber = pathRouteSourceLog();

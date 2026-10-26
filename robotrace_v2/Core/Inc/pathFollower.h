@@ -14,6 +14,7 @@
 //====================================//
 // 経路の標本化と形状変更。
 #define PATH_ROUTE_SPACING_MM              20.0f // 経路点を再標本化する距離間隔[mm]。
+#define PATH_CURVE_MAX_SPEED_MPS            10.0f // PATH_CURVEの機体速度上限[m/s]。曲率別速度はDISTANCEの有効なSD設定を共用。
 // 実測した機体投影寸法と合法余裕を確認済みのため、形状変更を許可する。
 #define PATH_SHORTCUT_GEOMETRY_ENABLE      1 // ショートカット形状変更の許可[0:無効、1:有効]。
 
@@ -147,6 +148,7 @@ extern int16_t pathLogPoseCorrectionHeading_cdeg;
 //====================================//
 
 int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel);
+int16_t routeBuildCurvatureFromLog(int logNumber);
 bool routeGenerateShortcut(uint8_t shortcutLevel);
 uint16_t pathRouteCount(void);
 bool pathFollowerGoalReached(void);

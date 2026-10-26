@@ -21,6 +21,18 @@
 #define BOOST_DISTANCE 2			// 距離基準2次走行
 #define BOOST_SHORTCUT 3			// ショートカット2次走行
 #define BOOST_PATH_REPLAY 4			// 一次走行経路のセンサレス再走行
+#define BOOST_PATH_CURVE 5			// 仮想ラインの曲率に応じた可変速経路走行
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 isPathRunMode
+// 処理概要     共通の経路追従制御を使用する走行モードか判定する
+// 引数         mode: 走行モード番号
+// 戻り値       true: 経路走行 false: その他
+/////////////////////////////////////////////////////////////////////
+static inline bool isPathRunMode(uint8_t mode)
+{
+    return mode == BOOST_PATH_REPLAY || mode == BOOST_SHORTCUT || mode == BOOST_PATH_CURVE;
+}
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 isSupportedRunMode
@@ -31,7 +43,7 @@
 static inline bool isSupportedRunMode(uint8_t mode)
 {
     return mode == BOOST_NONE || mode == BOOST_DISTANCE ||
-        mode == BOOST_SHORTCUT || mode == BOOST_PATH_REPLAY;
+        isPathRunMode(mode);
 }
 
 #define SEARCHRANGE 150				// 距離補正時の距離検索範囲[mm]

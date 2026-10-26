@@ -399,7 +399,7 @@ Shortcut画面は入場・項目変更時に本文を描画し、値だけの変
 - 設定ファイルの読み書き処理を変更する場合は、ファイル欠落時にデフォルト値でファイルが作成されることを確認する。
 - `targetSpeeds.txt` は既存18項目の末尾に `pathReplay` を加えた19項目形式とする。旧18項目は有効値を保ち、末尾に `pathReplay` の既定値を追加して修復する。
 - `shortcut.txt` は `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000,lineThetaGain_x1e9` の順で保存し、改行は付けない。既定値は `1,080,040,3000,0600,010,000`。旧6項目は有効値を保ち、`lineThetaGain_x1e9` を補って修復する。
-- `auto_run.txt` は2～5走目の方式を `走行番号,方式` で保存する。既定値は `2,DISTANCE / 3,SLIP / 4,PATH / 5,SHORTCUT`。起動時に読み、欠落・不正・SLIP依存関係違反は全行を既定値へ修復する。修復に失敗した場合は「設定修復失敗」、SD読込I/Oエラー時は「SD読込エラー」と表示してオートスタートを禁止する。I/Oエラー時は設定を書き換えない。SLIPの直前方式はDISTANCEに限る。
+- `auto_run.txt` は2～5走目の方式を `走行番号,方式` で保存する。方式には`PATH_CURVE`も指定できる。既定値は `2,DISTANCE / 3,SLIP / 4,PATH / 5,SHORTCUT`。起動時に読み、欠落・不正・SLIP依存関係違反は全行を既定値へ修復する。修復に失敗した場合は「設定修復失敗」、SD読込I/Oエラー時は「SD読込エラー」と表示してオートスタートを禁止する。I/Oエラー時は設定を書き換えない。SLIPの直前方式はDISTANCEに限る。
 - SD上の `auto_run.txt` を編集した場合は、反映のため再起動する。
 
 設定ファイルの保存先は `./setting/` です。詳細なファイル形式、読み書き関数、破損時の扱いは `.agents/skills/robotrace-sd-settings/SKILL.md` を使います。
@@ -473,13 +473,14 @@ Shortcut画面は入場・項目変更時に本文を描画し、値だけの変
 - `BOOST_NONE`: 1次走行。距離、角速度、マーカー、曲率半径を記録し、2次走行用のログを取る。
 - `BOOST_DISTANCE`: 1次走行の走行距離と比較し、現在の走行位置と曲率半径から速度を決定して走行する。
 - `BOOST_SHORTCUT`: `BOOST_PATH_REPLAY` の経路にLevel 1の直線回廊短縮を適用し、合法余裕を確認してヨーレート制御で走行する。
-- `BOOST_PATH_REPLAY`: 条件を満たす現行binの `x`, `y`, `encTotalOptimal` を型付きAPIで復元し、40 mm間隔に再標本化した経路を走行する。ラインセンサーは限定的な実座標姿勢補正とロスト時フォールバックに使う。Level 0専用速度は `targetSpeeds.txt` の `pathReplay` とする。
-- 現行番号は一次=0、DISTANCE=2、SHORTCUT=3、PATH REPLAY=4を維持する。旧`BOOST_MARKER`の番号1は廃止・再利用禁止とし、未定義値とともに走行開始を拒否する。ISR診断配列も添字1を空け、既存の他モードの添字を維持する。
-- PATH REPLAY / SHORTCUT は一次経路の終端から原点までの距離の半分だけ経路を延長し、その延長点をゴールとする。経路延長不能、配列容量超過、無効な経路元は生成エラーとして走行開始を禁止する。自己位置喪失時の停止を維持する。
+- `BOOST_PATH_REPLAY`: 条件を満たす現行binの `x`, `y`, `encTotalOptimal` を型付きAPIで復元し、`PATH_ROUTE_SPACING_MM`（現行20 mm）間隔に再標本化した経路を走行する。ラインセンサーは限定的な実座標姿勢補正とロスト時フォールバックに使う。Level 0専用速度は `targetSpeeds.txt` の `pathReplay` とする。
+- `BOOST_PATH_CURVE`（`PATH_CURVE`、番号5）: PATHと同じ仮想ラインを走り、経路点前後の接線方位差と距離から曲率半径を求める。DISTANCEと同じ`asignVelocity()`・`bstStraight`/`bst1500`～`bst100`の有効なSD設定を共用し、`pathReplay`/`shortCut`の速度上限は適用しない。上限10m/sと既存PATHの`acceleF`/`acceleD`による前後の速度制約を適用し、先頭速度はスタート前の`search`以下とする。加減速のcm/s量子化は上限を超えない方向へ丸める。経路生成・ゴール延長・1ms追従・ライン退避・自己位置喪失停止はPATHと共通とする。
+- 現行番号は一次=0、DISTANCE=2、SHORTCUT=3、PATH REPLAY=4、PATH_CURVE=5とする。旧`BOOST_MARKER`の番号1は廃止・再利用禁止とし、未定義値とともに走行開始を拒否する。ISR診断配列も添字1を空け、既存の他モードの添字を維持する。
+- PATH REPLAY / SHORTCUT / PATH_CURVE は一次経路の終端から原点までの距離の半分だけ経路を延長し、その延長点をゴールとする。経路延長不能、配列容量超過、無効な経路元は生成エラーとして走行開始を禁止する。自己位置喪失時の停止を維持する。
 
 ### 速度計画と確認観点
 
-- `BOOST_DISTANCE` は `PPAD[optimalIndex].boostSpeed`、`BOOST_PATH_REPLAY` と `BOOST_SHORTCUT` は `pathFollower.c` の `driveRoute[optimalIndex]` と速度プロファイルを正とする。
+- `BOOST_DISTANCE` は `PPAD[optimalIndex].boostSpeed`、`BOOST_PATH_REPLAY`、`BOOST_SHORTCUT`、`BOOST_PATH_CURVE` は `pathFollower.c` の `driveRoute[optimalIndex]` と速度プロファイルを正とする。
 - 低速小Rカーブのライン角速度目標は、曲率FFゲイン100%とラインセンサーFB 35%を併用し、`targetSpeed <= 90 pulse/ms` のBOOST_DISTANCE区間では絶対値1200 deg/sを上限とする。これは現行採用設定である。
 - 各モードのログ確認観点と速度計画の評価は `.agents/skills/robotrace-log-analysis/SKILL.md` を使う。
 
@@ -526,7 +527,7 @@ Shortcut画面は入場・項目変更時に本文を描画し、値だけの変
 - 共通ログ読込は現行スキーマの `.bin` のみとし、`logSource.h`のメタデータ取得・型付き次行取得を使用する。曲率・クロス前後100 mm直線化・XY計算は維持し、機体側のCSVヘッダ生成・CSV行読込・数値解析は行わない。停止中・FatFsロック下で1ファイルずつ実行する。
 - SLIP/PATHの整数メタデータ取得は`logMetadataReadInt()`へ統一する。カンマ区切りの完全一致キーと有限なint32整数相当値を使用し、`0`と`0.00`は同値として読む。欠落・重複・非有限値・端数・範囲外を拒否する。各方式の解析元条件とCRC検証は維持する。
 - DISTANCE/SLIPの読込は不要なXY計算を省く。PATHの初回生成は検証・クロス抽出と経路検証・生成の2走査とする。同一連続走行内のPATH/SHORTCUTは延長前基準経路を再利用できるが、再利用時も元binの全件CRC検証を行う。元ログ・生成設定・系列世代・共有RAMの使用先が変わった場合や失敗時は無効化し、ゴール延長と速度計画は毎回作り直す。詳細と実測結果は`doc/log-processing-performance.md`を参照する。
-- 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_DISTANCE`, `BOOST_SHORTCUT`, `BOOST_PATH_REPLAY` を正とする。
+- 走行モードはログ内パラメータ `optimalTrace` で区別する。定義は `robotrace_v2/Core/Inc/courseAnalysis.h` の `BOOST_NONE`, `BOOST_DISTANCE`, `BOOST_SHORTCUT`, `BOOST_PATH_REPLAY`, `BOOST_PATH_CURVE` を正とする。
 - 新しい走行モードを追加する場合は、`robotrace_v2/Core/Inc/courseAnalysis.h` に定義を追加する。
 - `emcStop` が 0 以外の場合は緊急停止しており、ゴールしていない走行として扱う。
 - 緊急停止条件は `robotrace_v2/Core/Inc/emergencyStop.h` の定義を正とする。経路追従中に自己位置を喪失し、ライン追従へ移行できない場合は `STOP_LOCALIZATION` とする。
@@ -571,7 +572,7 @@ Shortcut画面は入場・項目変更時に本文を描画し、値だけの変
 
 - ログ列の正、物理量、マーカー値、ログ周期、失敗走行分類、必須グラフ・表、解析出力命名は `.agents/skills/robotrace-log-analysis/SKILL.md` を使う。
 - 失敗走行は `emcStop != 0` で除外する。`cntlog` 欠落や処理落ちがあるログも無効とし、原因を特定して修正する。
-- `BOOST_DISTANCE`, `BOOST_PATH_REPLAY`, `BOOST_SHORTCUT` は相互に比較しない。1次走行は1次走行同士、2次走行は同じ種類同士、autoStartは5回すべて走行したログ同士で比較する。
+- `BOOST_DISTANCE`, `BOOST_PATH_REPLAY`, `BOOST_SHORTCUT`, `BOOST_PATH_CURVE` は相互に比較しない。1次走行は1次走行同士、2次走行は同じ種類同士、autoStartは5回すべて走行したログ同士で比較する。
 - バッテリー電圧差が大きい場合は、充電して再トライする。
 - 制御変更後は最低 10 本の実機走行ログを取り、変更前ログと比較する。採用判断は再現性を最優先する。
 - 解析スクリプトは `analysis/script/` に置く。Python などの使用は可能。
@@ -583,7 +584,7 @@ Shortcut画面は入場・項目変更時に本文を描画し、値だけの変
 
 - ユーザー指定で、有効性・無効理由（電流の有効性を含む）と記録間隔内の統計をbin/CSVから削除する。削除対象は`slipV2Valid/Reason/CurrentValid`、`slipV2LatValid/LatReason/LatValidMs/LatIntervalReason`、`slipV2PeakLong/PeakLat/PeakYawDps/OnLongMs/OnLatMs/OnYawMs/ValidMs/TotalMs/IntervalReason`の16列。
 - V2整理だけの時点は通常50列/135 B、詳細56列/144 B。その後の経路診断6列追加後は通常56列/154 B、詳細62列/163 B。残すV2関連9列は`slipV2LongFast/LongSlow/Lat/YawDps/Flags/CurrentHighSamples/PwmSum`と`imuYawAlphaFiltered/imuLatTangentialApplied`。瞬時フラグはbit0=縦、bit1=採用横、bit2=Yaw不整合。内部の判定有効性・区間統計の計算は維持し、保存しない。
-- PATH/SHORTCUT用の経路診断は既存列の末尾へ`pathErrorY_mm`（F32・横偏差mm）、`pathErrorHeading_cdeg`（S16・最近傍経路接線方位−機体方位、0.01deg単位）、`pathState`（U8・0無効/1経路追従/2ライン退避/3再合流/4自己位置喪失）、`pathYawFF_dps`、`pathYawLateralFB_dps`、`pathYawHeadingFB_dps`（各F32・符号付きdeg/s）の順で保存する。1ms更新の最新値を従来の距離間隔で記録し、経路モード以外は全6列を0とする。操舵3成分はFF、`-Klateral×横偏差`、`Kheading×方位偏差`で、合計を±1800deg/sへ制限する前の値。操舵式・横/方位ゲインは維持する。`routeControllerVersion=18`から自己位置積分→経路更新→PIDを1msごとに実行する。退避/白線消失は100ms、復帰条件は200ms、混合率の切替は100msを維持する。SDの位置/方位補正係数は5ms基準を保ち、1msでは1/5を適用する。補正許可上限は0.2mm/0.02deg毎回とする。詳細は[1ms経路更新](doc/path-follower-1ms.md)。
+- PATH/SHORTCUT/PATH_CURVE用の経路診断は既存列の末尾へ`pathErrorY_mm`（F32・横偏差mm）、`pathErrorHeading_cdeg`（S16・最近傍経路接線方位−機体方位、0.01deg単位）、`pathState`（U8・0無効/1経路追従/2ライン退避/3再合流/4自己位置喪失）、`pathYawFF_dps`、`pathYawLateralFB_dps`、`pathYawHeadingFB_dps`（各F32・符号付きdeg/s）の順で保存する。1ms更新の最新値を従来の距離間隔で記録し、経路モード以外は全6列を0とする。操舵3成分はFF、`-Klateral×横偏差`、`Kheading×方位偏差`で、合計を±1800deg/sへ制限する前の値。操舵式・横/方位ゲインは維持する。`routeControllerVersion=18`から自己位置積分→経路更新→PIDを1msごとに実行する。退避/白線消失は100ms、復帰条件は200ms、混合率の切替は100msを維持する。SDの位置/方位補正係数は5ms基準を保ち、1msでは1/5を適用する。補正許可上限は0.2mm/0.02deg毎回とする。詳細は[1ms経路更新](doc/path-follower-1ms.md)。
 - `slipPlannerVersion=3`、`slipPlannerPolicy=flag_sample_fraction`。50mmごとの`optimalIndex`別に各記録を1件とし、縦/横それぞれのON件数/全件数を使用する。1件以上のONで反映し、Yaw bitは計画へ使わない。従来の最小ON時間3msは廃止し、検出器自体の3/5ms継続判定は維持する。
 - リスク閾値0.60、近傍拡張、減速/増速倍率、先行減速、速度変化制限、10m/s上限は維持する。件数0の区間は補完せず増速しない。無効期間や記録間で終了した短いスリップは新ログから識別できない。
 - 共有RAMの有効時間配列2本を削除し、ON時間配列はON件数へ変更する。集計は停止中・ログ非記録中・FatFsロック下で行う。1ms検出器・割り込み内SD書込禁止は維持する。

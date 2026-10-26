@@ -919,6 +919,9 @@ static void setup_start(void)
 		case BOOST_PATH_REPLAY:
 			ssd1306_printf(Font_6x8, "PATH REPLAY");
 			break;
+		case BOOST_PATH_CURVE:
+			ssd1306_printf(Font_6x8, "PATH CURVE");
+			break;
 		}
 		pattern.calibration = 1;
 		autoStartAfterCalibration = false;

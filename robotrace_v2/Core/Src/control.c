@@ -518,6 +518,9 @@ void loopSystem(void)
 				ret = routeBuildFromLog(autoRunCurrentPlan.primaryLogNumber,
 					0U);
 				break;
+			case AUTO_RUN_MODE_PATH_CURVE:
+				ret = routeBuildCurvatureFromLog(autoRunCurrentPlan.primaryLogNumber);
+				break;
 			case AUTO_RUN_MODE_SHORTCUT:
 				ret = routeBuildFromLog(autoRunCurrentPlan.primaryLogNumber,
 					shortcutSettings.maxLevel);
@@ -720,7 +723,7 @@ void loopSystem(void)
 			optimalIndex = 0;
 
 			clearXYcie(); // 座標計算変数初期化
-			if (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT)
+			if (isPathRunMode(optimalTrace))
 			{
 				pathFollowerReset();
 			}
@@ -793,7 +796,7 @@ void loopSystem(void)
 			// motorCommandOutSynth(lineTraceOmegaFBCtrl.pwm, veloCtrl.pwm, 0);
 			motorCommandOut(veloCtrlL.pwm,veloCtrlR.pwm);
 		}
-		else if (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT)
+		else if (isPathRunMode(optimalTrace))
 		{
 			// 経路再走行。通常はヨーレート制御、ロスト時はライン制御へ連続的に切り替える。
 			boostSpeed = pathFollowerGetTargetSpeedMps();
@@ -806,7 +809,7 @@ void loopSystem(void)
 		}
 
 		// 通常走行はゴールマーカー、PATH系は中間延長点の経路弧長をゴールとする。
-		bool pathGoalMode = (optimalTrace == BOOST_PATH_REPLAY || optimalTrace == BOOST_SHORTCUT);
+		bool pathGoalMode = isPathRunMode(optimalTrace);
 		if (pathGoalMode ? pathFollowerGoalReached() : SGmarker >= COUNT_GOAL)
 		{
 			goalTime = cntRun;
