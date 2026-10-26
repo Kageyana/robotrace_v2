@@ -784,110 +784,85 @@ static void setup_calibration(void)
 ///////////////////////////////////////////////////////////////////////////////////////
 static void setup_log(void)
 {
-	static int16_t y = 0, offset, ret = 0; // y: 選択中のログNo, offset: 表示開始位置, ret: 解析結果
-	uint8_t i, j; // i: 表示ループ用, j: スイッチ入力用
-
-	if (pattern.display != pattern.beforeHex)
-	{
-		// 切替時に実行
-		ssd1306_printf(Font_6x8, "microSD  ");
-		y = endFileIndex + 1; // 前回解析したログを初期選択
-		ssd1306_SetCursor(30, 16);
-		ssd1306_printf(Font_6x8, "Dist <");
-		ssd1306_SetCursor(80, 16);
-		ssd1306_printf(Font_6x8, "> Path");
-		ssd1306_SetCursor(46, 25);
-		ssd1306_printf(Font_6x8, "indexD:%4d", numPPADarry);
-		ssd1306_SetCursor(46, 34);
-		ssd1306_printf(Font_6x8, "indexS:%4d", indexSC);
-		ssd1306_SetCursor(46, 43);
-		ssd1306_printf(Font_6x8, "marker:%4d", numPPAMarry);
-	}
-
-	dataTuningUD(&y, 1, 0, endFileIndex + 1); // ログNoを上下スイッチで選択
-
-	j = swValTact; // タクトスイッチの状態を取得
-	if (j == SW_LEFT || j == SW_RIGHT) // 左右スイッチで解析を実行
-	{
-		ssd1306_FillRectangle(30, 25, 127, 63, Black); // メイン表示空白埋め
-		ssd1306_SetCursor(46, 38);
-		ssd1306_printf(Font_6x8, "Calculating");
-		ssd1306_UpdateScreen(); // グラフィック液晶更新
-
-		if (y == endFileIndex + 1)
-		{
-			y = fileIndexLog; // 前回解析したログを再解析
-		}
-
-		if (j == SW_LEFT)
-		{
-			// 距離基準解析
-			ret = readLogDistance(fileNumbers[y]);
-		}
-		else if (j == SW_RIGHT)
-		{
-			// ショートカット解析
-			ret = calcXYcies(fileNumbers[y]);
-		}
-
-		if (ret > 0)
-		{
-			optimalIndex = 0; // 解析結果インデックスをリセット
-			ssd1306_FillRectangle(30, 25, 127, 63, Black); // メイン表示空白埋め
-			ssd1306_SetCursor(46, 25);
-			ssd1306_printf(Font_6x8, "indexD:%4d", numPPADarry);
-			ssd1306_SetCursor(46, 34);
-			ssd1306_printf(Font_6x8, "indexS:%4d", indexSC);
-			ssd1306_SetCursor(46, 43);
-			ssd1306_printf(Font_6x8, "marker:%4d", numPPAMarry);
-		}
-		else
-		{
-			ssd1306_FillRectangle(30, 25, 127, 63, Black); // メイン表示空白埋め
-			ssd1306_SetCursor(64, 30);
-			ssd1306_printf(Font_6x8, "Error");
-			ssd1306_SetCursor(61, 38);
-			ssd1306_printf(Font_6x8, "code:%d", ret);
-		}
-	}
-
-	// ログNoの選択処理
-	for (i = 0; i < 5; i++)
-	{
-		// 前回解析ログNoを選択しているとき
-		if (y == endFileIndex + 1)
-		{
-			ssd1306_SetCursor(0, 16);
-			ssd1306_printfB(Font_6x8, "%4d", fileNumbers[fileIndexLog]);
-		}
-		else
-		{
-			ssd1306_SetCursor(0, 16);
-			ssd1306_printf(Font_6x8, "%4d", fileNumbers[fileIndexLog]);
-		}
-
-		// ログNoを選択するとき
-		offset = endFileIndex - y - 4; // 前回解析Noと一番下のNoを除く表示中の4つ中一番上のインデックスを計算
-		ssd1306_SetCursor(0, 24 + (8 * i));
-
-		// 最新4つのデータを表示するとき
-		if (offset < 0)
-		{
-			offset = 0;
-		}
-
-		if (endFileIndex - y == i || (i == 4 && offset > 0))
-		{
-			// 選択したログNoをハイライト表示
-			ssd1306_printfB(Font_6x8, "%4d", fileNumbers[endFileIndex - offset - i]);
-		}
-		else
-		{
-			ssd1306_printf(Font_6x8, "%4d", fileNumbers[endFileIndex - offset - i]);
-		}
+    static const char *modeNames[] = {"DISTANCE", "PATH", "SHORTCUT", "PATH_CURVE"};
+    static int16_t selectedLog = 0, selectedMode = 0, result = 0;
+    static bool pushHeld = false;
+    bool redraw = (pattern.display != pattern.beforeHex);
+    if (redraw)
+    {
+        ssd1306_printf(Font_6x8, "LOG");
+        selectedLog = (fileIndexLog >= 0 && fileIndexLog <= endFileIndex) ? fileIndexLog : endFileIndex;
+        result = 0;
+        pushHeld = (swValTact == SW_PUSH);
     }
-}
 
+    // ログがない場合は配列を参照せず、解析も開始しない。
+    if (endFileIndex < 0 || fileNumbers[0] <= 0)
+    {
+        if (redraw)
+        {
+            ssd1306_SetCursor(0, 25);
+            ssd1306_printf(Font_6x8, "No logs");
+        }
+        pushHeld = (swValTact == SW_PUSH);
+        return;
+    }
+    if (selectedLog < 0 || selectedLog > endFileIndex) selectedLog = endFileIndex;
+    int16_t previousLog = selectedLog, previousMode = selectedMode;
+    dataTuningUD(&selectedLog, 1, 0, endFileIndex);
+    dataTuningLR(&selectedMode, 1, 0, 3);
+    if (selectedLog != previousLog || selectedMode != previousMode)
+    {
+        redraw = true;
+        result = 0;
+    }
+
+    bool analyze = (swValTact == SW_PUSH && !pushHeld);
+    pushHeld = (swValTact == SW_PUSH);
+    if (analyze)
+    {
+        ssd1306_FillRectangle(32, 25, 127, 63, Black);
+        ssd1306_SetCursor(32, 28);
+        ssd1306_printf(Font_6x8, "Analyzing");
+        if (!ssd1306_IsDMARunning()) ssd1306_UpdateScreen();
+        int16_t logNumber = fileNumbers[selectedLog];
+        switch (selectedMode)
+        {
+        case 0: result = readLogDistance(logNumber); break;
+        case 1: result = routeBuildFromLog(logNumber, 0U); break;
+        case 2: result = routeBuildFromLog(logNumber, shortcutSettings.maxLevel); break;
+        case 3: result = routeBuildCurvatureFromLog(logNumber); break;
+        default: result = -1; break;
+        }
+        if (result > 0)
+        {
+            optimalIndex = 0U;
+            fileIndexLog = selectedLog;
+        }
+        redraw = true;
+    }
+    if (!redraw) return;
+
+    ssd1306_FillRectangle(0, 16, 127, 63, Black);
+    int16_t first = selectedLog + 2;
+    if (first > endFileIndex) first = endFileIndex;
+    for (int16_t row = 0; row < 5 && first - row >= 0; row++)
+    {
+        int16_t index = first - row;
+        ssd1306_SetCursor(0, 16 + (8 * row));
+        if (index == selectedLog) ssd1306_printfB(Font_6x8, "%05d", fileNumbers[index]);
+        else ssd1306_printf(Font_6x8, "%05d", fileNumbers[index]);
+    }
+    ssd1306_SetCursor(32, 16);
+    ssd1306_printf(Font_6x8, "%s", modeNames[selectedMode]);
+    ssd1306_SetCursor(32, 28);
+    ssd1306_printf(Font_6x8, "L/R:Mode");
+    ssd1306_SetCursor(32, 40);
+    ssd1306_printf(Font_6x8, "PUSH:Analyze");
+    ssd1306_SetCursor(32, 52);
+    if (result > 0) ssd1306_printf(Font_6x8, "OK:%4d", result);
+    else if (result < 0) ssd1306_printf(Font_6x8, "Error:%d", result);
+}
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_start
 // 処理概要     スタート待ち画面とキャリブレーションを制御
