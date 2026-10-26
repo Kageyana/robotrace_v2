@@ -19,3 +19,11 @@ status: resolved
 確認方法: 対処後、変更前版のDebug/Release、追加診断、PC経路/XY/スキーマテスト、計測集計テスト、一次ログ2本のリプレイが成功し、manifest.jsonとELFハッシュを生成できた。UTF-8読取の修正を確認済み。float化版でも同じ手順を使用する。
 
 2026-10-04 再発: 残りのfloat化の一時集計コマンドでcompiler-diagnostics.txtを文字コード指定なしで読み、cp932のUnicodeDecodeErrorが発生した。ファームウェア、ビルド、検証結果への影響はない。encoding='utf-8'を明示して同じ診断を読み直し、残る昇格箇所を確認した。追加対策として一時コマンドにも保存時と同じ文字コード指定を必須とし、永続スクリプトvalidate_fpu_float_completion.pyの全テキスト読書きを明示指定した。再読取と検証スクリプトの成功を確認済み、resolved。
+
+## 2026-10-26：GDB子プロセスの標準出力をCP932で自動復号した
+
+全ライン暗部停止の静止実機試験で、Python subprocessのtext=TrueがGDBのUTF-8日本語ソース表示を既定CP932で復号し、reader threadのUnicodeDecodeErrorが発生した。取得stdoutがNoneとなり保存も失敗したため、その実行を成功証跡にしなかった。GDB側でどこまで処理したかを失われた出力から推定してはいけない。ファイル読書きのUTF-8指定だけでは子プロセスの復号を管理できない再発。
+
+リセットなしの読取り専用再接続でpatternTrace0・開始0・auto0・emc0・カウンタ0・PRIMASK0・左右PWM/CCR0を確認してから再試験した。subprocessはバイナリstdoutで取得し最初にwrite_bytesで生ログを保存し、表示用だけUTF-8/backslashreplaceで復号、Python標準出力もUTF-8とした。再試験は終了コード0、19/20回の境界・全10個の解除・全状態復元・faultレジスタ0・detachを保存できた。
+
+次回はGDBの初回呼出しからバイナリPIPEと原バイト保存を使用する。ログ処理失敗時は試験注入を繰り返さず、まずリセットなしで機体と出力・割込みマスクを確認する。SkillのGDB起動前へ反映した。今回の取得・復旧手順はresolved。証跡はbuild/emergency-line-loss/read-safe.raw.logとtarget.raw.log。

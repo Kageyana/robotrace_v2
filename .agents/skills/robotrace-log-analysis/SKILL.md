@@ -49,6 +49,8 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 
 ## PATH_CURVEの物理ずれと内部XY（2026-10-26）
 
+2026-10-26夜の完全逸脱停止追加後は、全モードで全10センサーの正規化値100未満が20ms連続するとemcStop=5で停止する。1個でも100以上で継続時間を解除し、PATH系のTRACKING中も適用する。以前の13810～13816は追加前のログ。以下の「PATH系の通常明暗停止無効」は当該旧ビルドの実装調査として保持する。解析用の明部閾値800以上なしを、今回の全暗部100未満の停止条件と同一視しない。詳細は[完全逸脱停止](../../../doc/path-line-loss-stop.md)。
+
 `BOOST_PATH_CURVE=5`はPATHと同じ仮想ラインをDISTANCE共通の曲率別速度で走る。PATH/SHORTCUTと同じ経路診断6列を使用する。制御のpathPose、CSVのx/y、pathErrorY_mmは車輪＋ジャイロに依存する推定値で、物理位置の独立な検証ではない。pathErrorY_mmは世界座標Yの実偏差ではない。
 
 XY重ね描きの良否を解釈する前に、ユーザーの物理観測を保持し、同じ記録のlSensorCari0～9（現行明部閾値800）・pathState・位置/方位補正係数と照合する。物理逸脱が報告された走行は、emcStop=0や小さい内部偏差を理由に正常へ置き換えない。開始時の原点リセットを、1走行内の周回ドリフトの説明に使わない。直線接線方向の位置は白線だけでは一意に求まらない。

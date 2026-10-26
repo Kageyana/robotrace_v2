@@ -203,7 +203,8 @@ void Interrupt1ms(void)
 			emcStop = STOP_ENCODER_STOP;
 		if (cntEmcStopLineSensorBright() && !pathModeActive)
 			emcStop = STOP_LINESENSOR_BRIGHT;
-		if (cntEmcStopLineSensorUnbright() && !pathModeActive)
+		// 完全逸脱は自己位置の推定状態に関係なく、PATH系を含む全モードで停止する。
+		if (cntEmcStopLineSensorUnbright())
 			emcStop = STOP_LINESENSOR_UNBRIGHT;
 		if (judgeOverSpeed())
 			emcStop = STOP_OVERSPEED;

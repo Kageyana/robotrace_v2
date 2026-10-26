@@ -134,34 +134,28 @@ bool cntEmcStopLineSensorBright(void)
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 cntEmcStopLineSensorUnbright
-// 処理概要     緊急停止要因のカウント ラインセンサ反応無し
+// 処理概要     全10センサーが暗部となった連続時間から完全逸脱を判定する
 // 引数         なし
 // 戻り値       true:緊急停止 false:異常なし
 /////////////////////////////////////////////////////////////////////
 bool cntEmcStopLineSensorUnbright(void)
 {
-	// 緊急停止条件
-	if (lSensorCari[3] < STOP_TH_LINE_SENSOR_UNBRIGHT
-		&& lSensorCari[4] < STOP_TH_LINE_SENSOR_UNBRIGHT
-		&& lSensorCari[5] < STOP_TH_LINE_SENSOR_UNBRIGHT
-		&& lSensorCari[6] < STOP_TH_LINE_SENSOR_UNBRIGHT)
+	// 端のセンサーだけでも反応していれば、完全逸脱の継続時間を解除する。
+	for (uint8_t i = 0U; i < NUM_SENSORS; i++)
+	{
+		if (lSensorCari[i] >= STOP_TH_LINE_SENSOR_UNBRIGHT)
+		{
+			cntLineSensorUnbright = 0U;
+			return false;
+		}
+	}
+
+	// 停止後も呼ばれた場合にオーバーフローで判定が解除されないよう飽和する。
+	if (cntLineSensorUnbright < STOP_LINE_LOST_TIME_MS)
 	{
 		cntLineSensorUnbright++;
 	}
-	else
-	{
-		cntLineSensorUnbright = 0;
-	}
-
-	// 停止条件継続タイマ
-	if (cntLineSensorUnbright > STOP_COUNT_LINESENSOR)
-	{
-		return true;
-	}
-	else
-	{
-		return false;
-	}
+	return cntLineSensorUnbright >= STOP_LINE_LOST_TIME_MS;
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 judgeOverSpeed
