@@ -22,6 +22,10 @@ description: ロボトレース走行ログを解析、比較、可視化する�
 
 RLOGヘッダ検査を組む前に `log_schema.h` の `LOG_SCHEMA_PROFILE_LIGHT` と実ヘッダのprofile・recordBytes・columnsを照合する。現行は軽量profile=1・66列/170B、詳細profile=0・72列/179B。名称から0/1を推測しない。旧ログは保存列定義と実ヘッダで世代を区別し、数値不一致を即座に破損と断定しない。[profile取り違えの記録](../../../doc/失敗事例/2026-10-16-self-describing-header-test-contract.md)参照。
 
+動画処理のランタイムはフォルダ名で推測しない。最初にGet-Command python.exeとTest-Path -LiteralPath <実体> -PathType Leafで実行ファイルを確定し、その実体で必要モジュールのspec・import・版を確認する。追加導入前に既存解析のsys.path・局所deps・必要版を読む。今回検証した実体はC:/Users/Natsuki/AppData/Local/Programs/Python/Python310/python.exe、局所依存先はbuild/video-analysis-runtime。新規環境で存在を再確認する。[実体と依存先の再発](../../../doc/失敗事例/2026-10-04-noise-analysis-input-preflight.md)参照。
+
+床校正のコードを書く前に全対象動画の初期画像から可視点ID・点数を棚卸しする。可視点だけをfitへ渡し、固定8点assert・先頭8個切出し・追跡の配列境界が残っていないか確認する。機体の赤黄を観測できない場合、外形中心の床投影を車軸位置や真の方位・滑り速度へ読み替えない。同じ方向・固定床位置の相対変位に限定し、全採用通過の原フレーム指定画像と測定線の感度を確認する。[2026-10-26の点数固定再発](../../../doc/失敗事例/2026-10-17-video-color-marker-identity.md)参照。
+
 ## 2026-10-21：V2正式採用後の現行仕様
 
 ユーザー指示によりV1互換・SHADOW切替を削除した。縦はFast単独10/8m/s²・3/5ms、横はLatCandidate版5の6.7/4.5m/s²・3/5ms・LPF0.8を使用する（初回ON6.5、2026-10-24の既存変更でON6.7）。保存検出器版4、`slipDetectorMode=ACTIVE_V2`、`slipLatPolicy=matched_candidate_v5`。通常66列/170B、詳細72列/179B（重複整理前の正式採用ログ13571～13577は70列/181B）。旧slipFlag/slipFlagLatと旧詳細診断9列は存在しない。slipV2Flagsの横bitとslipV2Lat/PeakLat/OnLatMsも採用横と同じ意味へ変更した。以下のSHADOW・旧サイズ・旧制御維持の記述は導入時の履歴として扱い、現行は[正式採用とSLIP走行](../../../doc/slip-v2-active.md)を優先する。
@@ -42,6 +46,18 @@ Use this skill when analyzing logs for the robotrace_v2 robot. Treat `AGENTS.md`
 2026-10-18のユーザー指定：モータ指令電圧上限が同じ走行は電圧差のみで除外せず、速度等は別に記録する。現行横候補版5は、接線補正を除いた同窓残差Rnへ角加速度と同じ一次LPF（前回0.8・今回0.2）を適用し、同窓の適用済み接線項Tbarを引く。ON6.5/OFF4.5m/s²、3/5ms、5/30ms窓と43サンプル充填。ON6.5はユーザー指定で今回テスト・ビルド未実施。最初の有効Rnで初期化し、無効でLPFを消去、区間統計リセットでは保持する。版5の保存候補残差から(R0±Rc)/2でRn/Tbarを逆算しない（この分離は追加LPF前の版1〜4に限る）。版・式・追加LPF係数/初期化方式のメタデータを先に確認する。旧ON5.2での既知16陽性窓保持を現行ON6.5へ流用せず、一次の不要ON・短い滑りの減衰・遅延の実機確認は残る。検出器版3/fast_only・初回SHADOW横4.6/3.8・従来制御は維持。詳細はdoc/slip-lateral-candidate.md。
 
 2026-10-18の対象訂正：新判定の二次実走は13505以降、一次13504の横判定はユーザー確認の誤検出として陰性対照へ保存する。13500～13503を初回新判定とした以前の結論は撤回。保存版・閾値・ビルドが同一でも対象所属を勝手に復元しない。詳細はdoc/slip-lateral-candidate.md。
+
+## PATH_CURVEの物理ずれと内部XY（2026-10-26）
+
+`BOOST_PATH_CURVE=5`はPATHと同じ仮想ラインをDISTANCE共通の曲率別速度で走る。PATH/SHORTCUTと同じ経路診断6列を使用する。制御のpathPose、CSVのx/y、pathErrorY_mmは車輪＋ジャイロに依存する推定値で、物理位置の独立な検証ではない。pathErrorY_mmは世界座標Yの実偏差ではない。
+
+XY重ね描きの良否を解釈する前に、ユーザーの物理観測を保持し、同じ記録のlSensorCari0～9（現行明部閾値800）・pathState・位置/方位補正係数と照合する。物理逸脱が報告された走行は、emcStop=0や小さい内部偏差を理由に正常へ置き換えない。開始時の原点リセットを、1走行内の周回ドリフトの説明に使わない。直線接線方向の位置は白線だけでは一意に求まらない。
+
+TRACKING中の白線消失だけでは退避せず、白線消失による停止はLINE_FALLBACK後という現行実装を確認する。実位置がずれても仮想位置が追従できるため、CSVの再積分一致を実機追従成功と呼ばない。XY変換そのものは対応binの全CRC・生左右積算平均距離・保存積算角度で別に検証する。CROSSが方位位相と不整合な場合は無検証で周回対応や位置補正へ使わない。
+
+検証済みの解析はリポジトリルート`D:/robotrace/robotrace_v2`で`python analysis/script/check_path_curve_y_drift_13742_13808.py`、`python analysis/script/validate_path_curve_drift_bins.py`、`python analysis/script/analyze_path_curve_y_drift_detail.py`、`python analysis/script/report_path_curve_y_drift.py`。Pythonの実体・NumPy/Matplotlibを確認し、原本を読み取り、出力はanalysisだけへ保存する。物理原因・実Y移動量・安全条件の修正は未確認。詳細は[観測限界の事例](../../../doc/失敗事例/2026-10-26-path-curve-odometry-hides-physical-drift.md)。
+
+2026-10-26の動画002～008／ログ13810～13816はユーザー確認のレンズ高700 mm。10/18の680 mmという履歴と混ぜない。床fit7～8点・留保4点、外形中心の同一方向通過31枚を確認し、13811/13812/13814の初回～5回目は外側約57/54/85 mm、内部XYは逆向き約25/27/27 mm。物理ずれを動画でも確認したが車軸位置や原因分離は未確定。検証と制約はanalysis/video_path_curve_13810_13816/report.md。再監査はanalysis/script/finalize_video_path_curve_13810_13816.py。原本・全CRCと物理計測品質を別に検査し、物理原因と制御修正はopenを維持する。
 
 ## Inputs
 
