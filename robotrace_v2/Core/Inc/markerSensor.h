@@ -23,7 +23,7 @@
 //====================================//
 // グローバル変数の宣言、定義
 //====================================//
-extern uint8_t  markerSensor;
+extern volatile uint8_t markerSensor;
 extern uint8_t  SGmarker;
 extern volatile uint8_t goalMarkerOnsetValid;
 extern volatile int32_t goalMarkerOnset_p;

@@ -9,6 +9,7 @@
 // シンボル定義
 //====================================//
 #define NUM_SENSORS 10
+#define LINE_SENSOR_ACQUISITION_POLICY_VERSION 2U // 取得IRQ優先と制御1ms中の公開フレーム固定を識別する版。
 #define THITA_SENSOR 11.0F // ラインセンサの間隔(角度)
 #define BASEVAL 4095.0F
 #define LS_AVERAGE_SAMPLES 2U	 // ラインセンサ平均化サンプル数
@@ -44,6 +45,19 @@ extern volatile uint32_t lineSensorMaxUpdateAgeMs;
 extern volatile bool lineSensorUpdateStale;
 extern volatile uint32_t lineSensorStaleCount;
 extern volatile uint16_t lineSensorVrefSample;
+#if defined(ROBOTRACE_ISR_TIMING) && ROBOTRACE_ISR_TIMING
+// 0/予約1/2/3/4/5は走行モード、6は校正・開始待ち・停止等。
+enum { LINE_TIMING_OTHER_SCOPE = 6, LINE_TIMING_SCOPE_COUNT = 7, LINE_TIMING_GAP_BINS = 9 };
+typedef struct
+{
+	uint32_t samples, poweredSamples, validSamples;
+	uint32_t updateEvents, skippedRequests, staleSamples;
+	uint32_t maxAgeMs, maxGapMs, maxGapTickMs;
+	uint32_t maxGapPattern, maxGapCalibration;
+	uint32_t gapHistogram[LINE_TIMING_GAP_BINS]; // 0～7msと8ms以上。制御周期から観測した更新間隔。
+} LineSensorTimingStats;
+extern volatile LineSensorTimingStats lineSensorTimingStats[LINE_TIMING_SCOPE_COUNT];
+#endif
 
 extern uint16_t lSensorCari[NUM_SENSORS];
 extern uint16_t lSensorMax[NUM_SENSORS];	// 各センサの最大値
@@ -55,11 +69,16 @@ extern bool lineSensorSettingCorrupt;
 // プロトタイプ宣言
 //====================================//
 void powerLineSensors(uint8_t onoff);
+void beginLineSensorControlFrame1ms(void);
+void endLineSensorControlFrame1ms(void);
 void lineSensorPhaseChanged(bool phase);
 void startLineSensorAcquisition(void);
 void completeLineSensorAcquisition(void);
 void failLineSensorAcquisition(void);
 void monitorLineSensorUpdate1ms(bool steeringUsesLine);
+#if defined(ROBOTRACE_ISR_TIMING) && ROBOTRACE_ISR_TIMING
+void recordLineSensorTiming1ms(uint8_t mode, uint8_t tracePattern, bool running);
+#endif
 void getLineSensor(bool phase, const uint16_t *sample, uint32_t epoch);
 void getAngleSensor(void);
 void finishLineSensorCalibration(void);

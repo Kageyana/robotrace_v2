@@ -14,6 +14,7 @@
 //====================================//
 #define DISPLAY_INIT_DMA_TIMEOUT_MS 200U // 初期化・設定画面で表示DMAの完了を待つ上限[ms]。
 #define RUN_STOP_HOLD_MS 2000U // 平均エンコーダ速度0の初回検出後、速度目標0のPID出力を継続する時間[ms]。メイン処理で経過を判定する。
+#define CONTROL_IRQ_PREEMPT_PRIORITY 3U // TIM6の運転時優先度。TIM3(1)/ADC DMA(2)の取得窓を優先し、起動時にCubeMX初期値0から切り替える。
 
 // 速度パラメータの既定値。有効なSD設定値を優先する。
 #define PARAM_SEARCH 1.0F // 一次走行の速度の既定値[m/s]。

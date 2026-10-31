@@ -51,18 +51,25 @@ static void updateSlipCurrentSample(uint32_t nowMs)
 }
 #if defined(ROBOTRACE_ISR_TIMING) && ROBOTRACE_ISR_TIMING
 volatile IsrTimingStats isrTimingStats[ISR_TIMING_MODE_COUNT] = {0};
+volatile IsrTimingStats isrIrqTimingStats[ISR_TIMING_MODE_COUNT] = {0};
+volatile uint32_t isrIrqPendingTicks[ISR_TIMING_MODE_COUNT] = {0};
+volatile uint16_t isrTimingIdleLoadUs = 0U;
+volatile IsrTimingStats isrIdleIrqTimingStats = {0};
+volatile uint32_t isrIdleIrqPendingTicks = 0U;
+static uint32_t timingPreviousCounter;
+static uint32_t timingIrqStart, timingIrqMode;
+static bool timingIrqRunning;
+static bool timingIrqIdleTest;
 _Static_assert(BOOST_NONE == 0 && BOOST_DISTANCE == 2 &&
 	BOOST_SHORTCUT == 3 && BOOST_PATH_REPLAY == 4 && BOOST_PATH_CURVE == 5, "ISR timing mode order changed");
 /////////////////////////////////////////////////////////////////////
-// モジュール名 recordIsrTiming
+// モジュール名 recordTimingStats
 // 処理概要     走行モード別に割り込み処理のサイクル数を整数で集計する
-// 引数         mode: BOOST走行モード, cycles: 計測区間のサイクル数
+// 引数         stats: 集計先, cycles: 計測区間のサイクル数
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-static void recordIsrTiming(uint32_t mode, uint32_t cycles)
+static void recordTimingStats(volatile IsrTimingStats *stats, uint32_t cycles)
 {
-	if (mode >= ISR_TIMING_MODE_COUNT || !isSupportedRunMode((uint8_t)mode)) return;
-	volatile IsrTimingStats *stats = &isrTimingStats[mode];
 	// サンプル数上限では集計を止め、合計と平均の整合を維持する。
 	if (stats->samples == UINT32_MAX) return;
 	if (stats->samples == 0U || cycles < stats->minCycles) stats->minCycles = cycles;
@@ -70,6 +77,73 @@ static void recordIsrTiming(uint32_t mode, uint32_t cycles)
 	stats->totalCycles += cycles;
 	stats->samples++;
 	if (cycles >= SystemCoreClock / 1000U) stats->over1ms++;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 timerTimingResetClock
+// 処理概要     DWT初期化後に周期間隔の基準を合わせる。集計値は保持する。
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void timerTimingResetClock(void)
+{
+	timingPreviousCounter = getCycleCounter();
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 timerTimingIrqBegin
+// 処理概要     TIM6のHAL呼出し前の時刻と走行モードを保持する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void timerTimingIrqBegin(void)
+{
+	timingIrqStart = getCycleCounter();
+	timingIrqMode = optimalTrace;
+	timingIrqRunning = patternTrace >= 12U && patternTrace < 100U &&
+		timingIrqMode < ISR_TIMING_MODE_COUNT && isSupportedRunMode((uint8_t)timingIrqMode);
+	timingIrqIdleTest = patternTrace == 0U && setupFlags.start == 0U &&
+		autoStart == 0U && modeLOG == 0U && isrTimingIdleLoadUs != 0U &&
+		isrTimingIdleLoadUs <= ISR_TIMING_IDLE_LOAD_MAX_US;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 timerTimingIrqEnd
+// 処理概要     HAL処理後のIRQ区間と次周期の保留を整数で集計する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void timerTimingIrqEnd(void)
+{
+	const uint32_t end = getCycleCounter();
+	if (timingIrqIdleTest)
+	{
+		recordTimingStats(&isrIdleIrqTimingStats, end - timingIrqStart);
+		if ((htim6.Instance->SR & TIM_FLAG_UPDATE) != 0U && isrIdleIrqPendingTicks < UINT32_MAX)
+			++isrIdleIrqPendingTicks;
+	}
+	if (!timingIrqRunning) return;
+	const bool pending = (htim6.Instance->SR & TIM_FLAG_UPDATE) != 0U;
+	recordTimingStats(&isrIrqTimingStats[timingIrqMode], end - timingIrqStart);
+	if (pending && isrIrqPendingTicks[timingIrqMode] < UINT32_MAX)
+		++isrIrqPendingTicks[timingIrqMode];
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 timerTimingIdleLoad
+// 処理概要     静止試験中だけ上限付きのCPU負荷を加え、取得IRQとの競合を測る
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void timerTimingIdleLoad(void)
+{
+	if (!timingIrqIdleTest || patternTrace != 0U || setupFlags.start != 0U ||
+		autoStart != 0U || modeLOG != 0U) return;
+	uint32_t loadUs = isrTimingIdleLoadUs;
+	if (loadUs > ISR_TIMING_IDLE_LOAD_MAX_US) loadUs = ISR_TIMING_IDLE_LOAD_MAX_US;
+	const uint32_t cycles = loadUs * (SystemCoreClock / 1000000U);
+	const uint32_t start = getCycleCounter();
+	uint32_t now;
+	do
+	{
+		now = getCycleCounter();
+	} while ((uint32_t)(now - start) < cycles);
 }
 #endif
 /////////////////////////////////////////////////////////////////////
@@ -94,14 +168,20 @@ void Interrupt1ms(void)
 
 	// 割り込み時間計測
 	uint32_t freqCount = getCycleCounter();
-	resetCycleCounter();
 #if defined(ROBOTRACE_ISR_TIMING) && ROBOTRACE_ISR_TIMING
+	// IRQ入口/出口を同じ時計で測るため、計測版ではDWTを連続運転する。
+	const uint32_t currentCounter = freqCount;
+	freqCount -= timingPreviousCounter;
+	timingPreviousCounter = currentCounter;
 	uint32_t isrTimingStart = getCycleCounter();
 	// 途中でゴール・停止状態へ遷移しても、入口のモードへ最後の周期を記録する。
 	bool isrTimingRunning = (patternTrace >= 12 && patternTrace < 100);
 	uint32_t isrTimingMode = optimalTrace;
+#else
+	resetCycleCounter();
 #endif
 	bootTime = getTimeMs(freqCount);
+	beginLineSensorControlFrame1ms();
 	updateBatteryVoltage();
 
 	// Encoder
@@ -154,6 +234,9 @@ void Interrupt1ms(void)
 	const bool pathSteeringActive = pathModeActive && patternTrace >= 12 && patternTrace < 100;
 	const PathFollowerState pathState = pathFollowerGetStatus();
 	monitorLineSensorUpdate1ms(!pathSteeringActive || pathState == PATH_STATE_LINE_FALLBACK || pathState == PATH_STATE_REJOIN);
+#if defined(ROBOTRACE_ISR_TIMING) && ROBOTRACE_ISR_TIMING
+	recordLineSensorTiming1ms((uint8_t)isrTimingMode, patternTrace, isrTimingRunning);
+#endif
 	if (pathModeActive && patternTrace >= 12 && patternTrace < 100)
 	{
 		pathFollowerUpdatePose1ms(Control_GetEncCurrentCorr_p(), imuVal.gyro.z);
@@ -321,8 +404,13 @@ void Interrupt1ms(void)
 		break;
 	}
 #if defined(ROBOTRACE_ISR_TIMING) && ROBOTRACE_ISR_TIMING
+	timerTimingIdleLoad();
+#endif
+	endLineSensorControlFrame1ms();
+#if defined(ROBOTRACE_ISR_TIMING) && ROBOTRACE_ISR_TIMING
 	uint32_t isrTimingEnd = getCycleCounter();
-	if (isrTimingRunning) recordIsrTiming(isrTimingMode, isrTimingEnd - isrTimingStart);
+	if (isrTimingRunning && isrTimingMode < ISR_TIMING_MODE_COUNT && isSupportedRunMode((uint8_t)isrTimingMode))
+		recordTimingStats(&isrTimingStats[isrTimingMode], isrTimingEnd - isrTimingStart);
 #endif
 }
 /////////////////////////////////////////////////////////////////////

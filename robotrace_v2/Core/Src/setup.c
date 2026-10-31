@@ -1121,9 +1121,15 @@ static bool calibrationLinePosition(float *position)
 	uint16_t values[NUM_SENSORS];
 	uint16_t minimum = UINT16_MAX;
 	uint16_t maximum = 0;
+	const uint32_t primask = __get_PRIMASK();
+	__disable_irq();
 	for (uint8_t i = 0; i < NUM_SENSORS; i++)
 	{
 		values[i] = lSensorCari[i];
+	}
+	__set_PRIMASK(primask);
+	for (uint8_t i = 0; i < NUM_SENSORS; i++)
+	{
 		if (values[i] < minimum) minimum = values[i];
 		if (values[i] > maximum) maximum = values[i];
 	}

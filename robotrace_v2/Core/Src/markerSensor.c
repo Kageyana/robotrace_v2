@@ -9,7 +9,7 @@
 //====================================//
 // グローバル変数の宣言、定義
 //====================================//
-uint8_t markerSensor = 0;
+volatile uint8_t markerSensor = 0;
 uint8_t SGmarker = 0;
 volatile uint8_t goalMarkerOnsetValid = 0U;
 volatile int32_t goalMarkerOnset_p = 0;

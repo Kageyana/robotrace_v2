@@ -166,6 +166,8 @@ void initSystem(void)
 	// GPIO初期化 ソフトリセット中の場合は実行しない
 	if(!softreset)
 	{
+		// 制御計算中もLED位相とADC完了を処理できるよう、タイマー開始前に設定する。
+		HAL_NVIC_SetPriority(TIM6_DAC_IRQn, CONTROL_IRQ_PREEMPT_PRIORITY, 0U);
 		// ADC
 		resultHAL[1] = HAL_ADC_Start_DMA(&hadc2, analogVal2, 4);
 
@@ -373,6 +375,9 @@ void initSystem(void)
 	initCycleCounter();
 	resetCycleCounter();
 	enableCycleCounter(); // カウント開始
+#if defined(ROBOTRACE_ISR_TIMING) && ROBOTRACE_ISR_TIMING
+	timerTimingResetClock();
+#endif
 
 	updateBatteryVoltage(); // バッテリ電圧を計算
 

@@ -32,6 +32,9 @@ volatile uint16_t lineSensorVrefSample = 0;
 static volatile uint32_t acquisitionEpoch = 0;
 static volatile uint32_t sensorPowerEpoch = 0;
 static volatile bool sampleAvailable = false;
+static volatile bool controlFrameActive = false;
+static uint16_t pendingLineRaw[NUM_SENSORS], pendingLineNormalized[NUM_SENSORS];
+static uint32_t pendingLineUpdates;
 static bool conversionPending = false;
 static bool requestedPhase = false;
 static uint32_t requestedTick = 0;
@@ -46,6 +49,13 @@ static uint16_t pairSample[2][NUM_SENSORS];
 static uint8_t completedPairCount;
 static uint32_t oldestPairTimeMs;
 static uint8_t readyMask;
+#if defined(ROBOTRACE_ISR_TIMING) && ROBOTRACE_ISR_TIMING
+volatile LineSensorTimingStats lineSensorTimingStats[LINE_TIMING_SCOPE_COUNT] = {0};
+static uint32_t timingPreviousUpdateCount, timingPreviousSkipCount, timingPreviousPowerEpoch;
+static uint32_t timingLastUpdateTick, timingLastUpdateScope;
+static uint32_t timingPreviousScope = LINE_TIMING_OTHER_SCOPE;
+static bool timingGapReady;
+#endif
 //====================================//
 // プロトタイプ宣言
 //====================================//
@@ -210,6 +220,7 @@ void powerLineSensors(uint8_t onoff)
 	++acquisitionEpoch;
 	++sensorPowerEpoch;
 	sampleAvailable = false;
+	pendingLineUpdates = 0U;
 	lineSensorUpdateAgeMs = 0;
 	lineSensorUpdateStale = false;
 	lineSensorVrefSample = 0;
@@ -218,6 +229,40 @@ void powerLineSensors(uint8_t onoff)
 	__HAL_TIM_SET_COMPARE(&LS_TIMER, LS_CHANNEL, onoff ? LS_COUNTERPERIOD : 0U);
 	powerMarkerSensors(0);
 	// 転送中なら占有を保持し、旧世代の完了を棄却してから新規取得を許可する。
+	__set_PRIMASK(primask);
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 beginLineSensorControlFrame1ms
+// 処理概要     ADC取得を継続したまま、制御とログが読む10素子の公開値を固定する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void beginLineSensorControlFrame1ms(void)
+{
+	const uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	controlFrameActive = true;
+	__set_PRIMASK(primask);
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 endLineSensorControlFrame1ms
+// 処理概要     制御中に完成した最新フレームを、更新件数とともに一括公開する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void endLineSensorControlFrame1ms(void)
+{
+	const uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	if (lineSensorPower && pendingLineUpdates != 0U)
+	{
+		memcpy(lSensor, pendingLineRaw, sizeof(pendingLineRaw));
+		memcpy(lSensorCari, pendingLineNormalized, sizeof(pendingLineNormalized));
+		lineSensorUpdateCount += pendingLineUpdates;
+		sampleAvailable = true;
+	}
+	pendingLineUpdates = 0U;
+	controlFrameActive = false;
 	__set_PRIMASK(primask);
 }
 //////////////////////////////////////////////////////////////////////
@@ -374,6 +419,69 @@ void monitorLineSensorUpdate1ms(bool steeringUsesLine)
 	if (stale && !lineSensorUpdateStale) ++lineSensorStaleCount;
 	lineSensorUpdateStale = stale;
 }
+#if defined(ROBOTRACE_ISR_TIMING) && ROBOTRACE_ISR_TIMING
+/////////////////////////////////////////////////////////////////////
+// モジュール名 addLineTimingCount
+// 処理概要     診断カウンタを上限で飽和させて加算する
+// 引数         count: 元の値, increment: 加算値
+// 戻り値       飽和後の値
+/////////////////////////////////////////////////////////////////////
+static uint32_t addLineTimingCount(uint32_t count, uint32_t increment)
+{
+	return increment > UINT32_MAX - count ? UINT32_MAX : count + increment;
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 recordLineSensorTiming1ms
+// 処理概要     操舵の使用条件によらず、モード別に更新間隔と棄却数を観測する
+// 引数         mode: BOOST走行モード, tracePattern: 制御状態, running:走行区間か
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void recordLineSensorTiming1ms(uint8_t mode, uint8_t tracePattern, bool running)
+{
+	const uint32_t scope = running && mode < LINE_TIMING_OTHER_SCOPE && mode != 1U ? mode : LINE_TIMING_OTHER_SCOPE;
+	volatile LineSensorTimingStats *stats = &lineSensorTimingStats[scope];
+	const uint32_t count = lineSensorUpdateCount, skipped = adcSkippedCount;
+	const uint32_t epoch = sensorPowerEpoch, now = HAL_GetTick();
+	const bool updated = count != timingPreviousUpdateCount;
+	stats->samples = addLineTimingCount(stats->samples, 1U);
+	stats->updateEvents = addLineTimingCount(stats->updateEvents, count - timingPreviousUpdateCount);
+	// 区間の末尾で観測したモードへ割当てる。境界をまたぐ要求差分を含む。
+	stats->skippedRequests = addLineTimingCount(stats->skippedRequests, skipped - timingPreviousSkipCount);
+	if (!lineSensorPower || !sampleAvailable || epoch != timingPreviousPowerEpoch || scope != timingPreviousScope)
+		timingGapReady = false;
+	if (lineSensorPower) stats->poweredSamples = addLineTimingCount(stats->poweredSamples, 1U);
+	if (lineSensorPower && sampleAvailable)
+	{
+		stats->validSamples = addLineTimingCount(stats->validSamples, 1U);
+		const uint32_t age = lineSensorUpdateAgeMs;
+		if (age > stats->maxAgeMs) stats->maxAgeMs = age;
+		if (age >= LS_UPDATE_STALE_MS) stats->staleSamples = addLineTimingCount(stats->staleSamples, 1U);
+		if (updated)
+		{
+			if (timingGapReady && timingLastUpdateScope == scope)
+			{
+				const uint32_t gap = now - timingLastUpdateTick;
+				const uint32_t bin = gap < LINE_TIMING_GAP_BINS - 1U ? gap : LINE_TIMING_GAP_BINS - 1U;
+				stats->gapHistogram[bin] = addLineTimingCount(stats->gapHistogram[bin], 1U);
+				if (gap > stats->maxGapMs)
+				{
+					stats->maxGapMs = gap;
+					stats->maxGapTickMs = now;
+					stats->maxGapPattern = tracePattern;
+					stats->maxGapCalibration = modeCalLinesensors;
+				}
+			}
+			timingLastUpdateTick = now;
+			timingLastUpdateScope = scope;
+			timingGapReady = true;
+		}
+	}
+	timingPreviousUpdateCount = count;
+	timingPreviousSkipCount = skipped;
+	timingPreviousPowerEpoch = epoch;
+	timingPreviousScope = scope;
+}
+#endif
 /////////////////////////////////////////////////////////////////////
 // モジュール名 getLineSensor
 // 処理概要  	ラインセンサのAD値を取得し、平均値を計算する
@@ -440,10 +548,20 @@ void getLineSensor(bool phase, const uint16_t *sample, uint32_t epoch)
 	__disable_irq();
 	if (lineSensorPower && powerEpoch == sensorPowerEpoch)
 	{
-		memcpy(lSensor, raw, sizeof(raw));
-		memcpy(lSensorCari, normalized, sizeof(normalized));
-		++lineSensorUpdateCount;
-		sampleAvailable = true;
+		if (controlFrameActive)
+		{
+			// 高優先度ADCから制御途中の配列を置換せず、完成した最新値だけを保留する。
+			memcpy(pendingLineRaw, raw, sizeof(raw));
+			memcpy(pendingLineNormalized, normalized, sizeof(normalized));
+			if (pendingLineUpdates < UINT32_MAX) ++pendingLineUpdates;
+		}
+		else
+		{
+			memcpy(lSensor, raw, sizeof(raw));
+			memcpy(lSensorCari, normalized, sizeof(normalized));
+			++lineSensorUpdateCount;
+			sampleAvailable = true;
+		}
 	}
 	__set_PRIMASK(primask);
 }

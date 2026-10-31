@@ -918,6 +918,8 @@ static void logBuildMetadata(void)
 	setLogHeaderStr("imuCalibrationSamples", runImuCalibrationSamples);
 	setLogHeaderStr("imuCalibrationReadErrors", runImuCalibrationReadErrors);
 	setLogHeaderStr("lineSensorCalibrationValid", runLineSensorCalibrationValid ? 1 : 0);
+	setLogHeaderStr("lineAcquisitionPolicyVersion", LINE_SENSOR_ACQUISITION_POLICY_VERSION);
+	setLogHeaderStr("lineControlIrqPriority", CONTROL_IRQ_PREEMPT_PRIORITY);
 	for (uint8_t i = 0U; i < NUM_SENSORS; i++)
 	{
 		char name[24];

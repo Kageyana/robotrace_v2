@@ -286,11 +286,15 @@ void TIM3_IRQHandler(void)
 void TIM6_DAC_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM6_DAC_IRQn 0 */
-
+#if defined(ROBOTRACE_ISR_TIMING) && ROBOTRACE_ISR_TIMING
+  timerTimingIrqBegin();
+#endif
   /* USER CODE END TIM6_DAC_IRQn 0 */
   HAL_TIM_IRQHandler(&htim6);
   /* USER CODE BEGIN TIM6_DAC_IRQn 1 */
-
+#if defined(ROBOTRACE_ISR_TIMING) && ROBOTRACE_ISR_TIMING
+  timerTimingIrqEnd();
+#endif
   /* USER CODE END TIM6_DAC_IRQn 1 */
 }
 
