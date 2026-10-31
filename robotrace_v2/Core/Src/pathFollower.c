@@ -1720,6 +1720,9 @@ void pathFollowerUpdateTarget1ms(void)
 			lineLostCount = 0U;
 		}
 		float desiredSpeed = targetSpeedMps;
+		// 有効な白線照合が戻るまで加速を保留し、計画上の減速は維持する。
+		if (optimalTrace == BOOST_PATH_CURVE && !matchedLine)
+			desiredSpeed = fminf(desiredSpeed, limitedTargetSpeedMps);
 		if (observationTrust.caution || followerState == PATH_STATE_LINE_FALLBACK ||
 			followerState == PATH_STATE_REJOIN)
 			desiredSpeed = fminf(desiredSpeed, fminf(tgtParam.search,

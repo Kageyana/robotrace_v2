@@ -92,8 +92,9 @@
 //====================================//
 // シンボル定義
 //====================================//
-#define PATH_ROUTE_CONTROLLER_VERSION      20U
+#define PATH_ROUTE_CONTROLLER_VERSION      21U
 #define PATH_CURVE_YAW_FF_VERSION            2U
+#define PATH_UNMATCHED_ACCEL_HOLD_VERSION    1U
 #define PATH_SOURCE_FORMAT_VERSION          1U
 
 typedef struct

@@ -960,6 +960,7 @@ static void logBuildMetadata(void)
 	setLogHeaderStr("pathYawFeedForwardVersion", PATH_CURVE_YAW_FF_VERSION);
 	setLogHeaderStrFPrecision("pathYawPreviewTime_ms", PATH_CURVE_YAW_PREVIEW_TIME_MS, 2U);
 	setLogHeaderStrS("pathYawSpeedSource", "encoder_1ms");
+	setLogHeaderStr("pathUnmatchedAccelHoldVersion", PATH_UNMATCHED_ACCEL_HOLD_VERSION);
 	setLogHeaderStrFPrecision("pathGyroBiasAtEnd_dps",
 		optimalTrace == BOOST_PATH_CURVE ? pathFollowerGyroBiasDps() : 0.0f, 6U);
 	setLogHeaderStr("pathObservationNoLineStopMs", PATH_OBSERVATION_STOP_MS);
