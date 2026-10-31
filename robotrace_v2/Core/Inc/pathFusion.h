@@ -12,7 +12,7 @@
 //====================================//
 #define PATH_FUSION_BACKGROUND 400U // PATH_CURVEの白線重心から差し引く背景[正規化AD値]。
 #define PATH_FUSION_ACTIVE_TH 800U // 明部として数える閾値[正規化AD値]。
-#define PATH_FUSION_MAX_WIDTH 4U // 単一の白線として許可する連続した明部数[個]。
+#define PATH_FUSION_MAX_WIDTH 6U // 単一の白線として許可する連続した明部数[個]。
 #define PATH_FUSION_WHITE_FORWARD_POINTS 4U // 白線観測地図の前方位相探索[点]。センサーの前方距離は地図に含む。
 #define PATH_FUSION_WHITE_SAMPLE_MAX_MM 20.0f // 一次の白線観測を割り当てる車軸経路点との距離上限[mm]。
 #define PATH_FUSION_RESIDUAL_CLIP_MM 15.0f // 任意の直接方位補正に使用する白線残差の飽和値[mm]。

@@ -38,7 +38,7 @@
 #define PARAM_UP_STEP 1.02F // 速度パラメータ増加用の倍率[無次元]。現行コードでは未使用。
 
 // ゴール
-#define COUNT_GOAL 6 // 停止動作へ移るゴールマーカー検出回数[回]。
+#define COUNT_GOAL 2 // 停止動作へ移るゴールマーカー検出回数[回]。
 
 // クロスライン検出関連
 #define TRACE_CROSSLINE_TH			2000 // クロスライン検出に使うラインセンサーの閾値[正規化AD値]。

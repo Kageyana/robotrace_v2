@@ -12,7 +12,7 @@
 // 調整パラメータ
 //====================================//
 #define CROSS_STRAIGHT_MM 100.0f // クロスライン区間の前後を直線扱いする追加距離[mm]。
-#define PRIMARY_ROUTE_GOAL_X_LIMIT_MM 60.0F // 一次ログを経路元として受け入れるゴールマーカー横位置の絶対値上限[mm]。
+#define PRIMARY_ROUTE_GOAL_X_LIMIT_MM 120.0F // 一次ログを経路元として受け入れるゴールマーカー横位置の絶対値上限[mm]。
 
 typedef enum { LOG_SOURCE_DISTANCE, LOG_SOURCE_SLIP, LOG_SOURCE_PATH } LogSourcePurpose;
 

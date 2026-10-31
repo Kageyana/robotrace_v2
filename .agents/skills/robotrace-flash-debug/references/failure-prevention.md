@@ -128,3 +128,13 @@ PC変換器へ渡すbinは初回からASCII連番名とヘッダ番号の一致�
 - 100kHzで約249KBのダウンロード約40秒＋照合約31秒を確認した。全体60秒のPython timeoutで切らない。CLIは進捗付き非同期セッションで短く待機を分割して終了を回収し、Pythonで包む場合は全体180秒等を確保してTimeoutExpiredの部分stdout/stderrも原バイト保存する。USBエラー後の盲目的な再書込みを避け、再接続・Device ID・Flash読出し一致を先に確認する。[書込み中断と復旧](../../../../doc/失敗事例/2026-10-27-stlink-usb-during-flash.md)。
 - 注入前に実ELFのnmでスクリプトの全関数・全グローバルを確認する。ヘッダ宣言やソース定義だけでは未リンクの関数を検出できない。設定固定等の関数が未リンクなら、製品の呼出し経路が本当にあるか確認する。試験都合のused属性を付けず、必要な製品接続とテストの責務を分ける。
 - 割込みマスクや入力を書き換える前に復元用の値を原ログ/ファイルへ保存する。途中エラーでは最初にリセットなしでPWM/CCR・開始要求・マスクを読み、元の状態を復元してから再試行する。最終detachと自分のサーバー終了を必ず確認する。
+
+
+## 2026-10-31：走行後のBIN storage failedを読む前
+
+再起動せず生RAM/Flashを先に保全し、実Flashと全ロード領域が一致するELFだけで読む。接続前に全照会式の根シンボルをfile-only GDBのinfo variables/addressまたはnmで検査する。USERFatFSは宣言があっても未リンクで、実マウントはsd_functions.cのfsだった。ログ列cntlogと実変数cntRunも区別する。補助ファイル名は今回の実在一覧から確定し、logBufferWriterの定義はSDcard.c内を検索する。
+
+GDB出力を原バイトで保存するだけでなく、表示するPythonのstdout/stderrをsys.stdout.reconfigure/sys.stderr.reconfigureでUTF-8にし、初回呼出し側もPYTHONIOENCODING=utf-8とする。生ログの読取で置換文字が出てもCP932へ再エンコードしない。解析ではRAM/コンテナのLEと実AppendU16/U32が保存するレコードのBEを個別確認し、スキーマ長・バイト収支・正の時刻差で誤復号を拒否する。
+
+13959のoverflow=true/writeFailed=falseはendLogが保存検証前に拒否する直接原因を示した。終了後はキューが排出済みなので空キューを根拠にoverflowを否定しない。SPI/err0は過去の一時遅延を否定しない。OLED割り込み待ちはデバッガの停止影響も分離し、走行時の原因と断定しない。根本原因の分離にはf_write最長時間・書込タスク最大間隔・キュー最大占有・初発時刻のRAM診断を別途検討する。詳細は[13959の回収と補助修正](../../../../doc/失敗事例/2026-10-31-bin-storage-overflow-13959.md)。
+診断プロセスのstdoutへSelect-Object -First等を直接つないで途中で閉じない。終了コード判定が必要な実行は全出力をファイルへ保存するかそのまま完了を待ち、表示量はツールのmax_output_tokensで制限する。13959の最終解析はパイプなしでexit0を確認した。
