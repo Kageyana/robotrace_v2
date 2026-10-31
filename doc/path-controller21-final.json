@@ -1,0 +1,22 @@
+{
+  "selected_by": "user",
+  "selected_local_date": "2026-10-31",
+  "timezone": "Asia/Tokyo",
+  "routeControllerVersion": 21,
+  "pathFusionEstimator": 3,
+  "pathYawFeedForwardVersion": 2,
+  "pathUnmatchedAccelHoldVersion": 1,
+  "controller22_adopted": false,
+  "additional_nine_drives_cancelled": true,
+  "resume_controller22_without_new_user_instruction": false,
+  "firmware_source": "robotrace_v2",
+  "restore_elf": "build/path-unmatched-speed-validation/MatchedLineSpeedTiming-bc7a3fca376fe10b9e2e42612812e0eccbf97eedacd9363269056c3a160eef87.elf",
+  "restore_elf_sha256": "bc7a3fca376fe10b9e2e42612812e0eccbf97eedacd9363269056c3a160eef87",
+  "restore_program_bytes": 254652,
+  "restore_helper": "analysis/controller21_restore_20261031/hardware.py",
+  "hardware_restore_pending_at_selection": true,
+  "hardware_connection_unavailable_user_confirmed": true,
+  "SD_settings_changed_for_selection": false,
+  "control_sources_changed_for_selection": false,
+  "new_physical_validation_performed": false
+}
