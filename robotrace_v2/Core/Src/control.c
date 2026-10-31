@@ -27,6 +27,8 @@ bool initLCD = false;		// LCD初期化状況		false:初期化失敗	true:初期�
 bool initIMU = false;		// IMU初期化状況		false:初期化失敗	true:初期化成功
 bool initCurrent = false;	// 電流センサ初期化状況	false:初期化失敗	true:初期化成功
 static bool softreset = false;		// ソフトウェアリセット	false:リセット未実行	true:リセット実行
+static bool normalStopHolding = false; // 通常ゴールの速度0検出後の停止制御保持中
+static uint32_t normalStopHoldTick = 0U; // 通常ゴールで速度0を初めて検出した時刻[ms]
 uint8_t autoStart = 0;				// 5走を自動で開始する
 int16_t autoStartAnalyze = 0; 		// 自動走行で使用するログの解析番号
 
@@ -115,6 +117,24 @@ static bool finishBinaryLogStorage(void)
 {
     motorCommandOut(0, 0);
     return logRecoveryIsReady();
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 stopMotorHoldComplete
+// 処理概要     速度0を初めて検出してから停止制御を保持する時間を判定する
+// 引数         holding: 速度0検出済みの状態、startTick: 初回検出時刻[ms]
+// 戻り値       true: 保持時間が経過した、false: 停止待ちまたは保持中
+/////////////////////////////////////////////////////////////////////
+static bool stopMotorHoldComplete(bool *holding, uint32_t *startTick)
+{
+	uint32_t now = HAL_GetTick();
+	if (!*holding && encCurrentN == 0)
+	{
+		*holding = true;
+		*startTick = now;
+	}
+	// 保持中に再び動いても、目標速度0のPIDを継続して停止へ戻す。
+	return *holding && (uint32_t)(now - *startTick) >= RUN_STOP_HOLD_MS;
 }
 
 // タイマ関連
@@ -814,6 +834,8 @@ void loopSystem(void)
 		{
 			goalTime = cntRun;
 			enc1 = 0;
+			normalStopHolding = false;
+			normalStopHoldTick = 0U;
 			patternTrace = 101;
 		}
 		break;
@@ -824,7 +846,7 @@ void loopSystem(void)
 			ssd1306_UpdateScreen_DMA();        // 停止していた画面更新を再開
 		}
 		// 停止速度まで減速
-		if (enc1 >= encMM(50))
+		if (normalStopHolding || enc1 >= encMM(50))
 		{
 			setTargetSpeed(0);
 		}
@@ -832,9 +854,10 @@ void loopSystem(void)
 		{
 			setTargetSpeed(tgtParam.stop);
 		}
-		motorCommandOutSynth(lineTraceCtrl.pwm, veloCtrl.pwm, 0);
+		// 速度0検出後は操舵を加えず、速度0のPID出力を保持する。
+		motorCommandOutSynth(normalStopHolding ? 0 : lineTraceCtrl.pwm, veloCtrl.pwm, 0);
 
-		if (encCurrentN == 0)
+		if (stopMotorHoldComplete(&normalStopHolding, &normalStopHoldTick))
 		{
 			patternTrace = 102;
 		}
@@ -1009,11 +1032,13 @@ void loopSystem(void)
 void emergencyStop(void)
 {
 	// 機体停止処理
+	bool stopped = false;
+	uint32_t stoppedTick = 0U;
 	setTargetSpeed(0);
-	while (encCurrentN > 5)
+	do
 	{
 		motorCommandOutSynth(0, veloCtrl.pwm, 0);
-	}
+	} while (!stopMotorHoldComplete(&stopped, &stoppedTick));
 	motorCommandOut(0, 0);
 	
 	if (!ssd1306_IsDMARunning())
