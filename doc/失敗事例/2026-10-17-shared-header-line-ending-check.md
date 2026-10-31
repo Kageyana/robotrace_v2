@@ -21,6 +21,16 @@ validation/log_storage/run.pyの比較はCSV側の行末CR/LFだけを除いてL
 
 確認はリポジトリルート・必要権限で `python validation/log_storage/run.py --converter C:/tool/AutoCopyCsvFromSd/RlogToCsv.exe` を再実行し、通常・詳細両方の全CRC、3種類の設定値の開始後変更からの分離、50行のPC変換値と全メタデータ内容一致が成功した。各プロファイルの結果はbuild/log-storage-validation以下へ保存した。4構成ARMビルドも成功。比較契約の修正はresolved、最初の実機ログは未確認。
 
+## 2026-10-28：RAM残留ヘッダと保存binの照合で再発
+
+対象は実走13870とリセットなしRAM採取の対応確認。binメタデータ側だけrstripした一方、RAMのcolumnTitle由来文字列には終端LFが残っていたため、新規assertが停止した。両ログの全CRCとPC再変換CSVの一致は成功しており、メタデータ内容の不一致ではなかった。
+
+compare_retained_header.pyで差分を実バイト由来の文字列へ限定して確認した結果、RAM3663B・bin3662B、差は末尾1文字LFのみだった。既存の改行契約をRAM由来文字列へ適用できていなかった再発である。両側の終端CR/LFだけを正規化し、項目名・順序・値・数値表記・他の文字は変更せず比較する。辞書としても全項目一致を独立に検査する。
+
+再発防止としてログ解析Skillのメタデータ比較前にRAM/bin/CSVの終端改行確認を追加した。実行はリポジトリルート・必要権限でpython analysis/script/analyze_path_timing_13869_13870.py。原本bin/CSV/RAMは変更しない。
+
+検証はanalysis/path_fusion_13869_13870/ram_metadata_byte_differences.jsonとvalidation.json。13869/13870の全CRC・全56列の再変換CSV一致・13870のRAMメタデータ全内容一致が成功した。status: resolved（比較契約の修正）。ADC最大age6msの発生区間や物理Y変位の精度とは別件。
+
 ## 2026-10-18：横候補版4のホストテストコピーで再発
 
 最終検査で、paired.c/metadata.cと元テストのバイト同一性assertが失敗した。文字列としては一致しており、生成コピーはCRLF63/34行、元はLF63/34行、差は改行バイトだけだった。実C比較16000周期・回帰・4構成ビルドは既に成功していた。既存対策は配布する共有ヘッダに限定され、検証用の無変換コピーにも同じ契約が必要な点を実行前に適用できていなかった。

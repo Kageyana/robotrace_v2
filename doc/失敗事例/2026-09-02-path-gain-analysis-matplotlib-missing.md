@@ -31,3 +31,10 @@ task: PATH REPLAYのゲイン変更前後ログ解析
 ## 2026-10-04 解析環境の再確認
 
 13005高音解析でバンドルPythonにはSciPy・Matplotlibがなくimport失敗が再発した。今回は通常Pythonの実体がPython310でありNumPy・Matplotlibのimportが成功、同環境で音声FFTとグラフを生成できた。追加対策: バンドルに描画ライブラリがない場合、既存の通常Pythonも必要importで検証し、使える環境を選ぶ。SciPyが必要な処理はNumPy FFTへ置換できるか確認する。
+
+
+## 2026-10-30：追加解析器が既存の動画依存配置を読まなかった
+
+13924の時刻同期器はPython310へSciPyがあると仮定してModuleNotFoundErrorで停止した。同期器はNumPyの粗密グリッド探索へ置換し、実入力で時刻差2.675535秒・角速度相関0.998607を確認した。その後、白線比較器でcv2を先にimportして再び停止。既存カメラ補助はbuild/video-analysis-runtimeをsys.pathへ加えてSciPy/OpenCVを使っていた。
+
+新比較器も最初に同じ依存先を明示し、importlib.util.find_specでnumpy/cv2/scipyを確認してからimportする。追加インストールはしていない。再発防止はPython実体だけでなく既存補助のsys.path設定と必要モジュールの実配置を実行前に読むこと。確認はanalysis/script/check_marked_071234_map.pyの起動・6314骨格点の投影・剛体比較完了。status: resolved（今回のランタイム解決）。

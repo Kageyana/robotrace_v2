@@ -52,3 +52,13 @@ PATH/SHORTCUTの1ms化後の4構成ビルドは成功したが、追加した集
 再発防止としてflash-debug Skillの実行前へ、追加する補助テストの固定サイズ・必須列・参照番号を現行ソースと照合し、旧契約なら製品ではなくテスト入力・期待を修正する手順を追加した。
 
 確認はファームウェアルートの明示workdir・必要権限付きで`python tests/run_manual_primary_metadata_tests.py`を再実行し、通常/詳細とも実DISTANCE/SLIP/PATH解析、開始時スナップショット、欠落・失敗計画、全自動方式がPASS。ログは`robotrace_v2/build/merge-slip-v2-validation/manual-primary.log`。今回のテスト契約修正はresolved。実走行・割り込み最大時間・検出精度は今回未確認。
+
+## 2026-10-28：追加診断の集計でwarningゼロを仮定
+
+TIM6/ADC計測拡張の4構成ビルドは成功したが、新設finalize.pyが既存warningを含むログへassert not warningsを置き、Debugの5件で停止した。変更前の全体ログbuild/path-timing-validation/build.logには同じ診断を含む既存6種類があり、今回の新規警告ではなかった。コードを警告対処のために変更していない。
+
+判定を基準全体ログの診断集合との差分へ修正した。行番号だけを正規化し、ファイルと診断メッセージを維持する。観測warningの翻訳単位が基準のコンパイル記録に含まれることも確認した。初回全体ログを保持し、再確認の増分ログは別ファイルへ保存した。
+
+再発防止は、生成した集計コードを実行する前にwarning判定を検査し、既存ゼロを証明していないassert not warningsを拒否すること。flash-debug Skillのビルド集計前にも追記した。build/isr-interval-validation/preflight_helpers.pyで対象スクリプトのASTを確認する。
+
+検証はbuild/isr-interval-validation/validation.json。通常3構成と独立計測ONの4構成成功、新規診断0、計測OFFの対象4モジュールの全命令/シンボル参照先一致を確認した。status: resolved（警告比較の前提修正）。MCU未検出による未書込みと、実走の計測未了は別件。

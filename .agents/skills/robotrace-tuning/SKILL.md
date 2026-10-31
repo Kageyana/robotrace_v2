@@ -13,6 +13,18 @@ description: ロボトレースのPID、速度フィードフォワード、ス�
 
 ## 実行前の再発防止
 
+
+走行評価集合の「ログ正常終了」と「ユーザー/映像で板内完走確認済み」を分け、未確認を別区分で保持する。emcStop0だけを物理的なはみ出しなしの根拠にしない。現在の23走比較ではemcStop0は21本だが、明示確認済みは13901～13910/13913～13922の20本で13899は未確認。採否・10本の物理確認へ未確認ログを加算しない。[確認範囲の訂正](../../../doc/失敗事例/2026-10-30-normal-log-physical-scope.md)参照。
+
+
+新しい速度解析の前に、SPEED_PARAM_FIELDSの保存19項目/メタデータ15項目を確認する。search/stop/shortCut/pathReplayはログ非出力。searchが欠けても過去の実SD値を推測せず、凍結C再生の既定を使うなら出典・適用範囲を明記する。保存RAMの停止時値も全過去走へ転用しない。NumPy集計はJSON保存前にint/float/boolへ明示変換し、集計のみ失敗した場合は完成済みC出力を検証して未実行部分から再開する。[非出力項目](../../../doc/失敗事例/2026-10-28-derived-analysis-helper-dependency.md)、[JSON集計型](../../../doc/失敗事例/2026-10-30-tracking-screen-json-scalar.md)参照。
+
+
+取得版2の13880/13881は正常ログ終了したが、動画13881に板外張出しと5通過Y+16.57mmがある。正常終了数をコースアウトのない実走本数へ加算しない。位置/方位49組×2走の固定入力再生は学習用感度であり、最小変位差を実機採用へ直結しない。独立動画と再生自己位置の変位差、喪失条件、副作用を確認し、実機変更前に今回の設定値・版・対象一次を保持する。詳細は[取得版2の実走](../../../analysis/path_acquisition_220117/report.md)。
+
+調整値を案内する前に、UIの項目名・画面表示値・SD/ログの倍率付き値を対照する。No.8 ShortcutのLine alphaは画面0.005がlineAlpha_x1000=5、画面0.100が100であり、「5へ変更」だけで案内しない。初回の実ログで版・保存設定を確認してから同条件の本数を増やす。13843～13846は全て100で途中停止したため、候補5の実走成功へ数えない。[実走比較](../../../doc/path-confidence-fusion.md)参照。
+
+
 最初のコマンドの前に [共通事前確認](../../../doc/skill-execution-preflight.md) を読み、パス・workdir・権限・実行環境を確定する。制御やパラメータの試行を設計するときは [分野別の再発防止](references/failure-prevention.md) も読む。関連する失敗記録は最新追記まで確認し、既知の失敗条件を初回操作から回避する。
 
 
@@ -101,3 +113,14 @@ For the 2026-10-12 v2 parallel evaluation, keep the legacy detector connected to
 For the 2026-10-14 longitudinal comparison, use `doc/slip-long-fast-only.md`: version 3 removes Slow from both ON/OFF conditions, keeping 10/8 m/s², 3/5ms and all windows fixed. LongSlow remains diagnostic and legacy control is unchanged. Identify version 2/3 from metadata; do not adjust thresholds, durations or speed plans while isolating this effect.
 
 For the lateral tangential candidate, use `doc/slip-lateral-candidate.md`. Keep thresholds and speed plans fixed while comparing the initial SHADOW lane and candidate in at least 10 same-mode, similar-voltage runs. Verify physical X direction before adoption. Separate steady turns/transients, CW/CCW and speed bands; compare residuals, interval peaks, ON time, validity, angular-acceleration dependence, detection position, completion, speed tracking and lap time. A lower ON rate alone does not establish more accurate slip detection. Existing IMU compensation and control remain connected to the initial paths; adoption is a separate change. Account for remaining angular-acceleration LPF lag.
+
+## 2026-10-27：白線融合の観測点と実制御再生
+
+融合比較の候補を作る前に、伝播する車体基準点・地図の基準点・センサー観測点を区別する。前方白線を車軸XYへ直接照合せず、一次の実センサー観測で小R区間の残差を確認する。全列棚卸しと有限の全候補を明記し、欠測列・未記録鮮度・重力基準を推定済み事実にしない。選定用で候補固定後に確認用を評価する。方法変更後に使い直す系列は新しい未見評価ではない。実制御の最近傍・ゲート・1ms補正上限・停止を含む原本bin再生を実施し、直線評価点の改善だけで採用しない。詳細は[白線観測点の混同](../../../doc/失敗事例/2026-10-27-path-white-observation-reference.md)と[版19](../../../doc/path-confidence-fusion.md)。初回実ログと同条件10走の採否確認は別途必要。
+
+1ms化する前に観測雑音・伝播雑音の時間単位を照合し、疎なログ値を独立した1ms観測として重複融合しない。保存optimalIndexに依存するPC診断と、推定結果で最近傍を選ぶ実制御を分けて検証する。単一線の接線位置や真biasの精度を数値最適化だけで保証しない。既知bias合成試験が期待精度を満たさない場合も、診断を保全し、位置改善・有限性の成功でその失敗を消さない。
+
+
+## 2026-10-29：白線未照合中の速度方針を変える前
+
+白線の明部と地図への有効照合を分け、未照合の初回周期・継続・回復、残差超過/地図欠測/古い取得、予定減速、方式分離と喪失停止を実Cで検証する。入口はリポジトリルート・必要権限のvalidation/path_unmatched_speed/run.py。失敗13898と同一次の正常13899、成功13901～13910を保持し、後の正常ADC集計を以前の失敗へ帰属させない。固定運動再生は速度指令の性質の検査であり、実閉ループの逸脱防止を証明しない。既に収集済みの版20の10走と、新しい方針の実走確認を分ける。[未照合中の再加速](../../../doc/失敗事例/2026-10-29-path-unmatched-reacceleration.md)参照。

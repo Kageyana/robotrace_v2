@@ -143,3 +143,25 @@ Src/log*をパスに渡した検索でos error 123、推測したtim.cで存在�
 ## 2026-10-25 PATH_CURVE調査での再発
 
 対象は新走行モードとLOG画面の実装調査。PowerShellへ`Core/Inc/{courseAnalysis,pathFollower,...}.h`を渡し、シェルの構文解析でMissing argumentとなり検索は実行されなかった。共通事前確認のBash展開禁止をコマンドへ反映できなかった再発である。修正は実在する`robotrace_v2/Core/Inc`を検索ルートにして`rg -n 'PATH|SHORTCUT|curvature|BOOST_' robotrace_v2/Core/Inc -g '*.h'`を使った。終了コード0と該当ヘッダの一致を確認した。今後は検索パスに`*`・`?`だけでなく波括弧もないことを組立時に確認し、ディレクトリと`-g`へ分ける。一般のソース調査で発生したため分野Skillへの変更は行わない。対処確認済み、resolvedを維持する。
+
+## 2026-10-28 動画ユーティリティ名の推測
+
+13872～13875の解析で、既存ラッパーから基本関数を探す際にtrack_video_path_curve_13810_13816.pyという存在しない名前を推測して読込に失敗した。既存の存在確認策を適用できなかった。ラッパーの実importを読み、実在するanalyze_video_path_curve_13810_13816.pyへ切り替え、4動画の校正・追跡が終了コード0で成功した。今後は対象ラッパーのimportから実体を解決し、Test-PathまたはPath.is_fileを確認してから読む。ログ解析Skillの実行前へ反映した。status: resolved（参照手順）。
+
+## 2026-10-28 ADC取得調査での再発
+
+13878の計測後に取得実装を探す際、存在しないCore/Src/sensor.cを複数ファイル検索へ混ぜ、os error 2が再発した。既存の存在確認策を検索組立へ適用できなかった。Core/Srcディレクトリだけを渡す検索へ修正し、lineSensor.c内の取得状態・棄却・HAL開始処理を確認した。再発防止としてsearch_sensor_acquisition.ps1を作り、入口で実在ディレクトリを確認し、-gへファイル形式を分離する。ログ解析Skillにこの実行点を追加した。修正検索とスクリプト実行で終了コード0を確認し、参照手順はresolved。取得遅延の実機原因は別途open。
+
+## 2026-10-28 終端照合調査での再発
+
+解析器名analyze_path_timing_13876_13878.py、ヘッダ名pathPolicy.hを推測して検索パスへ渡し、存在しない対象でos error2となった。実在ディレクトリへのrg --filesとシンボル検索へ戻し、replay_path_fusion_13876_13878.pyとpathFollower.c内のstatic関数を確認した。以後の今回解析はprepare_analysis_path_acquisition_220117.pyで実在する生成元の読込・構文/名前検査を行い、終了コード0を確認してから起動した。ログ解析Skillの入口へシンボルのヘッダ分離を仮定しない条件を追記する。status: resolved（参照経路）。
+
+## 2026-10-30：RAM計測の確認で下位モジュールフォルダを推測
+
+対象はRAM計測の理由幅の確認。Core/Inc/slipを推測してrgへ渡し、存在しないためos error2となった。実在Core/IncをTest-Pathで確認して検索へ戻し、slipDetection.hの実理由フィールドがuint16_tであることを確認した。製品や成果物は未変更。既存の存在確認が手組み検索の実行点に適用されなかった再発である。次回は実在する親と-gから検索し、下位名を機能名から構成しない。今回の機械検証はrecord_path_input_capture_search_preflight.pyで既知親のis_dirと実宣言検索の終了0を先にassertする。ログ解析Skillの実行前にも追加。status: resolved（参照と理由幅）。実機原因は別途open。
+
+## 2026-10-31：ルートにもtasks.jsonがあると仮定した
+
+版21の最終採用確認で、ルートの.vscode/tasks.jsonを存在確認せずrgの複数パスへ含め、os error2となった。ErrorActionPreference=Stopでもnativeコマンドの非0終了は停止せず、その呼出し内の後続読取りも実行された。製品・実機は未変更。既存の実在一覧取得とnative終了コード確認を実行点へ適用しなかった再発。
+
+rg --files .vscode robotrace_v2/.vscode -g '*.json'で再取得し、tasks.jsonはファーム直下だけにあることを確認してから実ファイルを読んだ。ルートsettings.jsonの古いsourceDirectoryも発見し、実在するワークスペース相対パスへ修正した。共通事前確認へVS Code階層の実在一覧とrg終了2以上での停止を追加した。一般の設定確認であり、無関係な分野Skillは変更しない。status: resolved（参照先と事前手順）。

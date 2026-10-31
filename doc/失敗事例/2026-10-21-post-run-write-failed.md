@@ -5,6 +5,8 @@ task: 走行後のWrite failed調査
 
 # 停止後のWrite failed表示をST-Linkで調査
 
+2026-10-27の再発13854はゼロヘッダtmpの原本保持・境界を除いた部分抽出まで確認した。保存失敗の当時のRAM状態は未採取であり、本件の原因未確定を維持する。詳細は[未確定tmpの再発](2026-10-18-unsealed-tmp-partial-recovery.md)とanalysis/path_fusion_13853_13861/report.md。関連関数を探す際にlogBufferWriter.c/hを仮定して読取が失敗したが、現行の型・実装はSDcard.c内にある。次回は実在Core/Srcディレクトリへの`rg -n 'logBufferWriterBeginRecord|logBufferWriterWriteSucceeded'`から定義位置を確定して読む。
+
 2026-10-21、ユーザーは走行後にWrite failedが出ると報告。調査開始前に機体を再起動済みだったため、走行時のRAMフラグは失われていた。
 
 ## 確認済み

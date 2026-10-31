@@ -7,6 +7,8 @@ description: robotrace_v2の機体、KiCad回路、CubeMX ioc、センサー配�
 
 ## 実行前の再発防止
 
+ADCの静止比較でもGDBの直接callを使わない。関数呼出し後にmain/setupのIPSR/VECTACTIVE32・NVIC active0となったため、通常UIのセンサーテスト経路でON/OFFし、単一サーバーを維持して各停止点の例外状態/開始要求/出力を記録する。公開未完validSamples0のstale0/gap0を正常と見なさない。終了時は負荷0・優先度3・元の凍結・センサーOFF/IPSR0/PWM0を確認する。[直接呼出し後の例外状態](../../../doc/失敗事例/2026-10-28-gdb-call-exception-state.md)参照。
+
 最初のコマンドの前に [共通事前確認](../../../doc/skill-execution-preflight.md) を読み、パス・workdir・権限・実行環境を確定する。機体・IMU・ADCの設定や座標を確認するときは [分野別の再発防止](references/failure-prevention.md) も読む。関連する失敗記録は最新追記まで確認し、既知の失敗条件を初回操作から回避する。
 
 ## Overview

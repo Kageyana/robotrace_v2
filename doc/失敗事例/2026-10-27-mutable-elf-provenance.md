@@ -1,0 +1,43 @@
+---
+type: codex-failure
+date: 2026-10-27
+task: 新走行ログと停止保持版の対応確認
+status: resolved
+severity: low
+---
+
+# 過去のELFハッシュを可変ビルド先へ要求した
+
+停止保持試験時のDebug ELFはSHA934186b37d6d2d8b965d5fb61af6b1c8c8b7ad6d4d4aa3403797d895fde5f167。新走行の解析で同じbuild/Debug/robotrace_v2.elfへそのSHAを要求したが、22:58:52の後続ビルドでSHA976a866b107a47c21fb6abd659ef3e5d26e8afc52e8f71dee48233b1e2b015ebへ更新され、監査が停止した。control.c/control.hは停止保持試験時と一致し、新ログのbuildTime22:58:50も現在ELF内時刻と一致した。ハッシュ不一致だけでFlash異常やコード改変とは扱っていない。
+
+通常のビルド先を過去成果物の固定保存先として扱ったことが原因。現在ELFをSHA名の解析原本フォルダへコピーして一致を検証し、過去ビルドSHAと現在ファイルSHAを別項目へ保存した。過去のfinal_validation.jsonは変更しない。今後のbuild/stop-motor-hold/finalize.pyは、ビルド直後にSHA名の成果物コピーを保存してから証跡を確定する。完了監査も過去の可変パスが不一致なら現在Flashを検証済みとせず、歴史的証跡と現在の未検証事項へ分ける。
+
+対処の検証はanalysis/path_fusion_13853_13861/stop_hold_provenance.jsonと原本ELFコピーのSHA一致でresolved。現在実機のFlash同一性や2秒間の実モーター指令は未検証であり、本対処の検証成功へ含めない。ビルド・デバッグSkillの成果物確定前へ不変コピー手順を追加する。
+
+同じ完了監査で、履歴13843～13846を最新20本の窓から検索する前提も停止した。解析中に13862～13867が追加され、過去4本が表示窓外へ出たためで、原本消失ではなかった。履歴は指定番号の原本とSHAから直接検証するよう修正し、最新ログ一覧を表示上の窓に限定した。監査は最新13867・検証済み完走10本・goal_complete=falseで成功。新規取り込みの存在だけで、未照合の13862以降を今回9動画へ所属させていない。
+
+## 2026-10-29：ホスト検証JSONとフィクスチャも可変成果物だった
+
+方位補正の正式実装中、path_fusionの試験を既定出力へ実行し、白線地図版2のmanifestが参照するbuild/path-fusion-port/validation.jsonを新版の結果で上書きした。旧ホスト出力本文は同じで、保存済み元ソースSHAとWindowsのCRLFを復元した候補が、旧manifest内のSHAと完全一致した。最初のLF候補は一致せず採用していない。
+
+旧JSONはbuild/white-extension-validation/archived-host/path-fusion-validation.jsonへ保管した。変更前のfinal_validation.original.jsonを保持し、manifest内の当該artifact参照だけを同一SHAの保存先へ移した。改修したreplay.inc/run.pyも事前コピーのSHA一致を確認して参照先を移した。今回のproductionの検証を旧版の合格記録へ読み替えていない。
+
+再発防止としてpath_fusionへROBOTRACE_PATH_FUSION_OUT、log_storageへ--outputを追加し、今回の全試験をbuild/heading-fusion-validation以下へ分離した。以後はELFだけでなく検証JSON・実行ファイル・生成フィクスチャも段階別に保存し、参照する全artifactを後続試験前後でSHA照合する。実行点は同フォルダhost.py/finalize.py。flash-debug Skillの成果物確定前へ追記する。
+
+確認はhistorical_artifact_relocation.jsonと旧final_validation.jsonの全10artifact SHA一致、新しいhost_validation.json・130再生・4構成ビルド。status: resolved（証跡の復旧と出力分離）。
+
+## 2026-10-29：実機Flashが最後に保存した計測版と異なった
+
+融合版3の書込み前、リセットなしで読み出したFlashが最後に実機照合した取得計測版886669cc…と一致せず、ガードで中止した。RAM131072BとFlash251412Bをbuild/adc-priority-validation/after-run-20261028T144945Zへ保全し、不一致ELFの234項目デコーダを適用しなかった。
+
+実機内のビルド時刻は2026-10-28 22:53:41、プログラム長251152B、末尾260Bは0xFFだった。保存済み白線地図版2のCore/CMakeを別フォルダへコピーし、__DATE__/__TIME__だけをその時刻へ固定した計測OFFのオフライン再構築で、251152Bが全バイト一致した。証跡はbuild/heading-fusion-validation/unexpected-flash/reconstruction.json。実機像は識別済みだが、書込みの実行者・経路は未確定である。
+
+再構築ELFのDWARFから停止確認用14項目の配置を生成し、合成RAMによる読出し自己試験後、新しいリセットなしRAM/Flashを照合した。出力0/開始なし/Fault0を確認し、その一致ELFの型配置で解釈した。バッテリー電圧は有効値なしだった。ビルド時刻やサイズの一致だけでRAM型を決めず、必ず実プログラム領域の全バイトを照合する。
+
+再発防止は、初回書込み前に対象各構成のELFをSHA名で保存し、想定Flashが異なる場合は生RAM/Flashを保全して型付き解析と書込みを止めること。保存ソースから再構築する場合も、全バイト一致の前に旧RAM配置を流用しない。identify.pyで配置自己試験・ソース保存像SHA・再読出し一致のゲートを確認した。status: resolved（像の識別と型付き読出し）、open（書込み経路の特定）。
+
+## 書込み経路のユーザー確認
+
+ユーザーより、ログ13881の後に「書込み／デバッグをした」と回答があった。最後の計測像と異なることは手動操作後の状態として扱う。読出し像が白線地図版2の計測OFFビルドと全バイト一致する事実は変わらない。具体的な実行コマンドまでは未確認。status: resolved（像の識別と手動操作の確認）。
+
+今回の新4構成はconfiguration-artifacts以下へ構成名/SHA付きELFを全て保管し、configuration_artifacts.jsonで各ビルドログSHA・元ソースと対応付けた。build.pyも各構成のビルド直後に保存するよう変更した。計測版だけの保管で通常Debug像を失う経路を防ぎ、全4コピーのSHA一致を確認した。

@@ -15,6 +15,72 @@ description: ロボトレース走行ログを解析、比較、可視化する�
 
 ## 実行前の再発防止
 
+版20/21/22等の新規比較では、CSVメタデータへ裸のintを使わず、compare_controller_20_21_22.metadata_integerの有限・整数相当検査を通す。全ログを読む前に5/5.00受入、5.1/nan/±inf拒否の6境界を確認する。13901～13910/13913～13922/13928の21原本で所属とSHA一致を確認済み。[整数表記の10/31再発](../../../doc/失敗事例/2026-10-14-log-metadata-integer-decimal-format.md)。
+
+2026-10-31：動画の同期前に録画先頭で機体が既に移動しているか確認し、正のoffsetだけを仮定しない。負offsetも含む探索結果・全ログに対する被覆率・相関を保存する。ログ先頭が写っていなければSG開始位置を補完せず、最初の実観測基準の相対比較と未観測時間を明記する。保持RAM境界を映像へ写す際は同時刻の有効点の間隔を先に検査し、25msを超えたら未測定とする。他時刻や制動後位置へ置換しない。原解像度の色閾値感度が1°ゲートを超える点は不合格を保持し、全点方位精度合格と呼ばない。[動画の開始/終了境界](../../../doc/失敗事例/2026-10-30-video-post-run-coverage.md)。
+
+新走行のRAMイベント比較前は、実events.csv・enum・生成条件を読む。イベントは理由だけでなく電流有効等の上位flags変化も記録されるため、旧走のイベント時刻一覧を期待値へ流用しない。各イベントの下位4bitと全周期履歴の一致・時刻順序・理由遷移を検証する。未知の準備スクリプト名もrg --filesで実在名を取得してから読む。PowerShellの依存した読取りはErrorActionPreference=Stopを設定する。入口はanalyze_curve22_070745_inputs.py、実14257周期/203レコードを検証済み。[派生補助の境界再発](../../../doc/失敗事例/2026-10-28-derived-analysis-helper-dependency.md)。
+
+派生スクリプトを複数生成する前に、全対象のAST ImportFrom/公開名を読み、importする名前の順序やROOT併記まで同一と仮定しない。全対象の置換計画を検査してから最初の生成を始める。完了済み段階は実ELF/配置SHA・生成ソース・成功証跡を照合し、消費側の生成失敗で配置照会やC試験を繰り返さない。版22統合のvalidate_path_trial_capture_decoder.pyは52配置と8異常試験を保全してCLI5件だけ再開した。[依存生成の再発](../../../doc/失敗事例/2026-10-28-derived-analysis-helper-dependency.md)参照。
+
+
+binをRAMと直接照合する前に実serializerを読む。現行RLOGヘッダlittle/レコードbig/nativeRAM littleを分離し、先頭時刻の実バイトと保存列154Bを検証する。派生再生はfscanfのheader/設定/行幅を確認する（基準19、慣性27）。差替え外の浮動小数点テキストは保持し、差替え前の全出力不変を確認する。今回の入口はanalyze_observed_220124.py、run_observed_220124_validity.py、probe_observed_220124_tail.py。[バイト順](../../../doc/失敗事例/2026-10-30-native-ram-and-log-record-byteorder.md)、[入力幅/精度](../../../doc/失敗事例/2026-10-28-derived-analysis-helper-dependency.md)参照。
+
+兄弟解析モジュールをimportする試験は、起動方法とsys.pathを確認する。repo rootのstdinから裸の兄弟名をimportせず、analysis/scriptに実在するスクリプト入口を絶対Python・明示workdirで実行する。validate_path_input_axis_pose.pyは7既知ケースを確認する。[起動契約の事例](../../../doc/失敗事例/2026-10-28-derived-analysis-helper-dependency.md)。
+
+新モジュールの検索では機能名からCore/Inc/slip等の下位フォルダを構成しない。直前に存在確認したCore/Inc等の親へrg -gを使い、実ファイル名を得てから読む。計測理由幅の検証はrecord_path_input_capture_search_preflight.pyが既知親・実宣言uint16_t・終了0を入口で確認する。[下位パス推測の再発](../../../doc/失敗事例/2026-08-11-windows-rg-glob-not-expanded.md)参照。
+
+配置JSONを復号する前に各valueの型と特殊キーを読む。end:0等を[offset,size]と一括分解せず、名前で除外した後に形と範囲を確認する。完了Cの後の消費側失敗ではexe/ソース/生出力/配置SHAを照合し、未実行の復号から再開する。RAM復号は実ELF/Flash一致・凍結・全52フィールド配置を確認し、合成fixtureを実機データと呼ばない。今回の入口はdecode_path_input_capture.py/validate_path_input_capture_decoder.py。[異種配置の事例](../../../doc/失敗事例/2026-10-28-derived-analysis-helper-dependency.md)参照。
+
+
+走行評価集合の「ログ正常終了」と「ユーザー/映像で板内完走確認済み」を分け、未確認を別区分で保持する。emcStop0だけを物理的なはみ出しなしの根拠にしない。現在の23走比較ではemcStop0は21本だが、明示確認済みは13901～13910/13913～13922の20本で13899は未確認。採否・10本の物理確認へ未確認ログを加算しない。[確認範囲の訂正](../../../doc/失敗事例/2026-10-30-normal-log-physical-scope.md)参照。
+
+
+
+派生再生の付加CSVはproducerのsnprintf/fputsまたはmanifestで命名・使用列を確定する。現在の追従診断は出力全名へ.tracking.csvを追加し、例は13898.csv.tracking.csv。with_suffixで置換しない。yaw命令と分解成分も実ヘッダを読み、推測した列名を使用しない。集計のみの失敗はSHA/参照一致で完了Cを保全し未実行段階から再開する。[出力契約](../../../doc/失敗事例/2026-10-28-derived-analysis-helper-dependency.md)参照。
+
+
+
+派生CSV解析で既存load/load_csvを流用する前に、関数実装のreturnと型を読む。check_path_curve_y_drift_13742_13808.loadは(summary, columns)で、生ヘッダはsummary['metadata']。生メタデータを直接返す別補助と混同せず、入口で型・原CSV番号・列数・SHAを照合する。重力を保存slipV2Latから除くときはlog_schema→保存元まで追跡し、matched_candidate_v5の平均と0.8 LPFを含む実C応答を使う。[補助の返り値](../../../doc/失敗事例/2026-10-28-derived-analysis-helper-dependency.md)参照。
+
+
+新しい速度解析の前に、SPEED_PARAM_FIELDSの保存19項目/メタデータ15項目を確認する。search/stop/shortCut/pathReplayはログ非出力。searchが欠けても過去の実SD値を推測せず、凍結C再生の既定を使うなら出典・適用範囲を明記する。保存RAMの停止時値も全過去走へ転用しない。NumPy集計はJSON保存前にint/float/boolへ明示変換し、集計のみ失敗した場合は完成済みC出力を検証して未実行部分から再開する。[非出力項目](../../../doc/失敗事例/2026-10-28-derived-analysis-helper-dependency.md)、[JSON集計型](../../../doc/失敗事例/2026-10-30-tracking-screen-json-scalar.md)参照。
+
+
+白線から横速度を学ぶ状態を追加するときは、横移動ゼロの対照・方位/gyroずれへの誤配分・独立映像の留保誤差を比較する。合成位置誤差や白線照合回数だけを根拠に採用しない。今回の5状態9組は23走×O0/O2の460再生で全9組の13924留保位置誤差が悪化し未採用。加速度の物理符号はこの白線のみの試験から確定しない。[白線だけの横速度学習](../../../doc/失敗事例/2026-10-30-white-only-lateral-state.md)参照。
+
+
+13924のような色点付き新規比較は、既存カメラ補助のsys.path設定を先に読む。この環境のOpenCV/SciPyはbuild/video-analysis-runtimeにあり、通常Python310のsite-packagesだけを仮定しない。依存先を明示後find_spec/importを検査し、CSVのgenfromtxtもencoding=utf-8-sigを指定する。時刻同期の粗密グリッドはNumPyだけで実行可能。[ランタイム再発](../../../doc/失敗事例/2026-09-02-path-gain-analysis-matplotlib-missing.md)参照。補助モジュールがsysをexportすると推測せず、argvは呼出し側で管理する。
+
+床点の採用凸包を機体追跡の板ROIへ流用しない。欠測床点があっても現画像の板外周を別に確認し、inventoryをassert前に保存する。低被覆率を宣言する前に欠測の代表原フレームを確認する。[床点とROIの契約](../../../doc/失敗事例/2026-10-17-video-color-marker-identity.md)参照。方位はunwrap後に時間補間し、差だけをwrapする。179→-179度の中点自己試験を先に通す。[循環角の補間](../../../doc/失敗事例/2026-10-30-circular-heading-interpolation.md)参照。
+
+
+過去系列を使う新規再生でも、全CSV/一次binの存在と原本SHAをコンパイルより前に解決する。<系列>/original/<番号>.csvという保存先を仮定しない。今回のbuild/path-yaw-ff-validation/replay.pyのcsv_sourceはbinary_validation.jsonのcsv_path/csv_sha256を優先し、旧系列はvalidation.jsonのoriginalsから番号と拡張子で一意に解決する。15走×O0/O2で両世代を確認した。[再生入口の世代差](../../../doc/失敗事例/2026-10-28-derived-analysis-helper-dependency.md)参照。
+
+周回の相対横変位が小さくても、板内走行の成功とは扱わない。全通過・全周の代表画像に加え、追跡bboxの板端への最接近フレームを原動画の元解像度で確認する。明部が残る過渡横偏差では、全暗部停止5や欠測停止7と別に、白線の端素子・経路偏差・操舵3成分・取得周期を照合する。今回の確認はanalysis/script/finalize_heading_002102.py。新撮影の高さは今回の明示740mmを校正/追跡の両方へ採用し、以前の700mmを流用しない。[過渡偏差と部分張出し](../../../doc/失敗事例/2026-10-29-path-transient-board-protrusion.md)参照。
+
+新しい監査で過去系列をまとめる前に、実在するbinary_validation.jsonとvalidation.jsonのキーを読む。CSV原本SHAは新しい系列ではcsv_path/csv_sha256、旧系列13848/13849ではvalidation.jsonのoriginalsにある。片側を推測せず、同じログ番号・拡張子で保存済みハッシュを解決して原本と照合する。今回の確認はanalysis/script/finalize_heading_probe_220117.py。[証跡契約の記録](../../../doc/失敗事例/2026-10-28-derived-analysis-helper-dependency.md)参照。
+
+終端で明部が見えるのにnoMatchが増える場合、白線更新ageだけでなく延長経路のwhiteRoute.validと探索窓を確認する。今回の実行はanalysis/script/check_path_white_tail.py。両端が有効な観測区間がない地図を、未観測点の有効化や停止緩和で隠さない。[終端地図不足](../../../doc/失敗事例/2026-10-28-path-white-map-goal-extension.md)参照。補助関数の宣言先をpathPolicy.h等と推測せず、実在Core/Src・Core/Incディレクトリへシンボル検索する。派生解析器のpreflightはモジュールfor/withの束縛もsymtableで取得する現行版を使い、未定義名拒否とfor内包表記受入の自己試験を先に実行する。集計primaryは文字列の場合があるため、監査の新規比較前に実型を読み、finite・整数相当を確認してからmode/primary/emcを比較する。
+
+PATHのIRQ時間が1ms未満でも、白線の取得窓・更新間隔・ageと回復条件を別に確認する。13877/13878はIRQ最大502µsでも鮮度切れ23.94%で長時間減速した。100ms連続回復が実際の更新周期で成立するか実関数試験を行い、集計ヒストグラムを1msの原因履歴へ読み替えない。ADC実装検索はsensor.c等を推測せず、リポジトリルートから`powershell.exe -NoProfile -ExecutionPolicy Bypass -File analysis/script/search_sensor_acquisition.ps1`で実在Core/Srcだけを検索する。[取得周期と回復条件](../../../doc/失敗事例/2026-10-28-path-sensor-cadence-prevents-recovery.md)参照。
+
+既存ラッパーの基本ユーティリティ名は接頭辞から推測せず、実importを読んで実体の存在を確認してから参照する。解析を切り出し生成するときは依存関数も移し、生成元と生成物を両方修正する。保存前に構文検査と直接グローバル参照検査を行い、実入力の小さい再生で確認する。今回の単純な構造では`python analysis/script/preflight_generated_path_analysis.py`を使う（動的importや入れ子は別途確認）。[パス推測の再発](../../../doc/失敗事例/2026-08-11-windows-rg-glob-not-expanded.md)、[依存関数の欠落](../../../doc/失敗事例/2026-10-28-derived-analysis-helper-dependency.md)参照。
+
+RAMのcolumnTitle由来メタデータをbin/CSVと照合するときは、assert前に実バイトの終端CR/LFを両側で確認する。片側だけrstripしない。終端改行だけを正規化し、項目名・順序・値・数値書式・他の文字は維持して全内容を照合する。さらに辞書として全項目一致を確認し、原本のSHA/CRCは無変換バイトで保持する。13870ではRAM末尾LF1文字だけで新規assertが停止した。既知の正規パス・明示workdir・必要権限でanalysis/script/analyze_path_timing_13869_13870.pyを実行して全CRC/全列/RAM照合まで確認する。[RAMヘッダ比較の再発](../../../doc/失敗事例/2026-10-17-shared-header-line-ending-check.md)参照。
+
+
+
+2026-10-27の新撮影/未確定tmpの追加確認：同じ高さ・床配置でも画素位置の据置を仮定しない。校正起動前に全初期画像のIDラベル・可視面積・旧中心との差を確認し、今回観測した探索中心を使う。品質ゲートは維持する。未確定tmpの連続性検査後は、採用末尾の512B/実書込単位境界をまたぐ行を保守的に除外して感度と除外数を記録する。古い全CRC合格コンテナを対象tmpのCRC・メタデータへ転用しない。[床点位置](../../../doc/失敗事例/2026-10-17-video-color-marker-identity.md)、[tmp境界](../../../doc/失敗事例/2026-10-18-unsealed-tmp-partial-recovery.md)参照。
+
+動画追跡と原フレーム画像生成は別ジョブとして、対応する各session_idの終了コード0を得てからmanifestを読む。履歴検証の必須番号を最新N本の表示窓から探さず、指定原本とSHAで検証する。ログバッファ関数もファイル名を推測せず、実在Core/Srcへrgで定義を探す（現行logBufferWriterはSDcard.c内）。
+
+
+メタデータの新規assertを追加する前に、数値項目を型付き変換して判定する。整数を意味する値にも小数表記があり、alpha==100・emc==7などの数値判定を文字列100/7との一致で代用しない。保存書式や原本バイトの一致は別の検査にする。[数値表記の再発](../../../doc/失敗事例/2026-10-14-log-metadata-integer-decimal-format.md)参照。
+
+2026-10-27の校正再発防止：下端の広い画像X区間で最大Yの色成分を選ぶ方式は機体反射を床点へ誤対応させた。校正前に全初期画像の床点IDラベルを目視し、IDごとの局所探索で実測重心・可視面積・位置差を検証する。欠測点は除外し、予測画素を観測へ置換しない。fitと独立留保の既存ゲートに合格するまで追跡しない。周回変位の比較切抜きは最初の通過の画像X/Yを両方固定し、床背景が動かないことを全採用図で確認する。画像名は生成manifestか実在一覧から取得する。詳細は[床点誤対応の10/27節](../../../doc/失敗事例/2026-10-17-video-color-marker-identity.md)。
+
+
 最初のコマンドの前に [共通事前確認](../../../doc/skill-execution-preflight.md) を読み、パス・workdir・権限・実行環境を確定する。CSVの探索・読込・集計・比較を始めるときは [分野別の再発防止](references/failure-prevention.md) も読む。関連する失敗記録は最新追記まで確認し、既知の失敗条件を初回操作から回避する。
 
 ペリフェラル初期化の調査では、CubeMXの分割生成を仮定してspi.c/tim.cを検索パスへ指定しない。最初に `rg -n "MX_SPI2_Init|BaudRatePrescaler" robotrace_v2/Core/Src -g "*.c"` のように実在ディレクトリを検索し、結果に出たファイルだけを読む。このプロジェクトのSPI2初期化はmain.cに存在する。
@@ -182,3 +248,9 @@ These 29 diagnostics are restored to both the 72-column light and 87-column deta
 ## Known malformed candidate CSV headers (13130–13144)
 
 These 15 originals have 72 numeric values but only 71 header names: the 30-byte temporary column buffer truncated `slipV2LatCandidateIntervalReason` and lost its comma, joining the next name. Never pass the original directly to a name-based numeric analysis. Use the derived copies under `analysis/slip_candidate_13125_13144/header_repaired/`, created by `analysis/script/check_slip_candidate_13125_13144.py`. Restoration requires the known schema CRC -1299980178, exact expected malformed header reproduced from the source, all 72 data values per row and expected row count. Keep and hash originals; reject unknown corruption. The source fix removes the short temporary buffer and has host/build validation. All 11 post-fix physical CSVs 13145–13155 (22:28:09 build) have the complete 72-column header and matching data rows without repair. Logs 13145–13150 are user-confirmed hand-held/free-spin checks; exclude them from normal-course completion and lap comparisons. The detailed 87-column physical CSV was not captured in this batch. See `doc/失敗事例/2026-10-12-csv-long-column-name-truncation.md`.
+
+## 2026-10-27：白線融合の観測点と実制御再生
+
+融合比較の候補を作る前に、伝播する車体基準点・地図の基準点・センサー観測点を区別する。前方白線を車軸XYへ直接照合せず、一次の実センサー観測で小R区間の残差を確認する。全列棚卸しと有限の全候補を明記し、欠測列・未記録鮮度・重力基準を推定済み事実にしない。選定用で候補固定後に確認用を評価する。方法変更後に使い直す系列は新しい未見評価ではない。実制御の最近傍・ゲート・1ms補正上限・停止を含む原本bin再生を実施し、直線評価点の改善だけで採用しない。詳細は[白線観測点の混同](../../../doc/失敗事例/2026-10-27-path-white-observation-reference.md)と[版19](../../../doc/path-confidence-fusion.md)。初回実ログと同条件10走の採否確認は別途必要。
+
+1ms化する前に観測雑音・伝播雑音の時間単位を照合し、疎なログ値を独立した1ms観測として重複融合しない。保存optimalIndexに依存するPC診断と、推定結果で最近傍を選ぶ実制御を分けて検証する。単一線の接線位置や真biasの精度を数値最適化だけで保証しない。既知bias合成試験が期待精度を満たさない場合も、診断を保全し、位置改善・有限性の成功でその失敗を消さない。

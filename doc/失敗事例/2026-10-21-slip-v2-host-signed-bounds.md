@@ -23,3 +23,7 @@ main整理で3つのPID画面を共通ループへ変更した際、`int16_t`の
 項目数が最大4でint16範囲内であることを確認し、比較値を`(int16_t)(i + 1U)`へ明示変換した。選択範囲・表示順・編集範囲は変更していない。PATH行数上限も既存SLIPと同じ`(int32_t)UINT16_MAX`へ揃えた。
 
 予防手順の対象を、整数上限だけでなくUI選択値・配列添字・`sizeof`・unsigned接尾辞を含む比較式へ拡張した。共通化後の実関数を抽出して、O0/O2・Wall/Wextra/Werrorでコンパイルする。`validation/control_refactor/run.py --baseline build/main-refactor-20261025/before`でモーター729ケース・PID画面2,592フレーム・速度設定178ケースが変更前と一致し、メタデータ35ケースと実PATH読込も成功した。対処・再実行を検証した範囲でresolved。実機UI操作は未確認。
+
+## 2026-10-27：uint16_t差分の整数拡張
+
+PATH白線周期地図の二分探索で`high-low > 1U`がMinGWの厳密警告で停止した。両辺がuint16_tでも減算結果はintへ拡張され、unsignedとの比較になっていた。low<=highを維持した有界探索の差分をuint32_tへ明示変換した。O0/O2・Wall/Wextra/Werrorの実モジュール検証が成功。予防の対象を変数宣言だけでなく、減算など整数拡張後の式へ広げる。結果はbuild/path-fusion-port/validation.json。対処検証済みとしてresolvedを維持する。
