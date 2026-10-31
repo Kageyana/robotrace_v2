@@ -20,6 +20,8 @@ typedef enum { LOG_SOURCE_DISTANCE, LOG_SOURCE_SLIP, LOG_SOURCE_PATH } LogSource
 typedef struct {
     int32_t cntlog, encCurrentN;
     float gyroValZ;
+    float imuAngleZ;
+    uint16_t lineSensors[10];
     int32_t courseMarker, encTotalOptimal;
     float ROC, targetSpeed;
     int32_t optimalIndex;

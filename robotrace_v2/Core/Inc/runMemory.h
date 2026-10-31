@@ -9,6 +9,7 @@
 
 #define OPT_BUFF_SIZE 1000
 #define PATH_ROUTE_MAX_POINTS 1514U
+#define PATH_MARKER_CAPACITY 128U
 
 typedef struct
 {
@@ -31,6 +32,23 @@ typedef struct
 } RoutePoint;
 
 _Static_assert(sizeof(RoutePoint) == 8U, "RoutePoint must remain 8 bytes");
+
+typedef struct
+{
+    uint16_t routeIndex;
+    uint16_t arcMm;
+    int16_t x_mm;
+    int16_t y_mm;
+    uint8_t type;
+    uint8_t reserved;
+} PathMarkerAnchor;
+
+typedef struct
+{
+    int16_t x_mm;
+    int16_t y_mm;
+    uint16_t valid;
+} PathWhitePoint;
 
 typedef struct
 {
@@ -59,8 +77,13 @@ typedef union
 		RoutePoint drive[PATH_ROUTE_MAX_POINTS];
 		uint16_t arcMm[PATH_ROUTE_MAX_POINTS];
 		uint8_t flags[PATH_ROUTE_MAX_POINTS];
+		PathMarkerAnchor markers[PATH_MARKER_CAPACITY];
+		PathWhitePoint white[PATH_ROUTE_MAX_POINTS];
 	} path;
 } RunMemory;
+
+_Static_assert(sizeof(((RunMemory *)0)->path) <= sizeof(((RunMemory *)0)->distance),
+    "PATH observations must fit in the existing shared RAM");
 
 typedef enum
 {

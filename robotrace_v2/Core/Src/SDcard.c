@@ -954,6 +954,20 @@ static void logBuildMetadata(void)
 	setLogHeaderStr("sgMarkerAtLogEnd", (int32_t)SGmarker);
 	setLogHeaderStr("encRightMarkerAtLogEnd_p", encRightMarker);
 	setLogHeaderStr("routeControllerVersion", PATH_ROUTE_CONTROLLER_VERSION);
+	setLogHeaderStr("pathObservationPolicyVersion", 1);
+	setLogHeaderStr("pathWhiteMapVersion", PATH_WHITE_MAP_VERSION);
+	setLogHeaderStr("pathFusionEstimator", PATH_FUSION_ESTIMATOR_VERSION);
+	setLogHeaderStr("pathYawFeedForwardVersion", PATH_CURVE_YAW_FF_VERSION);
+	setLogHeaderStrFPrecision("pathYawPreviewTime_ms", PATH_CURVE_YAW_PREVIEW_TIME_MS, 2U);
+	setLogHeaderStrS("pathYawSpeedSource", "encoder_1ms");
+	setLogHeaderStrFPrecision("pathGyroBiasAtEnd_dps",
+		optimalTrace == BOOST_PATH_CURVE ? pathFollowerGyroBiasDps() : 0.0f, 6U);
+	setLogHeaderStr("pathObservationNoLineStopMs", PATH_OBSERVATION_STOP_MS);
+	setLogHeaderStr("pathObservationNoMatchStopMs", PATH_OBSERVATION_MATCH_STOP_MS);
+	setLogHeaderStr("pathConfidenceAtEnd", isPathRunMode(optimalTrace) ? pathLogConfidencePermille : 0);
+	setLogHeaderStr("pathObservationAgeAtEnd_ms", isPathRunMode(optimalTrace) ? pathLogObservationAgeMs : 0);
+	setLogHeaderStrFPrecision("pathLoopPeriod_mm",
+		optimalTrace == BOOST_PATH_CURVE ? pathRunLoopPeriodMm() : 0.0f, 3U);
 	setLogHeaderStr("routeSourceLog", pathRouteSourceLog());
 	setLogHeaderStr("shortcutLevel", pathRouteShortcutLevel());
 	setLogHeaderStr("shortcutSettings.maxLevel", runShortcutSettings.maxLevel);

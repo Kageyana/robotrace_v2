@@ -656,6 +656,7 @@ void loopSystem(void)
 		{
 			updateBatteryVoltage(); // 走行開始直前の電圧を反映
 			powerLineSensors(1);   // ラインセンサ点灯
+			pathFollowerCaptureRunStartSettings(); // SD有無に関係なく、今回の経路設定と周期を固定する
 
 			// SDカードに変数保存
 			// PIDゲインを記録

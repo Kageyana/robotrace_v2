@@ -563,11 +563,16 @@ bool logSourceNext(FIL *file, LogSourceRow *row)
     const LogRecord *r = &binarySource.record;
     *row = (LogSourceRow){
         .cntlog = r->cntlog, .encCurrentN = r->encCurrentN, .gyroValZ = r->gyroVal_Z,
+        .imuAngleZ = r->imuAngle_Z,
         .courseMarker = r->courseMarker, .encTotalOptimal = (int32_t)r->encTotalOptimal,
         .ROC = binarySource.roc, .targetSpeed = r->targetSpeed, .optimalIndex = r->optimalIndex,
         .slipV2Flags = r->slipV2Flags,
         .x = binarySource.x, .y = binarySource.y
     };
+    const uint16_t sensors[10] = {r->lSensorCari0, r->lSensorCari1, r->lSensorCari2,
+        r->lSensorCari3, r->lSensorCari4, r->lSensorCari5, r->lSensorCari6,
+        r->lSensorCari7, r->lSensorCari8, r->lSensorCari9};
+    memcpy(row->lineSensors, sensors, sizeof(sensors));
     return true;
 }
 

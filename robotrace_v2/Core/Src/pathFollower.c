@@ -14,6 +14,7 @@
 #include "ff.h"
 #include "lineSensor.h"
 #include "sd_functions.h"
+#include "slipDetection.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -49,12 +50,16 @@ typedef struct
 	float x_mm;
 	float y_mm;
 	float residual_mm;
+	float normalX;
+	float normalY;
 } PathLineMatch;
 
 #define lineRoute (runMemory.path.line)
 #define driveRoute (runMemory.path.drive)
 #define driveRouteArcMm (runMemory.path.arcMm)
 #define routeFlags (runMemory.path.flags)
+#define routeMarkers (runMemory.path.markers)
+#define whiteRoute (runMemory.path.white)
 //====================================//
 // グローバル変数の宣言、定義
 //====================================//
@@ -65,6 +70,7 @@ static struct {
     uint32_t epoch;
     LogBinaryHeader source;
     ShortcutSettings settings;
+    bool curvatureGeometry;
 } routeCache;
 
 //====================================//
@@ -174,10 +180,12 @@ static bool pathPolicyGoalReached(bool goalValid, uint16_t routeIndex,
 // 引数         source: 全件検証済み識別情報, settings: 生成設定
 // 戻り値       true: 再利用可能 false: 再生成が必要
 /////////////////////////////////////////////////////////////////////
-static bool pathCacheMatches(const LogBinaryHeader *source, const ShortcutSettings *settings)
+static bool pathCacheMatches(const LogBinaryHeader *source, const ShortcutSettings *settings,
+    bool curvatureGeometry)
 {
     const ShortcutSettings *old = &routeCache.settings;
-    return routeCache.valid && autoRunState.seriesActive && runMemoryOwner == RUN_MEMORY_PATH &&
+    return routeCache.valid && routeCache.curvatureGeometry == curvatureGeometry &&
+        autoRunState.seriesActive && runMemoryOwner == RUN_MEMORY_PATH &&
         routeCache.epoch == autoRunSeriesGeneration() && routeCache.baseCount >= 2U &&
         routeCache.baseCount <= PATH_ROUTE_MAX_POINTS &&
         routeCache.source.number == source->number && routeCache.source.profile == source->profile &&
@@ -211,6 +219,7 @@ static uint8_t runRouteShortcutCorridorCount = 0U;
 static float runRouteShortcutReductionMm = 0.0f;
 static uint16_t runRouteCount = 0U;
 static uint32_t runRouteGeometryCrc32 = 0U;
+static float runLoopPeriodMm = 0.0f;
 static bool runStartSettingsValid = false;
 static PathPose pathPose;
 static PathFollowerState followerState = PATH_STATE_INACTIVE;
@@ -224,6 +233,13 @@ static float pathTravelMm = 0.0f;
 static uint16_t pathGoalArcMm = 0U;
 static bool pathGoalValid = false;
 static bool currentLineValid = false;
+static PathFusionFilter whiteFusionFilter;
+static uint16_t routeMarkerCount = 0U;
+static uint8_t previousFusionMarker = 0U;
+static float routeLoopPeriodMm = 0.0f;
+static PathObservationTrust observationTrust;
+static float observationStepDistanceMm = 0.0f;
+static float limitedTargetSpeedMps = 0.0f;
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathCrc32UpdateByte
@@ -302,6 +318,8 @@ float pathLogLegalMargin_mm = 0.0f;
 float pathLogLineMatchResidual_mm = 0.0f;
 uint16_t pathLogPoseCorrection_um = 0U;
 int16_t pathLogPoseCorrectionHeading_cdeg = 0;
+uint16_t pathLogConfidencePermille = 1000U;
+uint16_t pathLogObservationAgeMs = 0U;
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathWrapDeg
@@ -512,6 +530,34 @@ static void pathBuildSpeedProfile(RoutePoint *route, uint16_t count, uint8_t sho
 		if ((float)route[i].speed_cms * 0.01f > limit)
 			route[i].speed_cms = (uint16_t)(curvatureSpeed ? floorf(limit * 100.0f) : lroundf(limit * 100.0f));
 	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathPrepareWhiteGoalExtension
+// 処理概要     正規化前の観測を使い、ゴール延長点へ同じ周回位相の白線を割り当てる
+// 引数         periodMm: 検証済みの一次周回周期[mm]
+// 戻り値       true: 延長形状を準備済み false: 経路・延長形状が不適切
+/////////////////////////////////////////////////////////////////////
+static bool pathPrepareWhiteGoalExtension(float periodMm)
+{
+    if (routeCount < 3U || routeCount > PATH_ROUTE_MAX_POINTS) return false;
+    float endX, endY;
+    float sourceEndArcMm = (float)driveRouteArcMm[routeCount - 1U];
+    if (!pathFusionLoopPoint(driveRoute, driveRouteArcMm, routeCount, periodMm,
+        sourceEndArcMm, &endX, &endY)) return false;
+    float goalX, goalY, extensionMm;
+    uint16_t appendCount;
+    uint16_t availablePoints = (uint16_t)(PATH_ROUTE_MAX_POINTS - routeCount);
+    if (!pathPolicyComputeGoalExtension((float)pathFloatToInt16(endX), (float)pathFloatToInt16(endY),
+        PATH_ROUTE_SPACING_MM, availablePoints, &goalX, &goalY, &extensionMm, &appendCount)) return false;
+    for (uint16_t i = 0U; i < appendCount; i++)
+    {
+        float progressMm = sourceEndArcMm + fminf(extensionMm, PATH_ROUTE_SPACING_MM * (float)(i + 1U));
+        // 欠測時は無効のまま残す。車軸経路の延長座標を白線観測として扱わない。
+        (void)pathFusionWhiteLoopPoint(whiteRoute, driveRoute, driveRouteArcMm,
+            routeCount, periodMm, progressMm, &whiteRoute[routeCount + i]);
+    }
+    return true;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -903,7 +949,7 @@ static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel, bool 
     if (logSourceOpen(&file, logNumber, LOG_SOURCE_PATH) != FR_OK) goto failed;
     fileOpened = true;
     if (!logSourceInfo(&file, &source)) { resultCode = -10; goto failed; }
-    bool cached = pathCacheMatches(&source, &generationSettings);
+    bool cached = pathCacheMatches(&source, &generationSettings, curvatureSpeed);
     if (!pathReadSourceMetadata(&file, &columns)) { resultCode = -10; goto failed; }
     if (cached) {
         routeCount = routeCache.baseCount;
@@ -917,10 +963,18 @@ static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel, bool 
         memset(driveRoute, 0, sizeof(driveRoute));
         memset(routeFlags, 0, sizeof(routeFlags));
         routeCount = 1U;
+        memset(whiteRoute, 0, sizeof(whiteRoute));
+        routeMarkerCount = 0U;
+        routeLoopPeriodMm = 0.0f;
         float previousX = 0.0f, previousY = 0.0f, totalLength = 0.0f;
         float fusedX = 0.0f, fusedY = 0.0f, accumulated = 0.0f;
         float lastX = 0.0f, lastY = 0.0f, previousPulse = 0.0f;
         uint32_t parsedRows = 0U;
+        float previousCrossArc = 0.0f, previousCrossHeading = 0.0f;
+        float loopIntervals[8];
+        uint8_t loopIntervalCount = 0U;
+        int32_t previousSourceMarker = 0;
+        bool haveCross = false;
         LogSourceRow row;
         while (logSourceNext(&file, &row)) {
             float x = row.x, y = row.y, pulse = (float)row.encTotalOptimal;
@@ -930,6 +984,45 @@ static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel, bool 
             previousX = lastX = x; previousY = lastY = y; previousPulse = pulse;
             parsedRows++;
             if (!pathAppendRouteSample(x, y, &fusedX, &fusedY, &accumulated)) { resultCode = -7; goto failed; }
+            if (curvatureSpeed && isfinite(row.imuAngleZ))
+            {
+                PathFusionLine measured;
+                if (pathFusionSenseLine(row.lineSensors, pathSensorLateralMm, pathSensorForwardMm, &measured))
+                {
+                    uint16_t point = (uint16_t)(routeCount - 1U);
+                    float distance = pathPointDistance(x, y, lineRoute[point].x_mm, lineRoute[point].y_mm);
+                    uint16_t quality = (uint16_t)lroundf(fminf(distance, 1000.0f) * 10.0f) + 1U;
+                    if (distance <= PATH_FUSION_WHITE_SAMPLE_MAX_MM &&
+                        (whiteRoute[point].valid == 0U || quality < whiteRoute[point].valid))
+                    {
+                        float heading = row.imuAngleZ * DEG2RAD;
+                        whiteRoute[point] = (PathWhitePoint){
+                            pathFloatToInt16(x + measured.lateralMm * cosf(heading) + measured.forwardMm * sinf(heading)),
+                            pathFloatToInt16(y - measured.lateralMm * sinf(heading) + measured.forwardMm * cosf(heading)), quality};
+                    }
+                }
+            }
+            if (curvatureSpeed && row.courseMarker > 0 && row.courseMarker <= 3 &&
+                row.courseMarker != previousSourceMarker)
+            {
+                if (routeMarkerCount >= PATH_MARKER_CAPACITY || totalLength > UINT16_MAX)
+                    { resultCode = -7; goto failed; }
+                routeMarkers[routeMarkerCount++] = (PathMarkerAnchor){
+                    .routeIndex = (uint16_t)(routeCount - 1U),
+                    .arcMm = (uint16_t)lroundf(totalLength),
+                    .x_mm = pathFloatToInt16(x), .y_mm = pathFloatToInt16(y),
+                    .type = (uint8_t)row.courseMarker, .reserved = 0U};
+                if (row.courseMarker == CROSSLINE && isfinite(row.imuAngleZ))
+                {
+                    float turn = fabsf(row.imuAngleZ - previousCrossHeading);
+                    if (haveCross && turn > 300.0f && turn < 420.0f && loopIntervalCount < 8U)
+                        loopIntervals[loopIntervalCount++] = totalLength - previousCrossArc;
+                    previousCrossArc = totalLength;
+                    previousCrossHeading = row.imuAngleZ;
+                    haveCross = true;
+                }
+            }
+            previousSourceMarker = row.courseMarker;
         }
         if (logSourceError(&file) || parsedRows == 0U || totalLength < PATH_ROUTE_SPACING_MM ||
             columns.expectedRows != parsedRows || previousPulse <= 0.0f ||
@@ -944,6 +1037,32 @@ static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel, bool 
             routeCount++;
         }
         if (routeCount < 2U) { resultCode = -11; goto failed; }
+        if (curvatureSpeed)
+        {
+            float period = pathFusionPeriod(loopIntervals, loopIntervalCount);
+            if (period > 0.0f)
+            {
+                // 元の1周目をdrive側に保全し、line側を周回共通の地図へ変換する。
+                memcpy(driveRoute, lineRoute, sizeof(RoutePoint) * routeCount);
+                pathBuildDriveRouteArcLength();
+                // 元の一次位相・観測を保った状態で延長分も作り、キャッシュと共に保持する。
+                if (!pathPrepareWhiteGoalExtension(period)) { resultCode = -16; goto failed; }
+                if (!pathFusionNormalizeWhite(whiteRoute, driveRoute, driveRouteArcMm, routeCount, period))
+                    { resultCode = -16; goto failed; }
+                if (!pathFusionNormalizeLoop(lineRoute, driveRoute, driveRouteArcMm, routeCount, period))
+                    { resultCode = -16; goto failed; }
+                for (uint16_t marker = 0U; marker < routeMarkerCount; marker++)
+                {
+                    float markerX, markerY;
+                    if (!pathFusionLoopPoint(driveRoute, driveRouteArcMm, routeCount, period,
+                        routeMarkers[marker].arcMm, &markerX, &markerY))
+                        { resultCode = -16; goto failed; }
+                    routeMarkers[marker].x_mm = pathFloatToInt16(markerX);
+                    routeMarkers[marker].y_mm = pathFloatToInt16(markerY);
+                }
+                routeLoopPeriodMm = period;
+            }
+        }
     }
     FRESULT closed = logSourceClose(&file);
     fileOpened = false;
@@ -951,6 +1070,7 @@ static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel, bool 
     routeCache.valid = autoRunState.seriesActive;
     routeCache.source = source;
     routeCache.settings = generationSettings;
+    routeCache.curvatureGeometry = curvatureSpeed;
     routeCache.epoch = autoRunSeriesGeneration();
     routeCache.baseCount = routeCount;
 	pathComputeHeadings(lineRoute, routeCount);
@@ -1031,7 +1151,18 @@ int16_t routeBuildCurvatureFromLog(int logNumber)
 /////////////////////////////////////////////////////////////////////
 static bool pathSenseLine(float predictedErrorMm, PathLineObservation *observation)
 {
-	if (!isLineSensorCalibrationValid() || stateCrossLine || fabsf(predictedErrorMm) > PATH_SENSOR_FOV_MM) return false;
+	if (!isLineSensorCalibrationValid() || !lineSensorPower || lineSensorUpdateCount == 0U ||
+		lineSensorUpdateAgeMs >= LS_UPDATE_STALE_MS) return false;
+	if (optimalTrace == BOOST_PATH_CURVE)
+	{
+		PathFusionLine measured;
+		if (!pathFusionSenseLine(lSensorCari, pathSensorLateralMm, pathSensorForwardMm, &measured))
+			return false;
+		observation->lateral_mm = measured.lateralMm;
+		observation->forward_mm = measured.forwardMm;
+		return true;
+	}
+	if (stateCrossLine || fabsf(predictedErrorMm) > PATH_SENSOR_FOV_MM) return false;
 	uint32_t sum = 0U;
 	float weightedLateral = 0.0f;
 	float weightedForward = 0.0f;
@@ -1076,8 +1207,11 @@ static bool pathFindLineMatch(float sensorX_mm, float sensorY_mm, uint16_t neare
 	if (routeCount < 2U) return false;
 	uint16_t begin = (nearest > PATH_LINE_MATCH_BACK_POINTS) ?
 		(uint16_t)(nearest - PATH_LINE_MATCH_BACK_POINTS) : 0U;
-	uint16_t lastPoint = (nearest + PATH_LINE_MATCH_FORWARD_POINTS < routeCount) ?
-		(uint16_t)(nearest + PATH_LINE_MATCH_FORWARD_POINTS) : (uint16_t)(routeCount - 1U);
+	bool observedMap = optimalTrace == BOOST_PATH_CURVE;
+	uint16_t forwardPoints = observedMap ?
+		PATH_FUSION_WHITE_FORWARD_POINTS : PATH_LINE_MATCH_FORWARD_POINTS;
+	uint16_t lastPoint = (nearest + forwardPoints < routeCount) ?
+		(uint16_t)(nearest + forwardPoints) : (uint16_t)(routeCount - 1U);
 	bool found = false;
 	float bestDistanceSquared = 0.0f;
 	for (uint16_t i = begin; i < lastPoint; i++)
@@ -1086,10 +1220,11 @@ static bool pathFindLineMatch(float sensorX_mm, float sensorY_mm, uint16_t neare
 			((float)lineRoute[i].heading_cdeg * 0.01f) - pathPose.heading_deg);
 		if (!pathPolicyAssociationAllowed((float)driveRouteArcMm[i], maximumArcMm,
 			segmentHeadingError, PATH_ASSOCIATION_HEADING_MAX_DEG)) continue;
-		float x0 = (float)lineRoute[i].x_mm;
-		float y0 = (float)lineRoute[i].y_mm;
-		float segmentX = (float)lineRoute[i + 1U].x_mm - x0;
-		float segmentY = (float)lineRoute[i + 1U].y_mm - y0;
+		if (observedMap && (whiteRoute[i].valid == 0U || whiteRoute[i + 1U].valid == 0U)) continue;
+		float x0 = observedMap ? whiteRoute[i].x_mm : lineRoute[i].x_mm;
+		float y0 = observedMap ? whiteRoute[i].y_mm : lineRoute[i].y_mm;
+		float segmentX = (observedMap ? whiteRoute[i + 1U].x_mm : lineRoute[i + 1U].x_mm) - x0;
+		float segmentY = (observedMap ? whiteRoute[i + 1U].y_mm : lineRoute[i + 1U].y_mm) - y0;
 		float segmentLengthSquared = (segmentX * segmentX) + (segmentY * segmentY);
 		if (segmentLengthSquared <= 1.0f) continue;
 		float projection = (((sensorX_mm - x0) * segmentX) + ((sensorY_mm - y0) * segmentY)) /
@@ -1107,11 +1242,61 @@ static bool pathFindLineMatch(float sensorX_mm, float sensorY_mm, uint16_t neare
 			bestDistanceSquared = distanceSquared;
 			match->x_mm = candidateX;
 			match->y_mm = candidateY;
+			float length = sqrtf(segmentLengthSquared);
+			match->normalX = segmentY / length;
+			match->normalY = -segmentX / length;
 		}
 	}
 	if (!found) return false;
 	match->residual_mm = sqrtf(bestDistanceSquared);
 	return true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathApplyMarkerCorrection
+// 処理概要     種類・進行位相・方位が一致したマーカーで接線方向だけを補正する
+// 引数         nearest: 最近傍経路点, settings: 走行開始時の設定
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void pathApplyMarkerCorrection(uint16_t nearest, const ShortcutSettings *settings)
+{
+	uint8_t marker = courseMarker;
+	bool newEvent = marker != 0U && marker != previousFusionMarker;
+	previousFusionMarker = marker;
+	if (!newEvent || optimalTrace != BOOST_PATH_CURVE || routeLoopPeriodMm <= 0.0f ||
+		settings->lineAlpha_x1000 == 0U) return;
+	bool found = false;
+	uint16_t bestDelta = UINT16_MAX;
+	float bestResidual = 0.0f, tangentX = 0.0f, tangentY = 0.0f;
+	for (uint16_t i = 0U; i < routeMarkerCount; i++)
+	{
+		const PathMarkerAnchor *anchor = &routeMarkers[i];
+		if (anchor->type != marker || anchor->routeIndex >= routeCount) continue;
+		uint16_t delta = anchor->routeIndex > nearest ?
+			(uint16_t)(anchor->routeIndex - nearest) : (uint16_t)(nearest - anchor->routeIndex);
+		if (delta > PATH_FUSION_MARKER_SEARCH_POINTS || delta >= bestDelta) continue;
+		float heading = (float)lineRoute[anchor->routeIndex].heading_cdeg * 0.01f;
+		if (fabsf(pathWrapDeg(heading - pathPose.heading_deg)) > PATH_FUSION_MARKER_HEADING_DEG) continue;
+		float tx = sinf(heading * DEG2RAD), ty = cosf(heading * DEG2RAD);
+		float residual = (pathPose.x_mm - anchor->x_mm) * tx + (pathPose.y_mm - anchor->y_mm) * ty;
+		if (fabsf(residual) > PATH_FUSION_MARKER_RESIDUAL_MAX_MM) continue;
+		bestResidual = residual;
+		tangentX = tx;
+		tangentY = ty;
+		bestDelta = delta;
+		found = true;
+	}
+	if (found)
+	{
+		float correctionX, correctionY;
+		// マーカーではbiasを更新せず、接線方向の位置観測だけを融合する。
+		if (pathFusionFilterMarker(&whiteFusionFilter, tangentX, tangentY,
+			bestResidual, &correctionX, &correctionY))
+		{
+			pathPose.x_mm += correctionX;
+			pathPose.y_mm += correctionY;
+		}
+	}
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -1125,6 +1310,8 @@ void pathFollowerInvalidateRoute(void)
     routeCache.valid = false;
 	routeCount = 0U;
 	routeSourceLog = 0;
+	routeMarkerCount = 0U;
+	routeLoopPeriodMm = 0.0f;
 	pathGoalValid = false;
 	followerState = PATH_STATE_INACTIVE;
 	targetSpeedMps = 0.0f;
@@ -1171,6 +1358,14 @@ void pathFollowerReset(void)
 	pathLogLineMatchResidual_mm = 0.0f;
 	pathLogPoseCorrection_um = 0U;
 	pathLogPoseCorrectionHeading_cdeg = 0;
+	pathObservationReset(&observationTrust);
+	pathFusionFilterReset(&whiteFusionFilter);
+	previousFusionMarker = 0U;
+	currentLineValid = false;
+	observationStepDistanceMm = 0.0f;
+	limitedTargetSpeedMps = targetSpeedMps;
+	pathLogConfidencePermille = 1000U;
+	pathLogObservationAgeMs = 0U;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -1182,17 +1377,73 @@ void pathFollowerReset(void)
 void pathFollowerUpdatePose1ms(int32_t encoderPulse, float gyroDegPerSec)
 {
 	if (followerState == PATH_STATE_INACTIVE || followerState == PATH_STATE_LOCALIZATION_LOST) return;
-	pathPose.heading_deg = pathWrapDeg(pathPose.heading_deg + (gyroDegPerSec * 0.001f));
+	if (!isfinite(gyroDegPerSec))
+	{
+		followerState = PATH_STATE_LOCALIZATION_LOST;
+		targetSpeedMps = 0.0f;
+		limitedTargetSpeedMps = 0.0f;
+		pathLogState = PATH_STATE_LOCALIZATION_LOST;
+		pathLogConfidencePermille = 0U;
+		pathLogYawFF_dps = 0.0f;
+		pathLogYawLateralFB_dps = 0.0f;
+		pathLogYawHeadingFB_dps = 0.0f;
+		setTargetAngularVelocity(0.0f);
+		return;
+	}
+	const ShortcutSettings *settings = runStartSettingsValid ? &runStartSettings : &shortcutSettings;
+	bool fusionActive = optimalTrace == BOOST_PATH_CURVE && settings->lineAlpha_x1000 > 0U;
+	float correctedGyro = gyroDegPerSec - (fusionActive ? whiteFusionFilter.biasRadPerSec * RAD2DEG : 0.0f);
+	float middleHeading = pathPose.heading_deg + correctedGyro * 0.0005f;
+	pathPose.heading_deg = pathWrapDeg(pathPose.heading_deg + correctedGyro * 0.001f);
 	float distanceMm = (float)encoderPulse / PULSE_MILLIMETER;
+	observationStepDistanceMm = distanceMm;
 	if (distanceMm > 0.0f) pathTravelMm += distanceMm;
 	float headingRad = pathPose.heading_deg * DEG2RAD;
 	pathPose.x_mm += distanceMm * sinf(headingRad);
 	pathPose.y_mm += distanceMm * cosf(headingRad);
+	if (fusionActive) pathFusionFilterPredict(&whiteFusionFilter, distanceMm, middleHeading * DEG2RAD);
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathCurvatureAtArcWindow
+// 処理概要     時間先行した弧長窓で接線方位の変化を平均し、曲率の過剰な先行を抑える
+// 引数         nearest: 最近傍点、windowMm: 平均窓幅[mm]、measuredSpeedMps: 移動速度[m/s]
+// 戻り値       符号付き曲率[rad/mm]。窓が成立しない場合は0
+/////////////////////////////////////////////////////////////////////
+static float pathCurvatureAtArcWindow(uint16_t nearest, float windowMm, float measuredSpeedMps)
+{
+	if (routeCount < 2U || nearest >= routeCount || !isfinite(windowMm) || windowMm <= 1.0f ||
+		!isfinite(measuredSpeedMps)) return 0.0f;
+	// m/s × msはmm。曲率窓の中心だけを旋回応答時間ぶん先行させる。
+	float center = (float)driveRouteArcMm[nearest] +
+		fmaxf(0.0f, measuredSpeedMps) * PATH_CURVE_YAW_PREVIEW_TIME_MS;
+	if (!isfinite(center)) return 0.0f;
+	float start = fmaxf(0.0f, center - windowMm * 0.5f);
+	float end = fminf((float)driveRouteArcMm[routeCount - 1U], center + windowMm * 0.5f);
+	if (end - start <= 1.0f) return 0.0f;
+	uint16_t first = nearest;
+	while (first > 0U && (float)driveRouteArcMm[first] > start) first--;
+	while (first + 1U < routeCount && (float)driveRouteArcMm[first + 1U] <= start) first++;
+	float changeDeg = 0.0f, coveredMm = 0.0f;
+	for (uint16_t i = first; i + 1U < routeCount && (float)driveRouteArcMm[i] < end; i++)
+	{
+		float a = fmaxf(start, (float)driveRouteArcMm[i]);
+		float b = fminf(end, (float)driveRouteArcMm[i + 1U]);
+		float length = (float)driveRouteArcMm[i + 1U] - (float)driveRouteArcMm[i];
+		if (b > a && length > 0.0f)
+		{
+			float deltaDeg = pathWrapDeg(
+				((float)driveRoute[i + 1U].heading_cdeg - (float)driveRoute[i].heading_cdeg) * 0.01f);
+			changeDeg += deltaDeg * ((b - a) / length);
+			coveredMm += b - a;
+		}
+	}
+	return coveredMm > 1.0f ? changeDeg * DEG2RAD / coveredMm : 0.0f;
 }
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathFollowerUpdateTarget1ms
-// 処理概要     近傍経路を投影し、自己位置補正と速度・角速度目標を1ms周期で更新する
+// 処理概要     最新自己位置から経路との偏差、目標速度と操舵角速度を更新する
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
@@ -1239,7 +1490,8 @@ void pathFollowerUpdateTarget1ms(void)
 	bool corridorLineCorrectionBlocked = routeShortcutLevel > 0U &&
 		((routeFlags[nearest] & PATH_FLAG_CORRIDOR_APPLIED) != 0U);
 	PathLineMatch lineMatch = {(float)lineRoute[nearest].x_mm,
-		(float)lineRoute[nearest].y_mm, 0.0f};
+		(float)lineRoute[nearest].y_mm, 0.0f, 0.0f, 0.0f};
+	float correctionStartX = pathPose.x_mm, correctionStartY = pathPose.y_mm;
 	bool lineMatchValid = false;
 	pathLogPoseCorrection_um = 0U;
 	pathLogPoseCorrectionHeading_cdeg = 0;
@@ -1272,6 +1524,22 @@ void pathFollowerUpdateTarget1ms(void)
 				(residualY * sensorDerivativeY);
 			float thetaGain = (float)activeSettings->lineThetaGain_x1e9 * 1.0e-9f * 0.2f;
 			float headingCorrectionDeg = (-thetaGain * thetaGradient) * RAD2DEG;
+			if (optimalTrace == BOOST_PATH_CURVE)
+			{
+				float quality = pathFusionSlipWeight(slipV2.result.longFast, slipV2.result.longSlow,
+					slipV2.result.lateral, slipV2.result.yawDps, slipV2.result.flags,
+					slipV2.result.valid != 0U);
+				float residual = residualX * lineMatch.normalX + residualY * lineMatch.normalY;
+				float derivative = sensorDerivativeX * lineMatch.normalX + sensorDerivativeY * lineMatch.normalY;
+				float headingCorrectionRad = 0.0f;
+				pathFusionFilterCorrect(&whiteFusionFilter, lineMatch.normalX, lineMatch.normalY,
+					derivative, residual, quality, activeSettings->lineAlpha_x1000,
+					activeSettings->lineThetaGain_x1e9, &correctionX, &correctionY, &headingCorrectionRad);
+				correctionDistance = fminf(PATH_LINE_POSITION_CORRECTION_MAX_MM, hypotf(correctionX, correctionY));
+				headingCorrectionDeg = headingCorrectionRad * RAD2DEG;
+				headingCorrectionDeg = fminf(PATH_LINE_HEADING_CORRECTION_MAX_DEG,
+					fmaxf(-PATH_LINE_HEADING_CORRECTION_MAX_DEG, headingCorrectionDeg));
+			}
 			if (pathPolicyPoseCorrectionAllowed(correctionDistance, headingCorrectionDeg,
 				PATH_LINE_POSITION_CORRECTION_MAX_MM, PATH_LINE_HEADING_CORRECTION_MAX_DEG))
 			{
@@ -1283,10 +1551,37 @@ void pathFollowerUpdateTarget1ms(void)
 			}
 		}
 	}
+	pathApplyMarkerCorrection(nearest, activeSettings);
+	// 白線とマーカーが同じ周期に成立しても、位置補正の合計を0.2mm以内に保つ。
+	float totalCorrectionX = pathPose.x_mm - correctionStartX;
+	float totalCorrectionY = pathPose.y_mm - correctionStartY;
+	float totalCorrection = hypotf(totalCorrectionX, totalCorrectionY);
+	if (totalCorrection > PATH_LINE_POSITION_CORRECTION_MAX_MM)
+	{
+		float scale = PATH_LINE_POSITION_CORRECTION_MAX_MM / totalCorrection;
+		pathPose.x_mm = correctionStartX + totalCorrectionX * scale;
+		pathPose.y_mm = correctionStartY + totalCorrectionY * scale;
+		totalCorrection = PATH_LINE_POSITION_CORRECTION_MAX_MM;
+	}
+	pathLogPoseCorrection_um = (uint16_t)lroundf(totalCorrection * 1000.0f);
 	pathLogLineValid = currentLineValid ? 1U : 0U;
 	pathLogLinePointX_mm = lineMatch.x_mm;
 	pathLogLinePointY_mm = lineMatch.y_mm;
 	pathLogLineMatchResidual_mm = lineMatchValid ? lineMatch.residual_mm : 0.0f;
+	// 明部の存在と、自己位置を拘束できる白線照合を別々に監視する。
+	bool visibleLine = false;
+	for (uint8_t sensor = 0U; sensor < NUM_SENSORS; sensor++)
+	{
+		if (lSensorCari[sensor] >= PATH_SENSOR_ACTIVE_TH) visibleLine = true;
+	}
+	bool freshLine = lineSensorPower && lineSensorUpdateCount != 0U &&
+		lineSensorUpdateAgeMs < LS_UPDATE_STALE_MS;
+	bool matchedLine = currentLineValid && associationValid && lineMatchValid &&
+		lineMatch.residual_mm <= PATH_LINE_MATCH_RESIDUAL_MAX_MM;
+	pathObservationStep1ms(&observationTrust, freshLine, visibleLine, matchedLine,
+		observationStepDistanceMm);
+	pathLogConfidencePermille = observationTrust.confidencePermille;
+	pathLogObservationAgeMs = observationTrust.noMatchMs;
 	nearestDistance = pathPointDistance(pathPose.x_mm, pathPose.y_mm,
 		driveRoute[nearest].x_mm, driveRoute[nearest].y_mm);
 
@@ -1305,13 +1600,21 @@ void pathFollowerUpdateTarget1ms(void)
 	float segmentLength = pathPointDistance(driveRoute[nearest].x_mm, driveRoute[nearest].y_mm,
 		driveRoute[targetIndex].x_mm, driveRoute[targetIndex].y_mm);
 	float curvature = 0.0f;
-	if (segmentLength > 1.0f)
+	// 1msの自己位置更新で使用したエンコーダ移動量[mm/ms]は数値上m/sと等しい。
+	float measuredSpeedMps = isfinite(observationStepDistanceMm) ?
+		fminf(PATH_CURVE_MAX_SPEED_MPS, fmaxf(0.0f, observationStepDistanceMm)) : 0.0f;
+	if (optimalTrace == BOOST_PATH_CURVE)
+	{
+		curvature = pathCurvatureAtArcWindow(nearest, lookaheadMm, measuredSpeedMps);
+	}
+	else if (segmentLength > 1.0f)
 	{
 		float currentRouteHeading = (float)driveRoute[nearest].heading_cdeg * 0.01f;
 		curvature = pathWrapDeg(targetHeadingDeg - currentRouteHeading) * DEG2RAD / segmentLength;
 	}
 	targetSpeedMps = (float)driveRoute[nearest].speed_cms * 0.01f;
-	float feedForwardDegPerSec = (targetSpeedMps * 1000.0f) * curvature * RAD2DEG;
+	float feedForwardSpeedMps = optimalTrace == BOOST_PATH_CURVE ? measuredSpeedMps : targetSpeedMps;
+	float feedForwardDegPerSec = (feedForwardSpeedMps * 1000.0f) * curvature * RAD2DEG;
 	float kLateral = (float)activeSettings->kLateral_x100 * 0.01f;
 	float kHeading = (float)activeSettings->kHeading_x100 * 0.01f;
 	float targetYawRate = feedForwardDegPerSec - (kLateral * lateralError) + (kHeading * nearestHeadingError);
@@ -1338,7 +1641,8 @@ void pathFollowerUpdateTarget1ms(void)
 	{
 		lostCount = 0U;
 	}
-	if (followerState == PATH_STATE_TRACKING && lostCount >= PATH_LOST_TIME_MS)
+	if ((followerState == PATH_STATE_TRACKING || followerState == PATH_STATE_CAUTION) &&
+		lostCount >= PATH_LOST_TIME_MS)
 	{
 		if (currentLineValid)
 		{
@@ -1391,6 +1695,49 @@ void pathFollowerUpdateTarget1ms(void)
 		}
 	}
 
+	if (observationTrust.lost)
+	{
+		followerState = PATH_STATE_LOCALIZATION_LOST;
+		targetSpeedMps = 0.0f;
+		limitedTargetSpeedMps = 0.0f;
+		setTargetAngularVelocity(0.0f);
+		pathLogYawFF_dps = 0.0f;
+		pathLogYawLateralFB_dps = 0.0f;
+		pathLogYawHeadingFB_dps = 0.0f;
+	}
+	else
+	{
+		if (observationTrust.caution && followerState == PATH_STATE_TRACKING)
+			followerState = PATH_STATE_CAUTION;
+		else if (!observationTrust.caution && followerState == PATH_STATE_CAUTION)
+			followerState = PATH_STATE_TRACKING;
+		if (observationTrust.caution && currentLineValid &&
+			observationTrust.noMatchMs >= PATH_OBSERVATION_MATCH_CAUTION_MS &&
+			(followerState == PATH_STATE_TRACKING || followerState == PATH_STATE_CAUTION))
+		{
+			followerState = PATH_STATE_LINE_FALLBACK;
+			pathBlendPermille = 0U;
+			lineLostCount = 0U;
+		}
+		float desiredSpeed = targetSpeedMps;
+		if (observationTrust.caution || followerState == PATH_STATE_LINE_FALLBACK ||
+			followerState == PATH_STATE_REJOIN)
+			desiredSpeed = fminf(desiredSpeed, fminf(tgtParam.search,
+				PATH_OBSERVATION_CAUTION_SPEED_MPS));
+		float acceleration = fminf(20.0f, fmaxf(0.0f, tgtParam.acceleF)) * 0.001f;
+		float deceleration = fminf(20.0f, fmaxf(0.0f, tgtParam.acceleD)) * 0.001f;
+		if (observationTrust.caution && deceleration <= 0.0f) deceleration = 0.020f;
+		limitedTargetSpeedMps = fminf(limitedTargetSpeedMps + acceleration,
+			fmaxf(limitedTargetSpeedMps - deceleration, desiredSpeed));
+		targetSpeedMps = fmaxf(0.0f, limitedTargetSpeedMps);
+		// PATH_CURVEは減速中も現在の移動速度へFFを合わせる。他の経路モードは目標速度を使う。
+		feedForwardSpeedMps = optimalTrace == BOOST_PATH_CURVE ? measuredSpeedMps : targetSpeedMps;
+		pathLogYawFF_dps = feedForwardSpeedMps * 1000.0f * curvature * RAD2DEG;
+		targetYawRate = pathLogYawFF_dps + pathLogYawLateralFB_dps + pathLogYawHeadingFB_dps;
+		targetYawRate = fminf(1800.0f, fmaxf(-1800.0f, targetYawRate));
+		setTargetAngularVelocity(targetYawRate);
+		log_targetAngularVelocity = (int32_t)targetYawRate;
+	}
 	float lineOffset = pathPointDistance(lineRoute[nearest].x_mm, lineRoute[nearest].y_mm,
 		driveRoute[nearest].x_mm, driveRoute[nearest].y_mm);
 	pathLogErrorY_mm = lateralError;
@@ -1487,6 +1834,30 @@ uint8_t pathRouteShortcutCorridorCount(void) { return routeShortcutCorridorCount
 float pathRouteShortcutReductionMm(void) { return routeShortcutReductionMm; }
 
 /////////////////////////////////////////////////////////////////////
+// モジュール名 pathRouteLoopPeriodMm
+// 処理概要     周回共通地図に使用した一次の周期を取得する
+// 引数         なし
+// 戻り値       周期[mm]、共通化なしは0
+/////////////////////////////////////////////////////////////////////
+float pathRouteLoopPeriodMm(void) { return routeLoopPeriodMm; }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathRunLoopPeriodMm
+// 処理概要     走行開始時に固定した周回地図の周期を返す
+// 引数         なし
+// 戻り値       周回周期[mm]、未生成時0
+/////////////////////////////////////////////////////////////////////
+float pathRunLoopPeriodMm(void) { return runLoopPeriodMm; }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathFollowerGyroBiasDps
+// 処理概要     白線から推定した追加のジャイロずれを返す
+// 引数         なし
+// 戻り値       温度補正後の残留ジャイロずれ[deg/s]
+/////////////////////////////////////////////////////////////////////
+float pathFollowerGyroBiasDps(void) { return whiteFusionFilter.biasRadPerSec * RAD2DEG; }
+
+/////////////////////////////////////////////////////////////////////
 // モジュール名 pathFollowerCaptureRunStartSettings
 // 処理概要     走行開始時のショートカット設定と経路生成情報を固定する
 // 引数         なし
@@ -1504,6 +1875,7 @@ void pathFollowerCaptureRunStartSettings(void)
 	runRouteShortcutReductionMm = 0.0f;
 	runRouteCount = 0U;
 	runRouteGeometryCrc32 = 0U;
+	runLoopPeriodMm = 0.0f;
 	runGenerationSettings = (ShortcutSettings){0U, 0U, 0U, 0U, 0U, 0U, 0U};
 	if (isPathRunMode(optimalTrace))
 	{
@@ -1515,6 +1887,7 @@ void pathFollowerCaptureRunStartSettings(void)
 		runRouteShortcutReductionMm = routeShortcutReductionMm;
 		runRouteCount = routeCount;
 		runRouteGeometryCrc32 = routeGeometryCrc32;
+		runLoopPeriodMm = routeLoopPeriodMm;
 		runGenerationSettings = routeGenerationSettings;
 	}
 }

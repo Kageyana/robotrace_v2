@@ -590,7 +590,7 @@ Shortcut画面は入場・項目変更時に本文を描画し、値だけの変
 
 - ユーザー指定で、有効性・無効理由（電流の有効性を含む）と記録間隔内の統計をbin/CSVから削除する。削除対象は`slipV2Valid/Reason/CurrentValid`、`slipV2LatValid/LatReason/LatValidMs/LatIntervalReason`、`slipV2PeakLong/PeakLat/PeakYawDps/OnLongMs/OnLatMs/OnYawMs/ValidMs/TotalMs/IntervalReason`の16列。
 - V2整理だけの時点は通常50列/135 B、詳細56列/144 B。その後の経路診断6列追加後は通常56列/154 B、詳細62列/163 B。残すV2関連9列は`slipV2LongFast/LongSlow/Lat/YawDps/Flags/CurrentHighSamples/PwmSum`と`imuYawAlphaFiltered/imuLatTangentialApplied`。瞬時フラグはbit0=縦、bit1=採用横、bit2=Yaw不整合。内部の判定有効性・区間統計の計算は維持し、保存しない。
-- PATH/SHORTCUT/PATH_CURVE用の経路診断は既存列の末尾へ`pathErrorY_mm`（F32・横偏差mm）、`pathErrorHeading_cdeg`（S16・最近傍経路接線方位−機体方位、0.01deg単位）、`pathState`（U8・0無効/1経路追従/2ライン退避/3再合流/4自己位置喪失）、`pathYawFF_dps`、`pathYawLateralFB_dps`、`pathYawHeadingFB_dps`（各F32・符号付きdeg/s）の順で保存する。1ms更新の最新値を従来の距離間隔で記録し、経路モード以外は全6列を0とする。操舵3成分はFF、`-Klateral×横偏差`、`Kheading×方位偏差`で、合計を±1800deg/sへ制限する前の値。操舵式・横/方位ゲインは維持する。`routeControllerVersion=18`から自己位置積分→経路更新→PIDを1msごとに実行する。退避/白線消失は100ms、復帰条件は200ms、混合率の切替は100msを維持する。SDの位置/方位補正係数は5ms基準を保ち、1msでは1/5を適用する。補正許可上限は0.2mm/0.02deg毎回とする。詳細は[1ms経路更新](doc/path-follower-1ms.md)。
+- PATH/SHORTCUT/PATH_CURVE用の経路診断は既存列の末尾へ`pathErrorY_mm`（F32・横偏差mm）、`pathErrorHeading_cdeg`（S16・最近傍経路接線方位−機体方位、0.01deg単位）、`pathState`（U8・0無効/1経路追従/2ライン退避/3再合流/4自己位置喪失/5注意・減速）、`pathYawFF_dps`、`pathYawLateralFB_dps`、`pathYawHeadingFB_dps`（各F32・符号付きdeg/s）の順で保存する。1ms更新の最新値を従来の距離間隔で記録し、経路モード以外は全6列を0とする。操舵3成分はFF、`-Klateral×横偏差`、`Kheading×方位偏差`で、合計を±1800deg/sへ制限する前の値。操舵式・横/方位ゲインは維持する。`routeControllerVersion=18`から自己位置積分→経路更新→PIDを1msごとに実行する。退避/白線消失は100ms、復帰条件は200ms、混合率の切替は100msを維持する。SDの位置/方位補正係数は5ms基準を保ち、1msでは1/5を適用する。補正許可上限は0.2mm/0.02deg毎回とする。詳細は[1ms経路更新](doc/path-follower-1ms.md)。
 - `slipPlannerVersion=3`、`slipPlannerPolicy=flag_sample_fraction`。50mmごとの`optimalIndex`別に各記録を1件とし、縦/横それぞれのON件数/全件数を使用する。1件以上のONで反映し、Yaw bitは計画へ使わない。従来の最小ON時間3msは廃止し、検出器自体の3/5ms継続判定は維持する。
 - リスク閾値0.60、近傍拡張、減速/増速倍率、先行減速、速度変化制限、10m/s上限は維持する。件数0の区間は補完せず増速しない。無効期間や記録間で終了した短いスリップは新ログから識別できない。
 - 共有RAMの有効時間配列2本を削除し、ON時間配列はON件数へ変更する。集計は停止中・ログ非記録中・FatFsロック下で行う。1ms検出器・割り込み内SD書込禁止は維持する。
@@ -610,6 +610,24 @@ Shortcut画面は入場・項目変更時に本文を描画し、値だけの変
 - 手動SLIP計画も`slipSourceLogNumber`へ元DISTANCE番号を走行開始時に固定して保存する。通常DISTANCEは0。`primaryLogNumber`は元の一次番号を維持する。
 - V1互換・SHADOW切替は不要。更新後は新しい一次とDISTANCEのログを取得し、既存オートスタートのDISTANCE→SLIPへ進む。機体bin解析は現行スキーマ一致のみ、PCの自己記述変換とCRC検証は維持する。
 - 距離/速度制御/PATHの入力は生エンコーダのままとし、未検証の滑り距離モデルによる補正は行わない。最初の新形式実機ログと実走行の再現性は別途検証する。
+
+### 2026-10-27：白線観測の信頼度と周回共通地図
+
+`routeControllerVersion=20`の現行条件は本節を優先する。版19で導入した白線信頼度の条件は維持する。PATH/SHORTCUT/PATH_CURVEでは、新鮮な明部800以上なし20msまたは40mmで減速、60msまたは120mmで自己位置喪失とする。有効な白線照合なし60msまたは120mmで減速、150msまたは300mmで喪失。有効な照合100ms連続で回復し、喪失はリセットまで保持する。新鮮さはライン電源ON・更新件数非ゼロ・取得後3ms未満。全10個100未満20msの完全逸脱停止（emcStop=5）は維持する。喪失は既存STOP_LOCALIZATION（7）。注意中は1.0m/sと有効SDのsearchの低い方を上限に、SD加減速度（最大20m/s²）で制限する。減速度0でも注意中は20m/s²で減速する。PATH/SHORTCUTの曲率FFは制限後の目標速度へ合わせる。PATH_CURVEは後述の実移動速度を使う。判定時間と実機の停止時間・制動距離を同一視しない。
+
+PATH_CURVEの曲率FF版2は、従来の先読み距離を曲率の平均窓幅として使い、窓中心は1msのエンコーダ移動速度×10msだけ先行させる。方位変化は隣接点間ごとに±180度を補正し、弧長で平均する。旋回量は`pathFollowerUpdatePose1ms()`が同じ周期で使用した移動量[mm/ms＝m/s]を0～10m/sへ制限して掛ける。減速中の目標/実速度差を旋回FFへ持ち込まず、横/方位FB・SD速度表・加減速度・±1800deg/s上限は維持する。メタデータは`pathYawFeedForwardVersion=2`、`pathYawPreviewTime_ms=10.00`、`pathYawSpeedSource=encoder_1ms`を追加する。既存6診断列の順序・単位・記録間隔は維持し、`pathYawFF_dps`はPATH_CURVEでこの新計算法による値となる。実機の応答・板内走行・変更後10走は別に検証する。
+
+PATH_CURVEは一次の車軸経路と10素子による白線観測地図を別に保持する。背景400除去・明部800以上1群1～4個・重み合計1200以上の観測を、20mm以内の車軸経路点へ割り当てる。一次CROSS間の旋回300～420degと2～8間隔、周期1～10m・中央値差5%以内を検証できる場合だけ、一次1周目の並進閉じずれ50mm以下を分配し全周へ反復する。周期検証不能なら元の非周期経路・白線観測を使用してマーカー補正を無効とする。白線地図の欠測を正常観測へ補完しない。
+
+白線法線位置補正にはスリップ品質重みを使い、SDのlineAlpha/lineThetaGainを優先する。係数0を自動変更しない。マーカー補正は種類・経路点差±8・方位差±20deg・接線残差150mm以内の新規イベントに限る。全位置補正は合計0.2mm/1ms、方位は0.02deg/1ms以内。従来PATHと周期地図のキャッシュを共用しない。白線観測点と128マーカーはrunMemory.pathへ保持し、distance側より小さいことをstatic assertする。
+
+ログ列・recordBytesは維持し、pathStateへ5（注意・減速）を追加する。注意中に2（ライン退避）/3（再合流）になる場合もある。pathObservationPolicyVersion=1、pathWhiteMapVersion=2、開始時固定のpathLoopPeriod_mm、終端のpathConfidenceAtEnd/pathObservationAgeAtEnd_msをメタデータへ保存する。白線地図版2は、検証済み周期がある場合に正規化前の一次白線観測と元の弧長位相からゴール延長点の観測を生成する。補間両端のいずれかが欠測なら無効のまま残し、延長した車軸座標を白線観測へ代用しない。キャッシュは延長観測を含めて保持する。信頼度は欠測閾値に対する運用指標であり確率や位置誤差上限ではない。1msの信頼度履歴・センサー鮮度は未記録。詳細と検証範囲は[白線信頼度と融合](doc/path-confidence-fusion.md)。変更後の同条件10走と実機での採否確認は未完了。
+
+#### 版19の実機用推定器
+
+PATH_CURVEは白線の法線位置・方位・残留ジャイロずれを4状態共分散で融合する。lineAlpha=5を観測強度1、0をEKF無効として使用し、従来PATH/SHORTCUTの5ms位置補正率の解釈は変更しない。白線分散25mm²を品質と強度で割り、5ms基準から1msへの観測頻度換算で5倍とする。白線で進行位相を動かさず、位置gainを法線へ投影する。方位gainも有効にし、lineThetaGainは追加勾配として同じgainへ合成する。0は追加勾配OFFであり、alpha>0のEKF方位観測は有効。alpha=0では共分散/biasを更新せず、指定された追加方位勾配だけを許可する。位相確認済みマーカーは接線へ投影し、分散100mm²で位置のみ更新し、方位/biasは変えない。位置0.2mm・方位0.02deg/1ms・残留ジャイロずれ±5deg/sへ制限し、実際に適用するgainで共分散も更新する。残留ずれはPATH_CURVEの次の位置伝播へだけ適用し、IMUの元の校正・温度補正・保存角度は変更しない。
+
+pathFusionEstimator=3、pathGyroBiasAtEnd_dpsをメタデータに保存する。通常56列/154B・詳細62列/163Bを維持する。CSV x/yとimuAngle_Zは従来の生距離・積算角度による再構成であり、融合後の自己位置として解釈しない。比較モデルは保存optimalIndexを対応探索の種に使用する条件付き診断であり、実制御の最近傍選択・1ms観測・制限と区別する。修正版の全27,648候補と、版3の方位/bias切替60ケースを比較したが、制御採用には変更後の同条件10走と動画が必要。版3は実出力を使った独立Joseph計算・25設定のPSD・O0/O2再生で確認し、固定入力再生の改善を物理的な完走保証へ読み替えない。
 
 ### 2026-10-28 白線取得の割込み優先と制御フレーム
 

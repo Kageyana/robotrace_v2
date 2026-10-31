@@ -5,6 +5,8 @@
 // インクルード
 //====================================//
 #include "runMemory.h"
+#include "pathObservation.h"
+#include "pathFusion.h"
 #include "main.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -15,6 +17,7 @@
 // 経路の標本化と形状変更。
 #define PATH_ROUTE_SPACING_MM              20.0f // 経路点を再標本化する距離間隔[mm]。
 #define PATH_CURVE_MAX_SPEED_MPS            10.0f // PATH_CURVEの機体速度上限[m/s]。曲率別速度はDISTANCEの有効なSD設定を共用。
+#define PATH_CURVE_YAW_PREVIEW_TIME_MS      10.0f // PATH_CURVEの曲率平均窓中心の時間先行[ms]。実測した旋回応答約11msを基準とする。
 // 実測した機体投影寸法と合法余裕を確認済みのため、形状変更を許可する。
 #define PATH_SHORTCUT_GEOMETRY_ENABLE      1 // ショートカット形状変更の許可[0:無効、1:有効]。
 
@@ -25,7 +28,7 @@
 #define PATH_DEFAULT_KLATERAL_X100            3000U // 横偏差ゲインの既定値[(deg/s)/mm ×100]。
 #define PATH_DEFAULT_KHEADING_X100            600U // 方位偏差ゲインの既定値[(deg/s)/deg ×100]。
 #define PATH_DEFAULT_LINE_ALPHA_X1000         10U // 5ms基準の位置補正率の既定値[無次元 ×1000]。1ms更新では1/5を適用。
-#define PATH_DEFAULT_LINE_THETA_GAIN_X1E9      0U // 5ms基準の方位補正ゲインの既定値[1/mm^2 ×10^9]。1ms更新では1/5、0で補正なし。
+#define PATH_DEFAULT_LINE_THETA_GAIN_X1E9      0U // 追加方位勾配の既定値[1/mm^2 ×10^9]。1msで1/5、0で追加勾配OFF。PATH_CURVEのEKF方位観測は有効。
 
 // SD設定の許容範囲。範囲外の項目は既定値で修復する。
 #define PATH_LEVEL_MAX                        1U // 許可するショートカットレベルの上限[段階]。初期実機検証はLevel 1まで。
@@ -83,23 +86,24 @@
 #define PATH_LINE_MATCH_BACK_POINTS           2U // ライン観測と照合する最近傍点より後方の探索幅[点数]。
 #define PATH_LINE_MATCH_FORWARD_POINTS        4U // ライン観測と照合する最近傍点より前方の探索幅[点数]。
 #define PATH_LINE_MATCH_RESIDUAL_MAX_MM        30.0f // 自己位置補正を許可するライン観測残差の上限[mm]。
-#define PATH_LINE_POSITION_CORRECTION_MAX_MM    0.2f // 1msあたりの位置補正上限[mm/更新]。従来の1mm/5ms相当。
+#define PATH_LINE_POSITION_CORRECTION_MAX_MM    PATH_FUSION_POSITION_STEP_MAX_MM // 1msあたりの位置補正上限[mm/更新]。
 #define PATH_LINE_HEADING_CORRECTION_MAX_DEG    0.02f // 1msあたりの方位補正上限[deg/更新]。従来の0.1deg/5ms相当。
 
 //====================================//
 // シンボル定義
 //====================================//
-#define PATH_ROUTE_CONTROLLER_VERSION      18U
+#define PATH_ROUTE_CONTROLLER_VERSION      20U
+#define PATH_CURVE_YAW_FF_VERSION            2U
 #define PATH_SOURCE_FORMAT_VERSION          1U
 
 typedef struct
 {
 	uint8_t maxLevel; // ショートカット上限[段階]。0:形状変更なし、1:Level 1。
-	uint16_t lookaheadBaseMm; // 基本先読み距離[mm]。
+	uint16_t lookaheadBaseMm; // 基本先読み距離[mm]。PATH_CURVEでは曲率平均窓幅。
 	uint16_t lookaheadPerMpsMm; // 速度に応じた先読み距離加算係数[mm/(m/s)]。
 	uint16_t kLateral_x100; // 横偏差ゲイン[(deg/s)/mm ×100]。
 	uint16_t kHeading_x100; // 方位偏差ゲイン[(deg/s)/deg ×100]。
-	uint16_t lineAlpha_x1000; // 5ms基準の位置補正率[無次元 ×1000]。1ms更新では1/5を適用。
+	uint16_t lineAlpha_x1000; // PATH/SHORTCUTは5ms基準の位置補正率×1000。PATH_CURVEはEKF観測強度（5で基準1、0無効）。
 	uint16_t lineThetaGain_x1e9; // 5ms基準の方位補正ゲイン[1/mm^2 ×10^9]。1ms更新では1/5を適用。
 } ShortcutSettings;
 
@@ -109,7 +113,8 @@ typedef enum
 	PATH_STATE_TRACKING = 1,
 	PATH_STATE_LINE_FALLBACK = 2,
 	PATH_STATE_REJOIN = 3,
-	PATH_STATE_LOCALIZATION_LOST = 4
+	PATH_STATE_LOCALIZATION_LOST = 4,
+	PATH_STATE_CAUTION = 5
 } PathFollowerState;
 
 typedef enum
@@ -142,6 +147,8 @@ extern float pathLogLegalMargin_mm;
 extern float pathLogLineMatchResidual_mm;
 extern uint16_t pathLogPoseCorrection_um;
 extern int16_t pathLogPoseCorrectionHeading_cdeg;
+extern uint16_t pathLogConfidencePermille;
+extern uint16_t pathLogObservationAgeMs;
 
 //====================================//
 // プロトタイプ宣言
@@ -157,6 +164,9 @@ uint8_t pathRouteShortcutLevel(void);
 uint8_t pathRouteShortcutBuildStatus(void);
 uint8_t pathRouteShortcutCorridorCount(void);
 float pathRouteShortcutReductionMm(void);
+float pathRouteLoopPeriodMm(void);
+float pathRunLoopPeriodMm(void);
+float pathFollowerGyroBiasDps(void);
 void pathFollowerCaptureRunStartSettings(void);
 ShortcutSettings pathRouteGenerationSettings(void);
 ShortcutSettings pathRunStartSettings(void);
