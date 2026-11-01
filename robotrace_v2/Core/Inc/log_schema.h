@@ -118,12 +118,22 @@
     STORED(F32, pathYawLateralFB_dps, "%f", (isPathRunMode(optimalTrace) ? pathLogYawLateralFB_dps : 0.0f)) \
     STORED(F32, pathYawHeadingFB_dps, "%f", (isPathRunMode(optimalTrace) ? pathLogYawHeadingFB_dps : 0.0f))
 
-// 通常56列・154 B、詳細62列・163 B。既存列の末尾へ経路診断6列を追加する。
+// 前回の保存成功以降の区間集計。位置は補正距離の和[mm]、方位は符号付き和[deg]。
+// 適用フラグは区間内に非ゼロ補正が1回以上あれば1。経路モード以外は0。
+#define LOG_FIELD_LIST_PATH_CORRECTION(STORED, DERIVED) \
+    STORED(U8, pathWhiteCorrectionApplied, "%d", (isPathRunMode(optimalTrace) ? pathCorrectionLog.whiteApplied : 0U)) \
+    STORED(F32, pathWhiteCorrection_mm, "%f", (isPathRunMode(optimalTrace) ? pathCorrectionLog.whitePosition_mm : 0.0f)) \
+    STORED(F32, pathWhiteCorrectionHeading_deg, "%f", (isPathRunMode(optimalTrace) ? pathCorrectionLog.whiteHeading_deg : 0.0f)) \
+    STORED(U8, pathMarkerCorrectionApplied, "%d", (isPathRunMode(optimalTrace) ? pathCorrectionLog.markerApplied : 0U)) \
+    STORED(F32, pathMarkerCorrection_mm, "%f", (isPathRunMode(optimalTrace) ? pathCorrectionLog.markerPosition_mm : 0.0f))
+
+// 通常61列・168 B、詳細67列・177 B。既存列の末尾へ補正診断5列を追加する。
 #define LOG_FIELD_LIST(STORED, DERIVED) \
     LOG_BASE_FIELD_LIST(STORED, DERIVED) \
     LOG_FIELD_LIST_V2(STORED, DERIVED) \
     LOG_FIELD_LIST_LAT_DIAGNOSTICS(STORED, DERIVED) \
-    LOG_FIELD_LIST_PATH(STORED, DERIVED)
+    LOG_FIELD_LIST_PATH(STORED, DERIVED) \
+    LOG_FIELD_LIST_PATH_CORRECTION(STORED, DERIVED)
 
 // バイナリログで保存する型の対応表。
 #define LOG_CTYPE_U8  uint8_t

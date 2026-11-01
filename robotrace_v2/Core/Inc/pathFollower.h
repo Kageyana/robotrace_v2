@@ -153,11 +153,24 @@ extern int16_t pathLogPoseCorrectionHeading_cdeg;
 extern uint16_t pathLogConfidencePermille;
 extern uint16_t pathLogObservationAgeMs;
 
+// 前回のログ保存成功以降の補正。位置は各1msの補正ベクトル長の和、方位はCW正の符号付き和。
+// 白線とマーカーの合成位置上限を適用した後の寄与を別々に集計する。
+typedef struct
+{
+	float whitePosition_mm;
+	float whiteHeading_deg;
+	float markerPosition_mm;
+	uint8_t whiteApplied;
+	uint8_t markerApplied;
+} PathCorrectionLog;
+extern PathCorrectionLog pathCorrectionLog;
+
 //====================================//
 // プロトタイプ宣言
 //====================================//
 
 int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel);
+void pathFollowerResetCorrectionLog(void);
 int16_t routeBuildCurvatureFromLog(int logNumber);
 bool routeGenerateShortcut(uint8_t shortcutLevel);
 uint16_t pathRouteCount(void);

@@ -1013,6 +1013,7 @@ static void logBuildMetadata(void)
 void initLog(void)
 {
 	FRESULT fresult;		// f_write status
+	pathFollowerResetCorrectionLog();
 	lastRunSaved = false;
 	lastPrimaryRouteValid = false;
 	runImuCalibrationValid = IMU_CalibrationReady();
@@ -1129,6 +1130,7 @@ bool writeLogBufferPuts(void)
 		if (logBufferWriterEndRecord(&logBufferWriter))
 		{
 			cntSend++;
+			pathFollowerResetCorrectionLog();
 			return true;
 		}
 		else

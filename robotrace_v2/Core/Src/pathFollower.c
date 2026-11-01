@@ -318,6 +318,7 @@ uint16_t pathLogPoseCorrection_um = 0U;
 int16_t pathLogPoseCorrectionHeading_cdeg = 0;
 uint16_t pathLogConfidencePermille = 1000U;
 uint16_t pathLogObservationAgeMs = 0U;
+PathCorrectionLog pathCorrectionLog;
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathWrapDeg
@@ -1262,6 +1263,17 @@ static void pathApplyMarkerCorrection(uint16_t nearest, const ShortcutSettings *
 }
 
 /////////////////////////////////////////////////////////////////////
+// モジュール名 pathFollowerResetCorrectionLog
+// 処理概要     ログ保存成功時または走行初期化時に補正の区間集計をクリアする
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void pathFollowerResetCorrectionLog(void)
+{
+	pathCorrectionLog = (PathCorrectionLog){0};
+}
+
+/////////////////////////////////////////////////////////////////////
 // モジュール名 pathFollowerInvalidateRoute
 // 処理概要     共有RAM切替前に経路と追従状態を無効化する
 // 引数         なし
@@ -1269,6 +1281,7 @@ static void pathApplyMarkerCorrection(uint16_t nearest, const ShortcutSettings *
 /////////////////////////////////////////////////////////////////////
 void pathFollowerInvalidateRoute(void)
 {
+    pathFollowerResetCorrectionLog();
     routeCache.valid = false;
 	routeCount = 0U;
 	routeSourceLog = 0;
@@ -1293,6 +1306,7 @@ void pathFollowerInvalidateRoute(void)
 /////////////////////////////////////////////////////////////////////
 void pathFollowerReset(void)
 {
+	pathFollowerResetCorrectionLog();
 	if (runMemoryOwner != RUN_MEMORY_PATH)
 	{
 		pathFollowerInvalidateRoute();
@@ -1458,6 +1472,7 @@ void pathFollowerUpdateTarget1ms(void)
 	PathLineMatch lineMatch = {(float)lineRoute[nearest].x_mm,
 		(float)lineRoute[nearest].y_mm, 0.0f, 0.0f, 0.0f};
 	float correctionStartX = pathPose.x_mm, correctionStartY = pathPose.y_mm;
+	float whiteHeadingCorrectionDeg = 0.0f;
 	bool lineMatchValid = false;
 	pathLogPoseCorrection_um = 0U;
 	pathLogPoseCorrectionHeading_cdeg = 0;
@@ -1502,22 +1517,39 @@ void pathFollowerUpdateTarget1ms(void)
 				pathPose.heading_deg = pathWrapDeg(pathPose.heading_deg + headingCorrectionDeg);
 				pathLogPoseCorrection_um = (uint16_t)lroundf(correctionDistance * 1000.0f);
 				pathLogPoseCorrectionHeading_cdeg = pathFloatToInt16(headingCorrectionDeg * 100.0f);
+				whiteHeadingCorrectionDeg = headingCorrectionDeg;
 			}
 		}
 	}
+	float whiteCorrectionX = pathPose.x_mm - correctionStartX;
+	float whiteCorrectionY = pathPose.y_mm - correctionStartY;
+	float markerStartX = pathPose.x_mm, markerStartY = pathPose.y_mm;
 	pathApplyMarkerCorrection(nearest, activeSettings);
+	float markerCorrectionX = pathPose.x_mm - markerStartX;
+	float markerCorrectionY = pathPose.y_mm - markerStartY;
 	// 白線とマーカーが同じ周期に成立しても、位置補正の合計を0.2mm以内に保つ。
 	float totalCorrectionX = pathPose.x_mm - correctionStartX;
 	float totalCorrectionY = pathPose.y_mm - correctionStartY;
 	float totalCorrection = hypotf(totalCorrectionX, totalCorrectionY);
+	float correctionScale = 1.0f;
 	if (totalCorrection > PATH_LINE_POSITION_CORRECTION_MAX_MM)
 	{
 		float scale = PATH_LINE_POSITION_CORRECTION_MAX_MM / totalCorrection;
+		correctionScale = scale;
 		pathPose.x_mm = correctionStartX + totalCorrectionX * scale;
 		pathPose.y_mm = correctionStartY + totalCorrectionY * scale;
 		totalCorrection = PATH_LINE_POSITION_CORRECTION_MAX_MM;
 	}
 	pathLogPoseCorrection_um = (uint16_t)lroundf(totalCorrection * 1000.0f);
+	// 同時成立時も共通の縮小率を各寄与へ適用し、白線とマーカーを混ぜない。
+	float whitePositionCorrectionMm = hypotf(whiteCorrectionX, whiteCorrectionY) * correctionScale;
+	float markerPositionCorrectionMm = hypotf(markerCorrectionX, markerCorrectionY) * correctionScale;
+	pathCorrectionLog.whitePosition_mm += whitePositionCorrectionMm;
+	pathCorrectionLog.whiteHeading_deg += whiteHeadingCorrectionDeg;
+	pathCorrectionLog.markerPosition_mm += markerPositionCorrectionMm;
+	if (whitePositionCorrectionMm > 0.0f || whiteHeadingCorrectionDeg != 0.0f)
+		pathCorrectionLog.whiteApplied = 1U;
+	if (markerPositionCorrectionMm > 0.0f) pathCorrectionLog.markerApplied = 1U;
 	pathLogLineValid = currentLineValid ? 1U : 0U;
 	pathLogLinePointX_mm = lineMatch.x_mm;
 	pathLogLinePointY_mm = lineMatch.y_mm;
