@@ -98,3 +98,15 @@
 ## 2026-10-30：色点方位の合成入力と投影契約
 
 前後点の測定器を合成検証するときは、ぼけ長をX/Yカーネル幅と混同せず、実支持長・色の平均化・点間隔・量子化による正常/棄却条件を実行前に決める。投影の理論精度、レンズ逆補正の反復収束、実画像の画素/露光/高さ差は別に検証する。不一致に合わせて色/幾何ゲートを緩めない。新しい測定器では再投影一致も確認し、既存の共有校正と過去証跡は保持する。入口はanalysis/script/validate_body_marker_heading.pyとfinalize_body_marker_heading.py。合成90条件の0.733degを実機精度へ転用せず、高さ差1mmでも今回最大1.221degとなる感度を示す。完成済み検証は凍結されているため、仕様変更時は新フェーズへ保全してから実行する。[合成入力と逆投影](../../../../doc/失敗事例/2026-10-30-marker-synthetic-projection-contract.md)参照。
+
+## 2026-11-01：PowerShellメタデータ棚卸しの構文
+
+foreach文を直接パイプへ接続せず、`$items = foreach (...) { ... }; $items | ConvertTo-Csv`のように結果を配列へ保持する。同種のゲイン比較では`analysis/script/read_braking_metadata.ps1`を入口とし、明示したリポジトリworkdirから`powershell.exe -NoProfile -ExecutionPolicy Bypass -File analysis/script/read_braking_metadata.ps1`を実行する。入口はPowerShell Parserで直接接続の拒否と配列経由の受理を先に検査し、CSVの存在確認後に読み込む。[再発と検証](../../../../doc/失敗事例/2026-11-01-powershell-foreach-pipeline.md)参照。
+
+HTML属性や複雑な引用符を含むNode検証はPowerShellのnode -eへ埋め込まず、analysis/script/validate_braking_13993_13994.cjsのようなファイル入口を使う。Node実体とファイルパスだけを渡し、入力SHA・埋込み対象・JavaScript構文を検証する。CLI引用符だけの失敗では完了済み集計やHTMLを再生成しない。
+
+## 2026-11-01：ゴール後の未照合停止と周期未確定
+
+ゴール後の停止は、SG終値・emcStop・pathLoopPeriod_mm・終了時未照合時間・保存明部を分けて確認する。period>0向け白線延長の検証成功をperiod=0へ流用しない。13989～13991・13993はユーザー完走確認済みだが、周期0・白線可視のまま未照合150msで停止7。入口はanalysis/script/diagnose_goal_tail_13989_13993.py、証拠はanalysis/goal_tail_13989_13993/report.md。物理逸脱は疎な保存値から確定しない。
+
+ログ実装の検索もCore/Srcの実在親と-g '*.c'から始め、logBinary.c等のファイル分割を推測しない。rg終了2以上で後続へ進まない。新規文書追加は単独パッチで確定し、既存文書更新は直前に読んだ完全行だけをアンカーにする。拒否後は全対象の部分適用を確認し、完了済み解析を保全する。失敗記録はdoc/失敗事例/2026-11-01-goal-tail-investigation-preflight.md。周期未確定の実機終端問題はdoc/失敗事例/2026-10-28-path-white-map-goal-extension.mdの11/1追記を参照する。

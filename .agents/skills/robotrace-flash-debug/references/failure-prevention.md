@@ -144,3 +144,19 @@ GDB出力を原バイトで保存するだけでなく、表示するPythonのst
 白線照合回復後の加速を検査する前に、信頼度の100ms回復と、白線退避後の200ms再合流確認・100ms操舵混合を別条件として確認する。100ms直後の加速だけを期待して製品条件を緩めない。短縮回廊と前後の予約区間は補正・白線退避を禁止し、照合監視・加速保留・減速・喪失停止を別々に検査する。入口は実在するリポジトリルートのvalidation/path_common/run.py。検索は共通事前確認を読み終えてから実在するCore親と-gへ組み立て、旧D:や未配置の過去validationを前提にしない。詳細はdoc/失敗事例/2026-10-31-path-common-validation-contract.md。
 
 ビルド集計用の保存ログも、拡張子やPowerShellの版からUTF-16と決めず先頭BOMと実バイトを確認する。BOMが無ければ保存時の規約とUTF-8厳密復号を照合し、復号だけ失敗した完了ビルドを再実行しない。path_common/build.pyは保存済み基準ログをBOM判別してから未実行のビルドへ進む。
+
+## 2026-11-01：補正ログ検証前の入口確認
+
+検索先はTest-Pathの結果を表示するだけでなく、必須パスならFalseでthrowし、任意パスなら実在するものだけを配列化してrgへ渡す。robotrace_v2/testsが無いチェックアウトではvalidationのみを検索する。rg終了コード2以上では後続へ進まない。同じapply_patch内で同一パスを複数操作に分けず、1つのUpdate File内へhunkをまとめる。
+
+CRCフィクスチャではlogBinaryCrcUpdateの実引数const uint8_t *と照合し、const char *のschema/metadataからのバイト変換を明示する。Wpointer-sign等の警告を緩めない。補正ログはvalidation/path_correction_log/run.pyで通常/詳細×O0/O2の分離・区間保持・実writer・独立復号・全CRCを確認する。現行は通常61列/168 B・詳細67列/177 B。既存ログの列数を期待値へ流用しない。配備済みPC変換器が無い場合は、独立復号の成功と実変換器未確認を分けて報告する。[実例と検証結果](../../../../doc/失敗事例/2026-11-01-path-correction-log-preflight.md)。
+
+## 2026-11-01：クロス直線化の調査入口
+
+Skillに記載された補助スクリプトも現在のチェックアウトで実在確認する。search_firmware_sources.ps1が無い場合は実在するCore/Src・Core/Incと-g 'path*'へ分離して検索し、未確認のrobotrace_v2/tests等を加えない。必須パスはFalseでthrow、rg終了コード2以上で停止する。段落パッチは読込済みの完全行を使用し、拒否時は同じパッチの新規ファイルを含む全対象を再確認する。検証入口はvalidation/path_cross_straight/run.py。変更前Coreがbuild/path-cross-straight-20261101/before/Coreにあれば旧新制御トレースも照合し、無ければ現行試験だけ実行して旧新未比較を明示する。[事例](../../../../doc/失敗事例/2026-11-01-path-cross-straight-preflight.md)参照。
+
+## 2026-11-01：ゴールマーカー停止への移行検証
+
+制御版26はPATH/SHORTCUT/PATH_CURVEもSGmarker>=COUNT_GOALでcase101へ移る。リポジトリルートから必要権限でvalidation/goal_marker_stop/run.pyを実行し、実Cのゴール判定・通常ラインPIDへの切替・50mm/2秒境界・緊急停止優先を旧新×O0/O2で確認する。build.py before/afterはDebug/Releaseの原ログとELFを保全する。実機の制動・初回ログは別途確認する。詳細はdoc/path-goal-marker-stop.md。
+
+ソース呼出元の探索も未確認のsystem.c等を渡さず、Test-PathでCore/Srcを確認してからrg -n 'loopSystem|emcStop' robotrace_v2/Core/Src -g '*.c'を使い、終了2以上で停止する。警告比較は行正規表現のCR残存を避け、splitlines/stripで両側の行末を揃える。集計だけの失敗では実ELF/コピーSHA・実CのSHA・原ログを照合し、完了Debugはbuild.py after --resume-debugで集計のみ再開して未実行Releaseへ進む。事例はdoc/失敗事例/2026-11-01-goal-tail-investigation-preflight.md。

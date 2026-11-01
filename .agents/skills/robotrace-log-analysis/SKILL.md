@@ -230,8 +230,8 @@ These 29 diagnostics are restored to both the 72-column light and 87-column deta
 - `BOOST_NONE`: verify distance, angular velocity, markers, curvature radius, and XY plot. Pay special attention to angle drift.
 - `BOOST_MARKER`: verify all markers detected in the first run are detected.
 - `BOOST_DISTANCE`: verify current course position matches the estimated position and first-run distance.
-- `BOOST_PATH_REPLAY`: verify XY trajectory and completion against the validated primary route. For legacy logs with path diagnostics, also verify lateral/heading error, fallback count, and line-position/heading correction. Goal is the halfway extension from the primary endpoint toward the origin; marker count does not terminate PATH mode.
-- `BOOST_SHORTCUT`: verify the Level 1 straight corridor trajectory and completion. For legacy logs with path diagnostics, also verify non-negative `pathLegalMargin_mm` and absence of localization fallback. New logs cannot establish these diagnostic conditions directly. Goal uses the same extended-route arc length as PATH REPLAY.
+- `BOOST_PATH_REPLAY`: verify XY trajectory and completion against the validated primary route. For legacy logs with path diagnostics, also verify lateral/heading error, fallback count, and line-position/heading correction. 制御版26以降はゴールマーカー規定回数の確認後に通常ライン追従で減速・停止する。版25以前の延長経路終端ゴールと区別し、古いログへ新終了条件を適用しない。
+- `BOOST_SHORTCUT`: verify the Level 1 straight corridor trajectory and completion. For legacy logs with path diagnostics, also verify non-negative `pathLegalMargin_mm` and absence of localization fallback. New logs cannot establish these diagnostic conditions directly. 制御版26以降はPATH/PATH_CURVEと同じゴールマーカー確認後の通常ライン追従停止を使う。延長点到達を終了条件とするのは版25以前。
 - Route generation failure, extension failure, or point-capacity overflow must block route start. For automatic runs, invalid primary-source metadata blocks progression to the next run.
 - PATH/SHORTCUT tuning remains unadopted until same-condition real-world runs provide at least 10 logs per level; assess completion rate and stop-position repeatability before lap time.
 - Compare only logs with the same run mode; distance, path replay, and shortcut modes are not equivalent.
@@ -254,3 +254,12 @@ These 15 originals have 72 numeric values but only 71 header names: the 30-byte 
 融合比較の候補を作る前に、伝播する車体基準点・地図の基準点・センサー観測点を区別する。前方白線を車軸XYへ直接照合せず、一次の実センサー観測で小R区間の残差を確認する。全列棚卸しと有限の全候補を明記し、欠測列・未記録鮮度・重力基準を推定済み事実にしない。選定用で候補固定後に確認用を評価する。方法変更後に使い直す系列は新しい未見評価ではない。実制御の最近傍・ゲート・1ms補正上限・停止を含む原本bin再生を実施し、直線評価点の改善だけで採用しない。詳細は[白線観測点の混同](../../../doc/失敗事例/2026-10-27-path-white-observation-reference.md)と[版19](../../../doc/path-confidence-fusion.md)。初回実ログと同条件10走の採否確認は別途必要。
 
 1ms化する前に観測雑音・伝播雑音の時間単位を照合し、疎なログ値を独立した1ms観測として重複融合しない。保存optimalIndexに依存するPC診断と、推定結果で最近傍を選ぶ実制御を分けて検証する。単一線の接線位置や真biasの精度を数値最適化だけで保証しない。既知bias合成試験が期待精度を満たさない場合も、診断を保全し、位置改善・有限性の成功でその失敗を消さない。
+## 2026-11-01：外部変換ツールの環境差
+
+C:/tool/AutoCopyCsvFromSdなど文書の既定配置も、初回のrg/search前にTest-Path/Path.is_dirで存在確認する。現在のworkspaceのCSVが存在しても旧PCの変換ツール配置は保証されない。任意ツールが無ければ確認済みのLog親だけを探索し、CSV解析とbin全CRC未検証を分けて報告する。修正パッチは実際に読んだ完全行をアンカーとし、拒否後は全対象の部分適用を確認して未実行部分だけ再開する。[13980解析の事例](../../../doc/失敗事例/2026-11-01-log-analysis-external-tool-path.md)。
+
+## 2026-11-01：ゴール後の未照合停止と周期未確定
+
+ゴール後の停止は、SG終値・emcStop・pathLoopPeriod_mm・終了時未照合時間・保存明部を分けて確認する。period>0向け白線延長の検証成功をperiod=0へ流用しない。13989～13991・13993はユーザー完走確認済みだが、周期0・白線可視のまま未照合150msで停止7。入口はanalysis/script/diagnose_goal_tail_13989_13993.py、証拠はanalysis/goal_tail_13989_13993/report.md。物理逸脱は疎な保存値から確定しない。
+
+ログ実装の検索もCore/Srcの実在親と-g '*.c'から始め、logBinary.c等のファイル分割を推測しない。rg終了2以上で後続へ進まない。新規文書追加は単独パッチで確定し、既存文書更新は直前に読んだ完全行だけをアンカーにする。拒否後は全対象の部分適用を確認し、完了済み解析を保全する。失敗記録はdoc/失敗事例/2026-11-01-goal-tail-investigation-preflight.md。周期未確定の実機終端問題はdoc/失敗事例/2026-10-28-path-white-map-goal-extension.mdの11/1追記を参照する。
