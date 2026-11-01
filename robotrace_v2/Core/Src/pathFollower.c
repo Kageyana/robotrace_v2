@@ -57,6 +57,7 @@ typedef struct
 
 #define lineRoute (runMemory.path.line)
 #define driveRoute (runMemory.path.drive)
+#define sourceRouteXY (runMemory.path.sourceXY)
 #define driveRouteArcMm (runMemory.path.arcMm)
 #define routeFlags (runMemory.path.flags)
 #define routeMarkers (runMemory.path.markers)
@@ -67,6 +68,7 @@ typedef struct
 // キャッシュは共有RAM上の延長前基準経路だけ。走行メタデータは従来どおり別保持。
 static struct {
     bool valid;
+    bool sourceRadiiValid;
     uint16_t baseCount;
     uint32_t epoch;
     LogBinaryHeader source;
@@ -183,7 +185,7 @@ static bool pathPolicyGoalReached(bool goalValid, uint16_t routeIndex,
 static bool pathCacheMatches(const LogBinaryHeader *source, const ShortcutSettings *settings)
 {
     const ShortcutSettings *old = &routeCache.settings;
-    return routeCache.valid &&
+    return routeCache.valid && routeCache.sourceRadiiValid &&
         autoRunState.seriesActive && runMemoryOwner == RUN_MEMORY_PATH &&
         routeCache.epoch == autoRunSeriesGeneration() && routeCache.baseCount >= 2U &&
         routeCache.baseCount <= PATH_ROUTE_MAX_POINTS &&
@@ -348,12 +350,12 @@ static float pathPointDistance(float x0, float y0, float x1, float y1)
 }
 
 /////////////////////////////////////////////////////////////////////
-// モジュール名 pathBuildDriveRouteArcLength
-// 処理概要     実走行経路の各点までの累積弧長を算出する
-// 引数         なし
+// モジュール名 pathBuildRouteArcLength
+// 処理概要     指定経路の各点までの累積弧長を算出する
+// 引数         route: 弧長を計算する整数座標の経路
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-static void pathBuildDriveRouteArcLength(void)
+static void pathBuildRouteArcLength(const RoutePoint *route)
 {
 	memset(driveRouteArcMm, 0, sizeof(driveRouteArcMm));
 	pathGoalArcMm = 0U;
@@ -361,8 +363,8 @@ static void pathBuildDriveRouteArcLength(void)
 	float accumulatedMm = 0.0f;
 	for (uint16_t i = 1U; i < routeCount; i++)
 	{
-		accumulatedMm += pathPointDistance(driveRoute[i - 1U].x_mm, driveRoute[i - 1U].y_mm,
-			driveRoute[i].x_mm, driveRoute[i].y_mm);
+		accumulatedMm += pathPointDistance(route[i - 1U].x_mm, route[i - 1U].y_mm,
+			route[i].x_mm, route[i].y_mm);
 		float storedMm = fminf(accumulatedMm, (float)UINT16_MAX);
 		driveRouteArcMm[i] = (uint16_t)lroundf(storedMm);
 	}
@@ -371,6 +373,17 @@ static void pathBuildDriveRouteArcLength(void)
 		pathGoalArcMm = driveRouteArcMm[routeCount - 1U];
 		pathGoalValid = true;
 	}
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathBuildDriveRouteArcLength
+// 処理概要     実走行経路の累積弧長を確定する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void pathBuildDriveRouteArcLength(void)
+{
+	pathBuildRouteArcLength(driveRoute);
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -441,6 +454,7 @@ static bool pathAppendRouteSample(float xMm, float yMm,
 		startY += (yMm - startY) * ratio;
 		lineRoute[routeCount].x_mm = pathFloatToInt16(startX);
 		lineRoute[routeCount].y_mm = pathFloatToInt16(startY);
+		sourceRouteXY[routeCount] = (PathSourcePoint){startX, startY};
 		routeCount++;
 		remaining -= needed;
 		*accumulated = 0.0f;
@@ -472,6 +486,103 @@ static void pathComputeHeadings(RoutePoint *route, uint16_t count)
 }
 
 /////////////////////////////////////////////////////////////////////
+// モジュール名 pathSampleSourceXY
+// 処理概要     丸め前の基準経路を既存地図と同じ弧長で補間する
+// 引数         arcMm: 補間する弧長[mm]
+// 戻り値       丸め前の座標[mm]
+/////////////////////////////////////////////////////////////////////
+static PathSourcePoint pathSampleSourceXY(float arcMm)
+{
+	uint16_t low = 0U, high = (uint16_t)(routeCount - 1U);
+	while ((uint32_t)(high - low) > 1U)
+	{
+		uint16_t middle = (uint16_t)(low + (high - low) / 2U);
+		if ((float)driveRouteArcMm[middle] <= arcMm) low = middle;
+		else high = middle;
+	}
+	float length = (float)driveRouteArcMm[high] - driveRouteArcMm[low];
+	float u = length > 0.0f ? (arcMm - (float)driveRouteArcMm[low]) / length : 0.0f;
+	u = fminf(1.0f, fmaxf(0.0f, u));
+	return (PathSourcePoint){
+		sourceRouteXY[low].x_mm + (sourceRouteXY[high].x_mm - sourceRouteXY[low].x_mm) * u,
+		sourceRouteXY[low].y_mm + (sourceRouteXY[high].y_mm - sourceRouteXY[low].y_mm) * u};
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathPrepareSourceRadii
+// 処理概要     小数座標と未量子化の接線方位から速度計画用半径だけを保存する
+// 引数         periodMm: 周回共通地図の周期[mm]。0は正規化なし
+// 戻り値       true: 半径確定 false: 入力が非有限または周期不正
+/////////////////////////////////////////////////////////////////////
+static bool pathPrepareSourceRadii(float periodMm)
+{
+	routeCache.sourceRadiiValid = false;
+	if (routeCount < 2U || !isfinite(periodMm) || periodMm < 0.0f) return false;
+	PathSourcePoint closure = {0.0f, 0.0f};
+	if (periodMm > 0.0f)
+	{
+		if (periodMm < PATH_FUSION_LOOP_MIN_MM || periodMm > PATH_FUSION_LOOP_MAX_MM ||
+			periodMm >= (float)driveRouteArcMm[routeCount - 1U]) return false;
+		closure = pathSampleSourceXY(periodMm);
+		closure.x_mm -= sourceRouteXY[0].x_mm;
+		closure.y_mm -= sourceRouteXY[0].y_mm;
+	}
+	for (uint16_t i = 0U; i < routeCount; i++)
+	{
+		PathSourcePoint point[5];
+		for (int offset = -2; offset <= 2; offset++)
+		{
+			int index = (int)i + offset;
+			if (index < 0) index = 0;
+			if (index >= routeCount) index = (int)routeCount - 1;
+			PathSourcePoint value = sourceRouteXY[index];
+			if (periodMm > 0.0f)
+			{
+				float phase = fmodf((float)driveRouteArcMm[index], periodMm);
+				value = pathSampleSourceXY(phase);
+				value.x_mm -= closure.x_mm * (phase / periodMm);
+				value.y_mm -= closure.y_mm * (phase / periodMm);
+			}
+			if (!isfinite(value.x_mm) || !isfinite(value.y_mm)) return false;
+			point[offset + 2] = value;
+		}
+		uint16_t radius = INT16_MAX;
+		if (i > 0U && i + 1U < routeCount)
+		{
+			float h0 = atan2f(point[2].x_mm - point[0].x_mm,
+				point[2].y_mm - point[0].y_mm) * RAD2DEG;
+			float h1 = atan2f(point[4].x_mm - point[2].x_mm,
+				point[4].y_mm - point[2].y_mm) * RAD2DEG;
+			float changeRad = fabsf(pathWrapDeg(h1 - h0)) * DEG2RAD;
+			float dsMm = pathPointDistance(point[1].x_mm, point[1].y_mm,
+				point[3].x_mm, point[3].y_mm);
+			if (changeRad > 1.0e-4f && dsMm > 1.0f)
+				radius = (uint16_t)lroundf(fminf((float)INT16_MAX, fmaxf(1.0f, dsMm / changeRad)));
+		}
+		lineRoute[i].sourceRadius_mm = radius;
+	}
+	routeCache.sourceRadiiValid = true;
+	return true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathCanUseSourceRadius
+// 処理概要     元の形状を保った基準経路の半径を速度計画へ利用できるか判定する
+// 引数         index: 対象経路点
+// 戻り値       true: 丸め前半径を利用 false: 短縮・延長形状から再計算する
+/////////////////////////////////////////////////////////////////////
+static bool pathCanUseSourceRadius(uint16_t index)
+{
+	// 延長との接続では前後2点の形状が変わるため、従来の接線計算を使う。
+	if (!routeCache.sourceRadiiValid || index + 2U >= routeCache.baseCount ||
+		lineRoute[index].sourceRadius_mm == 0U) return false;
+	uint16_t begin = index > 2U ? (uint16_t)(index - 2U) : 0U;
+	for (uint16_t i = begin; i <= index + 2U; i++)
+		if ((routeFlags[i] & PATH_FLAG_CORRIDOR_APPLIED) != 0U) return false;
+	return true;
+}
+
+/////////////////////////////////////////////////////////////////////
 // モジュール名 pathBuildSpeedProfile
 // 処理概要     曲率と加減速制約から経路速度を設定する
 // 引数         route: 経路点列, count: 経路点数, shortcutLevel: 短縮レベル
@@ -489,17 +600,25 @@ static void pathBuildSpeedProfile(RoutePoint *route, uint16_t count, uint8_t sho
 		float speed = curvatureSpeed ? fminf(speedCap, asignVelocity(INT16_MAX)) : speedCap;
 		if (i > 0U && i + 1U < count && (routeFlags[i] & PATH_FLAG_CROSS_STRAIGHT) == 0U)
 		{
-			float h0 = (float)route[i - 1U].heading_cdeg * 0.01f;
-			float h1 = (float)route[i + 1U].heading_cdeg * 0.01f;
-			float dHeadingRad = fabsf(pathWrapDeg(h1 - h0)) * DEG2RAD;
-			float dsMm = pathPointDistance((float)route[i - 1U].x_mm, (float)route[i - 1U].y_mm,
-				(float)route[i + 1U].x_mm, (float)route[i + 1U].y_mm);
-			if (dHeadingRad > 1.0e-4f && dsMm > 1.0f)
+			if (pathCanUseSourceRadius(i))
 			{
-				float radiusMm = dsMm / dHeadingRad;
-				float curveSpeed = asignVelocity(pathFloatToInt16(radiusMm));
-				if (curvatureSpeed) speed = fminf(speedCap, curveSpeed);
-				else if (curveSpeed < speed) speed = curveSpeed;
+				float curveSpeed = asignVelocity((int16_t)lineRoute[i].sourceRadius_mm);
+				speed = fminf(speed, curveSpeed);
+			}
+			else
+			{
+				float h0 = (float)route[i - 1U].heading_cdeg * 0.01f;
+				float h1 = (float)route[i + 1U].heading_cdeg * 0.01f;
+				float dHeadingRad = fabsf(pathWrapDeg(h1 - h0)) * DEG2RAD;
+				float dsMm = pathPointDistance((float)route[i - 1U].x_mm, (float)route[i - 1U].y_mm,
+					(float)route[i + 1U].x_mm, (float)route[i + 1U].y_mm);
+				if (dHeadingRad > 1.0e-4f && dsMm > 1.0f)
+				{
+					float radiusMm = dsMm / dHeadingRad;
+					float curveSpeed = asignVelocity(pathFloatToInt16(radiusMm));
+					if (curvatureSpeed) speed = fminf(speedCap, curveSpeed);
+					else if (curveSpeed < speed) speed = curveSpeed;
+				}
 			}
 		}
 		route[i].speed_cms = (uint16_t)lroundf(fmaxf(0.0f, speed) * 100.0f);
@@ -1070,6 +1189,7 @@ static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel, bool 
             if (routeCount >= PATH_ROUTE_MAX_POINTS - PATH_GOAL_RESERVED_POINTS) { resultCode = -7; goto failed; }
             lineRoute[routeCount].x_mm = pathFloatToInt16(lastX);
             lineRoute[routeCount].y_mm = pathFloatToInt16(lastY);
+            sourceRouteXY[routeCount] = (PathSourcePoint){lastX, lastY};
             // 最終点だけは20mmの整数倍でない実際の終端距離で判定する。
             routeFlags[routeCount] = (totalLength >= crossStartMm - CROSS_STRAIGHT_MM &&
                 totalLength <= crossEndMm + CROSS_STRAIGHT_MM) ? PATH_FLAG_CROSS_STRAIGHT : 0U;
@@ -1078,6 +1198,9 @@ static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel, bool 
         if (routeCount < 2U) { resultCode = -11; goto failed; }
         {
             float period = pathFusionPeriod(loopIntervals, loopIntervalCount);
+            // drive側の小数座標は半径確定まで保持し、その後だけ整数経路へ切り替える。
+            pathBuildRouteArcLength(lineRoute);
+            if (!pathPrepareSourceRadii(period)) { resultCode = -11; goto failed; }
             if (period > 0.0f)
             {
                 // 元の1周目をdrive側に保全し、line側を周回共通の地図へ変換する。
@@ -1111,7 +1234,6 @@ static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel, bool 
     routeCache.epoch = autoRunSeriesGeneration();
     routeCache.baseCount = routeCount;
 	pathComputeHeadings(lineRoute, routeCount);
-	pathBuildSpeedProfile(lineRoute, routeCount, 0U, false);
 	memcpy(driveRoute, lineRoute, sizeof(RoutePoint) * routeCount);
 	bool shortcutOk = false;
 	if (requestedShortcutLevel > 0U && generationSettings.maxLevel == 0U)
@@ -1323,6 +1445,7 @@ void pathFollowerInvalidateRoute(void)
 {
     pathFollowerResetCorrectionLog();
     routeCache.valid = false;
+    routeCache.sourceRadiiValid = false;
 	routeCount = 0U;
 	routeSourceLog = 0;
 	routeMarkerCount = 0U;

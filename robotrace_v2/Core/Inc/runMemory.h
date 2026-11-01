@@ -29,10 +29,23 @@ typedef struct
 	int16_t x_mm;
 	int16_t y_mm;
 	int16_t heading_cdeg;
-	uint16_t speed_cms;
+	union
+	{
+		uint16_t speed_cms;       // 実走行経路の速度[0.01m/s]。
+		uint16_t sourceRadius_mm; // 基準経路の丸め前曲率半径[mm]。0は未設定。
+	};
 } RoutePoint;
 
 _Static_assert(sizeof(RoutePoint) == 8U, "RoutePoint must remain 8 bytes");
+
+typedef struct
+{
+	float x_mm;
+	float y_mm;
+} PathSourcePoint;
+
+_Static_assert(sizeof(PathSourcePoint) == sizeof(RoutePoint),
+	"Source XY scratch must share the drive route storage");
 
 typedef struct
 {
@@ -75,7 +88,12 @@ typedef union
 	struct
 	{
 		RoutePoint line[PATH_ROUTE_MAX_POINTS];
-		RoutePoint drive[PATH_ROUTE_MAX_POINTS];
+		union
+		{
+			RoutePoint drive[PATH_ROUTE_MAX_POINTS];
+			// 停止中の生成だけに使用し、半径確定後に実走行経路へ切り替える。
+			PathSourcePoint sourceXY[PATH_ROUTE_MAX_POINTS];
+		};
 		uint16_t arcMm[PATH_ROUTE_MAX_POINTS];
 		uint8_t flags[PATH_ROUTE_MAX_POINTS];
 		PathMarkerAnchor markers[PATH_MARKER_CAPACITY];
