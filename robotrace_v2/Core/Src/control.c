@@ -834,9 +834,8 @@ void loopSystem(void)
 			motorCommandOutSynth(0, veloCtrl.pwm, steeringPwm);
 		}
 
-		// 通常走行はゴールマーカー、PATH系は中間延長点の経路弧長をゴールとする。
-		bool pathGoalMode = isPathRunMode(optimalTrace);
-		if (pathGoalMode ? pathFollowerGoalReached() : SGmarker >= COUNT_GOAL)
+		// 全モードでゴールマーカー確認後は通常のライン追従による減速・停止へ移る。
+		if (SGmarker >= COUNT_GOAL)
 		{
 			goalTime = cntRun;
 			enc1 = 0;
