@@ -568,15 +568,16 @@ static bool pathPrepareSourceRadii(float periodMm)
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathCanUseSourceRadius
-// 処理概要     元の形状を保った基準経路の半径を速度計画へ利用できるか判定する
-// 引数         index: 対象経路点
+// 処理概要     指定した速度方針で一次経路の丸め前半径を利用できるか判定する
+// 引数         index: 対象経路点, primaryCurvature: 短縮区間でも一次曲率を使用
 // 戻り値       true: 丸め前半径を利用 false: 短縮・延長形状から再計算する
 /////////////////////////////////////////////////////////////////////
-static bool pathCanUseSourceRadius(uint16_t index)
+static bool pathCanUseSourceRadius(uint16_t index, bool primaryCurvature)
 {
 	// 延長との接続では前後2点の形状が変わるため、従来の接線計算を使う。
 	if (!routeCache.sourceRadiiValid || index + 2U >= routeCache.baseCount ||
 		lineRoute[index].sourceRadius_mm == 0U) return false;
+	if (primaryCurvature) return true;
 	uint16_t begin = index > 2U ? (uint16_t)(index - 2U) : 0U;
 	for (uint16_t i = begin; i <= index + 2U; i++)
 		if ((routeFlags[i] & PATH_FLAG_CORRIDOR_APPLIED) != 0U) return false;
@@ -587,13 +588,14 @@ static bool pathCanUseSourceRadius(uint16_t index)
 // モジュール名 pathSpeedRadiusMm
 // 処理概要     速度計画と先行減速に使う曲率半径を同じ形状から取得する
 // 引数         route: 経路点列, count: 経路点数, index: 対象点
+//              primaryCurvature: 短縮区間でも一次曲率を使用
 // 戻り値       曲率半径[mm]。-1は端点・クロス直線・曲率未検出
 /////////////////////////////////////////////////////////////////////
-static int16_t pathSpeedRadiusMm(const RoutePoint *route, uint16_t count, uint16_t index)
+static int16_t pathSpeedRadiusMm(const RoutePoint *route, uint16_t count, uint16_t index, bool primaryCurvature)
 {
 	if (index == 0U || index + 1U >= count ||
 		(routeFlags[index] & PATH_FLAG_CROSS_STRAIGHT) != 0U) return -1;
-	if (pathCanUseSourceRadius(index)) return (int16_t)lineRoute[index].sourceRadius_mm;
+	if (pathCanUseSourceRadius(index, primaryCurvature)) return (int16_t)lineRoute[index].sourceRadius_mm;
 	float h0 = (float)route[index - 1U].heading_cdeg * 0.01f;
 	float h1 = (float)route[index + 1U].heading_cdeg * 0.01f;
 	float dHeadingRad = fabsf(pathWrapDeg(h1 - h0)) * DEG2RAD;
@@ -606,17 +608,17 @@ static int16_t pathSpeedRadiusMm(const RoutePoint *route, uint16_t count, uint16
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathApplyDecelLead
 // 処理概要     半径減少率に応じて低い速度を手前へ広げ、減速開始を先行させる
-// 引数         route: 経路点列, count: 経路点数
+// 引数         route: 経路点列, count: 経路点数, primaryCurvature: 短縮区間でも一次曲率を使用
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-static void pathApplyDecelLead(RoutePoint *route, uint16_t count)
+static void pathApplyDecelLead(RoutePoint *route, uint16_t count, bool primaryCurvature)
 {
 	float baseLeadMm = tgtParam.decelLeadMm;
 	if (count <= 1U || !isfinite(baseLeadMm) || baseLeadMm <= 0.0f) return;
 	int16_t previousRadius = INT16_MAX;
 	for (uint16_t i = 1U; i < count; i++)
 	{
-		int16_t radius = pathSpeedRadiusMm(route, count, i);
+		int16_t radius = pathSpeedRadiusMm(route, count, i, primaryCurvature);
 		if (radius < 0) radius = INT16_MAX;
 		if (route[i].speed_cms < route[i - 1U].speed_cms && radius < previousRadius)
 		{
@@ -641,28 +643,29 @@ static void pathApplyDecelLead(RoutePoint *route, uint16_t count)
 // モジュール名 pathBuildSpeedProfile
 // 処理概要     曲率と加減速制約から経路速度を設定する
 // 引数         route: 経路点列, count: 経路点数, shortcutLevel: 短縮レベル
-//              curvatureSpeed: trueでDISTANCE共通の曲率別速度を使用
+//              curvatureSpeed: trueでDISTANCE共通の曲率別速度を使用（短縮時も一次曲率を使用）
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 static void pathBuildSpeedProfile(RoutePoint *route, uint16_t count, uint8_t shortcutLevel, bool curvatureSpeed)
 {
 	if (count == 0U) return;
+	bool primaryCurvature = curvatureSpeed && shortcutLevel > 0U;
 	float speedCap = (shortcutLevel == 0U) ? tgtParam.pathReplay : tgtParam.shortCut;
 	if (speedCap <= 0.0f) speedCap = tgtParam.pathReplay;
 	if (curvatureSpeed) speedCap = PATH_CURVE_MAX_SPEED_MPS;
 	for (uint16_t i = 0U; i < count; i++)
 	{
 		float speed = curvatureSpeed ? fminf(speedCap, asignVelocity(INT16_MAX)) : speedCap;
-		int16_t radius = pathSpeedRadiusMm(route, count, i);
+		int16_t radius = pathSpeedRadiusMm(route, count, i, primaryCurvature);
 		if (radius >= 0)
 		{
 			float curveSpeed = asignVelocity(radius);
-			if (curvatureSpeed && !pathCanUseSourceRadius(i)) speed = fminf(speedCap, curveSpeed);
+			if (curvatureSpeed && !pathCanUseSourceRadius(i, primaryCurvature)) speed = fminf(speedCap, curveSpeed);
 			else speed = fminf(speed, curveSpeed);
 		}
 		route[i].speed_cms = (uint16_t)lroundf(fmaxf(0.0f, speed) * 100.0f);
 	}
-	pathApplyDecelLead(route, count);
+	pathApplyDecelLead(route, count, primaryCurvature);
 	if (curvatureSpeed)
 	{
 		// スタートマーカーまではsearch速度のため、先頭から加速制約を適用する。
@@ -1145,11 +1148,12 @@ static void pathMarkCrossStraight(float startMm, float endMm)
 // モジュール名 routeBuildFromLogImpl
 // 処理概要     一次走行ログから20mm間隔の再走行経路を生成する
 // 引数         logNumber:ログ番号, shortcutLevel:短縮レベル
-//              curvatureSpeed: trueで曲率別速度のPATH_CURVEを生成
+//              curvatureMode: BOOST_NONEは定速上限、PATH_CURVE/SHORTCUT_CURVEは曲率別速度
 // 戻り値       経路点数、負値はエラー
 /////////////////////////////////////////////////////////////////////
-static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel, bool curvatureSpeed)
+static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel, uint8_t curvatureMode)
 {
+    bool curvatureSpeed = curvatureMode != BOOST_NONE;
     FIL file;
     RouteSourceInfo columns;
     ShortcutSettings generationSettings = shortcutSettings;
@@ -1343,7 +1347,7 @@ static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel, bool 
 	routeShortcutRequestedLevel = requestedShortcutLevel;
 	routeGenerationSettings = generationSettings;
 	routeGeometryCrc32 = pathComputeRouteGeometryCrc32();
-	optimalTrace = curvatureSpeed ? BOOST_PATH_CURVE : (shortcutOk ? BOOST_SHORTCUT : BOOST_PATH_REPLAY);
+	optimalTrace = curvatureSpeed ? curvatureMode : (shortcutOk ? BOOST_SHORTCUT : BOOST_PATH_REPLAY);
 	indexSC = (int16_t)routeCount;
 	optimalIndex = 0U;
 	sd_fatfs_unlock();
@@ -1367,7 +1371,7 @@ failed:
 int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 {
     LOG_PERF_BEGIN(tick);
-    int16_t result = routeBuildFromLogImpl(logNumber, shortcutLevel, false);
+    int16_t result = routeBuildFromLogImpl(logNumber, shortcutLevel, BOOST_NONE);
     if (shortcutLevel > 0U) { LOG_PERF_END(shortcutMs, tick); }
     else { LOG_PERF_END(pathMs, tick); }
     return result;
@@ -1382,8 +1386,22 @@ int16_t routeBuildFromLog(int logNumber, uint8_t shortcutLevel)
 int16_t routeBuildCurvatureFromLog(int logNumber)
 {
     LOG_PERF_BEGIN(tick);
-    int16_t result = routeBuildFromLogImpl(logNumber, 0U, true);
+    int16_t result = routeBuildFromLogImpl(logNumber, 0U, BOOST_PATH_CURVE);
     LOG_PERF_END(pathMs, tick);
+    return result;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 routeBuildShortcutCurvatureFromLog
+// 処理概要     短縮経路へ一次走行の曲率別速度と共通の加減速制約を設定する
+// 引数         logNumber: 一次ログ番号, shortcutLevel: 短縮レベル
+// 戻り値       経路点数、失敗時は負のエラーコード
+/////////////////////////////////////////////////////////////////////
+int16_t routeBuildShortcutCurvatureFromLog(int logNumber, uint8_t shortcutLevel)
+{
+    LOG_PERF_BEGIN(tick);
+    int16_t result = routeBuildFromLogImpl(logNumber, shortcutLevel, BOOST_SHORTCUT_CURVE);
+    LOG_PERF_END(shortcutMs, tick);
     return result;
 }
 

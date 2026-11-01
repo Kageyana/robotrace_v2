@@ -22,6 +22,7 @@
 #define BOOST_SHORTCUT 3			// ショートカット2次走行
 #define BOOST_PATH_REPLAY 4			// 一次走行経路のセンサレス再走行
 #define BOOST_PATH_CURVE 5			// 仮想ラインの曲率に応じた可変速経路走行
+#define BOOST_SHORTCUT_CURVE 6		// 一次曲率で速度を決めるショートカット経路走行
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 isPathRunMode
@@ -31,7 +32,8 @@
 /////////////////////////////////////////////////////////////////////
 static inline bool isPathRunMode(uint8_t mode)
 {
-    return mode == BOOST_PATH_REPLAY || mode == BOOST_SHORTCUT || mode == BOOST_PATH_CURVE;
+    return mode == BOOST_PATH_REPLAY || mode == BOOST_SHORTCUT || mode == BOOST_PATH_CURVE ||
+        mode == BOOST_SHORTCUT_CURVE;
 }
 
 /////////////////////////////////////////////////////////////////////

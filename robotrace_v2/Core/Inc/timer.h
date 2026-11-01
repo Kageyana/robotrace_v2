@@ -16,8 +16,8 @@
 //====================================//
 extern float bootTime;
 #if defined(ROBOTRACE_ISR_TIMING) && ROBOTRACE_ISR_TIMING
-// モード番号0/予約1/2/3/4/5の順。廃止した番号1は記録せず、他の添字を維持する。
-#define ISR_TIMING_MODE_COUNT 6U
+// モード番号0/予約1/2/3/4/5/6の順。廃止した番号1は記録せず、他の添字を維持する。
+#define ISR_TIMING_MODE_COUNT 7U
 typedef struct
 {
 	uint64_t totalCycles;

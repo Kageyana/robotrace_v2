@@ -61,7 +61,9 @@ static uint32_t timingIrqStart, timingIrqMode;
 static bool timingIrqRunning;
 static bool timingIrqIdleTest;
 _Static_assert(BOOST_NONE == 0 && BOOST_DISTANCE == 2 &&
-	BOOST_SHORTCUT == 3 && BOOST_PATH_REPLAY == 4 && BOOST_PATH_CURVE == 5, "ISR timing mode order changed");
+	BOOST_SHORTCUT == 3 && BOOST_PATH_REPLAY == 4 && BOOST_PATH_CURVE == 5 &&
+	BOOST_SHORTCUT_CURVE == 6 && ISR_TIMING_MODE_COUNT == BOOST_SHORTCUT_CURVE + 1U,
+	"ISR timing mode order changed");
 /////////////////////////////////////////////////////////////////////
 // モジュール名 recordTimingStats
 // 処理概要     走行モード別に割り込み処理のサイクル数を整数で集計する

@@ -35,7 +35,7 @@
 #define PARAM_BOOST_300 1.3F // 曲率半径300mmの区間の速度の既定値[m/s]。
 #define PARAM_BOOST_200 1.2F // 曲率半径200mmの区間の速度の既定値[m/s]。
 #define PARAM_BOOST_100 1.1F // 曲率半径100mmの区間の速度の既定値[m/s]。
-#define PARAM_DECEL_LEAD_MM 30.0F // DISTANCE/SLIP/PATH/SHORTCUT/PATH_CURVE共通の減速先行距離の既定値[mm]。有効なSD値を優先し、0で無効。
+#define PARAM_DECEL_LEAD_MM 30.0F // DISTANCE/SLIPと全経路モード共通の減速先行距離の既定値[mm]。有効なSD値を優先し、0で無効。
 
 #define PARAM_UP_STEP 1.02F // 速度パラメータ増加用の倍率[無次元]。現行コードでは未使用。
 

@@ -395,7 +395,13 @@ Shortcut画面は入場・項目変更時に本文を描画し、値だけの変
 - チューニングパラメータは見つけやすい場所に置き、意図が明らかでない変更には理由と単位を残す。
 - PID、ラインセンサー閾値、マーカー検出、加速度、速度制限の調整手順は `.agents/skills/robotrace-tuning/SKILL.md` を使う。
 
-### ショートカット候補の採用・除外（制御版28）
+### SHORTCUT_CURVE（制御版29）
+
+`BOOST_SHORTCUT_CURVE=6`を新設する。経路形状・候補採否・除外区間・保護域はSHORTCUTと同じとし、速度は短縮区間でも一次経路の丸め前曲率半径を使って`asignVelocity()`から生成する。DISTANCE/PATH_CURVEと同じSDの`bstStraight`/`bst1500`～`bst100`、`acceleF`/`acceleD`、`decelLeadMm`を使用し、定速走行用の`shortCut`/`pathReplay`の速度上限は適用しない。機体上限10m/s、先頭の`search`速度制約、実短縮経路の距離による前後の加減速制約を維持する。端点・クロス直線・一次半径の無い延長部はPATH_CURVEと同じ扱いとする。短縮できない場合やレベル0でも要求モード6を保持し、未短縮経路を曲率別速度で走る。
+
+LOG画面の5番目に`SHORTCUT_CURVE`を追加する。`auto_run.txt`の2～5走目にも同名を指定できるが、既定の走行順・既存SD値は変更しない。ログは既存PATH形式（通常61列/169B、詳細67列/178B）を使用し、`optimalTrace=6`・`routeControllerVersion=29`で識別する。1ms追従・白線観測・短縮保護域・ゴール後停止・緊急停止は全経路モードと共通。確認入口は`validation/shortcut_curve/run.py`、`entries.py`、`build.py`。詳細は`doc/shortcut-curve.md`。
+
+### ショートカット候補の採用・除外（制御版28で導入）
 
 SHORTCUTの候補は最大80mmの範囲で抽出し、旋回方向の反転2回以上を対象とする。採用する変位上限は`PATH_CORRIDOR_MAX_OFFSET_MM=50mm`と合法余裕の小さい方（現行49.5mm）とする。入口・出口の補間を含む候補全点が上限内の場合だけ採用する。超過候補は前後5点を含む区間全体を除外し、同じ膨らみを短い別候補へ切り直して再採用しない。除外印は採用区間の保護印と別に保持し、除外区間の白線補正・退避条件を変えない。
 
@@ -417,7 +423,7 @@ PATH/SHORTCUT/PATH_CURVEの速度計画にも、DISTANCE/SLIPと同じSD設定`d
 - 設定ファイルの読み書き処理を変更する場合は、ファイル欠落時にデフォルト値でファイルが作成されることを確認する。
 - `targetSpeeds.txt` は既存18項目の末尾に `pathReplay` を加えた19項目形式とする。旧18項目は有効値を保ち、末尾に `pathReplay` の既定値を追加して修復する。
 - `shortcut.txt` は `maxLevel,lookaheadBaseMm,lookaheadPerMpsMm,Klateral_x100,Kheading_x100,lineAlpha_x1000,lineThetaGain_x1e9` の順で保存し、改行は付けない。既定値は `1,080,040,3000,0600,010,000`。旧6項目は有効値を保ち、`lineThetaGain_x1e9` を補って修復する。
-- `auto_run.txt` は2～5走目の方式を `走行番号,方式` で保存する。方式には`PATH_CURVE`も指定できる。既定値は `2,DISTANCE / 3,SLIP / 4,PATH / 5,SHORTCUT`。起動時に読み、欠落・不正・SLIP依存関係違反は全行を既定値へ修復する。修復に失敗した場合は「設定修復失敗」、SD読込I/Oエラー時は「SD読込エラー」と表示してオートスタートを禁止する。I/Oエラー時は設定を書き換えない。SLIPの直前方式はDISTANCEに限る。
+- `auto_run.txt` は2～5走目の方式を `走行番号,方式` で保存する。方式には`PATH_CURVE`と`SHORTCUT_CURVE`も指定できる。既定値は `2,DISTANCE / 3,SLIP / 4,PATH / 5,SHORTCUT`。起動時に読み、欠落・不正・SLIP依存関係違反は全行を既定値へ修復する。修復に失敗した場合は「設定修復失敗」、SD読込I/Oエラー時は「SD読込エラー」と表示してオートスタートを禁止する。I/Oエラー時は設定を書き換えない。SLIPの直前方式はDISTANCEに限る。
 - SD上の `auto_run.txt` を編集した場合は、反映のため再起動する。
 
 設定ファイルの保存先は `./setting/` です。詳細なファイル形式、読み書き関数、破損時の扱いは `.agents/skills/robotrace-sd-settings/SKILL.md` を使います。
@@ -467,7 +473,7 @@ PATH/SHORTCUT/PATH_CURVEの速度計画にも、DISTANCE/SLIPと同じSD設定`d
 
 ### UI 操作とパラメータ保存タイミング
 
-- LOG画面は上下でログ番号、左右で`DISTANCE`→`PATH`→`SHORTCUT`→`PATH_CURVE`を選び、中央押下で解析する。PATHは短縮レベル0、SHORTCUTは設定済み`maxLevel`を使用する。ログなしでは解析しない。中央長押しは1回だけ実行し、選択変更がない周期は再描画しない。連続DMA実行中は同期転送しない。
+- LOG画面は上下でログ番号、左右で`DISTANCE`→`PATH`→`SHORTCUT`→`PATH_CURVE`→`SHORTCUT_CURVE`を選び、中央押下で解析する。PATH/PATH_CURVEは短縮レベル0、SHORTCUT/SHORTCUT_CURVEは設定済み`maxLevel`を使用する。ログなしでは解析しない。中央長押しは1回だけ実行し、選択変更がない周期は再描画しない。連続DMA実行中は同期転送しない。
 
 - 走行開始時、カウントダウン完了かつ IMU/電流センサーキャリブレーション完了後に、PID、速度フィードフォワード、目標速度を SD カードへ保存する。
 - 走行前は全走行共通で3秒カウントダウン（3→2→1）を表示し、開始2秒後にIMU・電流センサー校正を開始する。カウント終了後も校正正常完了まで停止を維持する。現行IMU校正は10ms間隔×100サンプルで約1秒のため、発進はカウント開始から通常約3秒＋校正完了判定・設定保存などの処理時間後となる。読取異常時は校正正常完了とせず、走行を開始しない。
@@ -496,7 +502,8 @@ PATH/SHORTCUT/PATH_CURVEの速度計画にも、DISTANCE/SLIPと同じSD設定`d
 - `BOOST_SHORTCUT`: `BOOST_PATH_REPLAY` の経路にLevel 1の直線回廊短縮を適用し、合法余裕を確認してヨーレート制御で走行する。
 - `BOOST_PATH_REPLAY`: 条件を満たす現行binの `x`, `y`, `encTotalOptimal` を型付きAPIで復元し、`PATH_ROUTE_SPACING_MM`（現行20 mm）間隔に再標本化した経路を走行する。ラインセンサーは限定的な実座標姿勢補正とロスト時フォールバックに使う。Level 0専用速度は `targetSpeeds.txt` の `pathReplay` とする。
 - `BOOST_PATH_CURVE`（`PATH_CURVE`、番号5）: PATHと同じ仮想ラインを走り、経路点前後の接線方位差と距離から曲率半径を求める。DISTANCEと同じ`asignVelocity()`・`bstStraight`/`bst1500`～`bst100`の有効なSD設定を共用し、`pathReplay`/`shortCut`の速度上限は適用しない。上限10m/sと既存PATHの`acceleF`/`acceleD`による前後の速度制約を適用し、先頭速度はスタート前の`search`以下とする。加減速のcm/s量子化は上限を超えない方向へ丸める。経路生成・ゴール延長・1ms追従・ライン退避・自己位置喪失停止はPATHと共通とする。
-- 現行番号は一次=0、DISTANCE=2、SHORTCUT=3、PATH REPLAY=4、PATH_CURVE=5とする。旧`BOOST_MARKER`の番号1は廃止・再利用禁止とし、未定義値とともに走行開始を拒否する。ISR診断配列も添字1を空け、既存の他モードの添字を維持する。
+- `BOOST_SHORTCUT_CURVE`（`SHORTCUT_CURVE`、番号6）: SHORTCUTと同じ短縮経路を、短縮区間も含めて一次曲率由来の可変速度で走る。速度表・加減速・先行減速はPATH_CURVEと共通とする。
+- 現行番号は一次=0、DISTANCE=2、SHORTCUT=3、PATH REPLAY=4、PATH_CURVE=5、SHORTCUT_CURVE=6とする。旧`BOOST_MARKER`の番号1は廃止・再利用禁止とし、未定義値とともに走行開始を拒否する。ISR診断配列も添字1を空け、既存の他モードの添字を維持する。
 - PATH REPLAY / SHORTCUT / PATH_CURVEの生成経路は、先読み用として一次経路終端から原点までの距離の半分だけ延長する。正常終了は延長点到達ではなくゴールマーカー確認を使い、その後は通常ライン追従で停止する（制御版26）。経路延長不能、配列容量超過、無効な経路元は引き続き生成エラーとして走行開始を禁止し、ゴール前の自己位置喪失停止を維持する。
 
 ### 2026-10-31：PATH／SHORTCUTとPATH_CURVEの共通制御（版23）

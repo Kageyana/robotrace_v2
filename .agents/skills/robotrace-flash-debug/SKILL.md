@@ -17,6 +17,8 @@ description: robotrace_v2をSTM32CubeCLT、STM32_Programmer_CLI、ST-Link/GDBで
 
 ## 実行前の再発防止
 
+新モードSHORTCUT_CURVEの現行検証はvalidation/shortcut_curveのrun.py、entries.py、build.py、check_timing.pyを使う。このチェックアウトにrobotrace_v2/testsは無いため固定検索せず、別入口は現在のvalidation一覧から選ぶ。参照の読込と依存する検索を別呼出しにする。[新モード追加時の再発](../../../doc/失敗事例/2026-10-31-path-common-validation-contract.md)。
+
 版21へ戻す場合はprepare_controller21_restore.pyで現807dfea…/復元bc7a3fca…の実像・実265配置を別領域へ確定し、analysis/controller21_restore_20261031/hardware.py capture --image installed→flash --before→boot --beforeを使う。旧ベンチのinstalled/diagnosticの役割を流用しない。ST-Link enumeration failedでも所有サーバー終了を確認して接続復旧を依頼し、GDB読取りやダウンロードが始まっていないことを原ログで保存する。再接続後は5分以内の新しい実停止captureを必須とする。[版21復元時の未列挙](../../../doc/失敗事例/2026-10-27-stlink-usb-during-flash.md)。
 
 Releaseを型付きで読戻す前は、CMakeCacheだけでなくcompile_commands.jsonの全対象Cで最後の-g/-Oを確認する。このツールチェーンの実効Releaseは-Os -g0で、全体CFLAGSの-g3は上書きされる。型情報は独立コピーの設定で-Osを維持して有効化し、実ELFのsizeofと元Releaseの実行命令列を照合する。前段失敗後は配置準備を呼ばず、run_path_release_types_pipeline.pyで完了証跡を確認する。[実効フラグと依存の事例](../../../doc/失敗事例/2026-10-31-release-dwarf-effective-flags.md)参照。

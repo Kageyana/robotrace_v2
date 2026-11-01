@@ -783,7 +783,7 @@ static void setup_calibration(void)
 ///////////////////////////////////////////////////////////////////////////////////////
 static void setup_log(void)
 {
-    static const char *modeNames[] = {"DISTANCE", "PATH", "SHORTCUT", "PATH_CURVE"};
+    static const char *const modeNames[] = {"DISTANCE", "PATH", "SHORTCUT", "PATH_CURVE", "SHORTCUT_CURVE"};
     static int16_t selectedLog = 0, selectedMode = 0, result = 0;
     static bool pushHeld = false;
     bool redraw = (pattern.display != pattern.beforeHex);
@@ -809,7 +809,7 @@ static void setup_log(void)
     if (selectedLog < 0 || selectedLog > endFileIndex) selectedLog = endFileIndex;
     int16_t previousLog = selectedLog, previousMode = selectedMode;
     dataTuningUD(&selectedLog, 1, 0, endFileIndex);
-    dataTuningLR(&selectedMode, 1, 0, 3);
+    dataTuningLR(&selectedMode, 1, 0, (int16_t)(sizeof(modeNames) / sizeof(modeNames[0]) - 1U));
     if (selectedLog != previousLog || selectedMode != previousMode)
     {
         redraw = true;
@@ -831,6 +831,7 @@ static void setup_log(void)
         case 1: result = routeBuildFromLog(logNumber, 0U); break;
         case 2: result = routeBuildFromLog(logNumber, shortcutSettings.maxLevel); break;
         case 3: result = routeBuildCurvatureFromLog(logNumber); break;
+        case 4: result = routeBuildShortcutCurvatureFromLog(logNumber, shortcutSettings.maxLevel); break;
         default: result = -1; break;
         }
         if (result > 0)
@@ -895,6 +896,9 @@ static void setup_start(void)
 			break;
 		case BOOST_PATH_CURVE:
 			ssd1306_printf(Font_6x8, "PATH CURVE");
+			break;
+		case BOOST_SHORTCUT_CURVE:
+			ssd1306_printf(Font_6x8, "SHORTCUT CURVE");
 			break;
 		}
 		pattern.calibration = 1;

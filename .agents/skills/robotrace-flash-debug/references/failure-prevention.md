@@ -179,3 +179,7 @@ Skill/再発防止参照を読む呼出しと、その内容に依存する検�
 ## 2026-11-01：nm原本の改行と配置照合
 
 nm出力をbytesで保存した場合、行末アンカーの正規表現へ渡す前にsplitlinesで改行を正規化する。原本・対象ELFのSHAを保存し、同じELFの原本から配置検証を再開する。パーサ失敗のため成功済みビルドをやり直さない。[走行別ログの配置検証](../../../../doc/失敗事例/2026-11-01-mode-log-diagnostics-preflight.md)、`validation/mode_log_diagnostics/finalize.py`を参照。
+
+## SHORTCUT_CURVE追加時の検証入口
+
+このチェックアウトの新モード検証はvalidation/shortcut_curve/run.py、entries.py、build.py、check_timing.pyを使う。存在しないrobotrace_v2/testsを過去参照から構成しない。追加検索は実在validationの一覧から選ぶ。[再発と確認](../../../../doc/失敗事例/2026-10-31-path-common-validation-contract.md)。

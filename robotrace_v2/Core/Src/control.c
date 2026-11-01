@@ -550,6 +550,10 @@ void loopSystem(void)
 			case AUTO_RUN_MODE_PATH_CURVE:
 				ret = routeBuildCurvatureFromLog(autoRunCurrentPlan.primaryLogNumber);
 				break;
+			case AUTO_RUN_MODE_SHORTCUT_CURVE:
+				ret = routeBuildShortcutCurvatureFromLog(autoRunCurrentPlan.primaryLogNumber,
+					shortcutSettings.maxLevel);
+				break;
 			case AUTO_RUN_MODE_SHORTCUT:
 				ret = routeBuildFromLog(autoRunCurrentPlan.primaryLogNumber,
 					shortcutSettings.maxLevel);

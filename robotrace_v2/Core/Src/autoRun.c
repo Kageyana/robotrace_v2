@@ -90,6 +90,11 @@ static bool parseMode(const char *text, size_t length, AutoRunMode *mode)
 		*mode = AUTO_RUN_MODE_SHORTCUT;
 		return true;
 	}
+	if (length == 14U && memcmp(text, "SHORTCUT_CURVE", 14U) == 0)
+	{
+		*mode = AUTO_RUN_MODE_SHORTCUT_CURVE;
+		return true;
+	}
 	return false;
 }
 
@@ -237,6 +242,7 @@ bool autoRunFormatConfig(const AutoRunMode modes[AUTO_RUN_CONFIG_SLOT_COUNT], ch
 		case AUTO_RUN_MODE_PATH: name = modeNames[2]; break;
 		case AUTO_RUN_MODE_SHORTCUT: name = modeNames[3]; break;
 		case AUTO_RUN_MODE_PATH_CURVE: name = "PATH_CURVE"; break;
+		case AUTO_RUN_MODE_SHORTCUT_CURVE: name = "SHORTCUT_CURVE"; break;
 		default: return false;
 		}
 		if (modes[slot] == AUTO_RUN_MODE_SLIP &&
@@ -349,6 +355,7 @@ const char *autoRunModeName(AutoRunMode mode)
 	case AUTO_RUN_MODE_PATH: return "PATH";
 	case AUTO_RUN_MODE_SHORTCUT: return "SHORTCUT";
 	case AUTO_RUN_MODE_PATH_CURVE: return "PATH_CURVE";
+	case AUTO_RUN_MODE_SHORTCUT_CURVE: return "SHORTCUT_CURVE";
 	default: return "INVALID";
 	}
 }

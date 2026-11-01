@@ -15,6 +15,8 @@ description: robotrace_v2のSDカード内設定ファイルを読む、書く�
 
 ## 実行前の再発防止
 
+auto_run.txtはSHORTCUT_CURVE（14文字）を2～5走目の全スロットで受理する。既定のDISTANCE/SLIP/PATH/SHORTCUTと19項目のtargetSpeeds.txt、7項目のshortcut.txtは維持する。新方式も一次参照と既存のSLIP依存・欠落修復・I/O時上書き禁止を適用する。確認はvalidation/shortcut_curve/entries.py、仕様は[SHORTCUT_CURVE](../../../doc/shortcut-curve.md)。
+
 最初のコマンドの前に [共通事前確認](../../../doc/skill-execution-preflight.md) を読み、パス・workdir・権限・実行環境を確定する。SD設定・保存・復旧・CSV形式を扱うときは [分野別の再発防止](references/failure-prevention.md) も読む。関連する失敗記録は最新追記まで確認し、既知の失敗条件を初回操作から回避する。
 
 

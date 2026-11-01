@@ -1,5 +1,14 @@
 # PATH共通化検証での検索入口と白線退避後の回復条件
 
+## 2026-11-01：SHORTCUT_CURVE追加時の検索先の再発
+
+- 事実: 新モードの関連検証を探す際、既知の欠落パスrobotrace_v2/testsを再びrgへ渡しos error 2となった。製品編集・ビルド前の読取段階で、原本とファームへの影響はない。
+- 原因: 過去参照のテスト配置を現チェックアウトへ当てはめ、実在検査を呼出し点で省略した。既存の「参照読込後、実在親だけを検索する」対策を適用できなかった再発。
+- 対処: 現存validationの一覧から依存する生成器を選び、新検証をvalidation/shortcut_curveへ集約した。新モードの検証入口をflash-debug Skillの実行前手順・再発防止参照へ追記した。
+- 再発防止: このチェックアウトの新モード検証はvalidation/shortcut_curve/run.py、entries.py、build.py、check_timing.pyを使う。存在しないtests名を構成せず、別の入口が必要な場合は現在のvalidation一覧から選ぶ。
+- 確認: 実在validation経由の実C O0/O2、画面・自動設定・保存/CRC、Debug/Release、診断ONのtimer.c構文検査が全件成功。
+- ステータス: resolved（検証入口）。新モードの実走は未確認。
+
 - status: resolved（検索と試験契約）。実走行性能は未検証。
 - 対象: PATH／SHORTCUTをPATH_CURVEの経路生成・補正・FF・未照合処理へ統一する作業。
 - 事実: 共通事前確認の読取りと同じ呼出し内で、未確認のvalidationとrobotrace_v2/testsをrgへ渡してos error 2、Core/Src/path*等をパスに渡してos error 123が発生した。後続のgit status成功により呼出し全体は終了0だった。製品への変更前の検索失敗で、解析値・実機への影響はない。
