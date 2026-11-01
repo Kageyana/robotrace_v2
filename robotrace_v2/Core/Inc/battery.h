@@ -13,7 +13,10 @@
 #define BAT_LV_1 1
 #define BAT_LV_2 2
 #define BAT_LV_3 3
-#define BATTERY_VOLTAGE_LPF_COEF 0.02f
+//====================================//
+// 調整パラメータ
+//====================================//
+#define BATTERY_VOLTAGE_LPF_COEF 0.18126925f // 1ms周期、時定数5msのLPF係数[無次元]。1-exp(-1ms/5ms)
 #define BATTERY_VOLTAGE_MIN_VALID_V 5.0f
 #define BATTERY_VOLTAGE_MAX_VALID_V 8.8f
 
