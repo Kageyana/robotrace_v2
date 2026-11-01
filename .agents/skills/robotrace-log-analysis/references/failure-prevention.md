@@ -144,3 +144,9 @@ NumPy配列から既存の標準statistics使用補助へ行辞書を渡す前�
 ## 2026-11-01：ライン診断の使用周期と保存周期
 
 ゲインの説明前に、対象番号ごとのlineKpUsed/lineKdUsed/lineGainStateの全組合せを出す。14033の終了Kd2を14034へ転用しない。14034はP2/D0とP5/D12で、終了値はP2/D0。左右目標は実記録を優先し、共通targetSpeedからの再構成はPID後のprocessMarkerEvent更新点を確認する。実14034の12不一致行は全てマーカー行で、非飽和輪から復元した使用目標で左右とフラグが整合した。一次の1ms連続証拠0件も未観測として保持する。入口はanalysis/script/diagnose_line_log_14033_14034.py、[周期境界の訂正](../../../../doc/失敗事例/2026-11-01-line-log-real-sample-boundary.md)。
+
+## 2026-11-01：PATH_CURVEの曲率・速度計画を調べる前
+
+ソース検索はリポジトリルートから`powershell.exe -NoProfile -ExecutionPolicy Bypass -File analysis/script/search_pathcurve_sources.ps1`を入口とする。実在Core/Srcの存在検査後、`rg -n <pattern> <directory> -g 'path*.c'`を使い、パス引数へpath*を置かない。未知ファイルは実在親のrg --filesで確定し、native終了2以上なら後続へ進まない。[11/1の検索再発](../../../../doc/失敗事例/2026-08-11-windows-rg-glob-not-expanded.md)。
+
+PC再生成の前に一次の長さ/経路間隔/予約点/保存最大optimalIndex/実ヘッダ容量を照合する。マクロ値を推測しない。現行容量と実走記録が不一致ならビルド同一性を未確認とし、診断専用容量拡大を機体計画の完全再現と呼ばない。bin全CRC・保存RAM・実ビルドを未照合なら、その限界を報告へ残す。[診断容量の契約](../../../../doc/失敗事例/2026-11-01-pathcurve-diagnostic-capacity-contract.md)。

@@ -15,6 +15,8 @@ description: ロボトレースのPID、速度フィードフォワード、ス�
 
 計画ROCの進入/復帰は別の先読み位置なので、両条件が同時成立し得る。理由bitと保持距離の試験では両方成立・片方成立・両方不成立を含め、進入時のbit3を不正としない。現行の計画ROCのみの切替はlineGainPolicyVersion=2。検証はvalidation/plan_roc_gain/run.pyとfinalize.py。[境界fixtureの訂正](../../../doc/失敗事例/2026-11-01-plan-roc-gain-fixture.md)。
 
+ソースの補助モジュール名を推測して検索パスへ加えない。既知のCore/Src・Core/IncをTest-Pathで確認し、`rg -n 'pathCurvatureAtArcWindow|PATH_CURVE_YAW_PREVIEW_TIME_MS' robotrace_v2/Core/Src robotrace_v2/Core/Inc -g '*.c' -g '*.h'`で実在ファイルを確定する。各rgの直後に終了コードを確認し、2以上なら後続読取りを止める。[10/31の補助名推測再発](../../../doc/失敗事例/2026-08-11-windows-rg-glob-not-expanded.md)参照。
+
 
 走行評価集合の「ログ正常終了」と「ユーザー/映像で板内完走確認済み」を分け、未確認を別区分で保持する。emcStop0だけを物理的なはみ出しなしの根拠にしない。現在の23走比較ではemcStop0は21本だが、明示確認済みは13901～13910/13913～13922の20本で13899は未確認。採否・10本の物理確認へ未確認ログを加算しない。[確認範囲の訂正](../../../doc/失敗事例/2026-10-30-normal-log-physical-scope.md)参照。
 

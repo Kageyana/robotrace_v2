@@ -39,6 +39,8 @@ SHORTCUT_CURVEはoptimalTrace=6、制御版29。SHORTCUTと同じ形状・除外
 
 走行別ログの検証器を生成する前に、[列定義・C抽出・診断文字コードの前提](../../../doc/失敗事例/2026-11-01-mode-log-diagnostics-preflight.md)を読む。排他的マクロはprofileごとに展開して一意性を検査し、テンプレートは単語境界付きの単一パス置換、実関数抽出は戻り値型を限定した定義パターンを使う。コンパイラ出力をbytesで保全し、解析前に改行を正規化する。
 
+日次の全件走査では個別load前にデータ行数を確認する。ヘッダだけのCSVはlogExpectedRows=0と照合してEMPTYへ分類し、数値解析から除外して次の番号を続ける。loadのAssertionError等もログ番号・原本SHA・理由を保存して全件処理を継続する。実データ入りだけを有限性・行幅・期待行数の検証へ渡す。入口はanalysis/script/audit_white_width6_20261031.pyで、13933のEMPTYと後続13934～13965の処理を確認済み。[空ログでの全件中断](../../../doc/失敗事例/2026-10-04-classification-corrupt-csv.md)参照。
+
 版20/21/22等の新規比較では、CSVメタデータへ裸のintを使わず、compare_controller_20_21_22.metadata_integerの有限・整数相当検査を通す。全ログを読む前に5/5.00受入、5.1/nan/±inf拒否の6境界を確認する。13901～13910/13913～13922/13928の21原本で所属とSHA一致を確認済み。[整数表記の10/31再発](../../../doc/失敗事例/2026-10-14-log-metadata-integer-decimal-format.md)。
 
 2026-10-31：動画の同期前に録画先頭で機体が既に移動しているか確認し、正のoffsetだけを仮定しない。負offsetも含む探索結果・全ログに対する被覆率・相関を保存する。ログ先頭が写っていなければSG開始位置を補完せず、最初の実観測基準の相対比較と未観測時間を明記する。保持RAM境界を映像へ写す際は同時刻の有効点の間隔を先に検査し、25msを超えたら未測定とする。他時刻や制動後位置へ置換しない。原解像度の色閾値感度が1°ゲートを超える点は不合格を保持し、全点方位精度合格と呼ばない。[動画の開始/終了境界](../../../doc/失敗事例/2026-10-30-video-post-run-coverage.md)。
@@ -287,3 +289,9 @@ C:/tool/AutoCopyCsvFromSdなど文書の既定配置も、初回のrg/search前�
 ゴール後の停止は、SG終値・emcStop・pathLoopPeriod_mm・終了時未照合時間・保存明部を分けて確認する。period>0向け白線延長の検証成功をperiod=0へ流用しない。13989～13991・13993はユーザー完走確認済みだが、周期0・白線可視のまま未照合150msで停止7。入口はanalysis/script/diagnose_goal_tail_13989_13993.py、証拠はanalysis/goal_tail_13989_13993/report.md。物理逸脱は疎な保存値から確定しない。
 
 ログ実装の検索もCore/Srcの実在親と-g '*.c'から始め、logBinary.c等のファイル分割を推測しない。rg終了2以上で後続へ進まない。新規文書追加は単独パッチで確定し、既存文書更新は直前に読んだ完全行だけをアンカーにする。拒否後は全対象の部分適用を確認し、完了済み解析を保全する。失敗記録はdoc/失敗事例/2026-11-01-goal-tail-investigation-preflight.md。周期未確定の実機終端問題はdoc/失敗事例/2026-10-28-path-white-map-goal-extension.mdの11/1追記を参照する。
+
+## 2026-11-01：PATH_CURVEの曲率・速度計画を調べる前
+
+ソース検索はリポジトリルートから`powershell.exe -NoProfile -ExecutionPolicy Bypass -File analysis/script/search_pathcurve_sources.ps1`を入口とする。実在Core/Srcの存在検査後、`rg -n <pattern> <directory> -g 'path*.c'`を使い、パス引数へpath*を置かない。未知ファイルは実在親のrg --filesで確定し、native終了2以上なら後続へ進まない。[11/1の検索再発](../../../doc/失敗事例/2026-08-11-windows-rg-glob-not-expanded.md)。
+
+PC再生成の前に一次の長さ/経路間隔/予約点/保存最大optimalIndex/実ヘッダ容量を照合する。マクロ値を推測しない。現行容量と実走記録が不一致ならビルド同一性を未確認とし、診断専用容量拡大を機体計画の完全再現と呼ばない。bin全CRC・保存RAM・実ビルドを未照合なら、その限界を報告へ残す。[診断容量の契約](../../../doc/失敗事例/2026-11-01-pathcurve-diagnostic-capacity-contract.md)。

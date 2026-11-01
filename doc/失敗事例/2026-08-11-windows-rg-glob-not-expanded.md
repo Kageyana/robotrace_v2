@@ -173,3 +173,15 @@ rg --files .vscode robotrace_v2/.vscode -g '*.json'で再取得し、tasks.json�
 ## 2026-11-01：先行減速実装の検証器参照での再発
 
 対象タスクは経路3方式へのdecelLeadMm適用。過去のビルド記録からvalidation/stop_motor_hold/run.pyの存在を仮定して読込み、さらに同ディレクトリへのrgでos error 2となった。直前のrg --files validationの実在一覧には対象がなく、一覧を後続読込の必須条件へ使わなかったことが原因。製品ソースの変更前に起きた調査失敗で、既に終了した変更前ビルドは反復していない。実在一覧からpath_common/build.pyとgoal_marker_stop/build.pyを読み、新しい検証器をvalidation/path_decel_leadへ作成した。入口でコンパイラ・Ninja・変更前Coreの存在と実モード宣言を検査し、変更前後4構成と実CのO0/O2テストを終了0で確認した。再発防止は過去文書の検証器パスを実在一覧へ照合してから別呼出しで読み、一覧にない対象は読まないこと。flash-debugの再発防止参照へこの実行点を追記する。record-failures Skillは本セッションの既確認一覧に存在しないため既存記録へ直接追記。status: resolved（参照経路と検証器の実行確認）。実機の制動・再現性は未確認。
+
+## 2026-10-31：ショートカット設定調査で補助ファイル名を推測
+
+対象は13950～13954の失敗に対するShortcut設定の改善余地の確認。実在一覧を得ずにpathGeometry.h/cをrgのパス引数へ指定し、両方でos error 2が発生した。実装はpathFollower.c内にあり、既存のファイル名推測禁止を今回の任意追加検索へ適用できなかった。後続の別検索が成功したためシェル全体は終了0だったが、当該検索は失敗である。
+
+対処は実在するCore/Src・Core/Incを検索ルートにしてpathCurvatureAtArcWindowとPATH_CURVE_YAW_PREVIEW_TIME_MSを検索し、pathFollower.c/hに定義があることを確認したこと。再発防止はtuning Skillの実行前へ、補助ファイル名を構成しないこと、シンボルから実在ファイルを確定する具体的なコマンド、rg終了2以上で後続を止める条件を追加する。修正検索の終了0と定義箇所を確認したため検索手順の対処はresolved。ファームウェア・設定は未変更で、走行改善の実機効果は未検証。
+
+## 2026-11-01 PATH_CURVE直線内減速調査での再発
+
+共通事前確認を読んだ後にも、rgのパスへCore/Src/path*を渡してos error123。続く検索ではルートにないCMakeLists.txtと未確認の解析スクリプト名を含めos error2。既存のglob分離・存在確認をコマンドへ適用できなかった再発。原本・製品コードへの変更はない。
+
+対処は実在Core/Srcへ-g 'path*.c'を付けた検索。pathBuildSpeedProfile等の定義を終了0で確認した。再発防止としてanalysis/script/search_pathcurve_sources.ps1に既知ルート存在検査・glob分離・native終了2以上で停止を固定し、ログ解析Skillの実行点へこの入口を追加。初回wrapper実行は共通手順の-ExecutionPolicy Bypassを落としてAuthorizationManagerで停止したため、共通手順と同じpowershell.exe -NoProfile -ExecutionPolicy Bypass -Fileで確認する。端末のポリシーやACLは変更しない。status: resolved（修正検索・入口確認）。
