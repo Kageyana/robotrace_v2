@@ -25,6 +25,7 @@
 
 #define PATH_FLAG_CORRIDOR_RESERVED           0x01U
 #define PATH_FLAG_CORRIDOR_APPLIED            0x02U
+#define PATH_FLAG_CROSS_STRAIGHT              0x04U
 
 typedef struct
 {
@@ -420,7 +421,7 @@ static bool pathReadSourceMetadata(FIL *file, RouteSourceInfo *source)
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathAppendRouteSample
-// 処理概要     経路を40mm間隔で再標本化する
+// 処理概要     経路を20mm間隔で再標本化する
 // 引数         xMm/yMm: 終点[mm], previousX/Y: 前点,
 //              accumulated: 残距離[mm]
 // 戻り値       true:追加成功 false:点数上限
@@ -486,7 +487,7 @@ static void pathBuildSpeedProfile(RoutePoint *route, uint16_t count, uint8_t sho
 	for (uint16_t i = 0U; i < count; i++)
 	{
 		float speed = curvatureSpeed ? fminf(speedCap, asignVelocity(INT16_MAX)) : speedCap;
-		if (i > 0U && i + 1U < count)
+		if (i > 0U && i + 1U < count && (routeFlags[i] & PATH_FLAG_CROSS_STRAIGHT) == 0U)
 		{
 			float h0 = (float)route[i - 1U].heading_cdeg * 0.01f;
 			float h1 = (float)route[i + 1U].heading_cdeg * 0.01f;
@@ -863,7 +864,8 @@ bool routeGenerateShortcut(uint8_t shortcutLevel)
 		return false;
 	}
 
-	memset(routeFlags, 0, sizeof(routeFlags));
+	// 一次ログ由来のクロス直線区間は短縮形状の再生成でも保持する。
+	for (uint16_t i = 0U; i < PATH_ROUTE_MAX_POINTS; i++) routeFlags[i] &= PATH_FLAG_CROSS_STRAIGHT;
 	pathComputeCorridorHeadings();
 	for (uint8_t count = 0U; count < PATH_CORRIDOR_MAX_COUNT; count++)
 	{
@@ -920,8 +922,24 @@ bool routeGenerateShortcut(uint8_t shortcutLevel)
 }
 
 /////////////////////////////////////////////////////////////////////
+// モジュール名 pathMarkCrossStraight
+// 処理概要     クロス検出区間の前後を含む経路点へ曲率直線化フラグを設定する
+// 引数         startMm/endMm: 一次経路上のクロス検出開始・終了距離[mm]
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void pathMarkCrossStraight(float startMm, float endMm)
+{
+	float first = ceilf(fmaxf(0.0f, startMm - CROSS_STRAIGHT_MM) / PATH_ROUTE_SPACING_MM);
+	float last = floorf((endMm + CROSS_STRAIGHT_MM) / PATH_ROUTE_SPACING_MM);
+	if (first >= PATH_ROUTE_MAX_POINTS) return;
+	uint16_t begin = (uint16_t)first;
+	uint16_t end = (uint16_t)fminf(last, (float)(PATH_ROUTE_MAX_POINTS - 1U));
+	for (uint16_t i = begin; i <= end; i++) routeFlags[i] |= PATH_FLAG_CROSS_STRAIGHT;
+}
+
+/////////////////////////////////////////////////////////////////////
 // モジュール名 routeBuildFromLogImpl
-// 処理概要     一次走行ログから40mm間隔の再走行経路を生成する
+// 処理概要     一次走行ログから20mm間隔の再走行経路を生成する
 // 引数         logNumber:ログ番号, shortcutLevel:短縮レベル
 //              curvatureSpeed: trueで曲率別速度のPATH_CURVEを生成
 // 戻り値       経路点数、負値はエラー
@@ -954,7 +972,7 @@ static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel, bool 
         routeCount = routeCache.baseCount;
         memset(lineRoute + routeCount, 0, sizeof(RoutePoint) * (PATH_ROUTE_MAX_POINTS - routeCount));
         memset(driveRoute, 0, sizeof(driveRoute));
-        memset(routeFlags, 0, sizeof(routeFlags));
+        for (uint16_t i = 0U; i < PATH_ROUTE_MAX_POINTS; i++) routeFlags[i] &= PATH_FLAG_CROSS_STRAIGHT;
         LOG_PERF_ADD(cacheHits, 1U);
     } else {
         if (!runMemoryPrepare(RUN_MEMORY_PATH)) { resultCode = -9; goto failed; }
@@ -974,6 +992,8 @@ static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel, bool 
         uint8_t loopIntervalCount = 0U;
         int32_t previousSourceMarker = 0;
         bool haveCross = false;
+        bool inCross = false;
+        float crossStartMm = 0.0f, crossEndMm = -CROSS_STRAIGHT_MM - 1.0f;
         LogSourceRow row;
         while (logSourceNext(&file, &row)) {
             float x = row.x, y = row.y, pulse = (float)row.encTotalOptimal;
@@ -983,6 +1003,18 @@ static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel, bool 
             previousX = lastX = x; previousY = lastY = y; previousPulse = pulse;
             parsedRows++;
             if (!pathAppendRouteSample(x, y, &fusedX, &fusedY, &accumulated)) { resultCode = -7; goto failed; }
+            if (!inCross && row.courseMarker == CROSSLINE)
+            {
+                crossStartMm = totalLength;
+                inCross = true;
+            }
+            else if (inCross && row.courseMarker != CROSSLINE)
+            {
+                // 一次解析と同じく、最初の非クロス行を検出区間の終端とする。
+                crossEndMm = totalLength;
+                pathMarkCrossStraight(crossStartMm, crossEndMm);
+                inCross = false;
+            }
             if (isfinite(row.imuAngleZ))
             {
                 PathFusionLine measured;
@@ -1028,11 +1060,19 @@ static int16_t routeBuildFromLogImpl(int logNumber, uint8_t shortcutLevel, bool 
             fabsf(totalLength - (previousPulse / PULSE_MILLIMETER)) > fmaxf(50.0f, totalLength * 0.05f)) {
             resultCode = -11; goto failed;
         }
+        if (inCross)
+        {
+            crossEndMm = totalLength;
+            pathMarkCrossStraight(crossStartMm, crossEndMm);
+        }
         if (pathPointDistance((float)lineRoute[routeCount - 1U].x_mm,
             (float)lineRoute[routeCount - 1U].y_mm, lastX, lastY) >= 0.5f) {
             if (routeCount >= PATH_ROUTE_MAX_POINTS - PATH_GOAL_RESERVED_POINTS) { resultCode = -7; goto failed; }
             lineRoute[routeCount].x_mm = pathFloatToInt16(lastX);
             lineRoute[routeCount].y_mm = pathFloatToInt16(lastY);
+            // 最終点だけは20mmの整数倍でない実際の終端距離で判定する。
+            routeFlags[routeCount] = (totalLength >= crossStartMm - CROSS_STRAIGHT_MM &&
+                totalLength <= crossEndMm + CROSS_STRAIGHT_MM) ? PATH_FLAG_CROSS_STRAIGHT : 0U;
             routeCount++;
         }
         if (routeCount < 2U) { resultCode = -11; goto failed; }
@@ -1410,6 +1450,8 @@ static float pathCurvatureAtArcWindow(uint16_t nearest, float windowMm, float me
 		{
 			float deltaDeg = pathWrapDeg(
 				((float)driveRoute[i + 1U].heading_cdeg - (float)driveRoute[i].heading_cdeg) * 0.01f);
+			// 直線化した20mm区間は平均窓の距離に含め、旋回量だけを0にする。
+			if ((routeFlags[i] & PATH_FLAG_CROSS_STRAIGHT) != 0U) deltaDeg = 0.0f;
 			changeDeg += deltaDeg * ((b - a) / length);
 			coveredMm += b - a;
 		}
