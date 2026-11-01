@@ -15,6 +15,7 @@
 #define PID_GAIN_MAX 255 // SDから受け付ける各PIDゲインの上限[実装スケールの整数値]。
 #define SPEED_FF_GAIN_MIN 0 // SDから受け付ける速度FFゲインの下限[Crr ×1000]。
 #define SPEED_FF_GAIN_MAX 255 // SDから受け付ける速度FFゲインの上限[Crr ×1000]。
+#define TARGET_SPEED_MAX_MPS 10.0F // 速度指令の上限[m/s]。非有限値・負値は停止指令へ置換する。
 
 // PID・速度FFの既定値は、有効なSD設定値を優先する。
 // PIDゲインの数値スケールは各制御関数の演算に従う。
@@ -81,7 +82,7 @@ typedef struct {
 //====================================//
 // グローバル変数の宣言、定義
 //====================================//
-extern uint8_t	targetSpeed;	// 目標速度
+extern uint16_t	targetSpeed;	// 目標速度[pulse/ms]。10m/sの580pulse/msまで保持する。
 extern float	targetSpeedCommand_m_s;	// setTargetSpeedで指定した速度指令値[m/s]
 extern float    targetAngularVelocity;  // 目標角速度
 

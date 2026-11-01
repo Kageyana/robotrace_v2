@@ -1,5 +1,11 @@
 # 自己記述RLOG v2
 
+## 2026-11-01 速度目標の16bit化
+
+`targetSpeed`の保存型をU8からU16へ変更した。列名・順序・単位[pulse/ms]は維持し、通常61列/169 B、詳細67列/178 Bとなる。制御変数と読込側の範囲もuint16_tへ揃え、4.6m/sの266pulse/msと10m/sの580pulse/msを保持する。自己記述スキーマとCRCは自動更新されるため、機体の解析元には新しい一次ログを取得する。過去ログは変更しない。
+
+`validation/target_speed_u16/run.py`は実setter・実writer/reader・SLIP行受入を通常/詳細×O0/O2で検証する。0/255/256/266/580の往復、バッファ境界、全CRC、列順一致を確認する。`build.py`は通常ログのDebug/ReleaseとARMの2byte配置・STRHを確認する。証跡は`build/target-speed-u16-20261101/`。現在の環境にPC変換器が無いため、PC変換器そのものと初回実機ログは未確認である。
+
 > 2026-10-24: 機体側CSV変換API・旧CSV読込・CSV行バッファを削除した。現行bin専用の型付き読込と`validation/log_storage/run.py`を使用する。以下の機体CSV変換や旧テストの説明は当時の履歴。現行仕様は[整理後の構成](main-code-cleanup.md)を参照する。
 
 2026-10-16のユーザー指示により、保存列の追加・削除・順序変更でPC変換器を更新しない自己記述方式へ移行する。旧RLOG v1の固定6形式は読まない。既存CSVの直接取込は維持する。

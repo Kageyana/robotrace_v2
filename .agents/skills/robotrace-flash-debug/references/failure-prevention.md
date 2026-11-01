@@ -164,3 +164,8 @@ Skillに記載された補助スクリプトも現在のチェックアウトで
 ## 2026-11-01：過去文書の検証器パスを読む実行点
 
 過去のbuild記録や説明にあるvalidation配下のパスも、現チェックアウトにあるとは仮定しない。最初の呼出しでrg --files validation -g '*.py'の実在一覧を取得し、結果を読んだ後の別呼出しで掲載されたファイルだけを読む。一覧にないディレクトリをGet-Contentやrgへ追加しない。新しい検証器は入口で参照Core・コンパイラ・実モード宣言を検査し、変更前ビルド成功後だけ製品編集へ進む。今回の入口はvalidation/path_decel_lead/run.pyとbuild.py。[先行減速実装時の参照失敗](../../../../doc/失敗事例/2026-08-11-windows-rg-glob-not-expanded.md)参照。
+## 2026-11-01：uint16速度目標の検証
+
+過去のvalidation/log_storage/run.pyは現チェックアウトに無い。検証器はrg --files validation -g '*.py'の実在一覧から選び、型変更はvalidation/target_speed_u16/run.pyとbuild.pyを入口にする。通常/詳細の169/178 B、targetSpeedのU16、255/256/266/580の実writer/readerとCRCを確認する。PC変換器未配置時は独立スキーマ復号の成功と、PC変換器・初回実機ログ未確認を分けて報告する。
+
+assertを使うZigホスト検証は、生成Cのassert.hより前でNDEBUGを解除し、O2でもassertが実行されることを保証する。nm等の行末正規表現も解析前にsplitlinesでCRLFを正規化する。集計失敗では実ソースSHA・保存ELFを照合し、build.py --resume-debugで完了済みDebugを再ビルドせず未実行Releaseだけを進める。[実際の失敗と検証](../../../../doc/失敗事例/2026-11-01-target-speed-u16-validation-preflight.md)。

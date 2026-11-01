@@ -24,7 +24,7 @@ pidParam yawRateCtrl = {"yawRate", KP3, KI3, KD3, 0, 0};
 // 速度フィードフォワード係数(セットアップ画面から変更可能: Crr×1000)
 int16_t speedFeedForwardGain = SPEED_FEEDFORWARD_GAIN_DEFAULT;
 
-uint8_t targetSpeed = 0;		 // 目標速度（初期値0）
+uint16_t targetSpeed = 0;		 // 目標速度[pulse/ms]（初期値0）
 float targetSpeedCommand_m_s;	// setTargetSpeedで指定した速度指令値[m/s]
 float targetAngularVelocity; // 目標角速度
 static int16_t speedTargetBefore = 0;	// 速度PID用の前回目標値
@@ -136,13 +136,21 @@ static int16_t calcSpeedFeedForward(float targetSpeed_mm_s, int16_t command_max,
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 setTargetSpeed
 // 処理概要     目標速度の設定
-// 引数         目標速度の整数倍値
+// 引数         speed: 目標速度[m/s]。0～TARGET_SPEED_MAX_MPSへ制限する。
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
 void setTargetSpeed(float speed)
 {
+	if (!isfinite(speed) || speed < 0.0F)
+	{
+		speed = 0.0F;
+	}
+	else if (speed > TARGET_SPEED_MAX_MPS)
+	{
+		speed = TARGET_SPEED_MAX_MPS;
+	}
 	targetSpeedCommand_m_s = speed;	// フィードフォワード計算へ引き渡す速度指令値[m/s]を保存
-	targetSpeed = (int16_t)(speed * PULSE_MILLIMETER);	// 速度指令値[m/s]をエンコーダ換算値へ変換
+	targetSpeed = (uint16_t)(speed * PULSE_MILLIMETER);	// 速度指令値[m/s]をエンコーダ換算値へ変換
 }
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 setTargetAngularVelocity

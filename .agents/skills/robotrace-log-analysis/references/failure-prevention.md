@@ -110,3 +110,9 @@ HTML属性や複雑な引用符を含むNode検証はPowerShellのnode -eへ埋�
 ゴール後の停止は、SG終値・emcStop・pathLoopPeriod_mm・終了時未照合時間・保存明部を分けて確認する。period>0向け白線延長の検証成功をperiod=0へ流用しない。13989～13991・13993はユーザー完走確認済みだが、周期0・白線可視のまま未照合150msで停止7。入口はanalysis/script/diagnose_goal_tail_13989_13993.py、証拠はanalysis/goal_tail_13989_13993/report.md。物理逸脱は疎な保存値から確定しない。
 
 ログ実装の検索もCore/Srcの実在親と-g '*.c'から始め、logBinary.c等のファイル分割を推測しない。rg終了2以上で後続へ進まない。新規文書追加は単独パッチで確定し、既存文書更新は直前に読んだ完全行だけをアンカーにする。拒否後は全対象の部分適用を確認し、完了済み解析を保全する。失敗記録はdoc/失敗事例/2026-11-01-goal-tail-investigation-preflight.md。周期未確定の実機終端問題はdoc/失敗事例/2026-10-28-path-white-map-goal-extension.mdの11/1追記を参照する。
+
+## 2026-11-01：直線減速は速度目標の型も確認する
+
+速度異常調査の初回検索はCore/Src親と-g '*.c'へ固定し、interrupt.c等の分割を仮定しない。TIM処理は現チェックアウトではtimer.c。rg終了コード2以上なら同じ呼出しの後続を停止する。新規診断のdictと**展開のキー重複を生成前に照合する。実関数抽出Cは製品とホストのwarning設定差を先に確認し、既存符号比較warningを回避するために製品式を変更しない。必要な例外はwarning種類を限定し、原診断を保存する。[調査入口の再発](../../../../doc/失敗事例/2026-11-01-primary-roc-investigation-preflight.md)。
+
+ROCが小さいという申告でも、一次保存ROC・経路生成半径・計画速度・PIDへ渡る速度目標・停止理由を分離する。最大速度×PULSE_MILLIMETERを算出し、制御変数とログ型の表現範囲を検査する。14008/14010/14011/14013は4.6m/sの266pulse/msがuint8_tの10へ折り返し、停止6。入口はanalysis/script/verify_speed_wrap_14012.py、証拠はanalysis/primary_roc_14012/report.md。約4.41235m/sが境界で、実機とログの型を揃えるまで原因記録はopen。[速度目標の8bit折返し](../../../../doc/失敗事例/2026-11-01-target-speed-u8-overflow.md)。

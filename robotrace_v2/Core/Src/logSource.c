@@ -587,7 +587,7 @@ bool logSourceValidateSlipRow(const LogSourceRow *row)
 	return row != NULL && row->courseMarker >= 0 && row->courseMarker <= (int32_t)UINT8_MAX &&
 		row->optimalIndex >= 0 && row->optimalIndex <= INT16_MAX &&
 		isfinite(row->ROC) && fabsf(row->ROC) <= INT16_MAX &&
-		isfinite(row->targetSpeed) && row->targetSpeed >= 0.0F && row->targetSpeed <= UINT8_MAX &&
+		isfinite(row->targetSpeed) && row->targetSpeed >= 0.0F && row->targetSpeed <= UINT16_MAX &&
 		row->slipV2Flags >= 0 &&
 		(row->slipV2Flags & ~(int32_t)(SLIP_V2_LONG | SLIP_V2_LAT | SLIP_V2_YAW)) == 0;
 }

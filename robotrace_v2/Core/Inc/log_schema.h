@@ -35,7 +35,7 @@
 	STORED(U8, courseMarker, "%d", courseMarkerLog) \
 	STORED(U32, encTotalOptimal, "%d", (uint32_t)encTotalOptimal) \
 	DERIVED(F32, ROC, "%f", log_roc) \
-	STORED(U8, targetSpeed, "%d", targetSpeed) \
+	STORED(U16, targetSpeed, "%d", targetSpeed) \
 	STORED(U16, optimalIndex, "%d", (uint16_t)optimalIndex) \
 	STORED(S16, lineTraceCtrl, "%d", (int16_t)lineTraceOmegaFBCtrl.pwm) \
 	STORED(S16, targetAngularvelo, "%d", (int16_t)log_targetAngularVelocity) \
@@ -127,7 +127,7 @@
     STORED(U8, pathMarkerCorrectionApplied, "%d", (isPathRunMode(optimalTrace) ? pathCorrectionLog.markerApplied : 0U)) \
     STORED(F32, pathMarkerCorrection_mm, "%f", (isPathRunMode(optimalTrace) ? pathCorrectionLog.markerPosition_mm : 0.0f))
 
-// 通常61列・168 B、詳細67列・177 B。既存列の末尾へ補正診断5列を追加する。
+// 通常61列・169 B、詳細67列・178 B。targetSpeedは16bitで保存する。
 #define LOG_FIELD_LIST(STORED, DERIVED) \
     LOG_BASE_FIELD_LIST(STORED, DERIVED) \
     LOG_FIELD_LIST_V2(STORED, DERIVED) \

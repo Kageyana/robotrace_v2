@@ -528,6 +528,8 @@ PATH/SHORTCUT/PATH_CURVEの速度計画にも、DISTANCE/SLIPと同じSD設定`d
 
 ## 13. ログ、ファームウェアバージョン、解析
 
+- `targetSpeed`は制御変数・ログ保存とも`uint16_t`（スキーマ`U16`）のエンコーダ速度[pulse/ms]とする。`setTargetSpeed()`は有限な0～10m/sへ制限し、負値・非有限値は0へ置換する。換算58019pulse/mでは4.6m/s=266、10m/s=580を保持する。CSV列名・順序・単位は維持し、通常61列/169 B、詳細67列/178 Bとなる。スキーマCRC変更後は新しい一次ログを取得し、初回実機bin/CSVで255を超える値・列・CRCを確認する。
+
 - 未使用の角度・距離PID削除に伴い、ログ1行目の `yawCtrl.kp/ki/kd` と `distCtrl.kp/ki/kd` は出力しない。CSVデータ列とバイナリレコード構成は維持する。変更後最初の実機ログでヘッダとデータ列を確認する。
 
 実機走行ログは `F:\Dropbox\Document\robotrace\Log\v2` に保存されています。
