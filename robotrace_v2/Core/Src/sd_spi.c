@@ -17,6 +17,7 @@
 // インクルード
 //====================================//
 #include "sd_spi.h"
+#include "analysisDisplay.h"
 #include "main.h"
 #include <string.h>
 #include <stdio.h>
@@ -83,6 +84,7 @@ static SD_Status SD_TransmitBuffer(const uint8_t *buffer, uint16_t len) {
         return SD_ERROR;
     }
     start = HAL_GetTick();
+    analysisDisplayPoll(); // SDのDMA転送中に描画する。画面送信完了は待たない。
     while (!dma_tx_done) {
         if ((HAL_GetTick() - start) > SD_DMA_WAIT_TIMEOUT_MS) {
             (void)HAL_SPI_DMAStop(&SD_SPI_HANDLE);
@@ -108,6 +110,7 @@ static SD_Status SD_ReceiveBuffer(uint8_t *buffer, uint16_t len) {
         return SD_ERROR;
     }
     start = HAL_GetTick();
+    analysisDisplayPoll(); // 読込DMAの待ち時間を利用し、解析ループをブロックしない。
     while (!dma_rx_done) {
         if ((HAL_GetTick() - start) > SD_DMA_WAIT_TIMEOUT_MS) {
             (void)HAL_SPI_DMAStop(&SD_SPI_HANDLE);

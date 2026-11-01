@@ -288,6 +288,12 @@ void ssd1306_UpdateScreen(void)
 /////////////////////////////////////////////////////////////////////
 void ssd1306_UpdateScreen_DMA(void)
 {
+	// 単発画面または停止要求前の最終ページが送信中なら、完了IRQで再開する。
+	// 解析終了側を待たせず、同じI2Cへの同期コマンド送信も競合させない。
+	if (SSD1306_DMA_OncePhase != 0 || HAL_I2C_GetState(&SSD1306_I2C_PORT) != HAL_I2C_STATE_READY) {
+		SSD1306_DMA_Running = 1;
+		return;
+	}
 	SSD1306_DMA_OncePhase = 0; // 単発送信終了後に従来の連続更新へ戻す
 	SSD1306_DMA_Page = 0;		// 0ページ目から送信開始
 	SSD1306_DMA_Completed = 0;	// 送信開始前に完了フラグをリセット
@@ -350,6 +356,19 @@ void ssd1306_StopDMA(void)
 	SSD1306_DMA_Running = 0;   // DMA送信継続フラグをリセット
 }
 /////////////////////////////////////////////////////////////////////
+// モジュール名 ssd1306_ResumeDMA
+// 処理概要     送信完了を待たず、DMA完了時に連続転送へ復帰する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void ssd1306_ResumeDMA(void)
+{
+	if (SSD1306_DMA_Running) return;
+	// 送信中ならその完了を利用し、停止中なら単発DMAで再開の契機を作る。
+	if (ssd1306_IsReadyForSingleUpdate() && !ssd1306_UpdateScreenOnce_DMA()) return;
+	SSD1306_DMA_Running = 1;
+}
+/////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_IsDMARunning
 // 処理概要     DMA版画面更新状態の参照
 // 引数         なし
@@ -381,6 +400,7 @@ void ssd1306_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c)
 		SSD1306_DMA_OncePhase = 0;
 		SSD1306_DMA_Completed = 1;
 		ssd1306_TransferCompletedCallback();
+		if (SSD1306_DMA_Running) ssd1306_UpdateScreen_DMA();
 		return;
 	}
 

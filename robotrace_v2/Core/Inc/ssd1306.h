@@ -159,6 +159,7 @@ uint8_t ssd1306_IsReadyForSingleUpdate(void); // 単発DMA送信を開始でき�
 uint8_t ssd1306_UpdateScreenOnce_DMA(void); // 画面コピーをDMAで一度だけ送信
 uint8_t ssd1306_IsTransferCompleted(void); // 全ページ送信完了フラグ参照
 void ssd1306_StopDMA(void); // DMA版画面更新を停止
+void ssd1306_ResumeDMA(void); // 同期コマンドを送らず、単発DMAの完了後に連続転送へ戻す
 uint8_t ssd1306_IsDMARunning(void); // DMA継続状態参照
 void ssd1306_TransferCompletedCallback(void); // DMA完了時のコールバック
 void ssd1306_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c); // I2Cメモリ転送完了処理

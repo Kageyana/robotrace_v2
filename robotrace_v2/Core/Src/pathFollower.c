@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "pathFollower.h"
+#include "analysisDisplay.h"
 #include "logSource.h"
 #include "logPerformance.h"
 #include "autoRun.h"
@@ -889,6 +890,7 @@ static bool pathFindBestCorridorCandidate(PathCorridorCandidate *candidate)
 	for (uint16_t begin = PATH_CORRIDOR_END_GUARD_POINTS;
 		begin + PATH_CORRIDOR_MIN_SPAN_POINTS + PATH_CORRIDOR_END_GUARD_POINTS < routeCount; begin++)
 	{
+		if ((begin & 15U) == 0U) analysisDisplayPoll();
 		for (uint16_t span = PATH_CORRIDOR_MIN_SPAN_POINTS; span <= PATH_CORRIDOR_MAX_SPAN_POINTS; span++)
 		{
 			uint16_t end = (uint16_t)(begin + span);
@@ -1101,6 +1103,7 @@ bool routeGenerateShortcut(uint8_t shortcutLevel)
 	}
 	for (uint16_t i = 0U; i + 1U < routeCount; i++)
 	{
+		if ((i & 15U) == 0U) analysisDisplayPoll();
 		for (uint16_t j = (uint16_t)(i + 3U); j + 1U < routeCount; j++)
 		{
 			if (pathSegmentsIntersect(driveRoute, i, j) && !pathSegmentsIntersect(lineRoute, i, j))

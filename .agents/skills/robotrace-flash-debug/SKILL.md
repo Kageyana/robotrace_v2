@@ -117,3 +117,6 @@ VS Codeからは `Build & Debug Microcontroller - ST-Link` または `Attach to 
 ## 2026-11-01：カウントダウン調査での入口再発
 
 参照読込専用の呼出しにはGet-Contentだけを置き、同じ呼出しへ検索を追加しない。返り値を読んだ次の呼出しで必須ディレクトリをTest-Pathし、任意のtests等は存在する場合だけ検索先へ追加する。rgのパス引数にglobを置かず-gへ分離し、終了2以上なら停止する。段落パッチも読込済み完全行を使い、拒否後は対象を再読込してから修正する。実例は[カウントダウン調査の再発](../../../doc/失敗事例/2026-11-01-countdown-search-preflight.md)を参照する。
+## 2026-11-01：解析待機画面の調査・ホスト化前
+
+関数名の所在は実在するCore/Srcのrg結果から選び、未確認のsystem.c等をGet-Contentへ渡さない。UIハーネス生成前にssd1306_fonts.hからssd1306_conf.hへの推移includeと既存マクロを確認し、実設定を読み込む場合は模擬ヘッダへ同じI2C設定を再定義しない。マクロ再定義のWerrorは試験側で直し、製品設定や警告を緩めない。必要権限・リポジトリルートの明示workdirでpython validation/analysis_display/run.pyを実行し、O0/O2の実描画・DMA競合・転送中終了・失敗復帰が全て通るまで実機へ進まない。実機の解析時間不増加は別途比較する。[調査・依存確認の再発](../../../doc/失敗事例/2026-11-01-analysis-display-preflight.md)参照。

@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "control.h"
+#include "analysisDisplay.h"
 #include "slipDetection.h"
 #include "autoRun.h"
 #include "pathFollower.h"
@@ -94,19 +95,7 @@ static bool updateDisplayDmaAndWait(uint32_t timeout_ms)
 /////////////////////////////////////////////////////////////////////
 static void showSlipAnalysisProgress(const char *stage, uint32_t lineNo)
 {
-	if (!modeDSP)
-	{
-		return;
-	}
-	ssd1306_FillRectangle(0, 42, 127, 63, Black);
-	ssd1306_SetCursor(0, 42);
-	ssd1306_printf(Font_6x8, "SLIP %d", autoRunCurrentPlan.slipSourceLogNumber);
-	ssd1306_SetCursor(0, 53);
-	ssd1306_printf(Font_6x8, "%s %lu", stage, (unsigned long)lineNo);
-	if (!ssd1306_IsDMARunning())
-	{
-		(void)updateDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS);
-	}
+	analysisDisplayProgress(stage, lineNo);
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 finishBinaryLogStorage
@@ -525,11 +514,7 @@ void loopSystem(void)
 
 			// 目標速度調整
 			// コース解析
-			ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-			ssd1306_SetCursor(0, 25);
-			ssd1306_printf(Font_11x18, "Analyzing");
-			ssd1306_SetCursor(0, 50);
-			ssd1306_printf(Font_6x8, "%s %d", autoRunModeName(autoRunCurrentPlan.requestedMode),
+			analysisDisplayBegin(autoRunModeName(autoRunCurrentPlan.requestedMode),
 				autoRunCurrentPlan.requestedMode == AUTO_RUN_MODE_SLIP ? autoRunCurrentPlan.slipSourceLogNumber :
 				autoRunCurrentPlan.primaryLogNumber);
 			// endLog() で確定済みのバイナリを直接解析する。
@@ -562,6 +547,7 @@ void loopSystem(void)
 				ret = -1;
 				break;
 			}
+			analysisDisplayEnd();
 			if(ret > 0)
 			{
 				// コース解析成功

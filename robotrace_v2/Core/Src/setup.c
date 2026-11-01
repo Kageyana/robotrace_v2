@@ -2,6 +2,7 @@
 // インクルード
 //====================================//
 #include "setup.h"
+#include "analysisDisplay.h"
 #include "battery.h"
 #include "motor.h"
 #include "pathFollower.h"
@@ -820,11 +821,8 @@ static void setup_log(void)
     pushHeld = (swValTact == SW_PUSH);
     if (analyze)
     {
-        ssd1306_FillRectangle(32, 25, 127, 63, Black);
-        ssd1306_SetCursor(32, 28);
-        ssd1306_printf(Font_6x8, "Analyzing");
-        if (!ssd1306_IsDMARunning()) ssd1306_UpdateScreen();
         int16_t logNumber = fileNumbers[selectedLog];
+        analysisDisplayBegin(modeNames[selectedMode], logNumber);
         switch (selectedMode)
         {
         case 0: result = readLogDistance(logNumber); break;
@@ -834,6 +832,7 @@ static void setup_log(void)
         case 4: result = routeBuildShortcutCurvatureFromLog(logNumber, shortcutSettings.maxLevel); break;
         default: result = -1; break;
         }
+        analysisDisplayEnd();
         if (result > 0)
         {
             optimalIndex = 0U;
@@ -1421,7 +1420,7 @@ void setup(void)
 		sendLED();
 	}
 
-	if (!testFlags.trace_test && !calibratIMU && !ssd1306_IsDMARunning())
+	if (!testFlags.trace_test && !calibratIMU && ssd1306_IsReadyForSingleUpdate())
 	{
 		ssd1306_UpdateScreen(); // 連続DMA停止中だけ同期転送する
 	}
