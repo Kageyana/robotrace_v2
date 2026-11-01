@@ -26,6 +26,7 @@
 #define PATH_FLAG_CORRIDOR_RESERVED           0x01U
 #define PATH_FLAG_CORRIDOR_APPLIED            0x02U
 #define PATH_FLAG_CROSS_STRAIGHT              0x04U
+#define PATH_FLAG_CORRIDOR_EXCLUDED           0x08U
 
 typedef struct
 {
@@ -806,7 +807,7 @@ static void pathComputeCorridorHeadings(void)
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathCorridorRangeIsFree
-// 処理概要     候補区間が既採用回廊の保護範囲と重ならないことを確認する
+// 処理概要     候補区間が既採用回廊の保護範囲や除外区間と重ならないことを確認する
 // 引数         begin,end: 候補区間の先頭と終端index
 // 戻り値       true:重なりなし false:重なりあり
 /////////////////////////////////////////////////////////////////////
@@ -814,7 +815,7 @@ static bool pathCorridorRangeIsFree(uint16_t begin, uint16_t end)
 {
 	for (uint16_t i = begin; i <= end; i++)
 	{
-		if ((routeFlags[i] & PATH_FLAG_CORRIDOR_RESERVED) != 0U) return false;
+		if ((routeFlags[i] & (PATH_FLAG_CORRIDOR_RESERVED | PATH_FLAG_CORRIDOR_EXCLUDED)) != 0U) return false;
 	}
 	return true;
 }
@@ -847,7 +848,7 @@ static bool pathEvaluateCorridorCandidate(uint16_t begin, uint16_t end, float *s
 		float projectedX = (float)lineRoute[begin].x_mm + (progress * dx);
 		float projectedY = (float)lineRoute[begin].y_mm + (progress * dy);
 		float offset = pathPointDistance(lineRoute[i].x_mm, lineRoute[i].y_mm, projectedX, projectedY);
-		if (offset > PATH_CORRIDOR_MAX_OFFSET_MM) return false;
+		if (offset > PATH_CORRIDOR_CANDIDATE_MAX_OFFSET_MM) return false;
 		if (i > begin)
 		{
 			sourceLength += pathPointDistance(lineRoute[i - 1U].x_mm, lineRoute[i - 1U].y_mm,
@@ -907,33 +908,65 @@ static bool pathFindBestCorridorCandidate(PathCorridorCandidate *candidate)
 }
 
 /////////////////////////////////////////////////////////////////////
-// モジュール名 pathApplyCorridorCandidate
-// 処理概要     候補区間を直線へ寄せて入口と出口を120mmで滑らかに接続する
-// 引数         candidate:適用する直線回廊候補
+// モジュール名 pathCorridorCandidateMove
+// 処理概要     候補点を直線回廊へ接続する補間変位を求める
+// 引数         candidate: 候補区間, index: 経路点, moveX/moveY: 変位の格納先[mm]
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-static void pathApplyCorridorCandidate(const PathCorridorCandidate *candidate)
+static void pathCorridorCandidateMove(const PathCorridorCandidate *candidate, uint16_t index,
+	float *moveX, float *moveY)
 {
 	uint16_t span = (uint16_t)(candidate->end - candidate->begin);
+	float progress = (float)(index - candidate->begin) / (float)span;
+	float chordX = (float)lineRoute[candidate->begin].x_mm +
+		((float)(lineRoute[candidate->end].x_mm - lineRoute[candidate->begin].x_mm) * progress);
+	float chordY = (float)lineRoute[candidate->begin].y_mm +
+		((float)(lineRoute[candidate->end].y_mm - lineRoute[candidate->begin].y_mm) * progress);
+	float entryWeight = pathCorridorSmoothstep((float)(index - candidate->begin) /
+		(float)PATH_CORRIDOR_TRANSITION_POINTS);
+	float exitWeight = pathCorridorSmoothstep((float)(candidate->end - index) /
+		(float)PATH_CORRIDOR_TRANSITION_POINTS);
+	float weight = fminf(entryWeight, exitWeight);
+	*moveX = (chordX - (float)lineRoute[index].x_mm) * weight;
+	*moveY = (chordY - (float)lineRoute[index].y_mm) * weight;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathCorridorCandidateFits
+// 処理概要     候補全体の補間変位が採用上限内か確認する
+// 引数         candidate: 候補区間, maximumOffsetMm: 採用する変位上限[mm]
+// 戻り値       true: 全点が上限内 false: 区間全体を除外
+/////////////////////////////////////////////////////////////////////
+static bool pathCorridorCandidateFits(const PathCorridorCandidate *candidate, float maximumOffsetMm)
+{
 	for (uint16_t i = candidate->begin; i <= candidate->end; i++)
 	{
-		float progress = (float)(i - candidate->begin) / (float)span;
-		float chordX = (float)lineRoute[candidate->begin].x_mm +
-			((float)(lineRoute[candidate->end].x_mm - lineRoute[candidate->begin].x_mm) * progress);
-		float chordY = (float)lineRoute[candidate->begin].y_mm +
-			((float)(lineRoute[candidate->end].y_mm - lineRoute[candidate->begin].y_mm) * progress);
-		float entryWeight = pathCorridorSmoothstep((float)(i - candidate->begin) /
-			(float)PATH_CORRIDOR_TRANSITION_POINTS);
-		float exitWeight = pathCorridorSmoothstep((float)(candidate->end - i) /
-			(float)PATH_CORRIDOR_TRANSITION_POINTS);
-		float weight = fminf(entryWeight, exitWeight);
-		float moveX = (chordX - (float)lineRoute[i].x_mm) * weight;
-		float moveY = (chordY - (float)lineRoute[i].y_mm) * weight;
+		float moveX, moveY;
+		pathCorridorCandidateMove(candidate, i, &moveX, &moveY);
+		float move = hypotf(moveX, moveY);
+		if (!isfinite(move) || move > maximumOffsetMm) return false;
+	}
+	return true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathApplyCorridorCandidate
+// 処理概要     候補区間を直線へ寄せて入口と出口を60mmで滑らかに接続する
+// 引数         candidate:適用する直線回廊候補
+//              maximumOffsetMm: 合法余裕を含む変位上限[mm]
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void pathApplyCorridorCandidate(const PathCorridorCandidate *candidate, float maximumOffsetMm)
+{
+	for (uint16_t i = candidate->begin; i <= candidate->end; i++)
+	{
+		float moveX, moveY;
+		pathCorridorCandidateMove(candidate, i, &moveX, &moveY);
 		float move = sqrtf((moveX * moveX) + (moveY * moveY));
-		if (move > PATH_CORRIDOR_MAX_OFFSET_MM)
+		if (move > maximumOffsetMm)
 		{
-			moveX *= PATH_CORRIDOR_MAX_OFFSET_MM / move;
-			moveY *= PATH_CORRIDOR_MAX_OFFSET_MM / move;
+			moveX *= maximumOffsetMm / move;
+			moveY *= maximumOffsetMm / move;
 		}
 		driveRoute[i].x_mm = pathFloatToInt16((float)lineRoute[i].x_mm + moveX);
 		driveRoute[i].y_mm = pathFloatToInt16((float)lineRoute[i].y_mm + moveY);
@@ -1015,7 +1048,8 @@ bool routeGenerateShortcut(uint8_t shortcutLevel)
 	if (shortcutLevel > PATH_LEVEL_MAX) shortcutLevel = PATH_LEVEL_MAX;
 	float legalOffsetMm = PATH_LINE_HALF_WIDTH_MM + PATH_OCCUPIED_HALF_WIDTH_MM -
 		PATH_TRACKING_ERROR_BUDGET_MM - PATH_LEGAL_RESERVE_MM;
-	if (legalOffsetMm <= 0.0f || PATH_CORRIDOR_MAX_OFFSET_MM > legalOffsetMm ||
+	float maximumOffsetMm = fminf(PATH_CORRIDOR_MAX_OFFSET_MM, legalOffsetMm);
+	if (!isfinite(maximumOffsetMm) || maximumOffsetMm <= 0.0f ||
 		PATH_OUTER_RADIUS_MM + legalOffsetMm > PATH_BOARD_CLEARANCE_MM)
 	{
 		routeShortcutBuildStatus = PATH_SHORTCUT_BUILD_LEGAL_GEOMETRY_INVALID;
@@ -1025,11 +1059,21 @@ bool routeGenerateShortcut(uint8_t shortcutLevel)
 	// 一次ログ由来のクロス直線区間は短縮形状の再生成でも保持する。
 	for (uint16_t i = 0U; i < PATH_ROUTE_MAX_POINTS; i++) routeFlags[i] &= PATH_FLAG_CROSS_STRAIGHT;
 	pathComputeCorridorHeadings();
-	for (uint8_t count = 0U; count < PATH_CORRIDOR_MAX_COUNT; count++)
+	while (routeShortcutCorridorCount < PATH_CORRIDOR_MAX_COUNT)
 	{
 		PathCorridorCandidate candidate;
 		if (!pathFindBestCorridorCandidate(&candidate)) break;
-		pathApplyCorridorCandidate(&candidate);
+		if (!pathCorridorCandidateFits(&candidate, maximumOffsetMm))
+		{
+			// 大きな膨らみを小区間へ切り直して再採用しない。補正抑止の保護域とは区別する。
+			uint16_t begin = candidate.begin > PATH_CORRIDOR_OVERLAP_GUARD_POINTS ?
+				(uint16_t)(candidate.begin - PATH_CORRIDOR_OVERLAP_GUARD_POINTS) : 0U;
+			uint16_t end = candidate.end + PATH_CORRIDOR_OVERLAP_GUARD_POINTS < routeCount ?
+				(uint16_t)(candidate.end + PATH_CORRIDOR_OVERLAP_GUARD_POINTS) : (uint16_t)(routeCount - 1U);
+			for (uint16_t i = begin; i <= end; i++) routeFlags[i] |= PATH_FLAG_CORRIDOR_EXCLUDED;
+			continue;
+		}
+		pathApplyCorridorCandidate(&candidate, maximumOffsetMm);
 		routeShortcutCorridorCount++;
 	}
 	if (routeShortcutCorridorCount == 0U)
@@ -1043,7 +1087,9 @@ bool routeGenerateShortcut(uint8_t shortcutLevel)
 	{
 		float offset = pathPointDistance(lineRoute[i].x_mm, lineRoute[i].y_mm,
 			driveRoute[i].x_mm, driveRoute[i].y_mm);
-		if (offset > PATH_CORRIDOR_MAX_OFFSET_MM + PATH_CORRIDOR_OFFSET_TOLERANCE_MM)
+		float roundedLimitMm = fminf(PATH_CORRIDOR_MAX_OFFSET_MM,
+			maximumOffsetMm + PATH_CORRIDOR_OFFSET_TOLERANCE_MM);
+		if (offset > roundedLimitMm)
 		{
 			memcpy(driveRoute, lineRoute, sizeof(RoutePoint) * routeCount);
 			routeShortcutBuildStatus = PATH_SHORTCUT_BUILD_OFFSET_VIOLATION;

@@ -1,5 +1,11 @@
 # ログ解析の再発防止
 
+ハッシュ検証の対象をPath.parts等で選び、検証前に期待件数と名前を確認する。空集合を全件一致として成功にせず、Windows/forward slashの両表記で対象選択を検査する。[ソース照合の空集合](../../../../doc/失敗事例/2026-11-01-source-hash-path-normalization.md)。
+
+14026以降の棚卸しはanalysis/script/compare_shortcut_primaries_14026.py prepareへ固定する。共通手順を読んだだけで即席foreach文を再作成せず、別のPowerShell入口ではParser検査を先行する。[棚卸しの再発](../../../../doc/失敗事例/2026-11-01-powershell-foreach-pipeline.md)。
+
+条件探索では、読込成功と短縮採否を分け、status=3/6等の正しい拒否も結果に残す。成功候補だけを期待して探索を止めない。PCの幾何候補は製品の合法性判定と別に保存する。[候補探索の結果契約](../../../../doc/失敗事例/2026-11-01-shortcut-host-assert-disabled.md)。
+
 ホストC解析の生成前に、assert内の読込・状態更新とNDEBUGを確認する。最適化で消えるassertに入力操作を置かず、常時有効な検査を使う。O0/O2の実入力全出力一致と異常入力拒否も確認する。[14038/14039の再発](../../../../doc/失敗事例/2026-11-01-shortcut-host-assert-disabled.md)。
 
 対象CSVを数値計算へ渡す前に以下を確認する。原本を変更せず、除外番号・理由・入力SHA256を成果物へ残す。

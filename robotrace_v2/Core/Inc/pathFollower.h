@@ -41,16 +41,17 @@
 #define PATH_LINE_THETA_GAIN_MAX_X1E9         1000U // 方位補正ゲインの上限[1/mm^2 ×10^9]。
 
 // ショートカットの直線回廊候補。点数指定の距離はPATH_ROUTE_SPACING_MMに従う。
-#define PATH_CORRIDOR_MIN_SPAN_POINTS         15U // 候補区間の最小長[点間隔数]。40mm間隔では600mm。
-#define PATH_CORRIDOR_MAX_SPAN_POINTS         40U // 候補区間の最大長[点間隔数]。40mm間隔では1600mm。
-#define PATH_CORRIDOR_TRANSITION_POINTS       3U // 回廊端で元経路へ滑らかに接続する長さ[点間隔数]。40mm間隔では120mm。
+#define PATH_CORRIDOR_MIN_SPAN_POINTS         15U // 候補区間の最小長[点間隔数]。20mm間隔では300mm。
+#define PATH_CORRIDOR_MAX_SPAN_POINTS         40U // 候補区間の最大長[点間隔数]。20mm間隔では800mm。
+#define PATH_CORRIDOR_TRANSITION_POINTS       3U // 回廊端で元経路へ滑らかに接続する長さ[点間隔数]。20mm間隔では60mm。
 #define PATH_CORRIDOR_END_GUARD_POINTS        4U // 経路の両端に残す回廊生成の保護幅[点数]。
 #define PATH_CORRIDOR_OVERLAP_GUARD_POINTS    5U // 回廊同士の重複を防ぐ前後の予約幅[点数]。
 #define PATH_CORRIDOR_MAX_COUNT               16U // 1経路に適用する直線回廊の上限[個]。
 #define PATH_CORRIDOR_HEADING_LIMIT_DEG       12.0f // 候補区間の端点方位と直線方位の許容差[deg]。
 #define PATH_CORRIDOR_TURN_THRESHOLD_DEG      2.0f // 蛇行の旋回方向変化として数える最小方位変化[deg]。
-#define PATH_CORRIDOR_MIN_SIGN_CHANGES        3U // 蛇行候補に必要な旋回方向の反転回数[回]。
-#define PATH_CORRIDOR_MAX_OFFSET_MM           34.0f // 元ラインからの直線回廊の最大横変位[mm]。
+#define PATH_CORRIDOR_MIN_SIGN_CHANGES        2U // 浅い蛇行も対象とする旋回方向の最小反転回数[回]。
+#define PATH_CORRIDOR_CANDIDATE_MAX_OFFSET_MM 80.0f // 除外判定前に候補全体を抽出する横変位上限[mm]。採用上限を超える候補は区間全体を除外する。
+#define PATH_CORRIDOR_MAX_OFFSET_MM           50.0f // 採用する回廊の変位上限[mm]。合法余裕との小さい方を適用する（現行49.5mm）。
 #define PATH_CORRIDOR_OFFSET_TOLERANCE_MM     0.5f // 生成後の最大横変位検査に加える許容誤差[mm]。
 #define PATH_CORRIDOR_MIN_PROJECTION          -0.02f // 候補点の直線区間への射影位置の下限[無次元、始点0・終点1]。
 #define PATH_CORRIDOR_MAX_PROJECTION          1.02f // 候補点の直線区間への射影位置の上限[無次元、始点0・終点1]。
@@ -94,7 +95,7 @@ _Static_assert((PATH_ROUTE_MAX_POINTS - PATH_GOAL_RESERVED_POINTS - 1U) * PATH_R
 //====================================//
 // シンボル定義
 //====================================//
-#define PATH_ROUTE_CONTROLLER_VERSION      27U
+#define PATH_ROUTE_CONTROLLER_VERSION      28U
 #define PATH_CURVE_YAW_FF_VERSION            2U
 #define PATH_UNMATCHED_ACCEL_HOLD_VERSION    1U
 #define PATH_SOURCE_FORMAT_VERSION          1U

@@ -25,6 +25,12 @@ description: ロボトレース走行ログを解析、比較、可視化する�
 
 ## 実行前の再発防止
 
+ソースSHAの照合対象はPath.parts等でパス階層を判定し、期待する件数・名前を検査してから全件一致を確認する。Windows区切りのキーをforward slashのprefixだけで除外せず、0件のallを成功にしない。[空集合の照合](../../../doc/失敗事例/2026-11-01-source-hash-path-normalization.md)。
+
+14026以降の一次ログ棚卸しはanalysis/script/compare_shortcut_primaries_14026.py prepareを使用し、即席のPowerShell foreachパイプを作らない。新しいPowerShell入口はParser検査後に実行する。[棚卸しでの再発](../../../doc/失敗事例/2026-11-01-powershell-foreach-pipeline.md)。
+
+条件探索のホスト解析では、経路読込成功と候補の採否を分ける。新規交差や合法性の拒否も正常な結果としてstatus付きで保存し、採用だけをassertしない。PCの幾何候補と製品ゲートの結果は別フィールドで保持する。[候補探索の結果契約](../../../doc/失敗事例/2026-11-01-shortcut-host-assert-disabled.md)。
+
 ホストC解析の生成前に、assert内の読込・状態更新とNDEBUGを確認する。最適化で消えるassertに入力操作を置かず、常時有効な検査を使う。O0/O2の実入力全出力一致と異常入力拒否も確認する。[14038/14039の再発](../../../doc/失敗事例/2026-11-01-shortcut-host-assert-disabled.md)。
 
 追加診断のあるログでは、終了ヘッダを使って走行中Kdを説明する前に、lineKpUsed/lineKdUsed/lineGainStateの全組合せと件数を集計する。共通targetSpeedはPID後のマーカー補正で変わり得るため、左右輪目標はwheelTargetL_p/R_pを優先する。不一致を拒否する前に更新順とマーカー行を確認する。[初回実ログの周期境界](../../../doc/失敗事例/2026-11-01-line-log-real-sample-boundary.md)。
