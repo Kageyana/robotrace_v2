@@ -962,13 +962,13 @@ static void logBuildMetadata(void)
 	setLogHeaderStrS("pathYawSpeedSource", "encoder_1ms");
 	setLogHeaderStr("pathUnmatchedAccelHoldVersion", PATH_UNMATCHED_ACCEL_HOLD_VERSION);
 	setLogHeaderStrFPrecision("pathGyroBiasAtEnd_dps",
-		optimalTrace == BOOST_PATH_CURVE ? pathFollowerGyroBiasDps() : 0.0f, 6U);
+		isPathRunMode(optimalTrace) ? pathFollowerGyroBiasDps() : 0.0f, 6U);
 	setLogHeaderStr("pathObservationNoLineStopMs", PATH_OBSERVATION_STOP_MS);
 	setLogHeaderStr("pathObservationNoMatchStopMs", PATH_OBSERVATION_MATCH_STOP_MS);
 	setLogHeaderStr("pathConfidenceAtEnd", isPathRunMode(optimalTrace) ? pathLogConfidencePermille : 0);
 	setLogHeaderStr("pathObservationAgeAtEnd_ms", isPathRunMode(optimalTrace) ? pathLogObservationAgeMs : 0);
 	setLogHeaderStrFPrecision("pathLoopPeriod_mm",
-		optimalTrace == BOOST_PATH_CURVE ? pathRunLoopPeriodMm() : 0.0f, 3U);
+		isPathRunMode(optimalTrace) ? pathRunLoopPeriodMm() : 0.0f, 3U);
 	setLogHeaderStr("routeSourceLog", pathRouteSourceLog());
 	setLogHeaderStr("shortcutLevel", pathRouteShortcutLevel());
 	setLogHeaderStr("shortcutSettings.maxLevel", runShortcutSettings.maxLevel);
