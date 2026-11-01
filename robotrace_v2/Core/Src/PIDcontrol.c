@@ -34,6 +34,7 @@ static int16_t feedForwardPwmL = 0, feedForwardPwmR = 0;
 static int16_t speedEncoderBefore = 0;	// 速度PID用の前回偏差
 
 int32_t log_targetAngularVelocity; // ログ用目標角速度
+LineTraceLog lineTraceLog;
 
 //====================================//
 // プロトタイプ宣言
@@ -162,6 +163,21 @@ void setTargetAngularVelocity(float angularVelocity)
 {
 	targetAngularVelocity = angularVelocity;
 }
+/////////////////////////////////////////////////////////////////////
+// モジュール名 syncSpeedPIDGains
+// 処理概要     速度PIDの設定ゲインを左右輪へ同時反映し、各PIDの内部状態は保持する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void syncSpeedPIDGains(void)
+{
+	const uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	veloCtrlL.kp = veloCtrlR.kp = veloCtrl.kp;
+	veloCtrlL.ki = veloCtrlR.ki = veloCtrl.ki;
+	veloCtrlL.kd = veloCtrlR.kd = veloCtrl.kd;
+	__set_PRIMASK(primask);
+}
 ///////////////////////////////////////////////////////////////////////////
 // モジュール名 resetSpeedPID
 // 処理概要	 速度PIDの内部状態をリセットする
@@ -257,6 +273,7 @@ void motorControlTraceOmegaFB(void)
 {
 	int32_t iP, iI, iD, iRet, target, Dev, Dif, senL, senR, sensorDiff;
 	static int32_t traceBefore;
+	lineTraceLog = (LineTraceLog){0};
 
 	// サーボモータ用PWM値計算
 	if (!isLineSensorCalibrationValid())
@@ -265,6 +282,10 @@ void motorControlTraceOmegaFB(void)
 		traceBefore = 0;
 		return;
 	}
+	// changeGain()後の値ではなく、この計算に適用した判定とゲインを保持する。
+	lineTraceLog.gain = lineGainLog;
+	lineTraceLog.kpUsed = (uint8_t)lineTraceOmegaFBCtrl.kp;
+	lineTraceLog.kdUsed = (uint8_t)lineTraceOmegaFBCtrl.kd;
 
 	if (isLineSensorCalibrationValid())
 	{
@@ -323,6 +344,8 @@ void motorControlTraceOmegaFB(void)
 	iP = lineTraceOmegaFBCtrl.kp * Dev;                    // 比例
 	iI = (int32_t)(lineTraceOmegaFBCtrl.ki * lineTraceOmegaFBCtrl.Int); // 積分
 	iD = lineTraceOmegaFBCtrl.kd * Dif;                    // 微分
+	lineTraceLog.pTerm = iP;
+	lineTraceLog.dTerm = iD;
 	iRet = iP + iI + iD;
 
 	// PWMを0～1000近傍に収める

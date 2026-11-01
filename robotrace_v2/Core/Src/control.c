@@ -36,6 +36,7 @@ static AutoRunPlan autoRunCurrentPlan = {0U, AUTO_RUN_MODE_INVALID, 0, 0};
 static AutoRunConfigLoadResult autoRunConfigLoadResult = AUTO_RUN_CONFIG_LOAD_IO_ERROR;
 bool stateCrossLine = false;		// クロスライン検出状態
 float rocrun = 2000;		// 曲率半径計算用変数
+LineGainLog lineGainLog;
 
 uint16_t analogValLSon[NUM_SENSORS+1]; // ADC結果格納配列
 uint16_t analogValLSoff[NUM_SENSORS+1]; // ADC結果格納配列s
@@ -274,6 +275,9 @@ void initSystem(void)
 		updateDisplayDmaAndWait(DISPLAY_INIT_DMA_TIMEOUT_MS); // 全ページ送信完了まで待つ
 	}
 	sendLED();
+
+	// SD読込の有無に関係なく、走行用左右PIDへ確定した速度ゲインを反映する。
+	syncSpeedPIDGains();
 
 	// IMU
 	initIMU = initBMI088();
@@ -557,10 +561,10 @@ void loopSystem(void)
 			if(ret > 0)
 			{
 				// コース解析成功
-				countdown = 7000;							  // 3秒カウントダウンを開始
+				countdown = RUN_START_COUNTDOWN_MS; // 3秒カウントダウンを開始
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56, 28);
-				ssd1306_printf(Font_16x26, "%d", autoStart);	// 追加: 走行回数を表示
+				ssd1306_printf(Font_16x26, "3");
 
 				patternTrace = 1;
 			}
@@ -614,7 +618,7 @@ void loopSystem(void)
 				}
 
 				motorCommandOut(0, 0);
-				countdown = 7000;							  // 3秒カウントダウンを開始
+				countdown = RUN_START_COUNTDOWN_MS; // 3秒カウントダウンを開始
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56, 28);
 				ssd1306_printf(Font_16x26, "3");
@@ -628,17 +632,6 @@ void loopSystem(void)
 		// カウントダウンスタート
 		if (modeDSP)
 		{
-			if (countdown == 4000)
-			{
-				ssd1306_SetCursor(56, 28);
-				ssd1306_printf(Font_16x26, "4");
-			}
-			if (countdown == 3000)
-			{
-				// ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
-				ssd1306_SetCursor(56, 28);
-				ssd1306_printf(Font_16x26, "3");
-			}
 			if (countdown == 2000)
 			{
 				ssd1306_SetCursor(56, 28);
@@ -1125,9 +1118,9 @@ void countDown(void)
 	if (countdown > 0)
 	{
 		countdown--;
-		if (countdown == 5000)
+		if (countdown == RUN_START_COUNTDOWN_MS - RUN_START_CALIBRATION_DELAY_MS)
 		{
-			IMU_StartCalibration(); // 100サンプルを20ms間隔で取得する
+			IMU_StartCalibration(); // 取得間隔とサンプル数はIMU.hの校正設定に従う
 			calibrateMotorCurrent = true;
 		}
 	}
@@ -1166,13 +1159,14 @@ void changeGain(void)
 	{
 		softresetHandled = false;
 	}
+	lineGainLog = (LineGainLog){.rocNow_mm = rocrun};
+	const bool curveHoldBefore = curveGainHold;
 
-	// 距離基準2次走行のみ、ROC閾値で直線/カーブに合わせてゲインを切り替える
+	// DISTANCE/SLIPは速度計画のROCだけで切り替え、実測の揺れを判定へ戻さない。
 	if (optimalTrace == BOOST_DISTANCE && numPPADarry > 0)
 	{
 		uint16_t rocIndexEnter = optimalIndex + GAIN_CHANGE_LOOKAHEAD_ENTER; // 先読みROCのインデックス
 		uint16_t rocIndexExit = optimalIndex + GAIN_CHANGE_LOOKAHEAD_EXIT; // 復帰判定用の先読みROCインデックス
-		float rocNow = rocrun;
 		float rocEnter = 0.0F;
 		float rocExit = 0.0F;
 		bool curvePredicted = false;
@@ -1189,28 +1183,16 @@ void changeGain(void)
 			rocIndexExit = (uint16_t)(numPPADarry - 1);
 		}
 
-		// 進入判定: 先読みROCと実測ROCのうちカーブ寄り（小さい側）を使う
-		if (PPAD[rocIndexEnter].ROC > rocNow)
-		{
-			rocEnter = rocNow;
-		}
-		else
-		{
-			rocEnter = PPAD[rocIndexEnter].ROC;
-		}
-
-		// 復帰判定: 実測ROCと近傍先読みROCの両方が直線側であることを要求
-		if (PPAD[rocIndexExit].ROC > rocNow)
-		{
-			rocExit = rocNow;
-		}
-		else
-		{
-			rocExit = PPAD[rocIndexExit].ROC;
-		}
+		// 進入4点先・復帰2点先の計画ROCを使い、従来の閾値と保持距離を維持する。
+		rocEnter = PPAD[rocIndexEnter].ROC;
+		rocExit = PPAD[rocIndexExit].ROC;
 
 		curvePredicted = (rocEnter <= GAIN_CHANGE_ROC_ENTER);
 		straightStable = (rocExit >= GAIN_CHANGE_ROC_EXIT);
+		lineGainLog.planEnterRoc_mm = PPAD[rocIndexEnter].ROC;
+		lineGainLog.planExitRoc_mm = PPAD[rocIndexExit].ROC;
+		// reason bit0（旧実測ROCによる進入）は予約とし、版2では立てない。
+		if (PPAD[rocIndexEnter].ROC <= GAIN_CHANGE_ROC_ENTER) lineGainLog.reason |= 2U;
 
 		if (curveGainHold)
 		{
@@ -1243,18 +1225,27 @@ void changeGain(void)
 				useStraightGain = false;
 			}
 		}
+		if (curveGainHold && straightStable) lineGainLog.reason |= 8U;
 	}
 	else
 	{
 		curveGainHold = false;
 		encChangeGain = 0;
+		lineGainLog.reason |= 64U;
 	}
 
 	// クロスライン検出時のゲイン切り替え
 	if (optimalTrace == BOOST_NONE && stateCrossLine)
 	{
 		useCrossLineGain = true;
+		lineGainLog.reason |= 32U;
 	}
+	lineGainLog.state = useCrossLineGain ? 4U : (useStraightGain ? 2U :
+		((optimalTrace == BOOST_DISTANCE && numPPADarry > 0) ? 3U : 1U));
+	lineGainLog.curveHold = curveGainHold ? 1U : 0U;
+	lineGainLog.stablePulse = encChangeGain;
+	if (curveGainHold) lineGainLog.reason |= 4U;
+	if (curveHoldBefore && !curveGainHold) lineGainLog.reason |= 16U;
 
 	if (useStraightGain || useCrossLineGain)
 	{

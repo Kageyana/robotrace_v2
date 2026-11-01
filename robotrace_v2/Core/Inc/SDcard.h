@@ -19,7 +19,7 @@ bool logHasIncompleteTemp(void);
 #include "log_schema.h" // フィールド順とレコードサイズを定義。
 
 #define BUFFER_SIZE_LOG 2048U
-#define LOG_SIZE LOG_RECORD_SIZE_BYTES // スキーマ由来のレコードサイズ。
+#define LOG_SIZE LOG_RECORD_SIZE_BYTES // 最大レコードサイズ[B]。実ファイル長・I/Oは走行別スキーマのrecordBytesを使う。
 
 #define BUFFER_SIZE_MARKER 500
 #define FILENUMBER_NUM 1000		// ログファイルナンバーの上限

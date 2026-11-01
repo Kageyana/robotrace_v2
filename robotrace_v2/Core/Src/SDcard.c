@@ -42,8 +42,15 @@ _Static_assert(SLIP_LAT_CANDIDATE_LPF_COEF == IMU_ALPHA_LPF_COEF,
 #define LOG_SCHEMA_STORED(type, name, fmt, expr) "S," #type "," #name "," fmt "\n"
 #define LOG_SCHEMA_DERIVED(type, name, fmt, expr) "D," #type "," #name "," fmt "\n"
 const char logSchemaText[LOG_SCHEMA_TEXT_BYTES + 1U] = LOG_FIELD_LIST(LOG_SCHEMA_STORED, LOG_SCHEMA_DERIVED);
+const char logLineSchemaText[LOG_LINE_SCHEMA_TEXT_BYTES + 1U] = LOG_FIELD_LIST_LINE(LOG_SCHEMA_STORED, LOG_SCHEMA_DERIVED);
 #undef LOG_SCHEMA_STORED
 #undef LOG_SCHEMA_DERIVED
+const LogStorageSchema logPathSchema = {logSchemaText, LOG_SCHEMA_TEXT_BYTES,
+	LOG_RECORD_SIZE_BYTES, LOG_BINARY_COLUMNS, false};
+const LogStorageSchema logLineSchema = {logLineSchemaText, LOG_LINE_SCHEMA_TEXT_BYTES,
+	LOG_LINE_RECORD_SIZE_BYTES, LOG_LINE_BINARY_COLUMNS, true};
+static const LogStorageSchema *runLogSchema = &logPathSchema;
+static uint8_t runLogMode;
 // ログ書込キューの状態は、このファイル内だけで保持・更新する。
 typedef struct
 {
@@ -848,8 +855,9 @@ static void logBuildMetadata(void)
 
 	setLogHeaderStr("binaryLogNumber", logFileNumber);
 	setLogHeaderStr("binaryDataCrc", (int32_t)savedDataCrc);
-	setLogHeaderStr("binarySchema", (int32_t)logStorageSchemaCrc());
+	setLogHeaderStr("binarySchema", (int32_t)logStorageSchemaCrcFor(runLogSchema));
 	setLogHeaderStr("logDerivedVersion", LOG_BINARY_DERIVED_VERSION);
+	setLogHeaderStr("lineGainPolicyVersion", LINE_GAIN_POLICY_VERSION);
 	setLogHeaderStrS("logXYDistance", "raw_wheel_average");
 	// 1行目: 走行条件と校正値
 	setLogHeaderStrS("fwVersion", FW_VERSION);
@@ -933,7 +941,7 @@ static void logBuildMetadata(void)
 	setLogHeaderStr("distanceScaleError_p", primaryRouteValidation.distanceScaleError_p);
 	// 制御パラメータ
 	setLogHeaderStrF("batteryVoltage_V", batteryVoltage_V);
-	setLogHeaderStrF("optimalTrace", optimalTrace);
+	setLogHeaderStrF("optimalTrace", runLogMode);
 	setLogHeaderStrF("autoStart", autoStart);
 	setLogHeaderStrF("emcStop", emcStop);
 	if (autoRunState.currentPlanValid && autoStart > 0U)
@@ -1013,6 +1021,9 @@ static void logBuildMetadata(void)
 void initLog(void)
 {
 	FRESULT fresult;		// f_write status
+	// 開始時に列定義とレコード長を固定し、途中のモード参照で混在させない。
+	runLogMode = optimalTrace;
+	runLogSchema = isPathRunMode(runLogMode) ? &logPathSchema : &logLineSchema;
 	pathFollowerResetCorrectionLog();
 	lastRunSaved = false;
 	lastPrimaryRouteValid = false;
@@ -1101,7 +1112,7 @@ bool writeLogBufferPuts(void)
 			return false;
 		}
 		// スキーマから固定レコードサイズを算出。
-		if (!logBufferWriterBeginRecord(&logBufferWriter, (uint32_t)LOG_RECORD_SIZE_BYTES))
+		if (!logBufferWriterBeginRecord(&logBufferWriter, runLogSchema->recordBytes))
 		{
 			logOverflow = true;
 			dbg_overflow++;
@@ -1117,7 +1128,11 @@ bool writeLogBufferPuts(void)
 #define LOG_SEND_F32(value) logSendFloat((float)(value))
 #define LOG_SEND_FIELD(type, name, fmt, expr) LOG_SEND_##type(expr);
 #define LOG_SEND_SKIP(type, name, fmt, expr)
-		LOG_FIELD_LIST(LOG_SEND_FIELD, LOG_SEND_SKIP)
+		if (runLogSchema->lineTrace) {
+			LOG_FIELD_LIST_LINE(LOG_SEND_FIELD, LOG_SEND_SKIP)
+		} else {
+			LOG_FIELD_LIST(LOG_SEND_FIELD, LOG_SEND_SKIP)
+		}
 #undef LOG_SEND_FIELD
 #undef LOG_SEND_SKIP
 #undef LOG_SEND_U8
@@ -1253,20 +1268,20 @@ bool endLog(void)
 	}
 
 	bool success = false;
-	LogBinaryHeader header = {logFileNumber, LOG_SCHEMA_PROFILE_LIGHT, LOG_RECORD_SIZE_BYTES,
-		cntSend, 0U, 0U, 0U, logStorageSchemaCrc(), sizeof(logSchemaText) - 1U,
-        LOG_BINARY_COLUMNS, LOG_BINARY_DERIVED_VERSION};
-	FSIZE_t dataEnd = LOG_BINARY_HEADER_BYTES + (FSIZE_t)cntSend * LOG_SIZE;
+	LogBinaryHeader header = {logFileNumber, LOG_SCHEMA_PROFILE_LIGHT, runLogSchema->recordBytes,
+		cntSend, 0U, 0U, 0U, logStorageSchemaCrcFor(runLogSchema), runLogSchema->textBytes,
+        runLogSchema->columns, LOG_BINARY_DERIVED_VERSION};
+	FSIZE_t dataEnd = LOG_BINARY_HEADER_BYTES + (FSIZE_t)cntSend * header.recordBytes;
 	const LogSaveCheck saved = {logBufferWriter.writeFailed, runImuCalibrationValid,
 		runImuCalibrationSamples, runImuCalibrationReadErrors};
 	if (f_lseek(&fil_W, dataEnd) != FR_OK || f_truncate(&fil_W) != FR_OK ||
-		f_sync(&fil_W) != FR_OK || !logStorageScanRecords(&fil_W, cntSend, &saved, &primaryRouteValidation, &savedDataCrc)) goto finish;
+		f_sync(&fil_W) != FR_OK || !logStorageScanRecords(&fil_W, &header, &saved, &primaryRouteValidation, &savedDataCrc)) goto finish;
 	logBuildMetadata();
 	header.metadataBytes = (uint32_t)strlen(columnTitle);
 	header.dataCrc = savedDataCrc;
 	header.metadataCrc = ~logBinaryCrcUpdate(UINT32_MAX, (const uint8_t *)columnTitle, header.metadataBytes);
 	if (f_lseek(&fil_W, dataEnd) != FR_OK ||
-        f_write(&fil_W, logSchemaText, header.schemaBytes, &writtenlog) != FR_OK || writtenlog != header.schemaBytes ||
+        f_write(&fil_W, runLogSchema->text, header.schemaBytes, &writtenlog) != FR_OK || writtenlog != header.schemaBytes ||
 		f_write(&fil_W, columnTitle, header.metadataBytes, &writtenlog) != FR_OK || writtenlog != header.metadataBytes) goto finish;
 	logBinaryEncodeHeader(logBuffers[0], &header);
 	if (f_lseek(&fil_W, 0U) != FR_OK ||

@@ -464,6 +464,7 @@ PATH/SHORTCUT/PATH_CURVEの速度計画にも、DISTANCE/SLIPと同じSD設定`d
 - LOG画面は上下でログ番号、左右で`DISTANCE`→`PATH`→`SHORTCUT`→`PATH_CURVE`を選び、中央押下で解析する。PATHは短縮レベル0、SHORTCUTは設定済み`maxLevel`を使用する。ログなしでは解析しない。中央長押しは1回だけ実行し、選択変更がない周期は再描画しない。連続DMA実行中は同期転送しない。
 
 - 走行開始時、カウントダウン完了かつ IMU/電流センサーキャリブレーション完了後に、PID、速度フィードフォワード、目標速度を SD カードへ保存する。
+- 走行前は全走行共通で3秒カウントダウン（3→2→1）を表示し、開始2秒後にIMU・電流センサー校正を開始する。カウント終了後も校正正常完了まで停止を維持する。現行IMU校正は10ms間隔×100サンプルで約1秒のため、発進はカウント開始から通常約3秒＋校正完了判定・設定保存などの処理時間後となる。読取異常時は校正正常完了とせず、走行を開始しない。
 - パラメータ保存は `autoStart <= 1` のときだけ行い、`autoStart >= 2` の連続走行中はスキップする。
 - オートスタートは最大 5 走を前提とする。詳細な保存ファイルの扱いは `.agents/skills/robotrace-sd-settings/SKILL.md` を使う。
 
@@ -528,7 +529,11 @@ PATH/SHORTCUT/PATH_CURVEの速度計画にも、DISTANCE/SLIPと同じSD設定`d
 
 ## 13. ログ、ファームウェアバージョン、解析
 
-- `targetSpeed`は制御変数・ログ保存とも`uint16_t`（スキーマ`U16`）のエンコーダ速度[pulse/ms]とする。`setTargetSpeed()`は有限な0～10m/sへ制限し、負値・非有限値は0へ置換する。換算58019pulse/mでは4.6m/s=266、10m/s=580を保持する。CSV列名・順序・単位は維持し、通常61列/169 B、詳細67列/178 Bとなる。スキーマCRC変更後は新しい一次ログを取得し、初回実機bin/CSVで255を超える値・列・CRCを確認する。
+- DISTANCE/SLIPのゲイン切替は`lineGainPolicyVersion=2`で識別し、速度計画`PPAD`のROCだけを使う。進入4点先が500mm以下でカーブ設定ゲイン、復帰2点先が600mm以上かつ`encChangeGain > encMM(20)`で直線P2/D0へ戻す。先読み終端制限、ゲイン保存/復元、一次のクロス切替、PATH系は維持する。実測`rocrun`は判定に使わず、`lineGainRocNow_mm`へ観測用に保存する。`lineGainReason` bit0は旧実測進入理由として予約し、版2では常に0。bit1以降は維持する。メタデータへ版を追加するが、列数・保存型・スキーマCRC・5mm記録は変更しない。キーのない14033/14034等は旧方式。詳細は[計画ROCによる切替](doc/plan-roc-gain.md)、検証は`validation/plan_roc_gain/run.py`と`finalize.py`。切替時点は従来どおりPID計算後で、使用値ログは次の計算周期へ対応させる。
+
+- `targetSpeed`は制御変数・ログ保存とも`uint16_t`（スキーマ`U16`）のエンコーダ速度[pulse/ms]とする。`setTargetSpeed()`は有限な0～10m/sへ制限し、負値・非有限値は0へ置換する。換算58019pulse/mでは4.6m/s=266、10m/s=580を保持する。この列の名前・順序・単位は維持する。スキーマCRC変更後は新しい一次ログを取得し、初回実機bin/CSVで255を超える値・列・CRCを確認する。
+
+- 一次・DISTANCE・SLIPは通常64列/166 B、詳細70列/175 B。PATH専用の偏差・操舵6列と補正5列を含めず、`lineKpUsed/lineKdUsed/lineGainState/lineGainReason/lineCurveGainHold/lineGainStablePulse/lineGainRocNow_mm/lineGainPlanEnterRoc_mm/lineGainPlanExitRoc_mm/linePTerm_x32/lineDTerm_x32/wheelTargetL_p/wheelTargetR_p/wheelTargetLimitFlags`の14列を共通列の後へ保存する。ゲイン判定はPID後に次周期へ反映されるため、実際に使用したゲインと判定をPID入口で保持し、P/D実計算値と対応させる。P/Dは右5bitシフト・±1000制限前の(pulse/ms)×32、左右目標は上下限制限後のpulse/ms。フラグはbit0左上限/bit1左下限/bit2右上限/bit3右下限。PATH/SHORTCUT/PATH_CURVEは通常61列/169 B、詳細67列/178 Bを維持し、この14列を追加しない。列定義とoptimalTraceを走行開始時に固定し、全件検証・機体の型付き読込はファイルの形式で処理する。SLIPは内部BOOST_DISTANCE=2と同じ形式。5mm距離間隔を維持し、短区間1ms記録は追加しない。旧PATH列を含む一次/DISTANCE/SLIPは解析元にしない。更新後は新しい一次から取得する。詳細は[ライン制御ログ](doc/line-control-log.md)、検証は`validation/mode_log_diagnostics/run.py`と`finalize.py`。
 
 - 未使用の角度・距離PID削除に伴い、ログ1行目の `yawCtrl.kp/ki/kd` と `distCtrl.kp/ki/kd` は出力しない。CSVデータ列とバイナリレコード構成は維持する。変更後最初の実機ログでヘッダとデータ列を確認する。
 
@@ -609,8 +614,8 @@ PATH/SHORTCUT/PATH_CURVEの速度計画にも、DISTANCE/SLIPと同じSD設定`d
 
 - ユーザー指定で、有効性・無効理由（電流の有効性を含む）と記録間隔内の統計をbin/CSVから削除する。削除対象は`slipV2Valid/Reason/CurrentValid`、`slipV2LatValid/LatReason/LatValidMs/LatIntervalReason`、`slipV2PeakLong/PeakLat/PeakYawDps/OnLongMs/OnLatMs/OnYawMs/ValidMs/TotalMs/IntervalReason`の16列。
 - V2整理だけの時点は通常50列/135 B、詳細56列/144 B。その後の経路診断6列追加後は通常56列/154 B、詳細62列/163 B。2026-11-01の補正診断5列追加後は通常61列/168 B、詳細67列/177 B。残すV2関連9列は`slipV2LongFast/LongSlow/Lat/YawDps/Flags/CurrentHighSamples/PwmSum`と`imuYawAlphaFiltered/imuLatTangentialApplied`。瞬時フラグはbit0=縦、bit1=採用横、bit2=Yaw不整合。内部の判定有効性・区間統計の計算は維持し、保存しない。
-- PATH/SHORTCUT/PATH_CURVE用の経路診断は既存列の末尾へ`pathErrorY_mm`（F32・横偏差mm）、`pathErrorHeading_cdeg`（S16・最近傍経路接線方位−機体方位、0.01deg単位）、`pathState`（U8・0無効/1経路追従/2ライン退避/3再合流/4自己位置喪失/5注意・減速）、`pathYawFF_dps`、`pathYawLateralFB_dps`、`pathYawHeadingFB_dps`（各F32・符号付きdeg/s）の順で保存する。1ms更新の最新値を従来の距離間隔で記録し、経路モード以外は全6列を0とする。操舵3成分はFF、`-Klateral×横偏差`、`Kheading×方位偏差`で、合計を±1800deg/sへ制限する前の値。操舵式・横/方位ゲインは維持する。`routeControllerVersion=18`から自己位置積分→経路更新→PIDを1msごとに実行する。退避/白線消失は100ms、復帰条件は200ms、混合率の切替は100msを維持する。SDの位置/方位補正係数は5ms基準を保ち、1msでは1/5を適用する。補正許可上限は0.2mm/0.02deg毎回とする。詳細は[1ms経路更新](doc/path-follower-1ms.md)。
-- PATH/SHORTCUT/PATH_CURVEの補正診断5列を末尾へ追加する。`pathWhiteCorrectionApplied`（U8）、`pathWhiteCorrection_mm`（F32）、`pathWhiteCorrectionHeading_deg`（F32）、`pathMarkerCorrectionApplied`（U8）、`pathMarkerCorrection_mm`（F32）の順。前回のログバッファ保存成功以降の区間集計で、適用フラグは非ゼロ補正が1回以上あれば1。位置量は各1msの補正ベクトル長の和[mm]、白線方位量はCW正の符号付き和[deg]。白線とマーカーが同時成立した場合は合成位置上限による共通縮小率を両寄与へ適用してから別々に集計する。位置量2列の和は合成変位長とは異なる。マーカーは位置だけを補正し、白線方位量へ混ぜない。経路モード以外は全5列を0とする。保存失敗時は集計を保持し、保存成功・ログ開始・走行初期化・経路無効化でクリアする。既存の偏差・操舵列は瞬時値のまま。更新後は新しい一次ログを取得し、最初の実機bin/CSVで列・値・CRCを確認する。詳細は[自己記述ログ](doc/self-describing-log.md)。
+- PATH/SHORTCUT/PATH_CURVE用の経路診断は既存列の末尾へ`pathErrorY_mm`（F32・横偏差mm）、`pathErrorHeading_cdeg`（S16・最近傍経路接線方位−機体方位、0.01deg単位）、`pathState`（U8・0無効/1経路追従/2ライン退避/3再合流/4自己位置喪失/5注意・減速）、`pathYawFF_dps`、`pathYawLateralFB_dps`、`pathYawHeadingFB_dps`（各F32・符号付きdeg/s）の順で保存する。1ms更新の最新値を従来の距離間隔で記録し、一次/DISTANCE/SLIP形式にはこの6列を含めない。操舵3成分はFF、`-Klateral×横偏差`、`Kheading×方位偏差`で、合計を±1800deg/sへ制限する前の値。操舵式・横/方位ゲインは維持する。`routeControllerVersion=18`から自己位置積分→経路更新→PIDを1msごとに実行する。退避/白線消失は100ms、復帰条件は200ms、混合率の切替は100msを維持する。SDの位置/方位補正係数は5ms基準を保ち、1msでは1/5を適用する。補正許可上限は0.2mm/0.02deg毎回とする。詳細は[1ms経路更新](doc/path-follower-1ms.md)。
+- PATH/SHORTCUT/PATH_CURVEの補正診断5列を末尾へ追加する。`pathWhiteCorrectionApplied`（U8）、`pathWhiteCorrection_mm`（F32）、`pathWhiteCorrectionHeading_deg`（F32）、`pathMarkerCorrectionApplied`（U8）、`pathMarkerCorrection_mm`（F32）の順。前回のログバッファ保存成功以降の区間集計で、適用フラグは非ゼロ補正が1回以上あれば1。位置量は各1msの補正ベクトル長の和[mm]、白線方位量はCW正の符号付き和[deg]。白線とマーカーが同時成立した場合は合成位置上限による共通縮小率を両寄与へ適用してから別々に集計する。位置量2列の和は合成変位長とは異なる。マーカーは位置だけを補正し、白線方位量へ混ぜない。一次/DISTANCE/SLIP形式にはこの5列を含めない。保存失敗時は集計を保持し、保存成功・ログ開始・走行初期化・経路無効化でクリアする。既存の偏差・操舵列は瞬時値のまま。更新後は新しい一次ログを取得し、最初の実機bin/CSVで列・値・CRCを確認する。詳細は[自己記述ログ](doc/self-describing-log.md)。
 - `slipPlannerVersion=3`、`slipPlannerPolicy=flag_sample_fraction`。50mmごとの`optimalIndex`別に各記録を1件とし、縦/横それぞれのON件数/全件数を使用する。1件以上のONで反映し、Yaw bitは計画へ使わない。従来の最小ON時間3msは廃止し、検出器自体の3/5ms継続判定は維持する。
 - リスク閾値0.60、近傍拡張、減速/増速倍率、先行減速、速度変化制限、10m/s上限は維持する。件数0の区間は補完せず増速しない。無効期間や記録間で終了した短いスリップは新ログから識別できない。
 - 共有RAMの有効時間配列2本を削除し、ON時間配列はON件数へ変更する。集計は停止中・ログ非記録中・FatFsロック下で行う。1ms検出器・割り込み内SD書込禁止は維持する。

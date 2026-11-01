@@ -5,7 +5,17 @@ description: ロボトレース走行ログを解析、比較、可視化する�
 
 # Robotrace Log Analysis
 
-## 2026-10-25：現行ログとSLIPフラグ集計
+## 2026-11-01：計画ROCによるゲイン切替（版2）
+
+ヘッダのlineGainPolicyVersion=2ではDISTANCE/SLIPの切替に計画ROCだけを使う。キーがない14033/14034等は旧方式。lineGainReason bit0は予約・常に0、lineGainRocNow_mmは観測用で判定には使わない。使用周期のKp/Kd・P/D記録と列定義は維持する。詳細は[計画ROCによる切替](../../../doc/plan-roc-gain.md)。
+
+## 2026-11-01：走行方式別のライン診断（現行）
+
+一次・DISTANCE・SLIPはPATH専用11列を保存せず、使用周期のゲイン・切替状態/理由/ROC/距離・P/D項・制限後の左右輪目標/制限フラグの14列を追加する。通常profile=1は64列/166 B、詳細profile=0は70列/175 B。PATH/SHORTCUT/PATH_CURVEは通常61列/169 B、詳細67列/178 Bを維持し、この14列を保存しない。5mm距離間隔を維持し、短区間1ms記録は追加しない。SLIPは内部BOOST_DISTANCE=2と同じ形式。列の意味・使用周期のラッチは[ライン制御ログ](../../../doc/line-control-log.md)を参照。
+
+機体はファイルの列定義で全件検証・型付き復号するが、旧PATH列を含む一次/DISTANCE/SLIPは解析元にしない。更新後は新しい一次から取得する。現行の検証入口はルートの`validation/plan_roc_gain/run.py`と`finalize.py`。診断追加時の不変比較は`validation/mode_log_diagnostics/`に保管する。PC変換器は実在パスを確認してから使い、現環境では未配備のため独立復号と全CRCの検証を分けて報告する。以下の共通列数と経路外ゼロ保存は履歴である。
+
+## 2026-10-25：ログとSLIPフラグ集計（履歴）
 
 有効性・無効理由（電流有効性を含む）と記録間隔内統計16列はbin/CSVから削除済み。経路診断6列追加後の現行は通常profile=1・56列/154 B、詳細profile=0・62列/163 B。50列/135 B・56列/144 BはV2整理だけの時点のサイズ。`slipV2Flags`はbit0=縦、bit1=採用横、bit2=Yaw不整合。SLIP計画は版3・`slipPlannerPolicy=flag_sample_fraction`で、optimalIndex別の縦/横ON記録数/全記録数を使用する。時間率ではなく、最小ON時間3msの追加選別は廃止した。検出器版4・3/5ms継続判定と内部計算は維持する。
 
@@ -14,6 +24,12 @@ description: ロボトレース走行ログを解析、比較、可視化する�
 経路診断6列は末尾の`pathErrorY_mm`（F32・mm）、`pathErrorHeading_cdeg`（S16・0.01deg）、`pathState`（U8）、`pathYawFF_dps/pathYawLateralFB_dps/pathYawHeadingFB_dps`（各F32・deg/s）。1ms更新の最新値を距離間隔で保存し、PATH/SHORTCUT/PATH_CURVE以外は0。方位偏差は最近傍接線−機体方位、操舵3成分は合計の±1800deg/s制限前。操舵式は維持する。経路更新版18は1msの自己位置積分→経路更新→PIDで実行し、SDの位置/方位補正係数は5ms基準の1/5を毎回適用する。退避100ms・復帰200ms・混合率切替100msは維持する。詳細は[自己記述ログ](../../../doc/self-describing-log.md)。
 
 ## 実行前の再発防止
+
+ホストC解析の生成前に、assert内の読込・状態更新とNDEBUGを確認する。最適化で消えるassertに入力操作を置かず、常時有効な検査を使う。O0/O2の実入力全出力一致と異常入力拒否も確認する。[14038/14039の再発](../../../doc/失敗事例/2026-11-01-shortcut-host-assert-disabled.md)。
+
+追加診断のあるログでは、終了ヘッダを使って走行中Kdを説明する前に、lineKpUsed/lineKdUsed/lineGainStateの全組合せと件数を集計する。共通targetSpeedはPID後のマーカー補正で変わり得るため、左右輪目標はwheelTargetL_p/R_pを優先する。不一致を拒否する前に更新順とマーカー行を確認する。[初回実ログの周期境界](../../../doc/失敗事例/2026-11-01-line-log-real-sample-boundary.md)。
+
+走行別ログの検証器を生成する前に、[列定義・C抽出・診断文字コードの前提](../../../doc/失敗事例/2026-11-01-mode-log-diagnostics-preflight.md)を読む。排他的マクロはprofileごとに展開して一意性を検査し、テンプレートは単語境界付きの単一パス置換、実関数抽出は戻り値型を限定した定義パターンを使う。コンパイラ出力をbytesで保全し、解析前に改行を正規化する。
 
 版20/21/22等の新規比較では、CSVメタデータへ裸のintを使わず、compare_controller_20_21_22.metadata_integerの有限・整数相当検査を通す。全ログを読む前に5/5.00受入、5.1/nan/±inf拒否の6境界を確認する。13901～13910/13913～13922/13928の21原本で所属とSHA一致を確認済み。[整数表記の10/31再発](../../../doc/失敗事例/2026-10-14-log-metadata-integer-decimal-format.md)。
 

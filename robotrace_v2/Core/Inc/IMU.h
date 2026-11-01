@@ -9,11 +9,14 @@
 #include <stdbool.h>
 #include <stdint.h>
 //====================================//
+// 調整パラメータ
+//====================================//
+#define IMU_CALIBRATION_SAMPLE_INTERVAL_MS 10U // 校正サンプルの取得間隔[ms]。1ms周期で判定し、100サンプルを約1秒で取得する。
+//====================================//
 // シンボル定義
 //====================================//
 #define DEFF_TIME 0.001F				// 制御周期[s]（1ms）
 #define IMU_CALIBRATION_SAMPLE_COUNT CALIBRATED_IMU_SAMPLE_COUNT	// ジャイロ・加速度校正のサンプル数
-#define IMU_CALIBRATION_SAMPLE_INTERVAL_MS 50U	// 校正サンプルの取得間隔[ms]
 #define IMU_TEMP_COEFF_SCALE 1000000L		// 温度係数の保存倍率
 #define IMU_TEMP_COEFF_MIN_X1000000 (-100000L)	// 温度係数設定の下限
 #define IMU_TEMP_COEFF_MAX_X1000000 100000L	// 温度係数設定の上限

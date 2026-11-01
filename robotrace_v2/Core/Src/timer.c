@@ -1,4 +1,4 @@
-//====================================//
+﻿//====================================//
 // インクルード
 //====================================//
 #include "timer.h"
@@ -249,6 +249,7 @@ void Interrupt1ms(void)
 	}
 	else if(patternTrace < 12 || patternTrace > 100)
 	{
+		lineTraceLog = (LineTraceLog){0};
 		// スタート直後とゴール後は通常のライン制御
 		motorControlSpeed();
 		if (patternTrace == 0 && autoStartCalibrationTurning && initIMU && !calibratIMU)
@@ -268,11 +269,16 @@ void Interrupt1ms(void)
 		int16_t delta = lineTraceOmegaFBCtrl.pwm;
 		int16_t targetL = (int16_t)targetSpeed + delta;
 		int16_t targetR = (int16_t)targetSpeed - delta;
-		const int16_t TARGET_MAX = (int16_t)PULSE_MILLIMETER * 4;
+		const int16_t TARGET_MAX = (int16_t)PULSE_MILLIMETER * 5;
+		lineTraceLog.wheelLimitFlags =
+			((targetL > TARGET_MAX) ? 1U : 0U) | ((targetL < -TARGET_MAX) ? 2U : 0U) |
+			((targetR > TARGET_MAX) ? 4U : 0U) | ((targetR < -TARGET_MAX) ? 8U : 0U);
 		if (targetL > TARGET_MAX) targetL = TARGET_MAX;
 		if (targetL < -TARGET_MAX) targetL = -TARGET_MAX;
 		if (targetR > TARGET_MAX) targetR = TARGET_MAX;
 		if (targetR < -TARGET_MAX) targetR = -TARGET_MAX;
+		lineTraceLog.wheelTargetL = targetL;
+		lineTraceLog.wheelTargetR = targetR;
 
 		motorControlSpeedLR(targetL, targetR);
 	}

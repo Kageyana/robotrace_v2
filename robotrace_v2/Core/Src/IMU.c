@@ -403,7 +403,7 @@ void calibrationIMU(void)
 	}
 	sampleIntervalMs = 0;
 
-	// 20msごとにジャイロの物理量を積算する
+	// IMU.hで指定した取得間隔ごとにジャイロの物理量を積算する
 	if (!BMI088getGyro() || !isfinite(BMI088val.gyro.x) ||
 		!isfinite(BMI088val.gyro.y) || !isfinite(BMI088val.gyro.z))
 	{

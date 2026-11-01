@@ -662,13 +662,7 @@ static void setup_pid(pidParam *pid, bool speedTest)
         powerLineSensors(0);
     }
 
-    if (speedTest)
-    {
-        veloCtrlL.kp = veloCtrlR.kp = veloCtrl.kp;
-        veloCtrlL.ki = veloCtrlR.ki = veloCtrl.ki;
-        veloCtrlL.kd = veloCtrlR.kd = veloCtrl.kd;
-    }
-    else
+    if (!speedTest)
     {
         if (testFlags.trace_test != testFlags.beforeMotorTest && testFlags.trace_test == 0)
             testFlags.trace_test = 2;
@@ -692,6 +686,11 @@ static void setup_pid(pidParam *pid, bool speedTest)
         ssd1306_printf(Font_7x10, "%4d", pid->pwm);
         if (pattern.gain >= 1 && pattern.gain <= count)
             dataTuningLR(gains[pattern.gain - 1], 1, 0, 255);
+    }
+    if (speedTest)
+    {
+        // 値変更と同じUI処理内で反映し、画面を離れても旧ゲインを残さない。
+        syncSpeedPIDGains();
     }
 }
 /////////////////////////////////////////////////////////////////////////////////////

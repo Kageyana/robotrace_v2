@@ -14,6 +14,8 @@
 //====================================//
 #define DISPLAY_INIT_DMA_TIMEOUT_MS 200U // 初期化・設定画面で表示DMAの完了を待つ上限[ms]。
 #define RUN_STOP_HOLD_MS 1000U // 平均エンコーダ速度0の初回検出後、速度目標0のPID出力を継続する時間[ms]。メイン処理で経過を判定する。
+#define RUN_START_COUNTDOWN_MS 3000 // 走行前カウントダウンの時間[ms]。1ms周期で減算する。
+#define RUN_START_CALIBRATION_DELAY_MS 2000 // カウント開始からIMU・電流校正開始までの待機時間[ms]。カウント終了後も校正正常完了まで停止する。
 #define CONTROL_IRQ_PREEMPT_PRIORITY 3U // TIM6の運転時優先度。TIM3(1)/ADC DMA(2)の取得窓を優先し、起動時にCubeMX初期値0から切り替える。
 
 // 速度パラメータの既定値。有効なSD設定値を優先する。
@@ -45,8 +47,8 @@
 #define TRACE_CROSSLINE_DISTANCE	60 // クロスライン付近でゲインを変更する距離[mm]。
 
 // 走行中ゲイン変更関連
-#define GAIN_CHANGE_ROC_ENTER			500 // カーブ用ゲインへ切り替える曲率半径の閾値[mm]。
-#define GAIN_CHANGE_ROC_EXIT			600 // 直線用ゲインへ戻す曲率半径の閾値[mm]。
+#define GAIN_CHANGE_ROC_ENTER			500 // カーブ用ゲインへ切り替える計画曲率半径の閾値[mm]。
+#define GAIN_CHANGE_ROC_EXIT			600 // 直線用ゲインへ戻す計画曲率半径の閾値[mm]。
 #define GAIN_CHANGE_LOOKAHEAD_ENTER		4 // カーブ進入判定で先読みする速度計画の要素数[点]。
 #define GAIN_CHANGE_LOOKAHEAD_EXIT		2 // 直線復帰判定で先読みする速度計画の要素数[点]。
 #define GAIN_CHANGE_STRAIGHT_STABLE_MM	20 // 直線用ゲインへの復帰に必要な連続直線距離[mm]。
@@ -54,6 +56,8 @@
 //====================================//
 // シンボル定義
 //====================================//
+#define LINE_GAIN_POLICY_VERSION 2U // DISTANCE/SLIPの切替方式。2:計画ROCのみ、旧方式は実測ROCも使用。
+
 // スタートモード
 #define START_SERACH 3
 #define START_OPTIMAL 4

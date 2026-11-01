@@ -79,6 +79,21 @@ typedef struct {
 	int16_t pwm;
 } pidParam;
 
+// ゲイン判定はPID計算の次周期へ適用される。使用周期の診断へコピーして保存する。
+typedef struct {
+	float rocNow_mm; // 判定時点の実測ROC[mm]。切替方式版2では観測用だけに使用する。
+	int32_t stablePulse;
+	int16_t planEnterRoc_mm, planExitRoc_mm;
+	uint8_t state, reason, curveHold;
+} LineGainLog;
+
+typedef struct {
+	LineGainLog gain;
+	int32_t pTerm, dTerm; // 右5bitシフト前。左右輪速度差分[pulse/ms]の32倍スケール。
+	int16_t wheelTargetL, wheelTargetR; // 上下限制限後[pulse/ms]。
+	uint8_t kpUsed, kdUsed, wheelLimitFlags;
+} LineTraceLog;
+
 //====================================//
 // グローバル変数の宣言、定義
 //====================================//
@@ -95,12 +110,15 @@ extern pidParam yawRateCtrl;
 extern int16_t speedFeedForwardGain;
 
 extern int32_t log_targetAngularVelocity; // ログ用目標角速度
+extern LineGainLog lineGainLog;
+extern LineTraceLog lineTraceLog;
 
 //====================================//
 // プロトタイプ宣言
 //====================================//
 void setTargetSpeed (float speed);
 void setTargetAngularVelocity (float angularVelocity);
+void syncSpeedPIDGains(void);
 void resetSpeedPID (void);
 void writePIDparameters(pidParam *pid);
 void readPIDparameters(pidParam *pid);

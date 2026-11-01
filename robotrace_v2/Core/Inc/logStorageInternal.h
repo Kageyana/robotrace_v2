@@ -29,14 +29,25 @@ extern char columnTitle[LOG_COLUMN_TITLE_BUFFER_SIZE];
 #define LOG_SCHEMA_STORED(type, name, fmt, expr) "S," #type "," #name "," fmt "\n"
 #define LOG_SCHEMA_DERIVED(type, name, fmt, expr) "D," #type "," #name "," fmt "\n"
 enum { LOG_SCHEMA_TEXT_BYTES = sizeof(LOG_FIELD_LIST(LOG_SCHEMA_STORED, LOG_SCHEMA_DERIVED)) - 1U };
+enum { LOG_LINE_SCHEMA_TEXT_BYTES = sizeof(LOG_FIELD_LIST_LINE(LOG_SCHEMA_STORED, LOG_SCHEMA_DERIVED)) - 1U };
 extern const char logSchemaText[LOG_SCHEMA_TEXT_BYTES + 1U];
+extern const char logLineSchemaText[LOG_LINE_SCHEMA_TEXT_BYTES + 1U];
 #undef LOG_SCHEMA_STORED
 #undef LOG_SCHEMA_DERIVED
 #define LOG_COLUMN_ADD(type, name, fmt, expr) + 1U
 enum { LOG_BINARY_COLUMNS = 0 LOG_FIELD_LIST(LOG_COLUMN_ADD, LOG_COLUMN_ADD) };
+enum { LOG_LINE_BINARY_COLUMNS = 0 LOG_FIELD_LIST_LINE(LOG_COLUMN_ADD, LOG_COLUMN_ADD) };
 #undef LOG_COLUMN_ADD
 _Static_assert(sizeof(logSchemaText) - 1U <= LOG_BINARY_SCHEMA_MAX_BYTES, "schema description too large");
 _Static_assert(LOG_BINARY_COLUMNS <= LOG_BINARY_MAX_COLUMNS, "too many log columns");
+_Static_assert(LOG_LINE_SCHEMA_TEXT_BYTES <= LOG_BINARY_SCHEMA_MAX_BYTES, "line schema description too large");
+_Static_assert(LOG_LINE_BINARY_COLUMNS <= LOG_BINARY_MAX_COLUMNS, "too many line log columns");
+typedef struct {
+    const char *text;
+    uint16_t textBytes, recordBytes, columns;
+    bool lineTrace;
+} LogStorageSchema;
+extern const LogStorageSchema logPathSchema, logLineSchema;
 typedef struct
 {
 	bool closureValid;
@@ -59,7 +70,9 @@ typedef struct {
 //====================================//
 bool logStorageCanRead(void);
 uint32_t logStorageSchemaCrc(void);
+uint32_t logStorageSchemaCrcFor(const LogStorageSchema *schema);
+const LogStorageSchema *logStorageSchemaForHeader(const LogBinaryHeader *header);
 bool logStorageReadContainerHeader(FIL *file, uint16_t number, LogBinaryHeader *header);
-bool logStorageScanRecords(FIL *file, uint16_t rows, const LogSaveCheck *saved,
+bool logStorageScanRecords(FIL *file, const LogBinaryHeader *header, const LogSaveCheck *saved,
     PrimaryRouteValidation *validation, uint32_t *dataCrc);
 #endif

@@ -108,7 +108,7 @@
     STORED(F32, imuYawAlphaFiltered, "%f", slipV2.lateralCandidate.result.alphaRadps2) \
     STORED(F32, imuLatTangentialApplied, "%f", slipV2.lateralCandidate.result.tangentialAppliedXMps2)
 
-// PATH/SHORTCUT/PATH_CURVEの1ms周期診断。経路モード以外は0を保存する。
+// PATH/SHORTCUT/PATH_CURVE専用の1ms周期診断。一次/DISTANCE/SLIP形式には含めない。
 // 方位偏差は最近傍経路接線に対する差[0.01deg]、操舵3成分は符号付きの飽和前指令[deg/s]。
 #define LOG_FIELD_LIST_PATH(STORED, DERIVED) \
     STORED(F32, pathErrorY_mm, "%f", (isPathRunMode(optimalTrace) ? pathLogErrorY_mm : 0.0f)) \
@@ -127,13 +127,43 @@
     STORED(U8, pathMarkerCorrectionApplied, "%d", (isPathRunMode(optimalTrace) ? pathCorrectionLog.markerApplied : 0U)) \
     STORED(F32, pathMarkerCorrection_mm, "%f", (isPathRunMode(optimalTrace) ? pathCorrectionLog.markerPosition_mm : 0.0f))
 
-// 通常61列・169 B、詳細67列・178 B。targetSpeedは16bitで保存する。
-#define LOG_FIELD_LIST(STORED, DERIVED) \
+// 一次/DISTANCE/SLIPの使用周期診断。状態・理由・単位はdoc/line-control-log.md参照。
+#define LOG_FIELD_LIST_LINE_CONTROL(STORED, DERIVED) \
+    STORED(U8, lineKpUsed, "%d", lineTraceLog.kpUsed) \
+    STORED(U8, lineKdUsed, "%d", lineTraceLog.kdUsed) \
+    STORED(U8, lineGainState, "%d", lineTraceLog.gain.state) \
+    STORED(U8, lineGainReason, "%d", lineTraceLog.gain.reason) \
+    STORED(U8, lineCurveGainHold, "%d", lineTraceLog.gain.curveHold) \
+    STORED(S32, lineGainStablePulse, "%ld", lineTraceLog.gain.stablePulse) \
+    STORED(F32, lineGainRocNow_mm, "%f", lineTraceLog.gain.rocNow_mm) \
+    STORED(S16, lineGainPlanEnterRoc_mm, "%d", lineTraceLog.gain.planEnterRoc_mm) \
+    STORED(S16, lineGainPlanExitRoc_mm, "%d", lineTraceLog.gain.planExitRoc_mm) \
+    STORED(S32, linePTerm_x32, "%ld", lineTraceLog.pTerm) \
+    STORED(S32, lineDTerm_x32, "%ld", lineTraceLog.dTerm) \
+    STORED(S16, wheelTargetL_p, "%d", lineTraceLog.wheelTargetL) \
+    STORED(S16, wheelTargetR_p, "%d", lineTraceLog.wheelTargetR) \
+    STORED(U8, wheelTargetLimitFlags, "%d", lineTraceLog.wheelLimitFlags)
+
+#define LOG_FIELD_LIST_COMMON(STORED, DERIVED) \
     LOG_BASE_FIELD_LIST(STORED, DERIVED) \
     LOG_FIELD_LIST_V2(STORED, DERIVED) \
-    LOG_FIELD_LIST_LAT_DIAGNOSTICS(STORED, DERIVED) \
+    LOG_FIELD_LIST_LAT_DIAGNOSTICS(STORED, DERIVED)
+
+// PATH系は従来どおり通常61列/169 B、詳細67列/178 B。
+#define LOG_FIELD_LIST(STORED, DERIVED) \
+    LOG_FIELD_LIST_COMMON(STORED, DERIVED) \
     LOG_FIELD_LIST_PATH(STORED, DERIVED) \
     LOG_FIELD_LIST_PATH_CORRECTION(STORED, DERIVED)
+
+// 一次/DISTANCE/SLIPはPATH専用11列を保存しない。通常64列/166 B、詳細70列/175 B。
+#define LOG_FIELD_LIST_LINE(STORED, DERIVED) \
+    LOG_FIELD_LIST_COMMON(STORED, DERIVED) \
+    LOG_FIELD_LIST_LINE_CONTROL(STORED, DERIVED)
+
+// 読込用構造体だけが両側を保持し、実レコードは走行開始時にどちらかへ固定する。
+#define LOG_FIELD_LIST_ALL(STORED, DERIVED) \
+    LOG_FIELD_LIST(STORED, DERIVED) \
+    LOG_FIELD_LIST_LINE_CONTROL(STORED, DERIVED)
 
 // バイナリログで保存する型の対応表。
 #define LOG_CTYPE_U8  uint8_t
@@ -154,6 +184,8 @@
 #define LOG_RECORD_SIZE_SKIP(type, name, fmt, expr)
 // 1レコード分のバイトサイズ。
 enum { LOG_RECORD_SIZE_BYTES = 0 LOG_FIELD_LIST(LOG_RECORD_SIZE_ADD, LOG_RECORD_SIZE_SKIP) };
+enum { LOG_LINE_RECORD_SIZE_BYTES = 0 LOG_FIELD_LIST_LINE(LOG_RECORD_SIZE_ADD, LOG_RECORD_SIZE_SKIP) };
+_Static_assert((unsigned)LOG_LINE_RECORD_SIZE_BYTES <= (unsigned)LOG_RECORD_SIZE_BYTES, "line log must fit in the shared record buffer");
 
 //====================================//
 // グローバル変数の宣言、定義

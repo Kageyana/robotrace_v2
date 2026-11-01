@@ -33,7 +33,7 @@ typedef struct
 {
 #define LOG_STRUCT_FIELD(type, name, fmt, expr) LOG_CTYPE_##type name;
 #define LOG_STRUCT_SKIP(type, name, fmt, expr)
-	LOG_FIELD_LIST(LOG_STRUCT_FIELD, LOG_STRUCT_SKIP)
+	LOG_FIELD_LIST_ALL(LOG_STRUCT_FIELD, LOG_STRUCT_SKIP)
 #undef LOG_STRUCT_FIELD
 #undef LOG_STRUCT_SKIP
 } LogRecord;
@@ -125,16 +125,20 @@ static float logReadF32(void)
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logReadRecord
-// 処理概要     LOG_FIELD_LISTの順で1レコードを復元する
-// 引数         rec: 現行ビルドのレコード復元先
+// 処理概要     指定した走行別列定義の順で1レコードを復元する
+// 引数         rec: 復元先, lineTrace: 一次/DISTANCE/SLIP形式ならtrue
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
-static void logReadRecord(LogRecord *rec)
+static void logReadRecord(LogRecord *rec, bool lineTrace)
 {
     memset(rec, 0, sizeof(*rec));
 #define LOG_READ_FIELD(type, name, fmt, expr) rec->name = logRead##type();
 #define LOG_READ_SKIP(type, name, fmt, expr)
-    LOG_FIELD_LIST(LOG_READ_FIELD, LOG_READ_SKIP)
+    if (lineTrace) {
+        LOG_FIELD_LIST_LINE(LOG_READ_FIELD, LOG_READ_SKIP)
+    } else {
+        LOG_FIELD_LIST(LOG_READ_FIELD, LOG_READ_SKIP)
+    }
 #undef LOG_READ_FIELD
 #undef LOG_READ_SKIP
 }
@@ -190,12 +194,15 @@ static FRESULT logReadBuffered(FIL *file, uint8_t *bytes, UINT length, FSIZE_t e
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logStorageScanRecords
 // 処理概要     記録のCRCとクロス区間を取得し、保存時は一次経路も検証する
-// 引数         file: 入力, rows: 行数, saved: 保存時状態(NULLは読込), validation: 保存検証結果, dataCrc: CRC出力
+// 引数         file: 入力, header: 走行別形式・行数, saved: 保存時状態(NULLは読込), validation: 保存検証結果, dataCrc: CRC出力
 // 戻り値       true: 読込成功 false: 読込失敗
 /////////////////////////////////////////////////////////////////////
-bool logStorageScanRecords(FIL *file, uint16_t rows, const LogSaveCheck *saved,
+bool logStorageScanRecords(FIL *file, const LogBinaryHeader *header, const LogSaveCheck *saved,
     PrimaryRouteValidation *validation, uint32_t *dataCrc)
 {
+	const LogStorageSchema *schema = logStorageSchemaForHeader(header);
+	if (schema == NULL || header->rows > UINT16_MAX) return false;
+	const uint16_t rows = (uint16_t)header->rows;
 	const bool live = saved != NULL;
 	uint8_t log[LOG_READ_RECORD_BYTES];
 	LogRecord rec;
@@ -223,16 +230,17 @@ bool logStorageScanRecords(FIL *file, uint16_t rows, const LogSaveCheck *saved,
 	if (live) validation->goalMarkerOnset_p = goalMarkerPulse;
 	for (j = 0; j < rows; j++)
 	{
-		fresult = logReadBuffered(file, log, LOG_SIZE, LOG_BINARY_HEADER_BYTES + (FSIZE_t)rows * LOG_SIZE);
+		fresult = logReadBuffered(file, log, schema->recordBytes,
+			LOG_BINARY_HEADER_BYTES + (FSIZE_t)rows * schema->recordBytes);
 		if (fresult != FR_OK)
 		{
 			printf("f_read error in endLog\r\n");
 			return false;
 		}
-		crc = logBinaryCrcUpdate(crc, log, LOG_SIZE);
+		crc = logBinaryCrcUpdate(crc, log, schema->recordBytes);
 
 		logaddress = log;
-		logReadRecord(&rec);
+		logReadRecord(&rec, schema->lineTrace);
 
 		time = rec.cntlog;
 		speed = (int16_t)rec.encCurrentN;
@@ -357,6 +365,7 @@ bool logStorageScanRecords(FIL *file, uint16_t rows, const LogSaveCheck *saved,
 
 static struct {
     FIL *file;
+    const LogStorageSchema *schema;
     LogBinaryHeader header;
     LogSourcePurpose purpose;
     LogRecord record;
@@ -369,13 +378,42 @@ static struct {
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 logStorageSchemaCrc
-// 処理概要     列名・型・順序・派生計算版からスキーマ識別CRCを取得する
+// 処理概要     PATH系の列名・型・順序からスキーマ識別CRCを取得する
 // 引数         なし
 // 戻り値       スキーマ識別CRC
 /////////////////////////////////////////////////////////////////////
 uint32_t logStorageSchemaCrc(void)
 {
-    return ~logBinaryCrcUpdate(UINT32_MAX, (const uint8_t *)logSchemaText, sizeof(logSchemaText) - 1U);
+    return logStorageSchemaCrcFor(&logPathSchema);
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logStorageSchemaCrcFor
+// 処理概要     指定した走行用列定義のCRC32を取得する
+// 引数         schema: 列定義
+// 戻り値       列定義CRC32
+/////////////////////////////////////////////////////////////////////
+uint32_t logStorageSchemaCrcFor(const LogStorageSchema *schema)
+{
+    return ~logBinaryCrcUpdate(UINT32_MAX, (const uint8_t *)schema->text, schema->textBytes);
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logStorageSchemaForHeader
+// 処理概要     長さ・列数・CRCが一致する現行の走行別列定義を選ぶ
+// 引数         header: 識別情報
+// 戻り値       一致する列定義、不一致またはNULL入力はNULL
+/////////////////////////////////////////////////////////////////////
+const LogStorageSchema *logStorageSchemaForHeader(const LogBinaryHeader *header)
+{
+    if (header == NULL || header->profile != LOG_SCHEMA_PROFILE_LIGHT) return NULL;
+    const LogStorageSchema *schemas[] = {&logPathSchema, &logLineSchema};
+    for (unsigned i = 0; i < sizeof(schemas) / sizeof(schemas[0]); ++i) {
+        const LogStorageSchema *schema = schemas[i];
+        if (header->recordBytes == schema->recordBytes && header->schemaBytes == schema->textBytes &&
+            header->columns == schema->columns && header->schema == logStorageSchemaCrcFor(schema)) return schema;
+    }
+    return NULL;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -389,14 +427,14 @@ bool logStorageReadContainerHeader(FIL *file, uint16_t number, LogBinaryHeader *
     UINT read = 0U;
     if (f_read(file, logBuffers[0], LOG_BINARY_HEADER_BYTES, &read) != FR_OK ||
         read != LOG_BINARY_HEADER_BYTES || !logBinaryDecodeHeader(logBuffers[0], f_size(file), header) ||
-        header->number != number || header->profile != LOG_SCHEMA_PROFILE_LIGHT ||
-        header->recordBytes != LOG_SIZE || header->schema != logStorageSchemaCrc() ||
-        header->schemaBytes != sizeof(logSchemaText) - 1U || header->columns != LOG_BINARY_COLUMNS) return false;
+        header->number != number) return false;
+    const LogStorageSchema *schema = logStorageSchemaForHeader(header);
+    if (schema == NULL) return false;
     // 機体の計画解析は現在のビルドと同じ列定義を要求する。PCは列定義から汎用復元する。
     logReadAheadReset();
     if (f_lseek(file, LOG_BINARY_HEADER_BYTES + (FSIZE_t)header->rows * header->recordBytes) != FR_OK ||
         f_read(file, logIoMemory.stopped.input, header->schemaBytes, &read) != FR_OK ||
-        read != header->schemaBytes || memcmp(logIoMemory.stopped.input, logSchemaText, header->schemaBytes)) return false;
+        read != header->schemaBytes || memcmp(logIoMemory.stopped.input, schema->text, header->schemaBytes)) return false;
     return true;
 }
 
@@ -433,17 +471,24 @@ FRESULT logSourceOpen(FIL *file, int logNumber, LogSourcePurpose purpose)
     LogBinaryHeader header;
     UINT read;
     uint32_t crc;
+    int32_t mode;
     if (!logStorageReadContainerHeader(file, number, &header) ||
         f_lseek(file, LOG_BINARY_HEADER_BYTES + (FSIZE_t)header.rows * header.recordBytes + header.schemaBytes) != FR_OK ||
         f_read(file, columnTitle, header.metadataBytes, &read) != FR_OK || read != header.metadataBytes) goto invalid;
     columnTitle[header.metadataBytes] = '\0';
+    const LogStorageSchema *schema = logStorageSchemaForHeader(&header);
     if (columnTitle[header.metadataBytes - 1U] != '\n' ||
         memchr(columnTitle, '\0', header.metadataBytes) != NULL ||
         ~logBinaryCrcUpdate(UINT32_MAX, (const uint8_t *)columnTitle, header.metadataBytes) != header.metadataCrc ||
-        !logStorageScanRecords(file, (uint16_t)header.rows, NULL, NULL, &crc) || crc != header.dataCrc ||
+        schema == NULL || !logMetadataReadInt(columnTitle, "optimalTrace", &mode) ||
+        mode < 0 || mode > UINT8_MAX ||
+        (mode != BOOST_NONE && mode != BOOST_DISTANCE && !isPathRunMode((uint8_t)mode)) ||
+        schema->lineTrace == isPathRunMode((uint8_t)mode) ||
+        !logStorageScanRecords(file, &header, NULL, NULL, &crc) || crc != header.dataCrc ||
         f_lseek(file, LOG_BINARY_HEADER_BYTES) != FR_OK) goto invalid;
     memset(&binarySource, 0, sizeof(binarySource));
     binarySource.file = file;
+    binarySource.schema = schema;
     binarySource.header = header;
     binarySource.purpose = purpose;
     logReadAheadReset();
@@ -550,12 +595,13 @@ bool logSourceNext(FIL *file, LogSourceRow *row)
     }
     uint8_t bytes[LOG_READ_RECORD_BYTES];
     if (binarySource.row == 0U) { LOG_PERF_ADD(fullScans, 1U); }
-    FRESULT result = logReadBuffered(file, bytes, LOG_SIZE,
-        LOG_BINARY_HEADER_BYTES + (FSIZE_t)binarySource.header.rows * LOG_SIZE);
+    const uint16_t recordBytes = binarySource.schema->recordBytes;
+    FRESULT result = logReadBuffered(file, bytes, recordBytes,
+        LOG_BINARY_HEADER_BYTES + (FSIZE_t)binarySource.header.rows * recordBytes);
     if (result != FR_OK) { binarySource.error = result; return false; }
-    binarySource.crc = logBinaryCrcUpdate(binarySource.crc, bytes, LOG_SIZE);
+    binarySource.crc = logBinaryCrcUpdate(binarySource.crc, bytes, recordBytes);
     logaddress = bytes;
-    logReadRecord(&binarySource.record);
+    logReadRecord(&binarySource.record, binarySource.schema->lineTrace);
     LOG_PERF_BEGIN(processTick);
     logProcessRecord();
     LOG_PERF_END(processMs, processTick);

@@ -169,3 +169,13 @@ Skillに記載された補助スクリプトも現在のチェックアウトで
 過去のvalidation/log_storage/run.pyは現チェックアウトに無い。検証器はrg --files validation -g '*.py'の実在一覧から選び、型変更はvalidation/target_speed_u16/run.pyとbuild.pyを入口にする。通常/詳細の169/178 B、targetSpeedのU16、255/256/266/580の実writer/readerとCRCを確認する。PC変換器未配置時は独立スキーマ復号の成功と、PC変換器・初回実機ログ未確認を分けて報告する。
 
 assertを使うZigホスト検証は、生成Cのassert.hより前でNDEBUGを解除し、O2でもassertが実行されることを保証する。nm等の行末正規表現も解析前にsplitlinesでCRLFを正規化する。集計失敗では実ソースSHA・保存ELFを照合し、build.py --resume-debugで完了済みDebugを再ビルドせず未実行Releaseだけを進める。[実際の失敗と検証](../../../../doc/失敗事例/2026-11-01-target-speed-u16-validation-preflight.md)。
+
+## 2026-11-01：同期設定の回帰と検証器の入口
+
+Skill/再発防止参照を読む呼出しと、その内容に依存する検索・ビルドを分離する。返り値を読んでから実在するvalidationだけを検索し、未配置robotrace_v2/testsを固定リストへ戻さない。新しい警告集計器は正規表現のfile/line/messageを名前付きグループで取り、ファイル拡張子・行番号の形を集計前に検査する。完成済みARM/ホスト結果で集計だけが失敗した場合は、原ログ・ソースSHA・ELFを照合して集計だけ再開する。[同期修正時の再発](../../../../doc/失敗事例/2026-11-01-path-correction-log-preflight.md)参照。
+
+複数PID構造体を使う制御では、SD保存対象と実IRQで使用する対象、起動後とUI最終編集の反映を照合する。左右速度PIDの入口はvalidation/speed_pid_sync/run.py。実C起動区間・UI・状態保持・PRIMASK復元をO0/O2で検査し、Debug/Releaseの警告比較とユーザーのtimer.c差分保持をfinalize.pyで確定する。[同期漏れの修正](../../../../doc/失敗事例/2026-11-01-wheel-speed-pid-gains-not-synchronized.md)参照。
+
+## 2026-11-01：nm原本の改行と配置照合
+
+nm出力をbytesで保存した場合、行末アンカーの正規表現へ渡す前にsplitlinesで改行を正規化する。原本・対象ELFのSHAを保存し、同じELFの原本から配置検証を再開する。パーサ失敗のため成功済みビルドをやり直さない。[走行別ログの配置検証](../../../../doc/失敗事例/2026-11-01-mode-log-diagnostics-preflight.md)、`validation/mode_log_diagnostics/finalize.py`を参照。
