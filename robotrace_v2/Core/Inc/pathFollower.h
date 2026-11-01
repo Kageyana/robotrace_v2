@@ -94,7 +94,7 @@ _Static_assert((PATH_ROUTE_MAX_POINTS - PATH_GOAL_RESERVED_POINTS - 1U) * PATH_R
 //====================================//
 // シンボル定義
 //====================================//
-#define PATH_ROUTE_CONTROLLER_VERSION      26U
+#define PATH_ROUTE_CONTROLLER_VERSION      27U
 #define PATH_CURVE_YAW_FF_VERSION            2U
 #define PATH_UNMATCHED_ACCEL_HOLD_VERSION    1U
 #define PATH_SOURCE_FORMAT_VERSION          1U

@@ -165,3 +165,11 @@ Src/log*をパスに渡した検索でos error 123、推測したtim.cで存在�
 版21の最終採用確認で、ルートの.vscode/tasks.jsonを存在確認せずrgの複数パスへ含め、os error2となった。ErrorActionPreference=Stopでもnativeコマンドの非0終了は停止せず、その呼出し内の後続読取りも実行された。製品・実機は未変更。既存の実在一覧取得とnative終了コード確認を実行点へ適用しなかった再発。
 
 rg --files .vscode robotrace_v2/.vscode -g '*.json'で再取得し、tasks.jsonはファーム直下だけにあることを確認してから実ファイルを読んだ。ルートsettings.jsonの古いsourceDirectoryも発見し、実在するワークスペース相対パスへ修正した。共通事前確認へVS Code階層の実在一覧とrg終了2以上での停止を追加した。一般の設定確認であり、無関係な分野Skillは変更しない。status: resolved（参照先と事前手順）。
+
+## 2026-11-01：経路モードの先読み減速調査での再発
+
+対象タスクはPATH・SHORTCUT・PATH_CURVEの先読み減速の静的確認。rgのパス引数へCore/Src/path*.cとCore/Inc/path*.hを渡し、os error 123が再発した。既存のglob分離ルールを初回検索へ適用できなかった。実在するCore/Src・Core/Incを検索ルートとし、-g 'path*.c' -g 'path*.h'へ分離して再検索し、終了コード0とpathBuildSpeedProfileの一致を確認した。再発防止は初回検索をディレクトリ＋-gで組み立て、パス引数に*・?があれば実行前に除くこと。製品コード・実機・設定値は未変更。record-failures Skillはローカル個人・repo Skill一覧で見つからなかったため既存記録へ直接追記した。一般のコード調査であり分野Skillの変更は行わない。status: resolved（検索手順の修正を確認）。
+
+## 2026-11-01：先行減速実装の検証器参照での再発
+
+対象タスクは経路3方式へのdecelLeadMm適用。過去のビルド記録からvalidation/stop_motor_hold/run.pyの存在を仮定して読込み、さらに同ディレクトリへのrgでos error 2となった。直前のrg --files validationの実在一覧には対象がなく、一覧を後続読込の必須条件へ使わなかったことが原因。製品ソースの変更前に起きた調査失敗で、既に終了した変更前ビルドは反復していない。実在一覧からpath_common/build.pyとgoal_marker_stop/build.pyを読み、新しい検証器をvalidation/path_decel_leadへ作成した。入口でコンパイラ・Ninja・変更前Coreの存在と実モード宣言を検査し、変更前後4構成と実CのO0/O2テストを終了0で確認した。再発防止は過去文書の検証器パスを実在一覧へ照合してから別呼出しで読み、一覧にない対象は読まないこと。flash-debugの再発防止参照へこの実行点を追記する。record-failures Skillは本セッションの既確認一覧に存在しないため既存記録へ直接追記。status: resolved（参照経路と検証器の実行確認）。実機の制動・再現性は未確認。

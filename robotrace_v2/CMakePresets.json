@@ -18,13 +18,6 @@
             }
         },
         {
-            "name": "DebugMarker",
-            "inherits": "Debug",
-            "cacheVariables": {
-                "ROBOTRACE_LOG_SCHEMA_PROFILE_LIGHT": "0"
-            }
-        },
-        {
             "name": "Release",
             "inherits": "default",
             "cacheVariables": {
@@ -36,10 +29,6 @@
         {
             "name": "Debug",
             "configurePreset": "Debug"
-        },
-        {
-            "name": "DebugMarker",
-            "configurePreset": "DebugMarker"
         },
         {
             "name": "Release",

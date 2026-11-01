@@ -160,3 +160,7 @@ Skillに記載された補助スクリプトも現在のチェックアウトで
 制御版26はPATH/SHORTCUT/PATH_CURVEもSGmarker>=COUNT_GOALでcase101へ移る。リポジトリルートから必要権限でvalidation/goal_marker_stop/run.pyを実行し、実Cのゴール判定・通常ラインPIDへの切替・50mm/2秒境界・緊急停止優先を旧新×O0/O2で確認する。build.py before/afterはDebug/Releaseの原ログとELFを保全する。実機の制動・初回ログは別途確認する。詳細はdoc/path-goal-marker-stop.md。
 
 ソース呼出元の探索も未確認のsystem.c等を渡さず、Test-PathでCore/Srcを確認してからrg -n 'loopSystem|emcStop' robotrace_v2/Core/Src -g '*.c'を使い、終了2以上で停止する。警告比較は行正規表現のCR残存を避け、splitlines/stripで両側の行末を揃える。集計だけの失敗では実ELF/コピーSHA・実CのSHA・原ログを照合し、完了Debugはbuild.py after --resume-debugで集計のみ再開して未実行Releaseへ進む。事例はdoc/失敗事例/2026-11-01-goal-tail-investigation-preflight.md。
+
+## 2026-11-01：過去文書の検証器パスを読む実行点
+
+過去のbuild記録や説明にあるvalidation配下のパスも、現チェックアウトにあるとは仮定しない。最初の呼出しでrg --files validation -g '*.py'の実在一覧を取得し、結果を読んだ後の別呼出しで掲載されたファイルだけを読む。一覧にないディレクトリをGet-Contentやrgへ追加しない。新しい検証器は入口で参照Core・コンパイラ・実モード宣言を検査し、変更前ビルド成功後だけ製品編集へ進む。今回の入口はvalidation/path_decel_lead/run.pyとbuild.py。[先行減速実装時の参照失敗](../../../../doc/失敗事例/2026-08-11-windows-rg-glob-not-expanded.md)参照。

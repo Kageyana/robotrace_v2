@@ -583,6 +583,60 @@ static bool pathCanUseSourceRadius(uint16_t index)
 }
 
 /////////////////////////////////////////////////////////////////////
+// モジュール名 pathSpeedRadiusMm
+// 処理概要     速度計画と先行減速に使う曲率半径を同じ形状から取得する
+// 引数         route: 経路点列, count: 経路点数, index: 対象点
+// 戻り値       曲率半径[mm]。-1は端点・クロス直線・曲率未検出
+/////////////////////////////////////////////////////////////////////
+static int16_t pathSpeedRadiusMm(const RoutePoint *route, uint16_t count, uint16_t index)
+{
+	if (index == 0U || index + 1U >= count ||
+		(routeFlags[index] & PATH_FLAG_CROSS_STRAIGHT) != 0U) return -1;
+	if (pathCanUseSourceRadius(index)) return (int16_t)lineRoute[index].sourceRadius_mm;
+	float h0 = (float)route[index - 1U].heading_cdeg * 0.01f;
+	float h1 = (float)route[index + 1U].heading_cdeg * 0.01f;
+	float dHeadingRad = fabsf(pathWrapDeg(h1 - h0)) * DEG2RAD;
+	float dsMm = pathPointDistance((float)route[index - 1U].x_mm, (float)route[index - 1U].y_mm,
+		(float)route[index + 1U].x_mm, (float)route[index + 1U].y_mm);
+	if (dHeadingRad > 1.0e-4f && dsMm > 1.0f) return pathFloatToInt16(dsMm / dHeadingRad);
+	return -1;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathApplyDecelLead
+// 処理概要     半径減少率に応じて低い速度を手前へ広げ、減速開始を先行させる
+// 引数         route: 経路点列, count: 経路点数
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void pathApplyDecelLead(RoutePoint *route, uint16_t count)
+{
+	float baseLeadMm = tgtParam.decelLeadMm;
+	if (count <= 1U || !isfinite(baseLeadMm) || baseLeadMm <= 0.0f) return;
+	int16_t previousRadius = INT16_MAX;
+	for (uint16_t i = 1U; i < count; i++)
+	{
+		int16_t radius = pathSpeedRadiusMm(route, count, i);
+		if (radius < 0) radius = INT16_MAX;
+		if (route[i].speed_cms < route[i - 1U].speed_cms && radius < previousRadius)
+		{
+			// DISTANCEと同じ半径減少率。実経路距離を使い、必要距離を満たす点まで切り上げる。
+			float changeRatio = (float)(previousRadius - radius) / (float)previousRadius;
+			float leadMm = baseLeadMm * changeRatio;
+			float shiftedMm = 0.0f;
+			uint16_t j = i;
+			while (j > 0U && shiftedMm < leadMm)
+			{
+				shiftedMm += pathPointDistance((float)route[j].x_mm, (float)route[j].y_mm,
+					(float)route[j - 1U].x_mm, (float)route[j - 1U].y_mm);
+				j--;
+				if (route[j].speed_cms > route[i].speed_cms) route[j].speed_cms = route[i].speed_cms;
+			}
+		}
+		previousRadius = radius;
+	}
+}
+
+/////////////////////////////////////////////////////////////////////
 // モジュール名 pathBuildSpeedProfile
 // 処理概要     曲率と加減速制約から経路速度を設定する
 // 引数         route: 経路点列, count: 経路点数, shortcutLevel: 短縮レベル
@@ -598,31 +652,16 @@ static void pathBuildSpeedProfile(RoutePoint *route, uint16_t count, uint8_t sho
 	for (uint16_t i = 0U; i < count; i++)
 	{
 		float speed = curvatureSpeed ? fminf(speedCap, asignVelocity(INT16_MAX)) : speedCap;
-		if (i > 0U && i + 1U < count && (routeFlags[i] & PATH_FLAG_CROSS_STRAIGHT) == 0U)
+		int16_t radius = pathSpeedRadiusMm(route, count, i);
+		if (radius >= 0)
 		{
-			if (pathCanUseSourceRadius(i))
-			{
-				float curveSpeed = asignVelocity((int16_t)lineRoute[i].sourceRadius_mm);
-				speed = fminf(speed, curveSpeed);
-			}
-			else
-			{
-				float h0 = (float)route[i - 1U].heading_cdeg * 0.01f;
-				float h1 = (float)route[i + 1U].heading_cdeg * 0.01f;
-				float dHeadingRad = fabsf(pathWrapDeg(h1 - h0)) * DEG2RAD;
-				float dsMm = pathPointDistance((float)route[i - 1U].x_mm, (float)route[i - 1U].y_mm,
-					(float)route[i + 1U].x_mm, (float)route[i + 1U].y_mm);
-				if (dHeadingRad > 1.0e-4f && dsMm > 1.0f)
-				{
-					float radiusMm = dsMm / dHeadingRad;
-					float curveSpeed = asignVelocity(pathFloatToInt16(radiusMm));
-					if (curvatureSpeed) speed = fminf(speedCap, curveSpeed);
-					else if (curveSpeed < speed) speed = curveSpeed;
-				}
-			}
+			float curveSpeed = asignVelocity(radius);
+			if (curvatureSpeed && !pathCanUseSourceRadius(i)) speed = fminf(speedCap, curveSpeed);
+			else speed = fminf(speed, curveSpeed);
 		}
 		route[i].speed_cms = (uint16_t)lroundf(fmaxf(0.0f, speed) * 100.0f);
 	}
+	pathApplyDecelLead(route, count);
 	if (curvatureSpeed)
 	{
 		// スタートマーカーまではsearch速度のため、先頭から加速制約を適用する。
