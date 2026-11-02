@@ -28,3 +28,7 @@ status: open
 `validation/analysis_display/run.py`をリポジトリルートの明示workdir・既知のGNU実行権限で実行する。転送中に見えるソースの不変性を確認し、フラグの状態だけで合格にしない。変更前Coreを保存した場合は`--core build/analysis-loading-transitions/before/Core --expect-old-tearing`でも問題検出を確認する。AGENTS.mdの現行転送方式と書込み・デバッグSkillの検証前手順も更新する。
 
 現行コードの全試験はO0/O2・Wall/Wextra/Werrorで成功し、同じ試験で変更前の2問題を検出した。コードの競合と検証漏れの対処はホスト確認済み。実機の切替表示と総解析時間の比較は未実施のためopenとする。
+
+## 2026-11-02：実起動時の表示有効条件の検証漏れ
+
+ユーザーから、解析開始後も画面が変わらないと報告があった。実コードの`initLCD`はfalseから更新されず、描画・DMAの検証以前に解析画面が無効になっていた。上記の試験成功を実機の表示成功へ拡張しない。現在のチェックアウトでは旧ハーネスが欠落していたため、`validation/analysis_display/run.py`を実起動フラグ・実描画・実DMAで再作成した。今回の入口には上記の旧`--core`/`--expect-old-tearing`オプションはなく、保存した変更前コードを使う負例も標準実行で確認する。原因と修正結果は[未更新フラグによる無表示](2026-11-02-analysis-display-inactive-initlcd.md)を参照する。

@@ -77,8 +77,8 @@
 #define PATH_ASSOCIATION_PROGRESS_MARGIN_MM   120.0f // 走行積算距離より先の経路候補を許可する余裕[mm]。
 #define PATH_ASSOCIATION_HEADING_MAX_DEG      60.0f // 経路候補と機体の方位差の許容上限[deg]。
 #define PATH_GOAL_RESERVED_POINTS             13U // 終端から原点方向への延長用に確保する点数[点]。20mm間隔で最大260mmの延長分。
-_Static_assert((PATH_ROUTE_MAX_POINTS - PATH_GOAL_RESERVED_POINTS - 1U) * PATH_ROUTE_SPACING_MM >= 35000.0f,
-    "PATH route capacity must cover a 35 m source");
+_Static_assert((PATH_ROUTE_MAX_POINTS - PATH_GOAL_RESERVED_POINTS - 1U) * PATH_ROUTE_SPACING_MM >= 36000.0f,
+    "PATH route capacity must cover a 36 m source");
 #define PATH_REJOIN_BLEND_STEP                10U // 復帰中に1msごとに増やす経路操舵の混合率[permille/更新]。100msで0→1000。
 
 // ライン観測と自己位置補正。判定周期は1ms。SDの補正係数は従来の5ms基準を維持する。

@@ -144,7 +144,8 @@ static void analysisDisplayNumber(char *text, uint8_t digits, uint32_t value)
 /////////////////////////////////////////////////////////////////////
 void analysisDisplayBegin(const char *mode, int16_t logNumber)
 {
-    active = modeDSP && initLCD && patternTrace == 0U && !modeLOG;
+    // 通常UIと同じ表示可否を使う。initLCDは起動処理で更新されない。
+    active = modeDSP && patternTrace == 0U && !modeLOG;
     if (!active) return;
     startedMs = HAL_GetTick();
     firstFrame = true;

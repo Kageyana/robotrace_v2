@@ -8,9 +8,9 @@
 #include <stdint.h>
 
 #define OPT_BUFF_SIZE 1000
-#define PATH_ROUTE_MAX_POINTS 1800U // 20mm間隔で35mの一次経路とゴール延長を保持する。
+#define PATH_ROUTE_MAX_POINTS 2000U // 20mm間隔で39.7mまでの一次経路とゴール延長を60KiB内に保持する。
 #define PATH_MARKER_CAPACITY 192U // 一次経路から登録するマーカーの上限[件]。
-#define RUN_MEMORY_MAX_BYTES (48U * 1024U) // DISTANCE/PATHで共用する静的RAMの上限[byte]。
+#define RUN_MEMORY_MAX_BYTES (60U * 1024U) // DISTANCE/PATHで共用する静的RAMの上限[byte]。
 
 typedef struct
 {
@@ -102,7 +102,7 @@ typedef union
 } RunMemory;
 
 _Static_assert(sizeof(RunMemory) <= RUN_MEMORY_MAX_BYTES,
-    "RunMemory must fit in the 48 KiB shared RAM budget");
+    "RunMemory must fit in the 60 KiB shared RAM budget");
 
 typedef enum
 {
