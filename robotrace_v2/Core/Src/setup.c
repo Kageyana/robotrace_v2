@@ -615,19 +615,32 @@ static void setup_sensors(void)
 
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_pid
-// 処理概要     PIDゲインの表示・編集・試験状態を共通処理し方式ごとの出力を維持する
-// 引数         pid: 調整対象, speedTest: trueなら速度PIDとFFの調整
+// 処理概要     PIDゲインの表示・組選択・編集保存・試験出力を行う
+// 引数         pid: 調整対象（速度・角速度FBラインは2組で管理）, speedTest: trueなら速度PIDとFFの調整
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////////////////
 static void setup_pid(pidParam *pid, bool speedTest)
 {
+    static int16_t gainGroup = CONTROL_GAIN_BASE;
+    static int8_t saveResult = 0; // 0:未編集、1:保存成功、-1:保存失敗
+    const bool grouped = speedTest || pid == &lineTraceOmegaFBCtrl;
+    const bool entering = pattern.display != pattern.beforeHex;
+    if (grouped && entering)
+    {
+        applyControlGainGroup((ControlGainGroup)gainGroup);
+        saveResult = 0;
+    }
+    pidParam *activePid = pid;
+    ControlGainProfile *profile = &controlGainProfiles[gainGroup];
+    if (grouped) pid = speedTest ? &profile->speed : &profile->lineOmega;
     const uint8_t lineRows[] = {18U, 32U, 44U, 0U};
-    const uint8_t speedRows[] = {18U, 30U, 42U, 54U};
-    const uint8_t *rows = speedTest ? speedRows : lineRows;
-    const uint8_t count = speedTest ? 4U : 3U;
-    FontDef gainFont = speedTest ? Font_6x8 : Font_7x10;
-    int16_t *gains[] = {&pid->kp, &pid->ki, &pid->kd, &speedFeedForwardGain};
-    char *labels[] = {"kp:", "ki:", "kd:", "ff:"};
+    const uint8_t groupLineRows[] = {18U, 30U, 42U, 54U};
+    const uint8_t groupSpeedRows[] = {18U, 27U, 36U, 45U, 54U};
+    const uint8_t *rows = grouped ? (speedTest ? groupSpeedRows : groupLineRows) : lineRows;
+    const uint8_t count = grouped ? (speedTest ? 5U : 4U) : 3U;
+    FontDef gainFont = grouped ? Font_6x8 : Font_7x10;
+    int16_t *gains[] = {&gainGroup, &pid->kp, &pid->ki, &pid->kd, &profile->speedFF};
+    char *labels[] = {"Grp", "kp:", "ki:", "kd:", "ff:"};
 
     if (pattern.display != pattern.beforeHex)
     {
@@ -635,7 +648,7 @@ static void setup_pid(pidParam *pid, bool speedTest)
         for (uint8_t i = 0U; i < count; i++)
         {
             ssd1306_SetCursor(0, rows[i]);
-            ssd1306_printf(gainFont, labels[i]);
+            ssd1306_printf(gainFont, labels[grouped ? i : i + 1U]);
         }
         ssd1306_SetCursor(60, 30);
         ssd1306_printf(Font_7x10, "pwm:");
@@ -653,7 +666,7 @@ static void setup_pid(pidParam *pid, bool speedTest)
         }
         else
         {
-            motorCommandOutSynth(pid->pwm, 0, 0);
+            motorCommandOutSynth(activePid->pwm, 0, 0);
             powerLineSensors(1);
         }
     }
@@ -675,23 +688,53 @@ static void setup_pid(pidParam *pid, bool speedTest)
     dataTuningUD(&pattern.gain, 1, count, 1);
     if (testFlags.trace_test == 0)
     {
+        if (pattern.gain >= 1 && pattern.gain <= count)
+        {
+            const uint8_t index = grouped ? (uint8_t)(pattern.gain - 1) : (uint8_t)pattern.gain;
+            int16_t before = *gains[index];
+            int16_t minimum = PID_GAIN_MIN, maximum = PID_GAIN_MAX;
+            if (grouped && index == 0U) maximum = CONTROL_GAIN_GROUP_COUNT - 1;
+            else if (speedTest && index == 4U)
+            {
+                minimum = SPEED_FF_GAIN_MIN;
+                maximum = SPEED_FF_GAIN_MAX;
+            }
+            dataTuningLR(gains[index], 1, minimum, maximum);
+            if (*gains[index] != before && grouped)
+            {
+                if (index != 0U)
+                    saveResult = !initMSD ? 0 : (writeControlGainProfiles() ? 1 : -1);
+                else
+                    saveResult = 0;
+                applyControlGainGroup((ControlGainGroup)gainGroup);
+                // 組選択の変更後は、同じ描画内から新しい組の値を参照する。
+                profile = &controlGainProfiles[gainGroup];
+                pid = speedTest ? &profile->speed : &profile->lineOmega;
+                gains[1] = &pid->kp; gains[2] = &pid->ki; gains[3] = &pid->kd;
+                gains[4] = &profile->speedFF;
+            }
+        }
         for (uint8_t i = 0U; i < count; i++)
         {
             ssd1306_SetCursor(21, rows[i]);
-            if (pattern.gain == (int16_t)(i + 1U))
-                ssd1306_printfB(gainFont, "%3d", *gains[i]);
+            if (grouped && i == 0U)
+            {
+                const char *name = gainGroup == CONTROL_GAIN_BASE ? "BASE " : "CURVE";
+                if (pattern.gain == 1) ssd1306_printfB(gainFont, "%s", name);
+                else ssd1306_printf(gainFont, "%s", name);
+            }
+            else if (pattern.gain == (int16_t)(i + 1U))
+                ssd1306_printfB(gainFont, "%3d", *gains[grouped ? i : i + 1U]);
             else
-                ssd1306_printf(gainFont, "%3d", *gains[i]);
+                ssd1306_printf(gainFont, "%3d", *gains[grouped ? i : i + 1U]);
         }
         ssd1306_SetCursor(88, 30);
-        ssd1306_printf(Font_7x10, "%4d", pid->pwm);
-        if (pattern.gain >= 1 && pattern.gain <= count)
-            dataTuningLR(gains[pattern.gain - 1], 1, 0, 255);
-    }
-    if (speedTest)
-    {
-        // 値変更と同じUI処理内で反映し、画面を離れても旧ゲインを残さない。
-        syncSpeedPIDGains();
+        ssd1306_printf(Font_7x10, "%4d", activePid->pwm);
+        if (grouped)
+        {
+            ssd1306_SetCursor(100, 54);
+            ssd1306_printf(Font_6x8, !initMSD ? "RAM" : (saveResult < 0 ? "ERR" : (saveResult > 0 ? " SD" : "   ")));
+        }
     }
 }
 /////////////////////////////////////////////////////////////////////////////////////

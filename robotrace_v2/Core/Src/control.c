@@ -38,6 +38,9 @@ static AutoRunConfigLoadResult autoRunConfigLoadResult = AUTO_RUN_CONFIG_LOAD_IO
 bool stateCrossLine = false;		// クロスライン検出状態
 float rocrun = 2000;		// 曲率半径計算用変数
 LineGainLog lineGainLog;
+static bool lineGainChanged = false;
+static int16_t beforeGainP = 0, beforeGainD = 0;
+static bool lineCurveGainHold = false;
 
 uint16_t analogValLSon[NUM_SENSORS+1]; // ADC結果格納配列
 uint16_t analogValLSoff[NUM_SENSORS+1]; // ADC結果格納配列s
@@ -231,10 +234,8 @@ void initSystem(void)
 
 			// 前回のPIDゲインを取得
 			readPIDparameters(&lineTraceCtrl);
-			readPIDparameters(&veloCtrl);
-			readSpeedFeedForwardGain(&speedFeedForwardGain);	// 速度フィードフォワード係数も読み出す
+			readControlGainProfiles(); // 既存3ファイルから走行モード別の2組を取得
 			readPIDparameters(&yawRateCtrl);
-			readPIDparameters(&lineTraceOmegaFBCtrl);
 
 			readLinesenval(); // ラインセンサの最大値と最小値を取得
 			readTgtspeeds();  // 目標速度を取得
@@ -266,7 +267,7 @@ void initSystem(void)
 	sendLED();
 
 	// SD読込の有無に関係なく、走行用左右PIDへ確定した速度ゲインを反映する。
-	syncSpeedPIDGains();
+	applyControlGainGroup(CONTROL_GAIN_BASE);
 
 	// IMU
 	initIMU = initBMI088();
@@ -641,6 +642,7 @@ void loopSystem(void)
 			updateBatteryVoltage(); // 走行開始直前の電圧を反映
 			powerLineSensors(1);   // ラインセンサ点灯
 			pathFollowerCaptureRunStartSettings(); // SD有無に関係なく、今回の経路設定と周期を固定する
+			applyControlGainGroup(controlGainGroupForMode(optimalTrace)); // ログ作成前に実使用ゲインを確定
 
 			// SDカードに変数保存
 			// PIDゲインを記録
@@ -651,9 +653,7 @@ void loopSystem(void)
 					writeLinesenval(); // 1走目前に実施したラインセンサ校正値を保存
 				}
 				writePIDparameters(&lineTraceCtrl);
-				writePIDparameters(&lineTraceOmegaFBCtrl);
-				writePIDparameters(&veloCtrl);
-				writeSpeedFeedForwardGain(speedFeedForwardGain);
+				if (initMSD) (void)writeControlGainProfiles(); // 一時的な直線用ゲインを保存しない
 				writePIDparameters(&yawRateCtrl);
 
 				writeTgtspeeds();  // 目標速度を保存
@@ -1117,6 +1117,20 @@ void countDown(void)
 	}
 }
 ///////////////////////////////////////////////////////////////////////////
+// モジュール名 resetLineGainState
+// 処理概要     停止中のゲイン組切替時に前走の一時ゲインとROC保持状態を破棄する
+// 引数         なし
+// 戻り値       なし
+///////////////////////////////////////////////////////////////////////////
+void resetLineGainState(void)
+{
+	lineGainChanged = false;
+	beforeGainP = beforeGainD = 0;
+	lineCurveGainHold = false;
+	encChangeGain = 0;
+	lineGainLog = (LineGainLog){0};
+}
+///////////////////////////////////////////////////////////////////////////
 // モジュール名 changeGain
 // 処理概要     ROCに応じてゲインを切り替える
 // 引数         なし
@@ -1124,25 +1138,22 @@ void countDown(void)
 ///////////////////////////////////////////////////////////////////////////
 void changeGain(void)
 {
-	static bool changeGain = false;
-	static int16_t beforeGainP = 0, beforeGainD = 0;
 	static bool softresetHandled = false;
-	static bool curveGainHold = false; // 急カーブ進入時にカーブ用ゲインを保持する
 	bool useStraightGain = false;
 	bool useCrossLineGain = false;
 
 	// ソフトウェアリセット時はゲイン変更状態を初期化する
 	if (softreset && !softresetHandled)
 	{
-		if (changeGain)
+		if (lineGainChanged)
 		{
 			lineTraceOmegaFBCtrl.kp = beforeGainP;
 			lineTraceOmegaFBCtrl.kd = beforeGainD;
 		}
 		beforeGainP = 0;
 		beforeGainD = 0;
-		changeGain = false;
-		curveGainHold = false;
+		lineGainChanged = false;
+		lineCurveGainHold = false;
 		encChangeGain = 0;
 		softresetHandled = true;
 	}
@@ -1151,7 +1162,7 @@ void changeGain(void)
 		softresetHandled = false;
 	}
 	lineGainLog = (LineGainLog){.rocNow_mm = rocrun};
-	const bool curveHoldBefore = curveGainHold;
+	const bool curveHoldBefore = lineCurveGainHold;
 
 	// DISTANCE/SLIPは速度計画のROCだけで切り替え、実測の揺れを判定へ戻さない。
 	if (optimalTrace == BOOST_DISTANCE && numPPADarry > 0)
@@ -1185,7 +1196,7 @@ void changeGain(void)
 		// reason bit0（旧実測ROCによる進入）は予約とし、版2では立てない。
 		if (PPAD[rocIndexEnter].ROC <= GAIN_CHANGE_ROC_ENTER) lineGainLog.reason |= 2U;
 
-		if (curveGainHold)
+		if (lineCurveGainHold)
 		{
 			// カーブを抜けきるまでカーブ用ゲインを維持する
 			useStraightGain = false;
@@ -1195,7 +1206,7 @@ void changeGain(void)
 				// 直線が一定距離続いたら直線用ゲインに戻す
 				if (encChangeGain > encMM(GAIN_CHANGE_STRAIGHT_STABLE_MM))
 				{
-					curveGainHold = false;
+					lineCurveGainHold = false;
 					encChangeGain = 0;
 					useStraightGain = true;
 				}
@@ -1211,16 +1222,16 @@ void changeGain(void)
 			// 高速直線から急カーブへは先読みROCで早めにカーブ用ゲインへ切替える
 			if (curvePredicted)
 			{
-				curveGainHold = true;
+				lineCurveGainHold = true;
 				encChangeGain = 0;
 				useStraightGain = false;
 			}
 		}
-		if (curveGainHold && straightStable) lineGainLog.reason |= 8U;
+		if (lineCurveGainHold && straightStable) lineGainLog.reason |= 8U;
 	}
 	else
 	{
-		curveGainHold = false;
+		lineCurveGainHold = false;
 		encChangeGain = 0;
 		lineGainLog.reason |= 64U;
 	}
@@ -1233,31 +1244,31 @@ void changeGain(void)
 	}
 	lineGainLog.state = useCrossLineGain ? 4U : (useStraightGain ? 2U :
 		((optimalTrace == BOOST_DISTANCE && numPPADarry > 0) ? 3U : 1U));
-	lineGainLog.curveHold = curveGainHold ? 1U : 0U;
+	lineGainLog.curveHold = lineCurveGainHold ? 1U : 0U;
 	lineGainLog.stablePulse = encChangeGain;
-	if (curveGainHold) lineGainLog.reason |= 4U;
-	if (curveHoldBefore && !curveGainHold) lineGainLog.reason |= 16U;
+	if (lineCurveGainHold) lineGainLog.reason |= 4U;
+	if (curveHoldBefore && !lineCurveGainHold) lineGainLog.reason |= 16U;
 
 	if (useStraightGain || useCrossLineGain)
 	{
-		if (!changeGain)
+		if (!lineGainChanged)
 		{
 			beforeGainP = lineTraceOmegaFBCtrl.kp;
 			beforeGainD = lineTraceOmegaFBCtrl.kd;
 			lineTraceOmegaFBCtrl.kp = 2;
 			lineTraceOmegaFBCtrl.kd = 0;
-			changeGain = true;
+			lineGainChanged = true;
 		}
 	}
 	else
 	{
-		if (changeGain)
+		if (lineGainChanged)
 		{
 			lineTraceOmegaFBCtrl.kp = beforeGainP;
 			lineTraceOmegaFBCtrl.kd = beforeGainD;
 			beforeGainP = 0;
 			beforeGainD = 0;
-			changeGain = false;
+			lineGainChanged = false;
 		}
 	}
 }
