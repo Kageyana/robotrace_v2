@@ -547,7 +547,6 @@ void loopSystem(void)
 				ret = -1;
 				break;
 			}
-			analysisDisplayEnd();
 			if(ret > 0)
 			{
 				// コース解析成功
@@ -555,6 +554,7 @@ void loopSystem(void)
 				ssd1306_FillRectangle(0, 15, 127, 63, Black); // メイン表示空白埋め
 				ssd1306_SetCursor(56, 28);
 				ssd1306_printf(Font_16x26, "3");
+				analysisDisplayEnd(); // カウントダウン画面を完成させてから転送へ戻す。
 
 				patternTrace = 1;
 			}
@@ -566,6 +566,7 @@ void loopSystem(void)
 				ssd1306_printf(Font_11x18, "Failed");
 				ssd1306_SetCursor(20, 50);
 				ssd1306_printf(Font_6x8, "Error %d", ret);
+				analysisDisplayEnd(); // 失敗画面も描画途中で連続転送を再開しない。
 
 				HAL_Delay(1000);
 

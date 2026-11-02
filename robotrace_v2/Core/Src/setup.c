@@ -832,7 +832,6 @@ static void setup_log(void)
         case 4: result = routeBuildShortcutCurvatureFromLog(logNumber, shortcutSettings.maxLevel); break;
         default: result = -1; break;
         }
-        analysisDisplayEnd();
         if (result > 0)
         {
             optimalIndex = 0U;
@@ -861,6 +860,8 @@ static void setup_log(void)
     ssd1306_SetCursor(32, 52);
     if (result > 0) ssd1306_printf(Font_6x8, "OK:%4d", result);
     else if (result < 0) ssd1306_printf(Font_6x8, "Error:%d", result);
+    // 結果画面を描き終えてから連続転送を再開する。
+    if (analyze) analysisDisplayEnd();
 }
 ///////////////////////////////////////////////////////////////////////////////////////
 // モジュール名 setup_start

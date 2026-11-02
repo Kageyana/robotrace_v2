@@ -18,7 +18,7 @@ static uint8_t SSD1306_DMA_Page = 0;          // 送信中のページ番号
 volatile uint8_t SSD1306_DMA_Completed = 0;   // 全ページ送信完了フラグ
 static volatile uint8_t SSD1306_DMA_Running = 0; // DMA送信継続フラグ
 #if defined(SSD1306_USE_I2C)
-static uint8_t SSD1306_DMA_Snapshot[SSD1306_BUFFER_SIZE]; // 単発送信用の画面コピー
+static uint8_t SSD1306_DMA_Snapshot[SSD1306_BUFFER_SIZE]; // 単発の全画面／連続転送の1ページで共用する固定コピー
 static volatile uint8_t SSD1306_DMA_OncePhase; // 0: 停止 1: コマンド 2: 画面
 static uint8_t SSD1306_DMA_OnceCommands[] = {
 	0x20, 0x00, // 水平アドレスモード
@@ -64,13 +64,17 @@ void ssd1306_WriteData(uint8_t *buffer, size_t buff_size)
 }
 /////////////////////////////////////////////////////////////////////
 // モジュール名 ssd1306_WriteData_DMA
-// 処理概要     DMAを使用したデータ送信
+// 処理概要     送信範囲を固定コピーへ移し、描画中の変更をDMAから分離する
 // 引数         buffer:送信データポインタ buff_size:送信サイズ
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
 void ssd1306_WriteData_DMA(uint8_t *buffer, size_t buff_size)
 {
-	HAL_I2C_Mem_Write_DMA(&SSD1306_I2C_PORT, SSD1306_I2C_ADDR, 0x40, 1, buffer, buff_size); // DMA送信開始
+	if (buff_size > sizeof(SSD1306_DMA_Snapshot)) return;
+	// 前のページの転送完了後だけ呼ぶ。単発転送とはOncePhaseで排他する。
+	memcpy(SSD1306_DMA_Snapshot, buffer, buff_size);
+	HAL_I2C_Mem_Write_DMA(&SSD1306_I2C_PORT, SSD1306_I2C_ADDR, 0x40, 1,
+		SSD1306_DMA_Snapshot, buff_size);
 }
 #elif defined(SSD1306_USE_SPI)
 /////////////////////////////////////////////////////////////////////

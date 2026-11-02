@@ -120,3 +120,9 @@ VS Codeからは `Build & Debug Microcontroller - ST-Link` または `Attach to 
 ## 2026-11-01：解析待機画面の調査・ホスト化前
 
 関数名の所在は実在するCore/Srcのrg結果から選び、未確認のsystem.c等をGet-Contentへ渡さない。UIハーネス生成前にssd1306_fonts.hからssd1306_conf.hへの推移includeと既存マクロを確認し、実設定を読み込む場合は模擬ヘッダへ同じI2C設定を再定義しない。マクロ再定義のWerrorは試験側で直し、製品設定や警告を緩めない。必要権限・リポジトリルートの明示workdirでpython validation/analysis_display/run.pyを実行し、O0/O2の実描画・DMA競合・転送中終了・失敗復帰が全て通るまで実機へ進まない。実機の解析時間不増加は別途比較する。[調査・依存確認の再発](../../../doc/失敗事例/2026-11-01-analysis-display-preflight.md)参照。
+
+## 2026-11-02：解析画面切替の検証前
+
+UIの転送競合をホスト化する前に、単発画面だけでなく連続DMAの実ポインタ・長さ・最後のページも確認する。HAL模擬は送信開始時の全バイトを保存し、完了時まで一致することを照合する。全8ページで解析開始を挿入し、手動5モード・自動6モードの成功/0件/失敗で結果描画完了後にだけ転送を再開できることを検査する。リポジトリルートの明示workdir・必要権限でpython validation/analysis_display/run.pyを実行する。保存した変更前Coreがあれば--core build/analysis-loading-transitions/before/Core --expect-old-tearingも実行し、元の2問題を検出できなければ完了としない。実機表示と総解析時間は別途確認する。[転送寿命の検証漏れ](../../../doc/失敗事例/2026-11-02-analysis-display-transfer-lifetime.md)参照。
+
+既存の検証入口へCLIを追加するときは、引数Namespaceと既存のコマンド実行ループの代入先を先に検索し、optionsとcommand等の別名にする。既定・追加オプションの両入口を最後まで実行する。[引数変数の衝突](../../../doc/失敗事例/2026-11-01-analysis-display-preflight.md)参照。
