@@ -29,7 +29,7 @@ SHORTCUT_CURVEはoptimalTrace=6、制御版29。SHORTCUTと同じ形状・除外
 
 ソースSHAの照合対象はPath.parts等でパス階層を判定し、期待する件数・名前を検査してから全件一致を確認する。Windows区切りのキーをforward slashのprefixだけで除外せず、0件のallを成功にしない。[空集合の照合](../../../doc/失敗事例/2026-11-01-source-hash-path-normalization.md)。
 
-14026以降の一次ログ棚卸しはanalysis/script/compare_shortcut_primaries_14026.py prepareを使用し、即席のPowerShell foreachパイプを作らない。新しいPowerShell入口はParser検査後に実行する。[棚卸しでの再発](../../../doc/失敗事例/2026-11-01-powershell-foreach-pipeline.md)。
+11/1の全一次ログ棚卸し・高速化の旧新比較は、実在するanalysis/script/verify_shortcut_speed_20261101.pyのprepare→run→reportを使う。保存日を日本時間のLastWriteTimeで判定し、buildDateを走行日としない。全保存CSV・全一次・拒否/欠番・原本SHAを別々に保存する。旧compare_shortcut_primaries_14026.pyの存在を仮定しない。即席のPowerShell foreachパイプを作らず、新しいPowerShell入口はParser検査後に実行する。[棚卸しでの再発](../../../doc/失敗事例/2026-11-01-powershell-foreach-pipeline.md)。
 
 条件探索のホスト解析では、経路読込成功と候補の採否を分ける。新規交差や合法性の拒否も正常な結果としてstatus付きで保存し、採用だけをassertしない。PCの幾何候補と製品ゲートの結果は別フィールドで保持する。[候補探索の結果契約](../../../doc/失敗事例/2026-11-01-shortcut-host-assert-disabled.md)。
 
@@ -295,3 +295,7 @@ C:/tool/AutoCopyCsvFromSdなど文書の既定配置も、初回のrg/search前�
 ソース検索はリポジトリルートから`powershell.exe -NoProfile -ExecutionPolicy Bypass -File analysis/script/search_pathcurve_sources.ps1`を入口とする。実在Core/Srcの存在検査後、`rg -n <pattern> <directory> -g 'path*.c'`を使い、パス引数へpath*を置かない。未知ファイルは実在親のrg --filesで確定し、native終了2以上なら後続へ進まない。[11/1の検索再発](../../../doc/失敗事例/2026-08-11-windows-rg-glob-not-expanded.md)。
 
 PC再生成の前に一次の長さ/経路間隔/予約点/保存最大optimalIndex/実ヘッダ容量を照合する。マクロ値を推測しない。現行容量と実走記録が不一致ならビルド同一性を未確認とし、診断専用容量拡大を機体計画の完全再現と呼ばない。bin全CRC・保存RAM・実ビルドを未照合なら、その限界を報告へ残す。[診断容量の契約](../../../doc/失敗事例/2026-11-01-pathcurve-diagnostic-capacity-contract.md)。
+
+## 2026-11-02：全一次の実経路生成をホスト化する前
+
+pathFollower.c全体をMinGWへ取り込む場合、未使用の走行制御・設定保存の外部変数/関数も実ヘッダから列挙する。--gc-sectionsで未定義参照が消えると仮定せず、必要なグローバルはvolatile/構造体まで一致させ、実行禁止のハードウェア・FatFs・設定APIは呼ばれたら失敗するスタブを最初から用意する。入口はリポジトリルートの明示workdir・必要権限でpython analysis/script/verify_shortcut_speed_20261101.py run。実キャッシュ成功時の追加読込0件も検査する。完了後にreportで全264比較・原本84 SHA・ソース77件を照合し、CSVの丸め・未記録速度設定の共通既定値・bin CRC未確認を明記する。[未使用依存の再発](../../../doc/失敗事例/2026-10-04-shared-ram-host-harness-dependencies.md)参照。
