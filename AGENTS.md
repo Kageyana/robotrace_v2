@@ -184,6 +184,8 @@ Codex は主にファームウェア開発に使用します。必要に応じ�
 
 DISTANCEの速度計画・マーカー配列とSLIP解析作業配列は同時使用するため、`runMemory.h`の`distance`側へまとめる。PATH/SHORTCUTのライン経路・走行経路・弧長・フラグは`path`側とし、両側を静的unionで共有する。切替は停止中・ログ非記録中・FatFsロック下で行い、旧計画を無効化してから書き換える。各走行のログ用メタデータは共有領域外に保持する。ログ解析は`logSource.h`の型付き読込を使用し、CSV読込行バッファは持たない。
 
+SHORTCUTの候補探索中だけ、速度生成前の`drive[].speed_cms`を旋回反転の累積回数へ一時利用する。別名は`pathFollower.c`内に置き、一次経路`line[].sourceRadius_mm`は保持する。候補探索終了後は従来の速度生成または一次経路への復帰で上書きし、公開計画へ累積回数を残さない。経路形状・採否・速度を維持する早期除外だけを行い、詳細検査とタイブレーク順序は変更しない。確認は`validation/shortcut_speed/run.py`、詳細は`doc/shortcut-analysis-speed.md`。
+
 ログI/O用6 KiBは、走行中の2 KiB×3本と停止中の4 KiB先読みで共用する。停止中に使わない残り2 KiBは走行用領域としてのみ保持し、機体側のCSV変換コードと出力バッファは持たない。停止時はログキューと最終書込の完了後に切り替え、検証・確定中はFatFsロックを保持する。CRC32/IEEE・全件検証を維持する。性能診断は`ROBOTRACE_LOG_PERFORMANCE`（既定OFF）のRAM集計で行い、走行ログ列へ追加しない。
 
 主な開発環境は VS Code、STM32CubeIDE for Visual Studio Code 拡張機能、STM32CubeCLT、STM32CubeMX です。`.vscode/` には CMake、Flash、ST-Link デバッグ用の設定があります。

@@ -64,6 +64,8 @@ typedef struct
 #define routeFlags (runMemory.path.flags)
 #define routeMarkers (runMemory.path.markers)
 #define whiteRoute (runMemory.path.white)
+// 速度生成前のdrive側を短縮候補の累積反転数へ一時利用する。構造体・RAM量は変えない。
+#define corridorTurnChanges(index) (driveRoute[(index)].speed_cms)
 //====================================//
 // グローバル変数の宣言、定義
 //====================================//
@@ -793,7 +795,7 @@ static float pathCorridorSmoothstep(float value)
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathComputeCorridorHeadings
-// 処理概要     直線回廊抽出用に前後2点から一次経路の接線方位を算出する
+// 処理概要     直線回廊抽出用の接線方位と、候補を早期除外する旋回反転の累積値を算出する
 // 引数         なし
 // 戻り値       なし
 /////////////////////////////////////////////////////////////////////
@@ -806,6 +808,25 @@ static void pathComputeCorridorHeadings(void)
 		float dx = (float)lineRoute[after].x_mm - (float)lineRoute[before].x_mm;
 		float dy = (float)lineRoute[after].y_mm - (float)lineRoute[before].y_mm;
 		driveRoute[i].heading_cdeg = pathFloatToInt16(pathWrapDeg(atan2f(dx, dy) * RAD2DEG) * 100.0f);
+	}
+	// 速度計画を作る前のdrive側だけを一時利用する。line側の一次半径は保持する。
+	uint16_t changes = 0U;
+	int8_t previousSign = 0;
+	for (uint16_t i = 0U; i < routeCount; i++)
+	{
+		if (i >= 2U && i + 2U < routeCount)
+		{
+			float beforeHeading = (float)driveRoute[i - 2U].heading_cdeg * 0.01f;
+			float afterHeading = (float)driveRoute[i + 2U].heading_cdeg * 0.01f;
+			float delta = pathWrapDeg(afterHeading - beforeHeading);
+			if (fabsf(delta) >= PATH_CORRIDOR_TURN_THRESHOLD_DEG)
+			{
+				int8_t sign = (delta > 0.0f) ? 1 : -1;
+				if (previousSign != 0 && sign != previousSign) changes++;
+				previousSign = sign;
+			}
+		}
+		corridorTurnChanges(i) = changes;
 	}
 }
 
@@ -895,7 +916,12 @@ static bool pathFindBestCorridorCandidate(PathCorridorCandidate *candidate)
 		{
 			uint16_t end = (uint16_t)(begin + span);
 			if (end + PATH_CORRIDOR_END_GUARD_POINTS >= routeCount) break;
-			if (!pathCorridorRangeIsFree(begin, end)) continue;
+			// spanは増加順なので、保護・除外点に達した後の長い候補もすべて不成立。
+			if (!pathCorridorRangeIsFree(begin, end)) break;
+			// 区間先頭より前からの反転を最大1回含み得る上界。下回る候補だけを除く。
+			uint16_t possibleChanges = (uint16_t)(corridorTurnChanges(end - 2U) -
+				corridorTurnChanges(begin + 2U));
+			if (possibleChanges < PATH_CORRIDOR_MIN_SIGN_CHANGES) continue;
 			float savingMm = 0.0f;
 			if (!pathEvaluateCorridorCandidate(begin, end, &savingMm)) continue;
 			uint16_t bestSpan = candidate->valid ? (uint16_t)(candidate->end - candidate->begin) : 0U;
@@ -1106,6 +1132,9 @@ bool routeGenerateShortcut(uint8_t shortcutLevel)
 		if ((i & 15U) == 0U) analysisDisplayPoll();
 		for (uint16_t j = (uint16_t)(i + 3U); j + 1U < routeCount; j++)
 		{
+			// 両線分の端点が一次経路のままなら、新しく交差することはない。
+			if (((routeFlags[i] | routeFlags[i + 1U] | routeFlags[j] | routeFlags[j + 1U]) &
+				PATH_FLAG_CORRIDOR_APPLIED) == 0U) continue;
 			if (pathSegmentsIntersect(driveRoute, i, j) && !pathSegmentsIntersect(lineRoute, i, j))
 			{
 				memcpy(driveRoute, lineRoute, sizeof(RoutePoint) * routeCount);

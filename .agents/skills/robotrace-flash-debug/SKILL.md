@@ -126,3 +126,7 @@ VS Codeからは `Build & Debug Microcontroller - ST-Link` または `Attach to 
 UIの転送競合をホスト化する前に、単発画面だけでなく連続DMAの実ポインタ・長さ・最後のページも確認する。HAL模擬は送信開始時の全バイトを保存し、完了時まで一致することを照合する。全8ページで解析開始を挿入し、手動5モード・自動6モードの成功/0件/失敗で結果描画完了後にだけ転送を再開できることを検査する。リポジトリルートの明示workdir・必要権限でpython validation/analysis_display/run.pyを実行する。保存した変更前Coreがあれば--core build/analysis-loading-transitions/before/Core --expect-old-tearingも実行し、元の2問題を検出できなければ完了としない。実機表示と総解析時間は別途確認する。[転送寿命の検証漏れ](../../../doc/失敗事例/2026-11-02-analysis-display-transfer-lifetime.md)参照。
 
 既存の検証入口へCLIを追加するときは、引数Namespaceと既存のコマンド実行ループの代入先を先に検索し、optionsとcommand等の別名にする。既定・追加オプションの両入口を最後まで実行する。[引数変数の衝突](../../../doc/失敗事例/2026-11-01-analysis-display-preflight.md)参照。
+
+## 2026-11-02：ショートカット高速化のホスト比較前
+
+既存検証を流用する前に実在一覧とrun.pyのコンパイル引数を読み、check.c等の慣例名を仮定しない。path_curvatureの実入力はplanner.c。関数・保存型・一次半径・フラグの用途を確認し、同じコンパイラ/最適化/保存精度で旧新を比較する。今回の入口はリポジトリルートの明示workdir・必要権限でpython validation/shortcut_speed/run.py。全522計画の座標/方位/速度/フラグ/採否のバイト一致、全候補窓の反転回数上界、一次半径保持、O0/O2一致が通るまで計画不変と報告しない。PCの計数付き候補生成時間と実機の総解析時間を区別する。[所在確認の再発](../../../doc/失敗事例/2026-10-28-derived-analysis-helper-dependency.md)、[高速化の契約](../../../doc/shortcut-analysis-speed.md)参照。

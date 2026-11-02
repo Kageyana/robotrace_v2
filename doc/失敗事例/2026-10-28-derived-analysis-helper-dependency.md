@@ -131,3 +131,9 @@ screen_tracking_guard.pyがtgtParam.searchをメタデータから直接読みKe
 - 対処/再発防止: 実events.csvとpathInputCapture.h/cを読み、各イベントの下位4bitと全周期履歴の一致、時刻順序、実理由遷移を検査する入口へ変更した。旧走の一覧へ合わせて実データを変更しない。未知名は実在一覧、producerの複合イベント条件、今回のheaderと値の型を先に確認する。ログ解析Skillの実行前へ追加した。
 - 確認: analyze_curve22_070745_inputs.pyは全14257周期、初期42周期以降の内部無効0、末尾512周期とBIN203件のgyro/横残差/補正パルス全ビット一致を確認した。フルFlash/実ELF/RAM SHAも一致し、実機再取得・再書込みは行わなかった。
 - status: resolved（入口/イベント比較契約）。open（独立DRDY鮮度・物理誤差原因）。
+
+## 2026-11-02：検証ランナーの実引数を読む前にcheck.cを仮定した
+
+ショートカット解析の高速化調査で、`validation/path_curvature/run.py`が実際には`planner.c`をコンパイルしているのに、慣例から`validation/path_curvature/check.c`をGet-Contentへ渡し、存在しないパスで失敗した。ディレクトリの存在確認だけでファイル名の推測を防げていなかった再発。ファームやログ原本は変更されていない。
+
+実在一覧とランナーのコンパイル引数を読み、`planner.c`を確認した。以降は実関数抽出で必要な依存を確定し、新しい`validation/shortcut_speed/run.py`で旧新の全計画をO0/O2で比較した。既存ランナーを流用する前に、ソース名・生成物名・コンパイル引数を先に読み、check.c等の慣例名を仮定しないことをSkillの実行前へ追記する。実在するplanner.cの読込と新旧比較が成功したため、この所在確認の対処はresolved。実機の処理時間は別途確認する。
