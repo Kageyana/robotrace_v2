@@ -157,6 +157,7 @@ void ssd1306_UpdateScreen(void);
 void ssd1306_UpdateScreen_DMA(void); // DMA版画面更新を開始
 uint8_t ssd1306_IsReadyForSingleUpdate(void); // 単発DMA送信を開始できるか確認
 uint8_t ssd1306_UpdateScreenOnce_DMA(void); // 画面コピーをDMAで一度だけ送信
+uint8_t ssd1306_UpdateRegionOnce_DMA(uint8_t x, uint8_t firstPage, uint8_t width, uint8_t pageCount); // ページ単位の矩形を固定コピーから単発DMA送信
 uint8_t ssd1306_IsTransferCompleted(void); // 全ページ送信完了フラグ参照
 void ssd1306_StopDMA(void); // DMA版画面更新を停止
 void ssd1306_ResumeDMA(void); // 同期コマンドを送らず、単発DMAの完了後に連続転送へ戻す

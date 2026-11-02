@@ -911,7 +911,7 @@ static bool pathFindBestCorridorCandidate(PathCorridorCandidate *candidate)
 	for (uint16_t begin = PATH_CORRIDOR_END_GUARD_POINTS;
 		begin + PATH_CORRIDOR_MIN_SPAN_POINTS + PATH_CORRIDOR_END_GUARD_POINTS < routeCount; begin++)
 	{
-		if ((begin & 15U) == 0U) analysisDisplayPoll();
+		analysisDisplayPoll(); // 候補探索中も開始点ごとに表示更新の時刻を確認する。
 		for (uint16_t span = PATH_CORRIDOR_MIN_SPAN_POINTS; span <= PATH_CORRIDOR_MAX_SPAN_POINTS; span++)
 		{
 			uint16_t end = (uint16_t)(begin + span);
@@ -1132,6 +1132,7 @@ bool routeGenerateShortcut(uint8_t shortcutLevel)
 		if ((i & 15U) == 0U) analysisDisplayPoll();
 		for (uint16_t j = (uint16_t)(i + 3U); j + 1U < routeCount; j++)
 		{
+			if ((j & 127U) == 0U) analysisDisplayPoll(); // 長い内側ループでも円環を止めない。
 			// 両線分の端点が一次経路のままなら、新しく交差することはない。
 			if (((routeFlags[i] | routeFlags[i + 1U] | routeFlags[j] | routeFlags[j + 1U]) &
 				PATH_FLAG_CORRIDOR_APPLIED) == 0U) continue;

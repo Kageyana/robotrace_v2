@@ -130,3 +130,9 @@ UIの転送競合をホスト化する前に、単発画面だけでなく連続
 ## 2026-11-02：ショートカット高速化のホスト比較前
 
 既存検証を流用する前に実在一覧とrun.pyのコンパイル引数を読み、check.c等の慣例名を仮定しない。path_curvatureの実入力はplanner.c。関数・保存型・一次半径・フラグの用途を確認し、同じコンパイラ/最適化/保存精度で旧新を比較する。今回の入口はリポジトリルートの明示workdir・必要権限でpython validation/shortcut_speed/run.py。全522計画の座標/方位/速度/フラグ/採否のバイト一致、全候補窓の反転回数上界、一次半径保持、O0/O2一致が通るまで計画不変と報告しない。PCの計数付き候補生成時間と実機の総解析時間を区別する。[所在確認の再発](../../../doc/失敗事例/2026-10-28-derived-analysis-helper-dependency.md)、[高速化の契約](../../../doc/shortcut-analysis-speed.md)参照。
+
+## 2026-11-02：文書にある補助スクリプトの現存確認
+
+文書や過去の成功記録にあるパスも、操作を作る直前の`Test-Path -LiteralPath <path> -PathType Leaf`を必須とする。FalseならGet-Content/実行へ進まず、実在ディレクトリの`rg --files`へ戻る。このチェックアウトには`Core/Src/i2c.c`、`slipAnalysis.c`、`validation/shortcut_speed/run.py`、`analysis/script/search_firmware_sources.ps1`はない。I2C設定はmain.c、SLIP解析はcourseAnalysis.cを実検索で確認した。読込は`$ErrorActionPreference='Stop'`、rgは直後に終了コード2以上のthrowを置き、後続成功で失敗を隠さない。[所在確認の再発](../../../doc/失敗事例/2026-11-01-analysis-display-preflight.md)参照。
+
+解析表示の現行入口はローカル`validation/analysis_display/run.py`で、旧--core/--expect-old-tearingは使えない。起動ガード、DMA参照範囲の不変性、部分転送後の全画面範囲復元、tick周回をO0/O2で確認する。100kHz相当の転送時間と頻繁な進捗変更を含む2秒試験は円環38コマ以上・転送8KB未満を条件とする。実機20fpsや解析時間の不増加へ拡張しない。

@@ -20,6 +20,7 @@ static volatile uint8_t SSD1306_DMA_Running = 0; // DMA送信継続フラグ
 #if defined(SSD1306_USE_I2C)
 static uint8_t SSD1306_DMA_Snapshot[SSD1306_BUFFER_SIZE]; // 単発の全画面／連続転送の1ページで共用する固定コピー
 static volatile uint8_t SSD1306_DMA_OncePhase; // 0: 停止 1: コマンド 2: 画面
+static uint16_t SSD1306_DMA_OnceLength; // 単発DMAの固定コピー有効長[byte]
 static uint8_t SSD1306_DMA_OnceCommands[] = {
 	0x20, 0x00, // 水平アドレスモード
 	0x21, SSD1306_X_OFFSET_LOWER + (SSD1306_X_OFFSET_UPPER << 4),
@@ -327,8 +328,29 @@ uint8_t ssd1306_IsReadyForSingleUpdate(void)
 /////////////////////////////////////////////////////////////////////
 uint8_t ssd1306_UpdateScreenOnce_DMA(void)
 {
+	return ssd1306_UpdateRegionOnce_DMA(0U, 0U, SSD1306_WIDTH, SSD1306_HEIGHT / 8U);
+}
+/////////////////////////////////////////////////////////////////////
+// モジュール名 ssd1306_UpdateRegionOnce_DMA
+// 処理概要     ページ境界の矩形を固定コピーへ詰め、コマンドと画素を非同期送信する
+// 引数         x: 左端[pixel], firstPage: 上端[8pixel/page], width: 幅[pixel], pageCount: 高さ[page]
+// 戻り値       1: 送信開始 0: 範囲外、転送中または開始失敗
+/////////////////////////////////////////////////////////////////////
+uint8_t ssd1306_UpdateRegionOnce_DMA(uint8_t x, uint8_t firstPage, uint8_t width, uint8_t pageCount)
+{
+	if (width == 0U || pageCount == 0U || (uint16_t)x + width > SSD1306_WIDTH ||
+		(uint16_t)firstPage + pageCount > SSD1306_HEIGHT / 8U) return 0;
 	if (!ssd1306_IsReadyForSingleUpdate()) return 0;
-	memcpy(SSD1306_DMA_Snapshot, SSD1306_Buffer, sizeof(SSD1306_DMA_Snapshot));
+	for (uint8_t page = 0U; page < pageCount; page++) {
+		memcpy(SSD1306_DMA_Snapshot + (uint16_t)page * width,
+			SSD1306_Buffer + (uint16_t)(firstPage + page) * SSD1306_WIDTH + x, width);
+	}
+	SSD1306_DMA_OnceLength = (uint16_t)width * pageCount;
+	uint8_t column = x + SSD1306_X_OFFSET_LOWER + (SSD1306_X_OFFSET_UPPER << 4);
+	SSD1306_DMA_OnceCommands[3] = column;
+	SSD1306_DMA_OnceCommands[4] = column + width - 1U;
+	SSD1306_DMA_OnceCommands[6] = firstPage;
+	SSD1306_DMA_OnceCommands[7] = firstPage + pageCount - 1U;
 	SSD1306_DMA_Completed = 0;
 	SSD1306_DMA_OncePhase = 1;
 	if (HAL_I2C_Mem_Write_DMA(&SSD1306_I2C_PORT, SSD1306_I2C_ADDR, 0x00, 1,
@@ -397,14 +419,22 @@ void ssd1306_I2C_MemTxCpltCallback(I2C_HandleTypeDef *hi2c)
 	if (SSD1306_DMA_OncePhase == 1) {
 		SSD1306_DMA_OncePhase = 2;
 		if (HAL_I2C_Mem_Write_DMA(&SSD1306_I2C_PORT, SSD1306_I2C_ADDR, 0x40, 1,
-			SSD1306_DMA_Snapshot, sizeof(SSD1306_DMA_Snapshot)) == HAL_OK) return;
+			SSD1306_DMA_Snapshot, SSD1306_DMA_OnceLength) == HAL_OK) return;
 		// 画面送信の開始失敗でも、CSV変換側を待機させない。
 	}
 	if (SSD1306_DMA_OncePhase != 0) {
 		SSD1306_DMA_OncePhase = 0;
 		SSD1306_DMA_Completed = 1;
 		ssd1306_TransferCompletedCallback();
-		if (SSD1306_DMA_Running) ssd1306_UpdateScreen_DMA();
+		if (SSD1306_DMA_Running) {
+			if (SSD1306_DMA_OnceLength < sizeof(SSD1306_DMA_Snapshot)) {
+				// 部分転送の列・ページ範囲を全画面DMAで戻してから連続転送へ移る。
+				SSD1306_DMA_Running = 0;
+				if (ssd1306_UpdateScreenOnce_DMA()) SSD1306_DMA_Running = 1;
+			} else {
+				ssd1306_UpdateScreen_DMA();
+			}
+		}
 		return;
 	}
 
