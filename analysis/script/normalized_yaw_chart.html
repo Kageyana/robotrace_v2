@@ -1,0 +1,143 @@
+<div id="normalized-yaw-20261031">
+  <h3>高速直線の角速度と差分指令</h3>
+  <label class="form-label">走行ログ
+    <select class="form-select" aria-label="走行ログ">
+      <option value="14074">14074 · 11/2 · 正常ログ終了</option>
+      <option value="14036">14036 · 11/1 · 正常ログ終了</option>
+      <option value="14034">14034 · 11/1 · 正常ログ終了</option>
+      <option value="14037">14037 · 11/1 · 停止ログ</option>
+    </select>
+  </label>
+  <div class="ny-detail text-small"></div>
+  <div class="ny-legend" data-panel="yaw" aria-label="角速度の系列"></div>
+  <div class="ny-plot" data-panel="yaw"></div>
+  <h3>同じ記録入力で計算した差分指令</h3>
+  <div class="ny-legend" data-panel="delta" aria-label="差分指令の系列"></div>
+  <div class="ny-plot" data-panel="delta"></div>
+  <div class="ny-note text-small">候補2案は実走結果ではありません。比較係数：min(1, 2 / max(速度[m/s], 0.5))</div>
+  <div class="tooltip" role="tooltip" hidden></div>
+  <script type="application/json" id="normalized-yaw-input">__REVIEWED_CHART_DATA__</script>
+  <style>
+    #normalized-yaw-20261031 {position:relative;display:grid;gap:calc(var(--font-size-base) * .65);}
+    #normalized-yaw-20261031 .ny-legend {display:flex;flex-wrap:wrap;gap:calc(var(--font-size-base) * .9);}
+    #normalized-yaw-20261031 .ny-legend button {display:flex;align-items:center;gap:calc(var(--font-size-base) * .4);border:0;background:transparent;color:var(--foreground);padding:0;font:inherit;}
+    #normalized-yaw-20261031 .ny-legend button[aria-pressed="false"] {opacity:.4;}
+    #normalized-yaw-20261031 .ny-swatch {width:20px;display:inline-block;border-top:2px solid currentColor;}
+    #normalized-yaw-20261031 svg {display:block;width:100%;}
+    #normalized-yaw-20261031 svg text {fill:var(--foreground);font-size:12px;}
+    #normalized-yaw-20261031 .tooltip {position:absolute;pointer-events:none;background:var(--popover);color:var(--popover-foreground);padding:calc(var(--font-size-base) * .5);z-index:2;}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <script>
+    (()=>{
+      const root=document.getElementById('normalized-yaw-20261031');
+      const data=JSON.parse(document.getElementById('normalized-yaw-input').textContent);
+      const picker=root.querySelector('select');
+      const tooltip=root.querySelector('[role="tooltip"]');
+      const plots=[...root.querySelectorAll('.ny-plot')];
+      const specs={
+        yaw:{unit:'deg/s',label:'目標角速度・実角速度',series:[
+          {name:'目標角速度',column:1,color:'var(--viz-series-1)',dash:''},
+          {name:'実角速度',column:2,color:'var(--viz-series-2)',dash:'5 3'}]},
+        delta:{unit:'pulse/ms',label:'片輪に加減する速度差指令',series:[
+          {name:'現行の実記録',column:3,color:'var(--viz-series-1)',dash:''},
+          {name:'目標・実測を縮小',column:4,color:'var(--viz-series-2)',dash:'6 3'},
+          {name:'目標のみ縮小',column:5,color:'var(--viz-series-3)',dash:'2 3'}]}
+      };
+      const initial=window.openai?.widgetState?.privateContent;
+      let selected=Object.hasOwn(data,initial?.selected)?initial.selected:'14074';
+      const active={yaw:[true,true],delta:[true,true,true]};
+      function adopt(state){
+        if(!state)return;
+        if(Object.hasOwn(data,state.selected))selected=state.selected;
+        for(const key of ['yaw','delta']){
+          if(Array.isArray(state.active?.[key])&&state.active[key].length===active[key].length)
+            active[key]=state.active[key].map(Boolean);
+        }
+      }
+      adopt(initial);
+      function remember(){window.openai?.setWidgetState({modelContent:{log:Number(selected),comparison:'固定入力の指令感度'},privateContent:{selected,active}})?.catch(()=>{});}
+      for(const key of ['yaw','delta']){
+        const legend=d3.select(root.querySelector(`.ny-legend[data-panel="${key}"]`));
+        specs[key].series.forEach((s,i)=>{
+          const b=legend.append('button').attr('type','button').attr('class','cursor-interaction').attr('aria-pressed',String(active[key][i]));
+          b.append('span').attr('class','ny-swatch').style('color',s.color).style('border-top-style',s.dash?'dashed':'solid');
+          b.append('span').text(s.name);
+          b.on('click',()=>{active[key][i]=!active[key][i];b.attr('aria-pressed',String(active[key][i]));drawAll();remember();});
+        });
+      }
+      function draw(container){
+        const width=container.getBoundingClientRect().width;
+        if(width<1)return;
+        const key=container.dataset.panel,spec=specs[key],rows=data[selected].values,height=220;
+        const m={left:68,right:16,top:28,bottom:52},right=width-m.right,bottom=height-m.bottom;
+        const xd=d3.extent(rows,r=>r[0]);
+        const yd=d3.extent(rows.flatMap(r=>spec.series.map(s=>r[s.column])).concat([0]));
+        const span=yd[1]-yd[0]||1;
+        const x=d3.scaleLinear().domain(xd).range([m.left+3,right-3]);
+        const y=d3.scaleLinear().domain([yd[0]-.06*span,yd[1]+.06*span]).range([bottom-3,m.top+3]);
+        container.replaceChildren();
+        const svg=d3.select(container).append('svg').attr('viewBox',`0 0 ${width} ${height}`)
+          .attr('role','img').attr('aria-label',`${selected}、${spec.label}。一次参照の直線内部、速度3m/s以上、P2/D0の保存点。`);
+        svg.append('title').text(`${selected}: ${spec.label}`);
+        svg.append('rect').attr('data-chart-frame','').attr('x',m.left).attr('y',m.top).attr('width',right-m.left).attr('height',bottom-m.top).attr('fill','none').attr('stroke','var(--border)');
+        svg.append('g').attr('transform',`translate(0,${bottom})`).call(d3.axisBottom(x).ticks(width<420?3:6).tickSize(0).tickPadding(8)).call(g=>g.select('.domain').remove());
+        svg.append('g').attr('transform',`translate(${m.left},0)`).call(d3.axisLeft(y).ticks(3).tickSize(0).tickPadding(8)).call(g=>g.select('.domain').remove());
+        svg.append('text').attr('class','axis-title').attr('data-axis','x').attr('x',(m.left+right)/2).attr('y',height-7).attr('text-anchor','middle').text('選択区間の先頭から [ms]');
+        svg.append('text').attr('class','axis-title').attr('data-axis','y').attr('x',m.left).attr('y',m.top-9).text(`[${spec.unit}]`);
+        if(yd[0]<0&&yd[1]>0)svg.append('line').attr('x1',m.left).attr('x2',right).attr('y1',y(0)).attr('y2',y(0)).attr('stroke','var(--border)');
+        spec.series.forEach((s,i)=>{
+          if(!active[key][i])return;
+          svg.append('path').attr('data-series',i).attr('fill','none').attr('stroke',s.color)
+            .attr('stroke-width',1.5).attr('stroke-dasharray',s.dash)
+            .attr('d',d3.line().x(r=>x(r[0])).y(r=>y(r[s.column]))(rows));
+        });
+        const guide=svg.append('line').attr('data-chart-hover-guide','').attr('y1',m.top).attr('y2',bottom).attr('stroke','var(--foreground)').attr('visibility','hidden');
+        const marks=spec.series.map(s=>svg.append('circle').attr('data-chart-hover-marker','').attr('r',3).attr('fill',s.color).attr('visibility','hidden'));
+        let pinned=false;
+        function hide(){tooltip.hidden=true;guide.attr('visibility','hidden');marks.forEach(a=>a.attr('visibility','hidden'));}
+        function show(event){
+          const px=Math.max(x(xd[0]),Math.min(x(xd[1]),d3.pointer(event,svg.node())[0])),position=x.invert(px);
+          const k=d3.bisector(r=>r[0]).center(rows,position);
+          const a=rows[Math.max(0,rows[k][0]>position?k-1:k)];
+          const b=rows[Math.min(rows.length-1,rows[k][0]>position?k:k+1)];
+          const value=column=>a[0]===b[0]?a[column]:a[column]+(b[column]-a[column])*(position-a[0])/(b[0]-a[0]);
+          const lines=[`${selected} · ${position.toFixed(1)} ms · ${value(6).toFixed(2)} m/s`];
+          guide.attr('x1',px).attr('x2',px).attr('visibility','visible');
+          spec.series.forEach((s,i)=>{
+            if(!active[key][i])return;
+            const v=value(s.column);
+            marks[i].attr('cx',px).attr('cy',y(v)).attr('visibility','visible');
+            lines.push(`${s.name}: ${v.toFixed(1)} ${spec.unit}`);
+          });
+          tooltip.replaceChildren(...lines.map(line=>{const div=document.createElement('div');div.textContent=line;return div;}));
+          tooltip.hidden=false;
+          tooltip.style.left=Math.max(0,Math.min(px+8,width-tooltip.offsetWidth))+'px';
+          tooltip.style.top=(container.offsetTop+25)+'px';
+        }
+        svg.append('rect').attr('data-chart-hit','').attr('data-chart-hover-overlay','cross-series')
+          .attr('x',m.left).attr('y',m.top).attr('width',right-m.left).attr('height',bottom-m.top).attr('fill','transparent')
+          .on('pointermove',e=>{if(!pinned)show(e);}).on('pointerleave',()=>{if(!pinned)hide();})
+          .on('click',e=>{pinned=!pinned;show(e);});
+        // 描画後、同じ軸内のtickと軸名の境界を確認。任意の装飾ラベルは持たない。
+        const labels=[...svg.node().querySelectorAll('.tick text,.axis-title')];
+        labels.forEach(label=>{
+          const box=label.getBoundingClientRect(),frame=svg.node().getBoundingClientRect();
+          if(label.parentNode.classList.contains('tick')&&box.left<frame.left+2)label.setAttribute('text-anchor','start');
+          if(label.parentNode.classList.contains('tick')&&box.right>frame.right-2)label.setAttribute('text-anchor','end');
+        });
+      }
+      function drawAll(){
+        tooltip.hidden=true;picker.value=selected;
+        const item=data[selected];
+        root.querySelector('.ny-detail').textContent=`一次参照の直線内部 ${(item.start_mm/1000).toFixed(2)}～${(item.end_mm/1000).toFixed(2)} m · 速度3m/s以上 · P2/D0 · ${item.saved_rows}保存点`;
+        for(const key of ['yaw','delta'])d3.select(root.querySelector(`.ny-legend[data-panel="${key}"]`)).selectAll('button').attr('aria-pressed',(_,i)=>String(active[key][i]));
+        plots.forEach(draw);
+      }
+      picker.addEventListener('change',()=>{selected=picker.value;drawAll();remember();});
+      new ResizeObserver(drawAll).observe(root);
+      window.addEventListener('openai:set_globals',event=>{adopt(event.detail?.globals?.widgetState?.privateContent);drawAll();});
+      drawAll();
+    })();
+  </script>
+</div>

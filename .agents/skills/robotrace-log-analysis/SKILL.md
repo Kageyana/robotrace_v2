@@ -25,6 +25,8 @@ description: ロボトレース走行ログを解析、比較、可視化する�
 
 ## 実行前の再発防止
 
+2026-11-02：PowerShellのforeach文を直接パイプへ接続しない制約は、原本棚卸しだけでなくsummary.json等の派生結果の整形にも適用する。今回の角速度正規化の確認は、明示workdirをrepo rootとし、analysis/script/analyze_normalized_yaw_20261031.py→report_normalized_yaw_20261031.pyの実入口で行う。後者は14本・一次9本のSHA、実診断4本、基準指令一致と候補RMS/制限率を再確認する。可視化確認はvalidate_normalized_yaw_chart.cjsを使う。[派生結果の整形での再発](../../../doc/失敗事例/2026-11-01-powershell-foreach-pipeline.md)参照。
+
 SHORTCUT_CURVEはoptimalTrace=6、制御版29。SHORTCUTと同じ形状・除外・保護域で、短縮区間も一次曲率由来の速度を使用する。PATH形式の通常61列/169B・詳細67列/178Bを共用する。BSTの曲率別SD速度を使い、shortCut/pathReplayの上限は使わない。初回ログで方式6・参照一次・速度目標・P5の注意状態・停止理由を確認する。詳細は[SHORTCUT_CURVE](../../../doc/shortcut-curve.md)。
 
 ソースSHAの照合対象はPath.parts等でパス階層を判定し、期待する件数・名前を検査してから全件一致を確認する。Windows区切りのキーをforward slashのprefixだけで除外せず、0件のallを成功にしない。[空集合の照合](../../../doc/失敗事例/2026-11-01-source-hash-path-normalization.md)。

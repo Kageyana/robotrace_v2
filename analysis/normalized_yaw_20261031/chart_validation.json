@@ -1,0 +1,83 @@
+{
+  "source": "C:/Users/ucawa/.codex/visualizations/2026/11/02/01a19c81-ea32-77d2-b235-88c8c166eb65/normalized-yaw-feedback.html",
+  "sha256": "c3177581c1dcb02949cb5d57767de8d673996ed1efb2f8692dcdaa9312394156",
+  "embeddedDataMatches": true,
+  "selector": true,
+  "legendToggle": true,
+  "crossSeriesTooltip": true,
+  "browserErrors": [],
+  "results": [
+    {
+      "width": 736,
+      "number": "14074",
+      "svg": 2,
+      "paths": 5,
+      "overflow": false,
+      "textOverflow": [],
+      "allPathsInside": true
+    },
+    {
+      "width": 736,
+      "number": "14036",
+      "svg": 2,
+      "paths": 5,
+      "overflow": false,
+      "textOverflow": [],
+      "allPathsInside": true
+    },
+    {
+      "width": 736,
+      "number": "14034",
+      "svg": 2,
+      "paths": 5,
+      "overflow": false,
+      "textOverflow": [],
+      "allPathsInside": true
+    },
+    {
+      "width": 736,
+      "number": "14037",
+      "svg": 2,
+      "paths": 5,
+      "overflow": false,
+      "textOverflow": [],
+      "allPathsInside": true
+    },
+    {
+      "width": 360,
+      "number": "14074",
+      "svg": 2,
+      "paths": 5,
+      "overflow": false,
+      "textOverflow": [],
+      "allPathsInside": true
+    },
+    {
+      "width": 360,
+      "number": "14036",
+      "svg": 2,
+      "paths": 5,
+      "overflow": false,
+      "textOverflow": [],
+      "allPathsInside": true
+    },
+    {
+      "width": 360,
+      "number": "14034",
+      "svg": 2,
+      "paths": 5,
+      "overflow": false,
+      "textOverflow": [],
+      "allPathsInside": true
+    },
+    {
+      "width": 360,
+      "number": "14037",
+      "svg": 2,
+      "paths": 5,
+      "overflow": false,
+      "textOverflow": [],
+      "allPathsInside": true
+    }
+  ]
+}
