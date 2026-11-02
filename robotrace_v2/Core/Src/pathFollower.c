@@ -2256,6 +2256,36 @@ uint16_t pathRunRouteCount(void) { return runRouteCount; }
 uint32_t pathRunRouteGeometryCrc32(void) { return runRouteGeometryCrc32; }
 
 /////////////////////////////////////////////////////////////////////
+// モジュール名 pathRunRouteExportMatches
+// 処理概要     停止後の共有経路が走行開始時の計画に一致するか確認する
+// 引数         なし
+// 戻り値       true: 一致、false: 経路無効または不一致
+/////////////////////////////////////////////////////////////////////
+bool pathRunRouteExportMatches(void)
+{
+	return !modeLOG && runMemoryOwner == RUN_MEMORY_PATH &&
+		runRouteCount >= 2U && runRouteCount <= PATH_ROUTE_MAX_POINTS &&
+		routeCount == runRouteCount && routeSourceLog == runRouteSourceLog &&
+		routeCache.source.number == (uint32_t)runRouteSourceLog &&
+		pathComputeRouteGeometryCrc32() == runRouteGeometryCrc32;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathRunRouteExportPoint
+// 処理概要     停止後のログ出力用に実際の計画経路の点をコピーする
+// 引数         index: 点番号、planned: 計画経路点の出力先[mm]
+// 戻り値       true: コピー成功、false: 使用中または不正な経路・引数
+/////////////////////////////////////////////////////////////////////
+bool pathRunRouteExportPoint(uint16_t index, RoutePoint *planned)
+{
+	if (modeLOG || runMemoryOwner != RUN_MEMORY_PATH || routeCount != runRouteCount ||
+		routeSourceLog != runRouteSourceLog || index >= runRouteCount ||
+		planned == NULL) return false;
+	*planned = driveRoute[index];
+	return true;
+}
+
+/////////////////////////////////////////////////////////////////////
 // モジュール名 writeShortcutSettings
 // 処理概要     ショートカット設定を固定CSV形式でSDカードへ保存する
 // 引数         なし

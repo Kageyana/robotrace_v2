@@ -197,6 +197,9 @@ uint8_t pathRunRouteShortcutCorridorCount(void);
 float pathRunRouteShortcutReductionMm(void);
 uint16_t pathRunRouteCount(void);
 uint32_t pathRunRouteGeometryCrc32(void);
+// 停止後のログ出力用。開始時の経路との一致を先に検証する。
+bool pathRunRouteExportMatches(void);
+bool pathRunRouteExportPoint(uint16_t index, RoutePoint *planned);
 void pathFollowerInvalidateRoute(void);
 void pathFollowerReset(void);
 void pathFollowerUpdatePose1ms(int32_t encoderPulse, float gyroDegPerSec);

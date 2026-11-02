@@ -299,3 +299,9 @@ PC再生成の前に一次の長さ/経路間隔/予約点/保存最大optimalIn
 ## 2026-11-02：全一次の実経路生成をホスト化する前
 
 pathFollower.c全体をMinGWへ取り込む場合、未使用の走行制御・設定保存の外部変数/関数も実ヘッダから列挙する。--gc-sectionsで未定義参照が消えると仮定せず、必要なグローバルはvolatile/構造体まで一致させ、実行禁止のハードウェア・FatFs・設定APIは呼ばれたら失敗するスタブを最初から用意する。入口はリポジトリルートの明示workdir・必要権限でpython analysis/script/verify_shortcut_speed_20261101.py run。実キャッシュ成功時の追加読込0件も検査する。完了後にreportで全264比較・原本84 SHA・ソース77件を照合し、CSVの丸め・未記録速度設定の共通既定値・bin CRC未確認を明記する。[未使用依存の再発](../../../doc/失敗事例/2026-10-04-shared-ram-host-harness-dependencies.md)参照。
+
+## 2026-11-02：実入口と旋回開始の位置基準
+
+文書に実在・検証済みと書かれたスクリプトでも、現在のチェックアウトのrg --files一覧とTest-Path -LiteralPathでファイル存在を確認してから読む。不在の入口へ進まず、存在する親の一覧から選ぶ。今回の入口はanalysis/script/diagnose_courseout_14061_14066.pyの通常実行→quantify→evidence。閾値位置の比較は最初の交差を挟む2点の不等式・補間範囲を検査し、符号付き系列のnp.interp外挿を先頭一致と誤認しない。5度/15度の既知線形入力も先に確認する。[入口と補間の再発](../../../doc/失敗事例/2026-11-02-courseout-analysis-preflight.md)。
+
+実白線より手前の旋回が報告された場合、車輪距離での旋回開始一致を物理位置一致と扱わない。時間先行FF・白線端素子・内部偏差・マーカー補正実績を別々に確認する。pathLoopPeriod_mm=0では現行pathApplyMarkerCorrectionが無効となるため、全行のpathMarkerCorrectionApplied/mmを集計する。SG=2・emcStop=0でも、参照一次とゴール入口距離が大きく違えば誤ゴールを疑い、逸脱と減速の先後を物理観測と照合する。14061は方式6、14064～14066は方式5として保持する。

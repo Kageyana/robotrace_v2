@@ -183,3 +183,13 @@ nm出力をbytesで保存した場合、行末アンカーの正規表現へ渡�
 ## SHORTCUT_CURVE追加時の検証入口
 
 このチェックアウトの新モード検証はvalidation/shortcut_curve/run.py、entries.py、build.py、check_timing.pyを使う。存在しないrobotrace_v2/testsを過去参照から構成しない。追加検索は実在validationの一覧から選ぶ。[再発と確認](../../../../doc/失敗事例/2026-10-31-path-common-validation-contract.md)。
+
+## 2026-11-02：停止後XYログの検証前
+
+未知の子フォルダ・設定ファイルは、親が存在しても個別のTest-Pathまたはrg --filesの実在結果で所在を確定する。FatFs設定はFATFS/Target/ffconf.h、現在利用可能な実writer/reader検証の生成器はvalidation/mode_log_diagnostics/run.py。停止時APIを常時成功モックから実実装へ切り替える前に、modeLOG・キュー・ファイルopen/close・共有RAM所有者・FatFsロックの遷移をfixtureへ明記する。記録中の拒否はI/O回数が変わらないことまで確認する。実endLogと型付き一次読込を使う入口はリポジトリルート・必要権限のvalidation/path_xy_columns/run.py。詳細は[停止後XY検証の事例](../../../../doc/失敗事例/2026-11-02-path-xy-host-preflight.md)を参照する。
+
+ログ追加の出力先は通常の番号.binとし、付属CSVを別方式として導入しない。既存x/yを含む全既存列の位置と保存値を維持し、新しい列は既存末尾へ置く。出力先・行対応・欠測表現を固定し、全既存スキーマのprefix一致と全既存保存値の一致を検証する。ユーザー訂正後に古い末尾XY化を再導入しない。上記事例の保存契約修正を参照する。
+
+## 2026-11-02：停止後保存の高速化を比較する前
+
+旧新の実ソースで専用グローバル宣言の有無を確認し、版固有のRAM宣言を両側へ一律に生成しない。入力件数を拡張するときは生成ループ・cntSendアサート・ヘッダ行数・コピー長・固定件数検査を同時に照合する。入口はリポジトリルート・必要権限のvalidation/path_xy_speed/run.py。全bin/seed/一次のバイト一致とFatFs APIの呼出/バイト量を通常/詳細×O0/O2で比較し、API計数を実SDの時間と混同しない。詳細は[保存高速化フィクスチャ](../../../../doc/失敗事例/2026-11-02-path-xy-speed-fixture.md)。

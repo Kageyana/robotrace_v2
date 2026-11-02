@@ -19,6 +19,7 @@
 typedef union {
     uint8_t logging[LOG_BUFFER_COUNT][LOG_BUFFER_SIZE_BYTES];
     struct { uint8_t input[4096]; } stopped;
+    uint8_t patch[LOG_BUFFER_COUNT * LOG_BUFFER_SIZE_BYTES];
 } LogIoMemory;
 //====================================//
 // グローバル変数の宣言、定義

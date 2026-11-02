@@ -62,3 +62,12 @@ PC変換器へ渡すbinは初回からASCII連番名とヘッダ番号の一致�
 - リポジトリルートをworkdirとし、最初から必要権限で`python validation/constants_metadata/run.py`を実行する。変更前Coreがある場合だけ`--baseline build/constants-metadata-20261025/before`を加える。通常/詳細・換算不一致・校正サンプル不一致が全件成功するまで実機検証へ進めない。validationはローカル専用・Git管理対象外とする。
 
 - SD数値の読込結果をホストで比較する新規CHECKでは、1.6F等の小数リテラルも期待値としてvolatile floatへ保存し、保存ビット列を比較する。再書込み回数・文字列一致とは別に検査し、許容誤差や製品側の読込式を変更して回避しない。既存の最終演算結果の保存ルールを定数比較にも適用する。詳細は[SD速度の直接比較の追記](../../../../doc/失敗事例/2026-10-12-host-float-snapshot-comparison.md)。
+## 2026-11-02：停止後XYログの検証前
+
+未知の子フォルダ・設定ファイルは、親が存在しても個別のTest-Pathまたはrg --filesの実在結果で所在を確定する。FatFs設定はFATFS/Target/ffconf.h、現在利用可能な実writer/reader検証の生成器はvalidation/mode_log_diagnostics/run.py。停止時APIを常時成功モックから実実装へ切り替える前に、modeLOG・キュー・ファイルopen/close・共有RAM所有者・FatFsロックの遷移をfixtureへ明記する。記録中の拒否はI/O回数が変わらないことまで確認する。実endLogと型付き一次読込を使う入口はリポジトリルート・必要権限のvalidation/path_xy_columns/run.py。詳細は[停止後XY検証の事例](../../../../doc/失敗事例/2026-11-02-path-xy-host-preflight.md)を参照する。
+
+ログ追加の出力先は通常の番号.binとし、付属CSVを別方式として導入しない。既存x/yを含む全既存列の位置と保存値を維持し、新しい列は既存末尾へ置く。出力先・行対応・欠測表現を固定し、全既存スキーマのprefix一致と全既存保存値の一致を検証する。ユーザー訂正後に古い末尾XY化を再導入しない。上記事例の保存契約修正を参照する。
+
+## 2026-11-02：停止後保存の高速化を比較する前
+
+旧新の実ソースで専用グローバル宣言の有無を確認し、版固有のRAM宣言を両側へ一律に生成しない。入力件数を拡張するときは生成ループ・cntSendアサート・ヘッダ行数・コピー長・固定件数検査を同時に照合する。入口はリポジトリルート・必要権限のvalidation/path_xy_speed/run.py。全bin/seed/一次のバイト一致とFatFs APIの呼出/バイト量を通常/詳細×O0/O2で比較し、API計数を実SDの時間と混同しない。詳細は[保存高速化フィクスチャ](../../../../doc/失敗事例/2026-11-02-path-xy-speed-fixture.md)。

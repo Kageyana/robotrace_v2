@@ -128,6 +128,7 @@ static bool readSavedLogNumber(int16_t *outNumber);
 static void writeSavedLogNumber(int16_t fileNumber);
 static int16_t calcNextLogNumber(void);
 static void setLogHeaderStrFPrecision(char *name, float value, unsigned precision);
+static bool logPatchPathXY(const LogBinaryHeader *header);
 
 //====================================//
 // ログバッファの内部処理
@@ -859,6 +860,7 @@ static void logBuildMetadata(void)
 	setLogHeaderStr("logDerivedVersion", LOG_BINARY_DERIVED_VERSION);
 	setLogHeaderStr("lineGainPolicyVersion", LINE_GAIN_POLICY_VERSION);
 	setLogHeaderStrS("logXYDistance", "raw_wheel_average");
+	if (isPathRunMode(runLogMode)) setLogHeaderStr("pathXYVersion", 2);
 	// 1行目: 走行条件と校正値
 	setLogHeaderStrS("fwVersion", FW_VERSION);
 	setLogHeaderStrS("gitCommit", GIT_COMMIT);
@@ -1274,8 +1276,15 @@ bool endLog(void)
 	FSIZE_t dataEnd = LOG_BINARY_HEADER_BYTES + (FSIZE_t)cntSend * header.recordBytes;
 	const LogSaveCheck saved = {logBufferWriter.writeFailed, runImuCalibrationValid,
 		runImuCalibrationSamples, runImuCalibrationReadErrors};
-	if (f_lseek(&fil_W, dataEnd) != FR_OK || f_truncate(&fil_W) != FR_OK ||
-		f_sync(&fil_W) != FR_OK || !logStorageScanRecords(&fil_W, &header, &saved, &primaryRouteValidation, &savedDataCrc)) goto finish;
+	if (f_lseek(&fil_W, dataEnd) != FR_OK || f_truncate(&fil_W) != FR_OK || f_sync(&fil_W) != FR_OK) goto finish;
+	if (isPathRunMode(runLogMode))
+	{
+		// キュー排出済みの共有I/O領域へ切り替え、同じtmpの計画XYだけ補完する。
+		FRESULT closed = f_close(&fil_W);
+		logTempOpen = false;
+		if (closed != FR_OK || !logPatchPathXY(&header)) goto finish;
+	}
+	if (!logStorageScanRecords(&fil_W, &header, &saved, &primaryRouteValidation, &savedDataCrc)) goto finish;
 	logBuildMetadata();
 	header.metadataBytes = (uint32_t)strlen(columnTitle);
 	header.dataCrc = savedDataCrc;
@@ -1289,7 +1298,7 @@ bool endLog(void)
 		f_sync(&fil_W) != FR_OK) goto finish;
 	success = true;
 finish:
-	if (f_close(&fil_W) != FR_OK) success = false;
+	if (logTempOpen && f_close(&fil_W) != FR_OK) success = false;
 	logTempOpen = false;
 	char temporary[20], binary[20];
 	logBinaryName(temporary, sizeof(temporary), logFileNumber, "tmp");
@@ -1298,12 +1307,90 @@ finish:
 	if (success) {
 		writeSavedLogNumber((int16_t)logFileNumber);
 		lastPrimaryRouteValid = optimalTrace == BOOST_NONE && primaryRouteValidation.closureValid;
-		lastRunSaved = true;
 		logRecoveryReady = true;
 		cntSend = 0;
+		lastRunSaved = success;
 	}
 	sd_fatfs_unlock();
 	return success;
+}
+
+
+// バイナリ列オフセットだけを生成する。値を構造体として直接参照しない。
+typedef struct __attribute__((packed)) {
+#define LOG_PATH_MEMBER(type, name, fmt, expr) LOG_CTYPE_##type name;
+#define LOG_PATH_SKIP(type, name, fmt, expr)
+    LOG_FIELD_LIST(LOG_PATH_MEMBER, LOG_PATH_SKIP)
+#undef LOG_PATH_MEMBER
+#undef LOG_PATH_SKIP
+} LogPathStoredRecord;
+_Static_assert(sizeof(LogPathStoredRecord) == LOG_RECORD_SIZE_BYTES, "path record offsets mismatch");
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logPathPutFloat
+// 処理概要     追加座標のF32生ビットを既存レコードと同じビッグエンディアンで格納する
+// 引数         bytes: 4バイト出力先、value: 座標[mm]
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+static void logPathPutFloat(uint8_t *bytes, float value)
+{
+    uint32_t bits;
+    memcpy(&bits, &value, sizeof(bits));
+    for (unsigned i = 0U; i < 4U; i++) bytes[i] = (uint8_t)(bits >> (24U - i * 8U));
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logPatchPathXYRecords
+// 処理概要     走行記録を6KiB以内のまとまりで1回走査し、追加XYだけを変更して書き戻す
+// 引数         header: 走行記録形式
+// 戻り値       true: 全件補完成功、false: 不正な形式・点番号またはI/O失敗
+/////////////////////////////////////////////////////////////////////
+static bool logPatchPathXYRecords(const LogBinaryHeader *header)
+{
+    if (header->recordBytes != sizeof(LogPathStoredRecord)) return false;
+    const uint32_t capacity = sizeof(logIoMemory.patch) / header->recordBytes;
+    for (uint32_t row = 0U; row < header->rows;) {
+        uint32_t count = header->rows - row;
+        if (count > capacity) count = capacity;
+        UINT length = (UINT)(count * header->recordBytes);
+        FSIZE_t position = LOG_BINARY_HEADER_BYTES + (FSIZE_t)row * header->recordBytes;
+        UINT read, written;
+        if (f_lseek(&fil_W, position) != FR_OK ||
+            f_read(&fil_W, logIoMemory.patch, length, &read) != FR_OK || read != length) return false;
+        for (uint32_t i = 0U; i < count; i++) {
+            uint8_t *record = logIoMemory.patch + i * header->recordBytes;
+            const uint8_t *indexBytes = record + offsetof(LogPathStoredRecord, optimalIndex);
+            uint16_t index = (uint16_t)(((uint16_t)indexBytes[0] << 8U) | indexBytes[1]);
+            if (index >= pathRunRouteCount()) return false;
+            RoutePoint planned;
+            if (!pathRunRouteExportPoint(index, &planned)) return false;
+            logPathPutFloat(record + offsetof(LogPathStoredRecord, pathPlanX_mm), planned.x_mm);
+            logPathPutFloat(record + offsetof(LogPathStoredRecord, pathPlanY_mm), planned.y_mm);
+        }
+        if (f_lseek(&fil_W, position) != FR_OK ||
+            f_write(&fil_W, logIoMemory.patch, length, &written) != FR_OK || written != length) return false;
+        row += count;
+    }
+    return true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 logPatchPathXY
+// 処理概要     停止後のtmpへ使用計画XYを補完し、通常のCRC確定へ渡す
+// 引数         header: 走行別記録形式（呼出前にキュー排出・sync・一時ファイルclose済み）
+// 戻り値       true: 補完成功、false: 保存失敗（未確定tmpは保持）
+/////////////////////////////////////////////////////////////////////
+static bool logPatchPathXY(const LogBinaryHeader *header)
+{
+    if (__get_IPSR() != 0U || !sd_fatfs_is_locked() || !logStorageCanRead() ||
+        (patternTrace > 10U && patternTrace < 100U && emcStop == 0U)) return false;
+    if (!pathRunRouteExportMatches()) return false;
+    // 走行中のキュー排出・close後だけ、6KiB全体を更新用へ切り替える。
+    char name[20];
+    logBinaryName(name, sizeof(name), logFileNumber, "tmp");
+    if (f_open(&fil_W, name, FA_READ | FA_WRITE | FA_OPEN_EXISTING) != FR_OK) return false;
+    logTempOpen = true;
+    return logPatchPathXYRecords(header) && f_sync(&fil_W) == FR_OK;
 }
 
 

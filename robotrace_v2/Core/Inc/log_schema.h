@@ -127,6 +127,11 @@
     STORED(U8, pathMarkerCorrectionApplied, "%d", (isPathRunMode(optimalTrace) ? pathCorrectionLog.markerApplied : 0U)) \
     STORED(F32, pathMarkerCorrection_mm, "%f", (isPathRunMode(optimalTrace) ? pathCorrectionLog.markerPosition_mm : 0.0f))
 
+// 停止後にoptimalIndexに対応する座標を補完する。走行中は予約欄へ0だけ保存する。
+#define LOG_FIELD_LIST_PATH_XY(STORED, DERIVED) \
+    STORED(F32, pathPlanX_mm, "%f", 0.0f) \
+    STORED(F32, pathPlanY_mm, "%f", 0.0f)
+
 // 一次/DISTANCE/SLIPの使用周期診断。状態・理由・単位はdoc/line-control-log.md参照。
 #define LOG_FIELD_LIST_LINE_CONTROL(STORED, DERIVED) \
     STORED(U8, lineKpUsed, "%d", lineTraceLog.kpUsed) \
@@ -149,13 +154,14 @@
     LOG_FIELD_LIST_V2(STORED, DERIVED) \
     LOG_FIELD_LIST_LAT_DIAGNOSTICS(STORED, DERIVED)
 
-// PATH系は従来どおり通常61列/169 B、詳細67列/178 B。
+// PATH系は通常63列/177 B、詳細69列/186 B。既存x/yを含む61/67列の位置は維持する。
 #define LOG_FIELD_LIST(STORED, DERIVED) \
     LOG_FIELD_LIST_COMMON(STORED, DERIVED) \
     LOG_FIELD_LIST_PATH(STORED, DERIVED) \
-    LOG_FIELD_LIST_PATH_CORRECTION(STORED, DERIVED)
+    LOG_FIELD_LIST_PATH_CORRECTION(STORED, DERIVED) \
+    LOG_FIELD_LIST_PATH_XY(STORED, DERIVED)
 
-// 一次/DISTANCE/SLIPはPATH専用11列を保存しない。通常64列/166 B、詳細70列/175 B。
+// 一次/DISTANCE/SLIPはPATH専用13列を保存しない。通常64列/166 B、詳細70列/175 B。
 #define LOG_FIELD_LIST_LINE(STORED, DERIVED) \
     LOG_FIELD_LIST_COMMON(STORED, DERIVED) \
     LOG_FIELD_LIST_LINE_CONTROL(STORED, DERIVED)
