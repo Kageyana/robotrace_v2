@@ -1,4 +1,4 @@
-﻿//====================================//
+//====================================//
 // インクルード
 //====================================//
 #include "PIDcontrol.h"
@@ -11,6 +11,8 @@
 #include "motor.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 //====================================//
 // グローバル変数の宣言、定義
 //====================================//
@@ -23,6 +25,11 @@ pidParam yawRateCtrl = {"yawRate", KP3, KI3, KD3, 0, 0};
 
 // 速度フィードフォワード係数(セットアップ画面から変更可能: Crr×1000)
 int16_t speedFeedForwardGain = SPEED_FEEDFORWARD_GAIN_DEFAULT;
+
+ControlGainProfile controlGainProfiles[CONTROL_GAIN_GROUP_COUNT] = {
+	{{"speed", KP2, KI2, KD2, 0, 0}, {"lineomega", KP6, KI6, KD6, 0, 0}, SPEED_FEEDFORWARD_GAIN_DEFAULT},
+	{{"speed", KP2, KI2, KD2, 0, 0}, {"lineomega", KP6, KI6, KD6, 0, 0}, SPEED_FEEDFORWARD_GAIN_DEFAULT}
+};
 
 uint16_t targetSpeed = 0;		 // 目標速度[pulse/ms]（初期値0）
 float targetSpeedCommand_m_s;	// setTargetSpeedで指定した速度指令値[m/s]
@@ -87,6 +94,178 @@ static int32_t applyLineTraceOmegaCurveFeedForward(int32_t sensorTarget, int32_t
 static bool settingValueInRange(int32_t value, int32_t min, int32_t max)
 {
 	return (value >= min) && (value <= max);
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 controlGainGroupForMode
+// 処理概要     実走行モードから共用するPID・FFゲインの組を選ぶ
+// 引数         mode:走行モード番号（SLIPの内部モードはDISTANCE）
+// 戻り値       一次・定速経路用または曲率別速度用のゲイン組
+/////////////////////////////////////////////////////////////////////
+ControlGainGroup controlGainGroupForMode(uint8_t mode)
+{
+	return (mode == BOOST_DISTANCE || mode == BOOST_PATH_CURVE || mode == BOOST_SHORTCUT_CURVE) ?
+		CONTROL_GAIN_CURVE : CONTROL_GAIN_BASE;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 applyControlGainGroup
+// 処理概要     停止中に設定ゲインを平均・左右速度PIDと角速度FBラインPIDへ同時反映する
+// 引数         group:反映するゲイン組
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void applyControlGainGroup(ControlGainGroup group)
+{
+	if ((unsigned)group >= CONTROL_GAIN_GROUP_COUNT ||
+		(patternTrace >= 11U && patternTrace != 103U) || modeLOG) return;
+	const ControlGainProfile *profile = &controlGainProfiles[group];
+	const uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	resetLineGainState(); // 前走の直線ゲイン復元先を次の組へ持ち越さない。
+	veloCtrl.kp = profile->speed.kp;
+	veloCtrl.ki = profile->speed.ki;
+	veloCtrl.kd = profile->speed.kd;
+	syncSpeedPIDGains();
+	lineTraceOmegaFBCtrl.kp = profile->lineOmega.kp;
+	lineTraceOmegaFBCtrl.ki = profile->lineOmega.ki;
+	lineTraceOmegaFBCtrl.kd = profile->lineOmega.kd;
+	speedFeedForwardGain = profile->speedFF;
+	veloCtrl.Int = veloCtrlL.Int = veloCtrlR.Int = lineTraceOmegaFBCtrl.Int = 0.0F;
+	speedTargetBefore = speedTargetBeforeL = speedTargetBeforeR = -1; // 同一目標速度でもFFを再計算する。
+	speedEncoderBefore = speedEncoderBeforeL = speedEncoderBeforeR = 0;
+	feedForwardPwmL = feedForwardPwmR = 0;
+	__set_PRIMASK(primask);
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 writeGainFile
+// 処理概要     ロック取得済みの設定ファイルへ整数ゲイン列を保存し書込・closeを確認する
+// 引数         name:既存ファイル名, values:保存値, count:項目数
+// 戻り値       true:保存成功 false:I/O異常
+/////////////////////////////////////////////////////////////////////
+static bool writeGainFile(const char *name, const int16_t *values, unsigned count)
+{
+	FIL fil;
+	char path[40];
+	char text[32]; // 最大6項目の255と区切り文字、終端を保持する。
+	size_t used = 0U;
+	for (unsigned i = 0U; i < count; ++i)
+	{
+		int length = snprintf(text + used, sizeof(text) - used, i == 0U ? "%03d" : ",%03d", values[i]);
+		if (length < 0 || (size_t)length >= sizeof(text) - used) return false;
+		used += (size_t)length;
+	}
+	int length = snprintf(path, sizeof(path), "%s%s.txt", PATH_SETTING, name);
+	if (length < 0 || (size_t)length >= sizeof(path)) return false;
+	if (f_open(&fil, path, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK) return false;
+	UINT written = 0U;
+	FRESULT result = f_write(&fil, text, (UINT)used, &written);
+	FRESULT closed = f_close(&fil);
+	return result == FR_OK && written == used && closed == FR_OK;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 readGainFile
+// 処理概要     2組の整数ゲインを読み、旧形式を両組へ継承し欠落・範囲外だけ補修する
+// 引数         name:既存ファイル名, values:既定値と読込先, count:2組の合計項目数, min/max:許容範囲
+// 戻り値       true:読込または修復成功 false:I/O異常（異常時に上書きしない）
+/////////////////////////////////////////////////////////////////////
+static bool readGainFile(const char *name, int16_t *values, unsigned count, int min, int max)
+{
+	FIL fil;
+	char path[40];
+	char text[64];
+	int length = snprintf(path, sizeof(path), "%s%s.txt", PATH_SETTING, name);
+	if (length < 0 || (size_t)length >= sizeof(path)) return false;
+	FRESULT result = f_open(&fil, path, FA_OPEN_EXISTING | FA_READ);
+	if (result == FR_NO_FILE || result == FR_NO_PATH) return writeGainFile(name, values, count);
+	if (result != FR_OK) return false;
+	UINT read = 0U;
+	result = f_read(&fil, text, sizeof(text) - 1U, &read);
+	bool complete = f_eof(&fil) && !f_error(&fil);
+	FRESULT closed = f_close(&fil);
+	if (result != FR_OK || closed != FR_OK) return false;
+	text[read] = '\0';
+	bool repair = !complete || strlen(text) != read;
+	unsigned fields = 0U;
+	bool valid = true;
+	char *token = text;
+	for (unsigned i = 0U; i < count && token != NULL; ++i)
+	{
+		char *next = strchr(token, ',');
+		if (next != NULL) *next++ = '\0';
+		char *end;
+		long raw = strtol(token, &end, 10);
+		bool hasNumber = end != token;
+		while (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n') ++end;
+		if (hasNumber && *end == '\0' && raw >= min && raw <= max)
+			values[i] = (int16_t)raw;
+		else
+		{
+			valid = false;
+			repair = true;
+		}
+		++fields;
+		token = next;
+	}
+	if (token != NULL) repair = true;
+	if (!repair && valid && fields == count / 2U)
+	{
+		// 旧PID3項目・FF1項目は既存の実機調整値を両グループへ引き継ぐ。
+		for (unsigned i = 0U; i < count / 2U; ++i) values[i + count / 2U] = values[i];
+		repair = true;
+	}
+	if (fields != count) repair = true;
+	return !repair || writeGainFile(name, values, count);
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 writeControlGainProfiles
+// 処理概要     停止中に2組の設定値を既存のspeed・lineomega・speed_ffファイルへ保存する
+// 引数         なし
+// 戻り値       true:全ファイル保存成功 false:保存禁止またはI/O異常
+/////////////////////////////////////////////////////////////////////
+bool writeControlGainProfiles(void)
+{
+	if (!initMSD || patternTrace >= 11U || modeLOG || !sd_fatfs_lock(500U)) return false;
+	int16_t speed[6], omega[6], ff[2];
+	for (unsigned i = 0U; i < CONTROL_GAIN_GROUP_COUNT; ++i)
+	{
+		const ControlGainProfile *p = &controlGainProfiles[i];
+		speed[3U*i] = p->speed.kp; speed[3U*i+1U] = p->speed.ki; speed[3U*i+2U] = p->speed.kd;
+		omega[3U*i] = p->lineOmega.kp; omega[3U*i+1U] = p->lineOmega.ki; omega[3U*i+2U] = p->lineOmega.kd;
+		ff[i] = p->speedFF;
+	}
+	bool ok = writeGainFile("speed", speed, 6U);
+	if (!writeGainFile("lineomega", omega, 6U)) ok = false;
+	if (!writeGainFile("speed_ff", ff, 2U)) ok = false;
+	sd_fatfs_unlock();
+	return ok;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 readControlGainProfiles
+// 処理概要     既存3ファイルから2組を読み、破損項目にはコード既定値を使用する
+// 引数         なし
+// 戻り値       なし
+/////////////////////////////////////////////////////////////////////
+void readControlGainProfiles(void)
+{
+	if (!initMSD || (patternTrace >= 11U && patternTrace != 103U) || modeLOG || !sd_fatfs_lock(500U)) return;
+	int16_t speed[6] = {KP2, KI2, KD2, KP2, KI2, KD2};
+	int16_t omega[6] = {KP6, KI6, KD6, KP6, KI6, KD6};
+	int16_t ff[2] = {SPEED_FEEDFORWARD_GAIN_DEFAULT, SPEED_FEEDFORWARD_GAIN_DEFAULT};
+	(void)readGainFile("speed", speed, 6U, PID_GAIN_MIN, PID_GAIN_MAX);
+	(void)readGainFile("lineomega", omega, 6U, PID_GAIN_MIN, PID_GAIN_MAX);
+	(void)readGainFile("speed_ff", ff, 2U, SPEED_FF_GAIN_MIN, SPEED_FF_GAIN_MAX);
+	sd_fatfs_unlock();
+	for (unsigned i = 0U; i < CONTROL_GAIN_GROUP_COUNT; ++i)
+	{
+		ControlGainProfile *p = &controlGainProfiles[i];
+		p->speed.kp = speed[3U*i]; p->speed.ki = speed[3U*i+1U]; p->speed.kd = speed[3U*i+2U];
+		p->lineOmega.kp = omega[3U*i]; p->lineOmega.ki = omega[3U*i+1U]; p->lineOmega.kd = omega[3U*i+2U];
+		p->speedFF = ff[i];
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -590,76 +769,5 @@ void readPIDparameters(pidParam *pid)
 	if (repair)
 	{
 		writePIDparameters(pid);
-	}
-}
-///////////////////////////////////////////////////////////////////////////
-// モジュール名 writeSpeedFeedForwardGain
-// 処理概要     速度フィードフォワード係数をSDカードへ保存
-// 引数         gain:保存する係数
-// 戻り値       なし
-///////////////////////////////////////////////////////////////////////////
-void writeSpeedFeedForwardGain(int16_t gain)
-{
-	FIL fil;
-	FRESULT fresult;
-	char fileName[32] = PATH_SETTING;
-
-	// ファイル名を生成して係数を書き込み
-	strcat(fileName, "speed_ff.txt");
-	fresult = f_open(&fil, fileName, FA_CREATE_ALWAYS | FA_WRITE);
-	if (fresult == FR_OK)
-	{
-		f_printf(&fil, "%03d", gain);
-		f_close(&fil);
-	}
-}
-///////////////////////////////////////////////////////////////////////////
-// モジュール名 readSpeedFeedForwardGain
-// 処理概要     速度フィードフォワード係数をSDカードから読み込む
-// 引数         gain:読み込んだ係数の格納先
-// 戻り値       なし
-///////////////////////////////////////////////////////////////////////////
-void readSpeedFeedForwardGain(int16_t *gain)
-{
-	FIL fil;
-	FRESULT fresult;
-	char fileName[32] = PATH_SETTING;
-	TCHAR gainStr[10] = {0};
-	int16_t readGain = *gain;
-	int rawGain = *gain;
-	bool repair = false;
-
-	// ファイル名を生成して係数を読み込み
-	strcat(fileName, "speed_ff.txt");
-	fresult = f_open(&fil, fileName, FA_OPEN_EXISTING | FA_READ);
-	if (fresult == FR_OK)
-	{
-		if (f_gets(gainStr, sizeof(gainStr), &fil) != NULL)
-		{
-			if (sscanf(gainStr, "%d", &rawGain) == 1 &&
-				settingValueInRange(rawGain, SPEED_FF_GAIN_MIN, SPEED_FF_GAIN_MAX))
-			{
-				readGain = (int16_t)rawGain;
-			}
-			else
-			{
-				repair = true;
-			}
-		}
-		else
-		{
-			repair = true;
-		}
-		f_close(&fil);
-	}
-	else
-	{
-		repair = true;
-	}
-
-	*gain = readGain;
-	if (repair)
-	{
-		writeSpeedFeedForwardGain(*gain);
 	}
 }

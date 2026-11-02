@@ -57,24 +57,23 @@ File: `imu_temp.txt`
 
 Files: `line.txt`, `lineomega.txt`, `speed.txt`, `yawRate.txt`
 
-- Implementation: `PIDcontrol.c`, `writePIDparameters()`, `readPIDparameters()`
-- Format: `kp,ki,kd`
-- Write format: `%03d,%03d,%03d`
-- Read format: `%d,%d,%d`
-- No newline.
-- Values are `int16_t` control gains.
+- `line.txt` and `yawRate.txt` retain `kp,ki,kd`, written as `%03d,%03d,%03d` by `writePIDparameters()` and read by `readPIDparameters()`.
+- `speed.txt` and `lineomega.txt` contain six integers: BASE P/I/D, then CURVE P/I/D. `readControlGainProfiles()` / `writeControlGainProfiles()` read and write both groups in the existing files.
+- BASE is primary/PATH/SHORTCUT; CURVE is DISTANCE/SLIP/PATH_CURVE/SHORTCUT_CURVE. SLIP uses the internal DISTANCE mode.
+- Values are zero-padded to three digits, comma-separated, no newline, range 0..255 in the existing implementation scale.
+- Valid legacy three-field files are migrated by copying the existing values into both groups. Missing or invalid fields use code defaults; other valid fields remain. Open/read/close I/O errors do not trigger automatic overwrite.
+- The PID UI has a Grp selector. Value edits immediately save both groups to SD; SD/ERR/RAM distinguishes saved/error/no-card state. Run start selects the mode's group and synchronizes average and left/right speed PIDs atomically. Transient straight-line gains must never be written over stored profiles.
 - `yaw.txt` and `dist.txt` belonged to removed unused PIDs; do not read or write them.
+- Details and host checks: [mode gain profiles](../../../doc/mode-control-gains.md), `validation/mode_control_gains/run.py`.
 
 ### Speed Feedforward
 
 File: `speed_ff.txt`
 
-- Implementation: `PIDcontrol.c`, `writeSpeedFeedForwardGain()`, `readSpeedFeedForwardGain()`
-- Format: `gain`
-- Write format: `%03d`
-- Read format: `%hd`
-- No newline.
-- Value is `speedFeedForwardGain`, with Crr multiplied by 1000.
+- `readControlGainProfiles()` / `writeControlGainProfiles()` use two comma-separated integers: BASE FF, then CURVE FF.
+- Write each value with `%03d`, no newline. Range 0..255, Crr multiplied by 1000.
+- A valid legacy single value is copied to both groups and saved in the expanded format.
+- Group changes invalidate cached average/left/right FF so unchanged speed targets still recalculate it.
 
 ### Speed and Acceleration Parameters
 

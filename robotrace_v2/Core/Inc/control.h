@@ -105,6 +105,7 @@ void loopSystem(void);
 void emergencyStop(void);
 void countDown(void);
 void changeGain(void);
+void resetLineGainState(void);
 void getADC2(void);
 void setEncoderVal(void);
 void writeTgtspeeds(void);

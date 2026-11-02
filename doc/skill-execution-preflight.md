@@ -23,6 +23,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'D:\robotrace\robotrace_
 
 ## 2. 権限を初回から選ぶ
 
+ビルドログの出力先もworkdirと同時に絶対パスへ解決してから親の実在を確認する。ファーム直下からリポジトリ直下のbuildへ保存する相対パスは`../build/`であり、`../../build/`ではない。PowerShellのリダイレクト失敗はbuild未実行として扱い、`$ErrorActionPreference='Stop'`とnative終了コードで後続処理を止める。[出力先の階層誤り](失敗事例/2026-11-03-mode-gains-build-output-path.md)参照。
+
 - 現在のセッションのpermission profileを確認する。作業ツリーのwrite許可は、`.git`、`.agents`、個人Skill、リムーバブルSDへのwrite許可を意味しない。
 - 対象がreadのみと分かっている場合、承認済み作業は**最初の書込みから** `exec_command(sandbox_permissions="require_escalated")` へ送る。`git add/commit/restore/switch/branch/merge/rm --cached` 等のindex・refs更新を通常権限で試さない。対象パスと操作を限定する。昇格はCodexのサンドボックス権限要求であり、OS管理者実行やACL変更とは別。
 - workspace内の`git status/diff/log`の読取は通常権限を使う。管理worktreeがworkspace外に作られた場合は、Gitのread操作もサンドボックスの対象パス制限を受ける。作成先をpermission profileと照合し、対象外なら初回のGit読取から必要権限で実行する。Git更新前は既存差分・対象・ロックの有無を確認し、ステージ成功後に `git diff --cached --check` と対象差分を確認してからコミットする。失敗後に後続commitへ進まない。

@@ -13,6 +13,8 @@ description: ロボトレースのPID、速度フィードフォワード、ス�
 
 ## 実行前の再発防止
 
+速度PID・角速度FBラインPID・速度FFはBASE（一次/PATH/SHORTCUT）とCURVE（DISTANCE/SLIP/PATH_CURVE/SHORTCUT_CURVE）の2組。調整前にUIのGrpと走行方式を照合し、保存値・実制御値・直線用一時切替を区別する。旧SD形式は現在値を両組へ引き継ぎ、UI変更時に既存3ファイルへ保存する。変更後はvalidation/mode_control_gains/run.pyで組独立・左右同期・同一速度でのFF再計算・SD再読込を確認する。[仕様](../../../doc/mode-control-gains.md)参照。
+
 計画ROCの進入/復帰は別の先読み位置なので、両条件が同時成立し得る。理由bitと保持距離の試験では両方成立・片方成立・両方不成立を含め、進入時のbit3を不正としない。現行の計画ROCのみの切替はlineGainPolicyVersion=2。検証はvalidation/plan_roc_gain/run.pyとfinalize.py。[境界fixtureの訂正](../../../doc/失敗事例/2026-11-01-plan-roc-gain-fixture.md)。
 
 ソースの補助モジュール名を推測して検索パスへ加えない。既知のCore/Src・Core/IncをTest-Pathで確認し、`rg -n 'pathCurvatureAtArcWindow|PATH_CURVE_YAW_PREVIEW_TIME_MS' robotrace_v2/Core/Src robotrace_v2/Core/Inc -g '*.c' -g '*.h'`で実在ファイルを確定する。各rgの直後に終了コードを確認し、2以上なら後続読取りを止める。[10/31の補助名推測再発](../../../doc/失敗事例/2026-08-11-windows-rg-glob-not-expanded.md)参照。

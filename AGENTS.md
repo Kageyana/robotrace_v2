@@ -394,6 +394,8 @@ Shortcut画面は入場・項目変更時に本文を描画し、値だけの変
 
 ### チューニングパラメータ方針
 
+- 速度PID・角速度FBラインPID・速度FFはBASE（一次/PATH/SHORTCUT）とCURVE（DISTANCE/SLIP/PATH_CURVE/SHORTCUT_CURVE）の2組で共用する。既存speed.txt・lineomega.txtはBASEのP/I/D→CURVEのP/I/Dの6項目、speed_ff.txtはBASE→CURVEの2項目へ拡張する。正常な旧形式は既存値を両組へ継承する。両PID画面のGrpで編集組を選び、値変更時にSDへ即時保存する。走行開始前に実モードの組を平均・左右速度PIDへ同時反映し、一時的な直線ゲインの復元先もリセットする。詳細は[走行モード別ゲイン](doc/mode-control-gains.md)。
+
 - チューニングパラメータは見つけやすい場所に置き、意図が明らかでない変更には理由と単位を残す。
 - PID、ラインセンサー閾値、マーカー検出、加速度、速度制限の調整手順は `.agents/skills/robotrace-tuning/SKILL.md` を使う。
 

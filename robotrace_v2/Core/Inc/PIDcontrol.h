@@ -79,6 +79,18 @@ typedef struct {
 	int16_t pwm;
 } pidParam;
 
+typedef enum {
+	CONTROL_GAIN_BASE = 0, // 一次・PATH・SHORTCUT
+	CONTROL_GAIN_CURVE,    // DISTANCE・SLIP・PATH_CURVE・SHORTCUT_CURVE
+	CONTROL_GAIN_GROUP_COUNT
+} ControlGainGroup;
+
+typedef struct {
+	pidParam speed;
+	pidParam lineOmega;
+	int16_t speedFF; // Crr ×1000
+} ControlGainProfile;
+
 // ゲイン判定はPID計算の次周期へ適用される。使用周期の診断へコピーして保存する。
 typedef struct {
 	float rocNow_mm; // 判定時点の実測ROC[mm]。切替方式版2では観測用だけに使用する。
@@ -108,6 +120,7 @@ extern pidParam veloCtrlL;
 extern pidParam veloCtrlR;
 extern pidParam yawRateCtrl;
 extern int16_t speedFeedForwardGain;
+extern ControlGainProfile controlGainProfiles[CONTROL_GAIN_GROUP_COUNT];
 
 extern int32_t log_targetAngularVelocity; // ログ用目標角速度
 extern LineGainLog lineGainLog;
@@ -119,11 +132,13 @@ extern LineTraceLog lineTraceLog;
 void setTargetSpeed (float speed);
 void setTargetAngularVelocity (float angularVelocity);
 void syncSpeedPIDGains(void);
+ControlGainGroup controlGainGroupForMode(uint8_t mode);
+void applyControlGainGroup(ControlGainGroup group);
+void readControlGainProfiles(void);
+bool writeControlGainProfiles(void);
 void resetSpeedPID (void);
 void writePIDparameters(pidParam *pid);
 void readPIDparameters(pidParam *pid);
-void writeSpeedFeedForwardGain(int16_t gain);
-void readSpeedFeedForwardGain(int16_t *gain);
 void motorControlTrace(void);
 void motorControlTraceOmegaFB(void);
 void motorControlSpeed(void);
