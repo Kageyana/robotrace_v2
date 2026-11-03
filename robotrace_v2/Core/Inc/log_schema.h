@@ -150,32 +150,51 @@
     STORED(U8, wheelTargetLimitFlags, "%d", lineTraceLog.wheelLimitFlags)
 
 #define LOG_FIELD_LIST_COMMON(STORED, DERIVED) \
-    LOG_BASE_FIELD_LIST(STORED, DERIVED) \
-    LOG_FIELD_LIST_V2(STORED, DERIVED) \
-    LOG_FIELD_LIST_LAT_DIAGNOSTICS(STORED, DERIVED)
+    LOG_BASE_FIELD_LIST(STORED, DERIVED)
 
 // 同じ記録のoptimalIndexに対応する計画半径[mm]。一次・計画なし・PATH延長部は0。
 // 開始時の走行方式を使い、停止中に生成したフィルタ済み一次半径を保存する。
 #define LOG_FIELD_LIST_FILTERED_ROC(STORED, DERIVED) \
     STORED(U16, filteredROC_mm, "%d", filteredRocMmForLog(runLogMode, optimalIndex))
 
-// PATH系は通常64列/179 B、詳細70列/188 B。既存列の位置は維持する。
+// 前後補正の区間集計と最新照合診断。PATH系ではslip診断9列を保存しない。
+// 理由集合はbit=PathProgressReason。未確定の数値診断はage=65535、valid=0。
+#define LOG_FIELD_LIST_PATH_PROGRESS(STORED, DERIVED) \
+    STORED(F32, pathProgressDelta_mm, "%f", pathProgressLog.applied_mm) \
+    STORED(F32, pathProgressAbsDelta_mm, "%f", pathProgressLog.absoluteApplied_mm) \
+    STORED(F32, pathProgressTotal_mm, "%f", pathProgressLog.total_mm) \
+    STORED(F32, pathProgressAlong_mm, "%f", pathProgressLog.along_mm) \
+    STORED(F32, pathProgressRms_mm, "%f", pathProgressLog.rms_mm) \
+    STORED(F32, pathProgressInformation, "%f", pathProgressLog.information) \
+    STORED(U8, pathProgressReason, "%d", pathProgressLog.reason) \
+    STORED(U16, pathProgressReasonMask, "%d", pathProgressLog.reasonMask) \
+    STORED(U16, pathProgressAcceptCount, "%d", pathProgressLog.accepted) \
+    STORED(U16, pathProgressRejectCount, "%d", pathProgressLog.rejected) \
+    STORED(U8, pathProgressMatchValid, "%d", pathProgressLog.matchValid) \
+    STORED(U16, pathProgressMatchAge_ms, "%d", pathProgressLog.matchAge_ms)
+
+// PATH系は通常67列/184 B、詳細73列/193 B。残す列の順序・型は維持する。
 #define LOG_FIELD_LIST(STORED, DERIVED) \
     LOG_FIELD_LIST_COMMON(STORED, DERIVED) \
     LOG_FIELD_LIST_PATH(STORED, DERIVED) \
     LOG_FIELD_LIST_PATH_CORRECTION(STORED, DERIVED) \
     LOG_FIELD_LIST_PATH_XY(STORED, DERIVED) \
-    LOG_FIELD_LIST_FILTERED_ROC(STORED, DERIVED)
+    LOG_FIELD_LIST_FILTERED_ROC(STORED, DERIVED) \
+    LOG_FIELD_LIST_PATH_PROGRESS(STORED, DERIVED)
 
 // 一次/DISTANCE/SLIPはPATH専用13列を保存しない。通常65列/168 B、詳細71列/177 B。
 #define LOG_FIELD_LIST_LINE(STORED, DERIVED) \
     LOG_FIELD_LIST_COMMON(STORED, DERIVED) \
+    LOG_FIELD_LIST_V2(STORED, DERIVED) \
+    LOG_FIELD_LIST_LAT_DIAGNOSTICS(STORED, DERIVED) \
     LOG_FIELD_LIST_LINE_CONTROL(STORED, DERIVED) \
     LOG_FIELD_LIST_FILTERED_ROC(STORED, DERIVED)
 
 // 読込用構造体だけが両側を保持し、実レコードは走行開始時にどちらかへ固定する。
 #define LOG_FIELD_LIST_ALL(STORED, DERIVED) \
     LOG_FIELD_LIST(STORED, DERIVED) \
+    LOG_FIELD_LIST_V2(STORED, DERIVED) \
+    LOG_FIELD_LIST_LAT_DIAGNOSTICS(STORED, DERIVED) \
     LOG_FIELD_LIST_LINE_CONTROL(STORED, DERIVED)
 
 // バイナリログで保存する型の対応表。

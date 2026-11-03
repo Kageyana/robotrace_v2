@@ -967,6 +967,12 @@ static void logBuildMetadata(void)
 	setLogHeaderStr("pathObservationPolicyVersion", 1);
 	setLogHeaderStr("pathWhiteMapVersion", PATH_WHITE_MAP_VERSION);
 	setLogHeaderStr("pathFusionEstimator", PATH_FUSION_ESTIMATOR_VERSION);
+	setLogHeaderStr("pathProgressPolicyVersion", PATH_PROGRESS_POLICY_VERSION);
+	const PathProgressDiagnostics *progressDiagnostics = pathProgressDiagnostics();
+	bool progressPathRun = isPathRunMode(optimalTrace);
+	setLogHeaderStrFPrecision("pathProgressApplied_mm", progressPathRun ? progressDiagnostics->applied_mm : 0.0f, 3U);
+	setLogHeaderStr("pathProgressAccepted", progressPathRun ? progressDiagnostics->accepted : 0U);
+	setLogHeaderStr("pathProgressReasonAtEnd", progressPathRun ? progressDiagnostics->reason : PATH_PROGRESS_DISABLED);
 	setLogHeaderStr("pathYawFeedForwardVersion", PATH_CURVE_YAW_FF_VERSION);
 	setLogHeaderStrFPrecision("pathYawPreviewTime_ms", PATH_CURVE_YAW_PREVIEW_TIME_MS, 2U);
 	setLogHeaderStrS("pathYawSpeedSource", "encoder_1ms");

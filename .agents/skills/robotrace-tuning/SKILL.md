@@ -13,6 +13,8 @@ description: ロボトレースのPID、速度フィードフォワード、ス�
 
 ## 実行前の再発防止
 
+白線履歴による進捗補正の検証はvalidation/path_progress/run.py、integration.py --replay、metadata.pyを使う。新処理のON/OFFでlineAlphaを変更せず、既存白線EKF・実ログ速度表・入力・鮮度仮定を両側で固定する。記録済みoptimalIndexを正解にせず実探索を動かし、14084の実停止7を再現しない固定入力再生を改善効果の証拠にしない。実関数の抽出はstatic修飾とプロトタイプ除外を実定義から確認し、全抽出成功後にコンパイルする。PowerShellの正規表現でアンダースコアを不要にエスケープしない。[比較条件と入口の再発防止](../../../doc/失敗事例/2026-11-03-path-progress-validation-preflight.md)参照。 新モジュールはホストだけでなくARM GCCでも-Wall/-Wextra/-Werrorでコンパイルし、整数昇格等の診断差を確認する。
+
 速度PID・角速度FBラインPID・速度FFはBASE（一次/PATH/SHORTCUT）とCURVE（DISTANCE/SLIP/PATH_CURVE/SHORTCUT_CURVE）の2組。調整前にUIのGrpと走行方式を照合し、保存値・実制御値・直線用一時切替を区別する。旧SD形式は現在値を両組へ引き継ぎ、UI変更時に既存3ファイルへ保存する。変更後はvalidation/mode_control_gains/run.pyで組独立・左右同期・同一速度でのFF再計算・SD再読込を確認する。[仕様](../../../doc/mode-control-gains.md)参照。
 
 計画ROCの進入/復帰は別の先読み位置なので、両条件が同時成立し得る。理由bitと保持距離の試験では両方成立・片方成立・両方不成立を含め、進入時のbit3を不正としない。現行の計画ROCのみの切替はlineGainPolicyVersion=2。検証はvalidation/plan_roc_gain/run.pyとfinalize.py。[境界fixtureの訂正](../../../doc/失敗事例/2026-11-01-plan-roc-gain-fixture.md)。

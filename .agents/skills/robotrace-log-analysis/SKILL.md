@@ -5,6 +5,12 @@ description: ロボトレース走行ログを解析、比較、可視化する�
 
 # Robotrace Log Analysis
 
+## 2026-11-03：PATH系の前後補正をSD時系列へ保存
+
+PATH系だけからslip診断9列29Bを除外し、前後補正の12列34Bを末尾に保存する。通常67列/184B・詳細73列/193B。一次/DISTANCE/SLIPはslip列を含め通常65列/168B・詳細71列/177Bを維持する。残す列の位置は変わるため列名で読む。検出器の演算・保留判定・設定メタデータは変更しない。pathProgressDelta_mm/AbsDelta_mmは保存成功以降の符号付き/絶対補正量、Total_mmは走行累積、Along_mm/Rms_mm/Informationは数値評価できた最新候補。Reasonは最新状態、ReasonMaskは区間内の状態集合（bit=PathProgressReason）、AcceptCount/RejectCountは区間件数、MatchValidは最新照合の検査通過、MatchAge_msは数値診断の経過時間（65535は未確定または飽和）。以前の候補値が残り得るのでvalid/age/理由を併用する。ヘッダのpathProgressApplied_mmとpathProgressAcceptedは走行集計であり、CSVの区間Delta/Countと混同しない。
+
+入口はvalidation/path_progress_log/run.py。通常/詳細×新旧×O0/O2の実writer/reader・全CRC・既存値・XY補完後の診断保持・保存失敗時の区間保持を検査する。旧PATHは機体読込で拒否するが、変更のない旧一次の受入を維持する。C識別子の式置換は単語境界を使い、ReasonをReasonMaskへ部分一致させない。詳細は[SD進捗診断](../../../doc/path-progress-correction.md)、[列名境界の事例](../../../doc/失敗事例/2026-11-03-path-progress-log-preflight.md)。実機の初回ログ・実PC変換器・1ms処理時間は別途確認する。
+
 ## 2026-11-03：フィルタ済み計画ROCの保存
 
 全形式の末尾にfilteredROC_mm（U16・mm）を追加した。現在位置のDISTANCE/SLIP PPAD半径、PATH系のフィルタ済み一次半径を保存し、一次・計画なし・範囲外・PATH延長部は0（未定義）。SHORTCUTでも短縮後の幾何半径ではない。一次/DISTANCE/SLIPは通常65列/168B・詳細71列/177B、PATH系は通常64列/179B・詳細70列/188B。既存ROC・全列位置・計算版2・5mm記録を維持する。機体の解析元には更新後の新しい一次が必要。仕様は[フィルタ済みROCログ](../../../doc/filtered-roc-log.md)。以下の列数は変更当時の履歴とする。

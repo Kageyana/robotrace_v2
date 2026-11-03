@@ -7,6 +7,7 @@
 #include "runMemory.h"
 #include "pathObservation.h"
 #include "pathFusion.h"
+#include "pathProgress.h"
 #include "main.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -98,7 +99,7 @@ _Static_assert((PATH_ROUTE_MAX_POINTS - PATH_GOAL_RESERVED_POINTS - 1U) * PATH_R
 //====================================//
 // シンボル定義
 //====================================//
-#define PATH_ROUTE_CONTROLLER_VERSION      29U
+#define PATH_ROUTE_CONTROLLER_VERSION      30U
 #define PATH_CURVE_YAW_FF_VERSION            2U
 #define PATH_UNMATCHED_ACCEL_HOLD_VERSION    1U
 #define PATH_SOURCE_FORMAT_VERSION          1U
@@ -158,7 +159,7 @@ extern uint16_t pathLogConfidencePermille;
 extern uint16_t pathLogObservationAgeMs;
 
 // 前回のログ保存成功以降の補正。位置は各1msの補正ベクトル長の和、方位はCW正の符号付き和。
-// 白線とマーカーの合成位置上限を適用した後の寄与を別々に集計する。
+// 白線の法線・履歴による前後補正の合計上限を適用する。版30以降のマーカー寄与は0。
 typedef struct
 {
 	float whitePosition_mm;

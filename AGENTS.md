@@ -399,7 +399,15 @@ Shortcut画面は入場・項目変更時に本文を描画し、値だけの変
 - チューニングパラメータは見つけやすい場所に置き、意図が明らかでない変更には理由と単位を残す。
 - PID、ラインセンサー閾値、マーカー検出、加速度、速度制限の調整手順は `.agents/skills/robotrace-tuning/SKILL.md` を使う。
 
-### SHORTCUT_CURVE（制御版29）
+### 白線履歴による経路進捗補正（制御版30）
+
+全経路モード（PATH/SHORTCUT/PATH_CURVE/SHORTCUT_CURVE）は、`pathProgress.c/h`の白線履歴照合で前後位置を補正する。一次の前方白線観測地図を使い、生車輪距離・実ジャイロで相対配置した新鮮な20観測（15mm以上の間隔、最小220mm幅）を照合する。前後・横・方位の3変数を同時評価し、法線だけの既存EKFの制限は解除しない。直線・一定R等の識別不能、別解、地図欠測、白線不明瞭・鮮度切れ、滑りフラグON、短縮保護域・クロス直線域、ライン退避・再合流中は補正を保留する。3候補×4反復を1反復/1msへ分割し、別時点の2照合が一致した場合だけ、前後差最大60mm・微小差2mm保留・最大0.1mm/1msで経路接線方向へ適用する。法線補正を優先し、合計0.2mm/1ms以内を守る。`pathPose`と補正済み進捗上限を同量更新し、生エンコーダ積算・生CSV XYは変更しない。`lineAlpha_x1000=0`で新補正も無効とする。SD設定は追加しない。
+
+版30のPATH系ではマーカーによる自己位置補正を実行しない。DISTANCEの距離補正、開始・ゴール判定は従来どおり。既存`pathWhiteCorrectionApplied/pathWhiteCorrection_mm`は法線と白線履歴の前後補正を合成した各1msの位置補正を含み、`pathMarkerCorrectionApplied/pathMarkerCorrection_mm`は常に0となる。ヘッダへ`pathProgressPolicyVersion=1`、実適用前後量の符号付き累積`pathProgressApplied_mm`、照合受理件数`pathProgressAccepted`、終了時状態`pathProgressReasonAtEnd`を追加する。受理件数は補正量非ゼロの回数や独立な観測数ではない。詳細と検証入口は[白線履歴による進捗補正](doc/path-progress-correction.md)。実走行による改善効果・最長TIM6時間・取得欠落・同条件10走は未確認。
+
+SDの時系列診断はPATH系の末尾へ12列34Bを追加し、PATH系だけからslip診断9列29Bを除外する。通常67列/184B、詳細73列/193B。一次/DISTANCE/SLIPはslip列を含め通常65列/168B・詳細71列/177Bのまま。残す列の順序・型・値、CRC形式、5mm距離記録は維持する。`pathProgressDelta_mm/AbsDelta_mm`は保存成功以降の符号付き/絶対前後補正量[mm]、`pathProgressTotal_mm`は走行累積[mm]、`pathProgressAlong_mm/Rms_mm/Information`は最新の推定前後差[mm]・法線残差RMS[mm]・識別情報量[無次元]。`pathProgressReason`は最新状態、`pathProgressReasonMask`は区間内の状態集合（bit=PathProgressReason）、`pathProgressAcceptCount/RejectCount`は区間受理/棄却数（U16飽和）、`pathProgressMatchValid`は最新照合が識別性・残差・別解検査を通過したか、`pathProgressMatchAge_ms`は最新数値診断の経過時間[ms]（65535は未確定または飽和）。区間量・件数・理由集合だけを保存成功後にリセットし、保存失敗時は保持する。数値評価できない時は以前の値が残るのでvalid/age/理由を併用する。保存検証は`validation/path_progress_log/run.py`。除外前のPATH形式は機体読込で拒否し、変更のない旧一次形式は受入を維持する。除外9列の名前とスキーマ変更の検証範囲は前掲の進捗補正文書を参照する。検出器の演算と設定メタデータは変更しない。
+
+### SHORTCUT_CURVE（制御版29で導入、現行30）
 
 `BOOST_SHORTCUT_CURVE=6`を新設する。経路形状・候補採否・除外区間・保護域はSHORTCUTと同じとし、速度は短縮区間でも一次経路の丸め前曲率半径を使って`asignVelocity()`から生成する。DISTANCE/PATH_CURVEと同じSDの`bstStraight`/`bst1500`～`bst100`、`acceleF`/`acceleD`、`decelLeadMm`を使用し、定速走行用の`shortCut`/`pathReplay`の速度上限は適用しない。機体上限10m/s、先頭の`search`速度制約、実短縮経路の距離による前後の加減速制約を維持する。端点・クロス直線・一次半径の無い延長部はPATH_CURVEと同じ扱いとする。短縮できない場合やレベル0でも要求モード6を保持し、未短縮経路を曲率別速度で走る。
 

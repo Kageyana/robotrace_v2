@@ -240,7 +240,6 @@ static bool pathGoalValid = false;
 static bool currentLineValid = false;
 static PathFusionFilter whiteFusionFilter;
 static uint16_t routeMarkerCount = 0U;
-static uint8_t previousFusionMarker = 0U;
 static float routeLoopPeriodMm = 0.0f;
 static PathObservationTrust observationTrust;
 static float observationStepDistanceMm = 0.0f;
@@ -1558,54 +1557,6 @@ static bool pathFindLineMatch(float sensorX_mm, float sensorY_mm, uint16_t neare
 }
 
 /////////////////////////////////////////////////////////////////////
-// モジュール名 pathApplyMarkerCorrection
-// 処理概要     種類・進行位相・方位が一致したマーカーで接線方向だけを補正する
-// 引数         nearest: 最近傍経路点, settings: 走行開始時の設定
-// 戻り値       なし
-/////////////////////////////////////////////////////////////////////
-static void pathApplyMarkerCorrection(uint16_t nearest, const ShortcutSettings *settings)
-{
-	uint8_t marker = courseMarker;
-	bool newEvent = marker != 0U && marker != previousFusionMarker;
-	previousFusionMarker = marker;
-	if (!newEvent || routeLoopPeriodMm <= 0.0f ||
-		(routeShortcutLevel > 0U && (routeFlags[nearest] & PATH_FLAG_CORRIDOR_RESERVED) != 0U) ||
-		settings->lineAlpha_x1000 == 0U) return;
-	bool found = false;
-	uint16_t bestDelta = UINT16_MAX;
-	float bestResidual = 0.0f, tangentX = 0.0f, tangentY = 0.0f;
-	for (uint16_t i = 0U; i < routeMarkerCount; i++)
-	{
-		const PathMarkerAnchor *anchor = &routeMarkers[i];
-		if (anchor->type != marker || anchor->routeIndex >= routeCount) continue;
-		uint16_t delta = anchor->routeIndex > nearest ?
-			(uint16_t)(anchor->routeIndex - nearest) : (uint16_t)(nearest - anchor->routeIndex);
-		if (delta > PATH_FUSION_MARKER_SEARCH_POINTS || delta >= bestDelta) continue;
-		float heading = (float)lineRoute[anchor->routeIndex].heading_cdeg * 0.01f;
-		if (fabsf(pathWrapDeg(heading - pathPose.heading_deg)) > PATH_FUSION_MARKER_HEADING_DEG) continue;
-		float tx = sinf(heading * DEG2RAD), ty = cosf(heading * DEG2RAD);
-		float residual = (pathPose.x_mm - anchor->x_mm) * tx + (pathPose.y_mm - anchor->y_mm) * ty;
-		if (fabsf(residual) > PATH_FUSION_MARKER_RESIDUAL_MAX_MM) continue;
-		bestResidual = residual;
-		tangentX = tx;
-		tangentY = ty;
-		bestDelta = delta;
-		found = true;
-	}
-	if (found)
-	{
-		float correctionX, correctionY;
-		// マーカーではbiasを更新せず、接線方向の位置観測だけを融合する。
-		if (pathFusionFilterMarker(&whiteFusionFilter, tangentX, tangentY,
-			bestResidual, &correctionX, &correctionY))
-		{
-			pathPose.x_mm += correctionX;
-			pathPose.y_mm += correctionY;
-		}
-	}
-}
-
-/////////////////////////////////////////////////////////////////////
 // モジュール名 pathFollowerResetCorrectionLog
 // 処理概要     ログ保存成功時または走行初期化時に補正の区間集計をクリアする
 // 引数         なし
@@ -1614,6 +1565,7 @@ static void pathApplyMarkerCorrection(uint16_t nearest, const ShortcutSettings *
 void pathFollowerResetCorrectionLog(void)
 {
 	pathCorrectionLog = (PathCorrectionLog){0};
+	pathProgressResetLog();
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -1625,6 +1577,7 @@ void pathFollowerResetCorrectionLog(void)
 void pathFollowerInvalidateRoute(void)
 {
     pathFollowerResetCorrectionLog();
+    pathProgressReset();
     routeCache.valid = false;
     routeCache.sourceRadiiValid = false;
 	routeCount = 0U;
@@ -1651,6 +1604,7 @@ void pathFollowerInvalidateRoute(void)
 void pathFollowerReset(void)
 {
 	pathFollowerResetCorrectionLog();
+	pathProgressReset();
 	if (runMemoryOwner != RUN_MEMORY_PATH)
 	{
 		pathFollowerInvalidateRoute();
@@ -1680,7 +1634,6 @@ void pathFollowerReset(void)
 	pathLogPoseCorrectionHeading_cdeg = 0;
 	pathObservationReset(&observationTrust);
 	pathFusionFilterReset(&whiteFusionFilter);
-	previousFusionMarker = 0U;
 	currentLineValid = false;
 	observationStepDistanceMm = 0.0f;
 	limitedTargetSpeedMps = targetSpeedMps;
@@ -1716,6 +1669,7 @@ void pathFollowerUpdatePose1ms(int32_t encoderPulse, float gyroDegPerSec)
 	float middleHeading = pathPose.heading_deg + correctedGyro * 0.0005f;
 	pathPose.heading_deg = pathWrapDeg(pathPose.heading_deg + correctedGyro * 0.001f);
 	float distanceMm = (float)encoderPulse / PULSE_MILLIMETER;
+	pathProgressPredict1ms(distanceMm, gyroDegPerSec * DEG2RAD);
 	observationStepDistanceMm = distanceMm;
 	if (distanceMm > 0.0f) pathTravelMm += distanceMm;
 	float headingRad = pathPose.heading_deg * DEG2RAD;
@@ -1867,13 +1821,35 @@ void pathFollowerUpdateTarget1ms(void)
 			}
 		}
 	}
+	bool freshLine = lineSensorPower && lineSensorUpdateCount != 0U &&
+		lineSensorUpdateAgeMs < LS_UPDATE_STALE_MS;
+	float tangentRad = (float)driveRoute[nearest].heading_cdeg * 0.01f * DEG2RAD;
+	PathProgressInput progressInput = {
+		.poseX_mm = pathPose.x_mm, .poseY_mm = pathPose.y_mm,
+		.heading_rad = pathPose.heading_deg * DEG2RAD, .tangent_rad = tangentRad,
+		.lateral_mm = observation.lateral_mm, .forward_mm = observation.forward_mm,
+		.observationId = lineSensorUpdateCount, .nearest = nearest,
+		.enabled = activeSettings->lineAlpha_x1000 > 0U && associationValid &&
+			!corridorLineCorrectionBlocked && slipV2.result.flags == 0U &&
+			(followerState == PATH_STATE_TRACKING || followerState == PATH_STATE_CAUTION),
+		.lineValid = currentLineValid && freshLine
+	};
+	float progressCorrectionMm = pathProgressStep1ms(&progressInput, whiteRoute,
+		driveRouteArcMm, routeFlags, routeCount,
+		PATH_FLAG_CORRIDOR_RESERVED | PATH_FLAG_CROSS_STRAIGHT);
+	// 先に適用した法線補正を優先し、全白線補正の0.2mm/1ms以内に収める。
+	float remainingCorrectionMm = fmaxf(0.0f, PATH_LINE_POSITION_CORRECTION_MAX_MM -
+		hypotf(pathPose.x_mm - correctionStartX, pathPose.y_mm - correctionStartY));
+	progressCorrectionMm = fminf(remainingCorrectionMm,
+		fmaxf(-remainingCorrectionMm, progressCorrectionMm));
+	pathPose.x_mm += progressCorrectionMm * sinf(tangentRad);
+	pathPose.y_mm += progressCorrectionMm * cosf(tangentRad);
+	// 補正済み進捗の探索上限も同じ量だけ動かす。生車輪距離は変更しない。
+	pathTravelMm = fmaxf(0.0f, pathTravelMm + progressCorrectionMm);
+	maximumArcMm = pathTravelMm + PATH_ASSOCIATION_PROGRESS_MARGIN_MM;
 	float whiteCorrectionX = pathPose.x_mm - correctionStartX;
 	float whiteCorrectionY = pathPose.y_mm - correctionStartY;
-	float markerStartX = pathPose.x_mm, markerStartY = pathPose.y_mm;
-	pathApplyMarkerCorrection(nearest, activeSettings);
-	float markerCorrectionX = pathPose.x_mm - markerStartX;
-	float markerCorrectionY = pathPose.y_mm - markerStartY;
-	// 白線とマーカーが同じ周期に成立しても、位置補正の合計を0.2mm以内に保つ。
+	// 法線・前後補正を合わせた位置移動量を最終検査する。
 	float totalCorrectionX = pathPose.x_mm - correctionStartX;
 	float totalCorrectionY = pathPose.y_mm - correctionStartY;
 	float totalCorrection = hypotf(totalCorrectionX, totalCorrectionY);
@@ -1887,15 +1863,13 @@ void pathFollowerUpdateTarget1ms(void)
 		totalCorrection = PATH_LINE_POSITION_CORRECTION_MAX_MM;
 	}
 	pathLogPoseCorrection_um = (uint16_t)lroundf(totalCorrection * 1000.0f);
-	// 同時成立時も共通の縮小率を各寄与へ適用し、白線とマーカーを混ぜない。
+	pathProgressRecordApplied(progressCorrectionMm * correctionScale);
+	pathTravelMm = fmaxf(0.0f, pathTravelMm - progressCorrectionMm * (1.0f - correctionScale));
 	float whitePositionCorrectionMm = hypotf(whiteCorrectionX, whiteCorrectionY) * correctionScale;
-	float markerPositionCorrectionMm = hypotf(markerCorrectionX, markerCorrectionY) * correctionScale;
 	pathCorrectionLog.whitePosition_mm += whitePositionCorrectionMm;
 	pathCorrectionLog.whiteHeading_deg += whiteHeadingCorrectionDeg;
-	pathCorrectionLog.markerPosition_mm += markerPositionCorrectionMm;
 	if (whitePositionCorrectionMm > 0.0f || whiteHeadingCorrectionDeg != 0.0f)
 		pathCorrectionLog.whiteApplied = 1U;
-	if (markerPositionCorrectionMm > 0.0f) pathCorrectionLog.markerApplied = 1U;
 	pathLogLineValid = currentLineValid ? 1U : 0U;
 	pathLogLinePointX_mm = lineMatch.x_mm;
 	pathLogLinePointY_mm = lineMatch.y_mm;
@@ -1906,8 +1880,6 @@ void pathFollowerUpdateTarget1ms(void)
 	{
 		if (lSensorCari[sensor] >= PATH_SENSOR_ACTIVE_TH) visibleLine = true;
 	}
-	bool freshLine = lineSensorPower && lineSensorUpdateCount != 0U &&
-		lineSensorUpdateAgeMs < LS_UPDATE_STALE_MS;
 	bool matchedLine = currentLineValid && associationValid && lineMatchValid &&
 		lineMatch.residual_mm <= PATH_LINE_MATCH_RESIDUAL_MAX_MM;
 	pathObservationStep1ms(&observationTrust, freshLine, visibleLine, matchedLine,

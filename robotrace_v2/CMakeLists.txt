@@ -86,6 +86,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 	${CMAKE_SOURCE_DIR}/Core/Src/pathFollower.c
 	${CMAKE_SOURCE_DIR}/Core/Src/pathObservation.c
 	${CMAKE_SOURCE_DIR}/Core/Src/pathFusion.c
+	${CMAKE_SOURCE_DIR}/Core/Src/pathProgress.c
 	${CMAKE_SOURCE_DIR}/Core/Src/DWT.c
 	${CMAKE_SOURCE_DIR}/Core/Src/emergencyStop.c
 	${CMAKE_SOURCE_DIR}/Core/Src/encoder.c
