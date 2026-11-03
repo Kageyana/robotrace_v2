@@ -46,6 +46,9 @@
 #define KI6		0 // 角速度FB付きライン追従の積分ゲイン既定値[実装スケールの整数値]。
 #define KD6		25 // 角速度FB付きライン追従の微分ゲイン既定値[実装スケールの整数値]。
 
+// ライン偏差から目標角速度を作る速度倍率の上限（速度指令自体は制限しない）
+#define LINE_TRACE_OMEGA_REFERENCE_SPEED_MPS 2.5F // 基準速度[m/s]。1ms平均エンコーダ値へ換算して整数未満を切り捨て、正逆両方向に適用する。SD設定対象外。
+
 // BOOST_DISTANCE低速カーブで過大なライン角速度目標を抑える採用設定
 #define LINE_TRACE_OMEGA_TARGET_CAP_ENABLE 1 // 低速DISTANCE走行のライン角速度目標制限[0:無効、1:有効]。
 #define LINE_TRACE_OMEGA_TARGET_CAP_ABS_DEG_S 1200 // 制限を適用したときの目標角速度の絶対値上限[deg/s]。

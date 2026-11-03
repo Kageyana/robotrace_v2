@@ -443,8 +443,8 @@ void motorControlTrace(void)
 	traceBefore = Dev; // 次回はこの値が1ms前の値となる
 }
 ///////////////////////////////////////////////////////////////////////////
-// モジュール名 motorControlTrace
-// 処理概要     ライントレース時の制御量の計算
+// モジュール名 motorControlTraceOmegaFB
+// 処理概要     速度倍率を制限したライン目標と実角速度から制御量を計算する
 // 引数         なし
 // 戻り値       なし
 ///////////////////////////////////////////////////////////////////////////
@@ -494,7 +494,14 @@ void motorControlTraceOmegaFB(void)
 				+ (lSensor[9] * TRACE_WEIGHT_FAR);
 	}
 	sensorDiff = senR - senL;
-	target = (sensorDiff * encCurrentN) >> 9;
+	// 高速時は目標側の速度倍率だけを抑え、ジャイロFBの強さは維持する。
+	int32_t sensorSpeedPulse = encCurrentN;
+	const int32_t referenceSpeedPulse = (int32_t)(LINE_TRACE_OMEGA_REFERENCE_SPEED_MPS * PULSE_MILLIMETER);
+	if (sensorSpeedPulse > referenceSpeedPulse)
+		sensorSpeedPulse = referenceSpeedPulse;
+	else if (sensorSpeedPulse < -referenceSpeedPulse)
+		sensorSpeedPulse = -referenceSpeedPulse;
+	target = (sensorDiff * sensorSpeedPulse) >> 9;
 	target = applyLineTraceOmegaCurveFeedForward(target, sensorDiff);
 	if (LINE_TRACE_OMEGA_TARGET_CAP_ENABLE &&
 			optimalTrace == BOOST_DISTANCE &&

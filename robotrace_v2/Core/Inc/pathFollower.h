@@ -16,6 +16,9 @@
 //====================================//
 // 経路の標本化と形状変更。
 #define PATH_ROUTE_SPACING_MM              20.0f // 経路点を再標本化する距離間隔[mm]。
+#define PATH_ROC_FILTER_POINTS             11U // 速度計画用曲率の対称平均窓[奇数点]。20mm間隔11点と局所80mm推定で全幅280mm。R700未満を含む窓は変更しない。
+_Static_assert(PATH_ROC_FILTER_POINTS >= 3U && PATH_ROC_FILTER_POINTS % 2U == 1U,
+    "PATH ROC window must be odd and contain at least three points");
 #define PATH_CURVE_MAX_SPEED_MPS            10.0f // PATH_CURVE/SHORTCUT_CURVEの機体速度上限[m/s]。DISTANCEの有効なSD曲率別速度を共用。
 #define PATH_CURVE_YAW_PREVIEW_TIME_MS      10.0f // 全経路モードの曲率平均窓中心の時間先行[ms]。実測した旋回応答約11msを基準とする。
 // 実測した機体投影寸法と合法余裕を確認済みのため、形状変更を許可する。
@@ -176,6 +179,7 @@ int16_t routeBuildCurvatureFromLog(int logNumber);
 int16_t routeBuildShortcutCurvatureFromLog(int logNumber, uint8_t shortcutLevel);
 bool routeGenerateShortcut(uint8_t shortcutLevel);
 uint16_t pathRouteCount(void);
+uint16_t pathFollowerGetFilteredRocMm(uint16_t index);
 bool pathFollowerGoalReached(void);
 int16_t pathRouteSourceLog(void);
 uint8_t pathRouteShortcutLevel(void);

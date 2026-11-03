@@ -514,7 +514,7 @@ static PathSourcePoint pathSampleSourceXY(float arcMm)
 
 /////////////////////////////////////////////////////////////////////
 // モジュール名 pathPrepareSourceRadii
-// 処理概要     小数座標と未量子化の接線方位から速度計画用半径だけを保存する
+// 処理概要     丸め前の接線方位から半径を求め、急旋回を保護して速度計画だけを平滑化する
 // 引数         periodMm: 周回共通地図の周期[mm]。0は正規化なし
 // 戻り値       true: 半径確定 false: 入力が非有限または周期不正
 /////////////////////////////////////////////////////////////////////
@@ -551,22 +551,67 @@ static bool pathPrepareSourceRadii(float periodMm)
 			point[offset + 2] = value;
 		}
 		uint16_t radius = INT16_MAX;
+		float signedChangeRad = 0.0f;
 		if (i > 0U && i + 1U < routeCount)
 		{
 			float h0 = atan2f(point[2].x_mm - point[0].x_mm,
 				point[2].y_mm - point[0].y_mm) * RAD2DEG;
 			float h1 = atan2f(point[4].x_mm - point[2].x_mm,
 				point[4].y_mm - point[2].y_mm) * RAD2DEG;
-			float changeRad = fabsf(pathWrapDeg(h1 - h0)) * DEG2RAD;
+			signedChangeRad = pathWrapDeg(h1 - h0) * DEG2RAD;
+			float changeRad = fabsf(signedChangeRad);
 			float dsMm = pathPointDistance(point[1].x_mm, point[1].y_mm,
 				point[3].x_mm, point[3].y_mm);
 			if (changeRad > 1.0e-4f && dsMm > 1.0f)
 				radius = (uint16_t)lroundf(fminf((float)INT16_MAX, fmaxf(1.0f, dsMm / changeRad)));
 		}
+		// 平滑化が終わるまでは既存の半径欄を符号付き半径の作業領域にする。
+		lineRoute[i].sourceRadius_mm = (uint16_t)(int16_t)(signedChangeRad < 0.0f ? -(int16_t)radius : (int16_t)radius);
+	}
+	const uint16_t halfWindow = PATH_ROC_FILTER_POINTS / 2U;
+	int16_t window[PATH_ROC_FILTER_POINTS];
+	for (uint16_t i = 0U; i < PATH_ROC_FILTER_POINTS; i++) window[i] = INT16_MAX;
+	for (uint16_t i = 0U; i <= halfWindow && i < routeCount; i++) window[i + halfWindow] = (int16_t)lineRoute[i].sourceRadius_mm;
+	for (uint16_t i = 0U; i < routeCount; i++)
+	{
+		uint16_t radius = (uint16_t)abs(window[halfWindow]);
+		// 局所曲率自体にも前後2点が必要。端点の片側推定を広い窓へ混ぜない。
+		if (i >= halfWindow + 2U && i + halfWindow + 2U < routeCount)
+		{
+			float curvature[PATH_ROC_FILTER_POINTS];
+			bool gentle = true;
+			for (uint16_t j = 0U; j < PATH_ROC_FILTER_POINTS; j++)
+			{
+				if ((float)abs(window[j]) < PLAN_ROC_FILTER_MIN_RADIUS_MM) gentle = false;
+				curvature[j] = abs(window[j]) == INT16_MAX ? 0.0f : 1.0f / (float)window[j];
+			}
+			if (gentle)
+			{
+				float filtered = fabsf(filterPlanningCurvature(curvature, PATH_ROC_FILTER_POINTS));
+				if (!isfinite(filtered)) return false;
+				radius = filtered > 1.0f / (float)INT16_MAX ? (uint16_t)lroundf(1.0f / filtered) : INT16_MAX;
+			}
+		}
 		lineRoute[i].sourceRadius_mm = radius;
+		for (uint16_t j = 0U; j + 1U < PATH_ROC_FILTER_POINTS; j++) window[j] = window[j + 1U];
+		window[PATH_ROC_FILTER_POINTS - 1U] = i + halfWindow + 1U < routeCount ?
+			(int16_t)lineRoute[i + halfWindow + 1U].sourceRadius_mm : INT16_MAX;
 	}
 	routeCache.sourceRadiiValid = true;
 	return true;
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 pathFollowerGetFilteredRocMm
+// 処理概要     同じ経路インデックスのフィルタ済み一次半径をログ用に取得する
+// 引数         index: 保存するoptimalIndex
+// 戻り値       一次計画半径[mm]。計画なし・延長部・範囲外は0
+/////////////////////////////////////////////////////////////////////
+uint16_t pathFollowerGetFilteredRocMm(uint16_t index)
+{
+	if (runMemoryOwner != RUN_MEMORY_PATH || !routeCache.sourceRadiiValid ||
+		index >= routeCache.baseCount || index >= routeCount) return 0U;
+	return lineRoute[index].sourceRadius_mm;
 }
 
 /////////////////////////////////////////////////////////////////////

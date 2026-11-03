@@ -9,6 +9,7 @@
 - リポジトリルートは `D:\robotrace\robotrace_v2`、ファームウェアルートは `D:\robotrace\robotrace_v2\robotrace_v2`。ビルドの `workdir` は後者、文書・fixture生成は前者を明示する。文書更新とビルドは別の呼出しにする。
 - ファームと`C:\tool\AutoCopyCsvFromSd`を同時に扱う場合、呼出しのworkdirを確定してからパスを組み立てる。複数リポジトリの読取は絶対パスに限定し、Gitは`git -C <対象ルート>`で対象を明示する。外側のworkdirだけを後からPCツール側へ変えて、ファームの相対パスを残さない。実行前に対象ファイルの`Test-Path -LiteralPath`を確認し、不一致ならその呼出しを開始しない。
 - 初回の検索は実在ディレクトリを `Test-Path -LiteralPath ... -PathType Container` で確認し、ディレクトリ＋`-g`へ限定する。未確認のファイル名やディレクトリ（`.agents`等）を検索パスへ指定しない。
+- 文書の参照先も名称から構成しない。関連Skillから読む設計文書は先に`rg --files doc -g '*fusion*' -g '*observ*'`等で実在一覧を取得し、選んだ全ファイルに`Test-Path -LiteralPath <path> -PathType Leaf`を通す。1件でも不在ならその検索呼出しを開始せず、実在一覧へ戻る。複数パスのrgは終了コード2以上を直ちに拒否する。2026-11-03の距離補正検討での再発は[コースアウト解析の入口検査](失敗事例/2026-11-02-courseout-analysis-preflight.md)参照。
 - VS Codeの設定ファイルもルートとファーム直下で同じ構成と仮定しない。まず `rg --files .vscode robotrace_v2/.vscode -g '*.json'` の実在一覧で所在を確定する。このチェックアウトのtasks.jsonはファーム直下だけにある。PowerShellのErrorActionPreference=Stopだけではnativeコマンドの非0終了を停止できないため、rgの終了コード2以上はその場で例外にし、後続処理へ進まない。
 - 外部コマンドのパス引数へ `*`、`?`、Bashの `{a,b}` を渡さない。ファイルを絞るのは `rg --files` または以下の検索結果に実在パスが出てからとする。
 

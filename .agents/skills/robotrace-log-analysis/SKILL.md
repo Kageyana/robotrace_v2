@@ -5,6 +5,12 @@ description: ロボトレース走行ログを解析、比較、可視化する�
 
 # Robotrace Log Analysis
 
+## 2026-11-03：フィルタ済み計画ROCの保存
+
+全形式の末尾にfilteredROC_mm（U16・mm）を追加した。現在位置のDISTANCE/SLIP PPAD半径、PATH系のフィルタ済み一次半径を保存し、一次・計画なし・範囲外・PATH延長部は0（未定義）。SHORTCUTでも短縮後の幾何半径ではない。一次/DISTANCE/SLIPは通常65列/168B・詳細71列/177B、PATH系は通常64列/179B・詳細70列/188B。既存ROC・全列位置・計算版2・5mm記録を維持する。機体の解析元には更新後の新しい一次が必要。仕様は[フィルタ済みROCログ](../../../doc/filtered-roc-log.md)。以下の列数は変更当時の履歴とする。
+
+現在の保存検証は、全依存の存在を入口で確認するvalidation/filtered_roc_log/run.pyを使う。通常/詳細×新旧×O0/O2の実getter/writer/reader・全CRC・旧一次拒否・XY補完後のROC保持を確認する。記録値は開始時方式と同じ行のoptimalIndexで照合し、一次0を旋回半径0と解釈しない。資料の古いvalidation/log_storage/run.pyはこのチェックアウトに無い。挿入目印は宣言全体で件数検査し、main置換時は元のスキーマassertも移す。Skill見出しは改行正規化後に照合し、元の改行形式で保存する。[今回の入口・アンカーの記録](../../../doc/失敗事例/2026-11-03-filtered-roc-log-preflight.md)参照。
+
 ## 2026-11-01：計画ROCによるゲイン切替（版2）
 
 ヘッダのlineGainPolicyVersion=2ではDISTANCE/SLIPの切替に計画ROCだけを使う。キーがない14033/14034等は旧方式。lineGainReason bit0は予約・常に0、lineGainRocNow_mmは観測用で判定には使わない。使用周期のKp/Kd・P/D記録と列定義は維持する。詳細は[計画ROCによる切替](../../../doc/plan-roc-gain.md)。
@@ -24,6 +30,8 @@ description: ロボトレース走行ログを解析、比較、可視化する�
 経路診断6列は末尾の`pathErrorY_mm`（F32・mm）、`pathErrorHeading_cdeg`（S16・0.01deg）、`pathState`（U8）、`pathYawFF_dps/pathYawLateralFB_dps/pathYawHeadingFB_dps`（各F32・deg/s）。1ms更新の最新値を距離間隔で保存し、PATH/SHORTCUT/PATH_CURVE以外は0。方位偏差は最近傍接線−機体方位、操舵3成分は合計の±1800deg/s制限前。操舵式は維持する。経路更新版18は1msの自己位置積分→経路更新→PIDで実行し、SDの位置/方位補正係数は5ms基準の1/5を毎回適用する。退避100ms・復帰200ms・混合率切替100msは維持する。詳細は[自己記述ログ](../../../doc/self-describing-log.md)。
 
 ## 実行前の再発防止
+
+2026-11-03：大会図面とROCを比較する前は、黒線形状・距離倍率・保存積算方位による対応を固定し、半径候補から対応位置を選ばない。過去の依存配置はTest-Path/is_dirで検査し、現環境のPythonと描画importを確認する。ホスト化ではanalysisDisplayPoll等の追加APIと既存warningを実ソース/fixtureで照合し、延長点の半径0を正常契約として検査する。複合曲率窓の端保護は広い窓の半幅＋局所推定半幅とし、CW/CCWの定常円・短い直線・非有限入力を先に試す。実C再生の入口はvalidation/planning_roc/run.py、原本と最終ソースSHAはreport_roc_layout_20261103.pyで照合する。[今回の入口・経路端の記録](../../../doc/失敗事例/2026-11-03-planning-roc-preflight-and-edges.md)参照。
 
 2026-11-02：PowerShellのforeach文を直接パイプへ接続しない制約は、原本棚卸しだけでなくsummary.json等の派生結果の整形にも適用する。今回の角速度正規化の確認は、明示workdirをrepo rootとし、analysis/script/analyze_normalized_yaw_20261031.py→report_normalized_yaw_20261031.pyの実入口で行う。後者は14本・一次9本のSHA、実診断4本、基準指令一致と候補RMS/制限率を再確認する。可視化確認はvalidate_normalized_yaw_chart.cjsを使う。[派生結果の整形での再発](../../../doc/失敗事例/2026-11-01-powershell-foreach-pipeline.md)参照。
 

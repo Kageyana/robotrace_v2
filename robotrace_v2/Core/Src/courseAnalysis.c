@@ -88,6 +88,44 @@ float calcROC(int16_t velo, float angvelo, float dt)
 
 	return R;
 }
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 filterPlanningCurvature
+// 処理概要     急旋回を含まない対称窓だけで符号付き曲率を平均する
+// 引数         curvature: 等距離点の符号付き曲率[1/mm], count: 奇数の点数
+// 戻り値       平滑化曲率[1/mm]。急旋回を含む場合は中央点の値、非有限入力はNAN
+/////////////////////////////////////////////////////////////////////
+float filterPlanningCurvature(const float *curvature, uint16_t count)
+{
+	if (curvature == NULL || count < 3U || count % 2U == 0U) return NAN;
+	float sum = 0.0f;
+	bool gentle = true;
+	for (uint16_t i = 0U; i < count; i++)
+	{
+		if (!isfinite(curvature[i])) return NAN;
+		if (fabsf(curvature[i]) > 1.0f / PLAN_ROC_FILTER_MIN_RADIUS_MM) gentle = false;
+		sum += curvature[i];
+	}
+	return gentle ? sum / (float)count : curvature[count / 2U];
+}
+
+/////////////////////////////////////////////////////////////////////
+// モジュール名 filteredRocMmForLog
+// 処理概要     保存する走行方式と現在インデックスに対応するフィルタ済み計画半径を取得する
+// 引数         mode: ログ開始時の走行方式, index: 同じ記録のoptimalIndex
+// 戻り値       計画半径[mm]。一次・計画なし・範囲外は0
+/////////////////////////////////////////////////////////////////////
+uint16_t filteredRocMmForLog(uint8_t mode, uint16_t index)
+{
+	if (mode == BOOST_DISTANCE)
+	{
+		if (runMemoryOwner != RUN_MEMORY_DISTANCE || numPPADarry <= 0 || index >= (uint16_t)numPPADarry) return 0U;
+		int16_t radius = PPAD[index].ROC;
+		return radius > 0 ? (uint16_t)radius : 0U;
+	}
+	if (isPathRunMode(mode)) return pathFollowerGetFilteredRocMm(index);
+	return 0U;
+}
 /////////////////////////////////////////////////////////////////////
 // モジュール名 saveLogNumber
 // 処理概要     解析したログファイルの番号を設定ファイルに保存する
@@ -377,6 +415,9 @@ static int16_t readLogDistanceProgress(int logNumber,
 		int32_t numD = 0, numM = 0, cntCurR = 0, numStraight = 0;
 		int32_t previousDistance = 0, analysisBaseDistance = 0;
 		bool havePreviousDistance = false;
+		float previousHeadingDeg = 0.0f, binStartHeadingDeg = 0.0f;
+		// SLIP解析前の作業領域を借り、RAM増設なしで符号付き曲率を保持する。
+		float *planCurvature = runMemory.distance.slip.rocAbsSum;
 		int16_t ROCbuff[(CALCDISTANCE / LOG_DISTANCE_MM) + 2U];
 		int16_t sortROC[(CALCDISTANCE / LOG_DISTANCE_MM) + 2U];
 		int32_t straightMeter = 0;
@@ -413,6 +454,8 @@ static int16_t readLogDistanceProgress(int logNumber,
 				previousDistance = distance;
 				analysisBaseDistance = distance;
 				havePreviousDistance = true;
+				previousHeadingDeg = row.imuAngleZ;
+				binStartHeadingDeg = row.imuAngleZ;
 			}
 			// マーカー状態を解析する
 			// marker==3は交差ラインのマーカー
@@ -436,6 +479,14 @@ static int16_t readLogDistanceProgress(int logNumber,
 			// 行間隔の変動を考慮し、実距離50 mmごとに解析する。
 			if (distance - analysisBaseDistance >= encMM(CALCDISTANCE))
 			{
+				// 境界を挟む保存方位を補間し、瞬時角速度の標本間引きによる偏りを避ける。
+				float fraction = distance > previousDistance ?
+					(float)(analysisBaseDistance + encMM(CALCDISTANCE) - previousDistance) / (float)(distance - previousDistance) : NAN;
+				if (fraction < 0.0f || fraction > 1.0f) fraction = NAN;
+				float endHeadingDeg = previousHeadingDeg + fraction * (row.imuAngleZ - previousHeadingDeg);
+				planCurvature[numD] = (endHeadingDeg - binStartHeadingDeg) * DEG2RAD /
+					((float)encMM(CALCDISTANCE) / PULSE_MILLIMETER);
+				binStartHeadingDeg = endHeadingDeg;
 				int32_t copyCount = cntCurR;
 				if (copyCount > (int32_t)(sizeof(sortROC) / sizeof(sortROC[0])))
 				{
@@ -508,6 +559,7 @@ static int16_t readLogDistanceProgress(int logNumber,
 				cntCurR++;
 			}
 			previousDistance = distance;
+			previousHeadingDeg = row.imuAngleZ;
 		}
 
 		if (!errorDetected)
@@ -529,6 +581,23 @@ static int16_t readLogDistanceProgress(int logNumber,
 				numDCount = numD;        // 要素数が0ならそのまま使用する
 			}
 			numD = numDCount;
+			// 急旋回や窓の端では従来の50mm中央値をそのまま使用する。
+			const int32_t rocHalfWindow = (int32_t)(PLAN_ROC_FILTER_POINTS / 2U);
+			for (int32_t idx = rocHalfWindow; idx + rocHalfWindow < numD; idx++)
+			{
+				bool gentle = true;
+				for (int32_t j = idx - rocHalfWindow; j <= idx + rocHalfWindow; j++)
+				{
+					if ((float)PPAD[j].ROC < PLAN_ROC_FILTER_MIN_RADIUS_MM ||
+						fabsf(planCurvature[j]) > 1.0f / PLAN_ROC_FILTER_MIN_RADIUS_MM) gentle = false;
+				}
+				if (!gentle) continue;
+				float curvature = fabsf(filterPlanningCurvature(&planCurvature[idx - rocHalfWindow], PLAN_ROC_FILTER_POINTS));
+				if (!isfinite(curvature)) continue;
+				float radius = curvature > 1.0f / ROC_STRAIGHT_TH ? 1.0f / curvature : ROC_STRAIGHT_MAX;
+				PPAD[idx].ROC = (int16_t)lroundf(radius);
+				PPAD[idx].boostSpeed = asignVelocity(PPAD[idx].ROC);
+			}
 			applyDecelLeadToPpad((int16_t)numD); // 曲率半径の変化に応じて減速開始位置を手前へ移す
 
 			// 目標速度配列を整形し、加減速を制限する

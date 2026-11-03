@@ -55,6 +55,12 @@ static inline bool isSupportedRunMode(uint8_t mode)
 #define ROC_STRAIGHT_TH 2800.0F		// 直線とみなす曲率半径の閾値[mm]
 #define ROC_STRAIGHT_MAX 3000.0F		// 直線とみなす曲率半径の閾値[mm]
 
+// 速度計画用ROCの調整パラメータ。停止中の解析だけに適用する。
+#define PLAN_ROC_FILTER_MIN_RADIUS_MM 700.0F // 窓内すべてがこの半径以上のときだけ符号付き曲率を平均する[mm]。
+#define PLAN_ROC_FILTER_POINTS 5U // DISTANCEの中央前後2点の対称窓[点]。50mm区間を5点、合計250mm。
+_Static_assert(PLAN_ROC_FILTER_POINTS >= 3U && PLAN_ROC_FILTER_POINTS % 2U == 1U,
+    "Planning ROC window must be odd and contain at least three points");
+
 // 3次走行用スリップ解析(2次ログ)の調整用定数
 #define CA_SLIP_ON_MIN_SAMPLES 1U		// 区間リスクへ反映する最小フラグON記録数[件]。ログは距離基準で時間率ではない。
 #define CA_SLIP_MAX_SPEED_MPS 10.0F	// 既定の機体安全上限[m/s]をSLIP増速後にも適用する
@@ -125,6 +131,8 @@ extern Courseplot xycie;
 // プロトタイプ宣言
 //====================================//
 float calcROC(int16_t velo, float angvelo, float dt);
+float filterPlanningCurvature(const float *curvature, uint16_t count);
+uint16_t filteredRocMmForLog(uint8_t mode, uint16_t index);
 void saveLogNumber(int16_t fileNumber);
 void getLogNumber(void);
 int16_t readLogDistance(int logNumber);

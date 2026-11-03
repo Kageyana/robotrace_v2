@@ -534,6 +534,12 @@ PATH/SHORTCUT/PATH_CURVEの速度計画にも、DISTANCE/SLIPと同じSD設定`d
 - 左右の正規化指令と実DUTYはそれぞれ `-1000` から `1000` に飽和させる。
 - 走行モードごとの出力経路を変更する場合は、`control.c` と `PIDcontrol.c` を確認する。
 
+### 速度計画用ROCの平滑化（2026-11-03）
+
+後続のログ出力追加では、全形式の末尾に`filteredROC_mm`（U16・mm）を保存する。同じ行の`optimalIndex`に対応するDISTANCE/SLIPのPPAD半径、PATH系のフィルタ済み一次半径とし、一次・計画なし・範囲外・PATH延長部は0（未定義）とする。SHORTCUTでも短縮後の幾何半径へ置き換えない。開始時方式と現在インデックスで静的計画を読むだけとし、1msフィルタ処理は追加しない。既存全列を維持し、一次/DISTANCE/SLIPは通常65列/168B・詳細71列/177B、PATH系は通常64列/179B・詳細70列/188B。計算版2は維持し、スキーマCRCを更新する。更新後は新しい一次ログを取得する。詳細は[フィルタ済みROCログ](doc/filtered-roc-log.md)、確認は`validation/filtered_roc_log/run.py`。以下の段落は初回平滑化実装時点の方針。
+
+停止中の計画生成でのみ、R700以上が連続する窓の符号付き曲率を対称平均する。DISTANCE/SLIPの一次計画は50mm区間5点・250mm、PATH系は既存80mm局所曲率を20mm間隔11点・全幅280mmとする。R700未満を含む窓、局所推定の端が欠ける窓では既存の半径を維持する。DISTANCEは保存積算方位から境界曲率を作り、SLIP開始前の作業領域を共用する。PATHは計画確定前だけ半径欄を符号付き作業領域に使い、公開前に正の半径へ戻す。ログの瞬時ROC・計算版・列・経路形状・白線地図・1ms操舵・安全条件は変更しない。詳細と11/2・3全一次の比較は[計画ROCフィルタ](doc/planning-roc-filter.md)、検証入口は`validation/planning_roc/run.py`。R2600と短い連続R100の差は残り、実機10走の確認は未実施。
+
 ### スリップ判定とチューニング
 
 - オフライン検証では、まず基準一次走行に対する始終点X差と1周目/最終周の最大Y差（ともに絶対値。X差は一次以下、最大Y差は一次の最大Y差に対して±20mm以内の両条件で滑りなし）で判定し、その後動画を確認する。動画が明確なら動画、動画が不確定ならXY判定を閾値調整の正として使う。XYはマーカー補正前の生左右平均距離を使用する。判定・採用根拠と走行単位/局所区間を分けて記録し、解析のみの回はファームウェア・設定を変更しない。詳細は[スリップ評価の優先順](doc/slip-evaluation-policy.md)と該当Skillを参照する。
@@ -550,7 +556,7 @@ PATH/SHORTCUT/PATH_CURVEの速度計画にも、DISTANCE/SLIPと同じSD設定`d
 
 - `targetSpeed`は制御変数・ログ保存とも`uint16_t`（スキーマ`U16`）のエンコーダ速度[pulse/ms]とする。`setTargetSpeed()`は有限な0～10m/sへ制限し、負値・非有限値は0へ置換する。換算58019pulse/mでは4.6m/s=266、10m/s=580を保持する。この列の名前・順序・単位は維持する。スキーマCRC変更後は新しい一次ログを取得し、初回実機bin/CSVで255を超える値・列・CRCを確認する。
 
-- 一次・DISTANCE・SLIPは通常64列/166 B、詳細70列/175 B。PATH専用の偏差・操舵6列と補正5列を含めず、`lineKpUsed/lineKdUsed/lineGainState/lineGainReason/lineCurveGainHold/lineGainStablePulse/lineGainRocNow_mm/lineGainPlanEnterRoc_mm/lineGainPlanExitRoc_mm/linePTerm_x32/lineDTerm_x32/wheelTargetL_p/wheelTargetR_p/wheelTargetLimitFlags`の14列を共通列の後へ保存する。ゲイン判定はPID後に次周期へ反映されるため、実際に使用したゲインと判定をPID入口で保持し、P/D実計算値と対応させる。P/Dは右5bitシフト・±1000制限前の(pulse/ms)×32、左右目標は上下限制限後のpulse/ms。フラグはbit0左上限/bit1左下限/bit2右上限/bit3右下限。PATH/SHORTCUT/PATH_CURVEは通常61列/169 B、詳細67列/178 Bを維持し、この14列を追加しない。列定義とoptimalTraceを走行開始時に固定し、全件検証・機体の型付き読込はファイルの形式で処理する。SLIPは内部BOOST_DISTANCE=2と同じ形式。5mm距離間隔を維持し、短区間1ms記録は追加しない。旧PATH列を含む一次/DISTANCE/SLIPは解析元にしない。更新後は新しい一次から取得する。詳細は[ライン制御ログ](doc/line-control-log.md)、検証は`validation/mode_log_diagnostics/run.py`と`finalize.py`。
+- 一次・DISTANCE・SLIPは通常65列/168 B、詳細71列/177 B。共通末尾の`filteredROC_mm`を含む。PATH専用の偏差・操舵6列と補正5列を含めず、`lineKpUsed/lineKdUsed/lineGainState/lineGainReason/lineCurveGainHold/lineGainStablePulse/lineGainRocNow_mm/lineGainPlanEnterRoc_mm/lineGainPlanExitRoc_mm/linePTerm_x32/lineDTerm_x32/wheelTargetL_p/wheelTargetR_p/wheelTargetLimitFlags`の14列を共通列の後へ保存する。ゲイン判定はPID後に次周期へ反映されるため、実際に使用したゲインと判定をPID入口で保持し、P/D実計算値と対応させる。P/Dは右5bitシフト・±1000制限前の(pulse/ms)×32、左右目標は上下限制限後のpulse/ms。フラグはbit0左上限/bit1左下限/bit2右上限/bit3右下限。PATH/SHORTCUT/PATH_CURVE/SHORTCUT_CURVEは通常64列/179 B、詳細70列/188 Bとし、この14列を追加しない。列定義とoptimalTraceを走行開始時に固定し、全件検証・機体の型付き読込はファイルの形式で処理する。SLIPは内部BOOST_DISTANCE=2と同じ形式。5mm距離間隔を維持し、短区間1ms記録は追加しない。旧PATH列を含む一次/DISTANCE/SLIPは解析元にしない。更新後は新しい一次から取得する。詳細は[ライン制御ログ](doc/line-control-log.md)、検証は`validation/mode_log_diagnostics/run.py`と`finalize.py`。
 
 - 未使用の角度・距離PID削除に伴い、ログ1行目の `yawCtrl.kp/ki/kd` と `distCtrl.kp/ki/kd` は出力しない。CSVデータ列とバイナリレコード構成は維持する。変更後最初の実機ログでヘッダとデータ列を確認する。
 
@@ -617,7 +623,7 @@ PATH/SHORTCUT/PATH_CURVEの速度計画にも、DISTANCE/SLIPと同じSD設定`d
 
 ### PATH系の停止後XY列
 
-- PATH/SHORTCUT/PATH_CURVE/SHORTCUT_CURVEは、既存末尾へ`pathPlanX_mm`、`pathPlanY_mm`（F32・mm）の2列を追加する。ユーザー指定により一次XYの`pathPrimaryX_mm/pathPrimaryY_mm`と`pathXYFlags`は記録しない。既存`x/y`を含む全既存列の位置・型・意味を維持する。通常63列/177 B、詳細69列/186 B。一次/DISTANCE/SLIP形式は変更しない。
+- PATH/SHORTCUT/PATH_CURVE/SHORTCUT_CURVEは、既存末尾へ`pathPlanX_mm`、`pathPlanY_mm`（F32・mm）の2列を追加する。ユーザー指定により一次XYの`pathPrimaryX_mm/pathPrimaryY_mm`と`pathXYFlags`は記録しない。既存`x/y`を含む全既存列の位置・型・意味を維持する。`filteredROC_mm`を含め通常64列/179 B、詳細70列/188 B。一次/DISTANCE/SLIPにはXY列を追加しない。
 - 各行の`optimalIndex`に対応する実際の使用計画点を記録する。SHORTCUT系では短縮経路、全方式で周期地図補正・ゴール延長を含む。時刻一致ではなく経路点番号の対応。
 - 走行中は追加8 Bの予約欄へ0を保存し、停止・キュー排出・最終書込後に同じtmpの計画XYだけ補完する。その後、既存の全件検証・CRC・schema/metadata・sync/close/renameで同じ番号のbinを確定する。付属CSVは作らない。
 - 開始時の経路点数・一次番号・形状CRCと共有RAM上の実計画を照合する。停止後に一次原本を再読込せず、一次XYの再構成・補間と専用16,000 B配列を削除した。6KiB以内の完全なレコード単位で走行ログを1回走査し、計画XY以外の全バイトを維持してまとめて書き戻す。逆行するoptimalIndexにも対応する。一次原本のCRC・受入検証は走行前の経路生成時に維持する。

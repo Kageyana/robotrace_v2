@@ -1,5 +1,9 @@
 # 自己記述RLOG v2
 
+## 2026-11-03 フィルタ済み計画ROC
+
+全形式の末尾に`filteredROC_mm`（U16・mm）を追加する。DISTANCE/SLIPは現在の`optimalIndex`のPPAD半径、PATH系は同じ点のフィルタ済み一次半径とし、一次・計画なし・PATH延長部は0を記録する。既存`ROC`と全既存列の位置・型・意味を維持する。一次/DISTANCE/SLIPは通常65列/168B・詳細71列/177B、PATH系は通常64列/179B・詳細70列/188B。計算版2を維持し、スキーマCRCを自動更新する。機体の解析元には新しい一次ログが必要である。意味と確認は[フィルタ済みROCログ](filtered-roc-log.md)を参照する。以下の列数は変更当時の履歴。
+
 ## 2026-11-02 PATH系の停止後XY列
 
 PATH/SHORTCUT/PATH_CURVE/SHORTCUT_CURVEは既存末尾へ`pathPlanX_mm`、`pathPlanY_mm`（F32・mm）の2列を追加する。通常63列/177 B、詳細69列/186 B。ユーザー指定により一次XYの2列と`pathXYFlags`は記録しない。既存`x/y`を含む全既存列の位置と一次/DISTANCE/SLIP形式を維持する。走行中は0の予約欄とし、停止後にRAM上の実計画を`optimalIndex`で参照し、同じtmpの計画XYだけを書き換えてから通常のCRC確定を行う。停止後の一次原本再読込・補間・専用16,000 B配列を削除した。`pathXYVersion=2`で識別する。付属CSVは作成しない。仕様と検証は[停止後XYログ](path-xy-log.md)を参照する。以下の旧列数・列順に関する記述は各変更当時の履歴。
